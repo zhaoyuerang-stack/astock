@@ -1,4 +1,4 @@
-"""Stage 1.1 minimal strategy factory CLI."""
+"""Strategy factory CLI for stage 1."""
 import argparse
 import json
 import os
@@ -13,30 +13,49 @@ import pandas as pd
 
 from factory.evaluator import evaluate_candidates
 from factory.pareto import annotate_pareto
-from factory.search_space import default_candidates
+from factory.search_space import default_candidates, grid_candidates
+
+
+def choose_candidates(mode, limit):
+    if mode == "default":
+        candidates = default_candidates()
+        return candidates[:limit] if limit else candidates
+    if mode == "grid":
+        return grid_candidates(limit=limit)
+    raise ValueError(f"Unsupported mode: {mode}")
+
+
+def default_output(mode):
+    if mode == "grid":
+        return "reports/factory_stage1_2.json"
+    return "reports/factory_stage1_1.json"
 
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--mode", choices=["default", "grid"], default="default")
     ap.add_argument("--start", default="2018-01-01")
-    ap.add_argument("--out", default="reports/factory_stage1_1.json")
+    ap.add_argument("--limit", type=int, default=None, help="Maximum candidates to evaluate.")
+    ap.add_argument("--top", type=int, default=20, help="Rows to print in the terminal report.")
+    ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
-    rows = evaluate_candidates(default_candidates(), start=args.start)
+    candidates = choose_candidates(args.mode, args.limit)
+    rows = evaluate_candidates(candidates, start=args.start)
     ranked = annotate_pareto(rows)
 
-    out = Path(args.out)
+    out = Path(args.out or default_output(args.mode))
     out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps(ranked, ensure_ascii=False, indent=2))
 
     view = pd.DataFrame(ranked)
     cols = [
-        "pareto", "family", "version", "desc", "annual", "maxdd", "sharpe",
+        "pareto", "front_eligible", "family", "version", "desc", "annual", "maxdd", "sharpe",
         "turnover_pa", "cost_drag_pa", "oos_annual", "corr_to_baseline",
         "hit_single",
     ]
-    print(f"\nStage 1.1 factory candidates ({args.start}~latest)")
-    print(view[cols].to_string(index=False, formatters={
+    print(f"\nStage 1 factory candidates mode={args.mode} n={len(candidates)} ({args.start}~latest)")
+    print(view[cols].head(args.top).to_string(index=False, formatters={
         "annual": "{:+.1%}".format,
         "maxdd": "{:+.1%}".format,
         "sharpe": "{:.2f}".format,

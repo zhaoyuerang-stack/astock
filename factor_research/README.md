@@ -6,7 +6,7 @@
 - 目标：年化收益 >= 35%，最大回撤 <= 15%
 - 旧口径结果：`data_full` 年化约 40.4%，但含幸存者偏差水分
 - 真实成本基线：`data_lake` 2018-2026 年化约 21.2%，最大回撤约 -16.2%
-- 阶段状态：阶段 0 已关闭；下一步进入阶段 1 多目标工厂化
+- 阶段状态：阶段 0 已关闭；当前在阶段 1 多目标工厂化
 - 版本登记：`strategy_versions.json`
 
 ## 目录说明
@@ -119,18 +119,31 @@ python3 factory/run_factory.py
 reports/factory_stage1_1.json
 ```
 
-当前版本只做少量候选母策略的多目标评估和 Pareto 排序，不是完整 NSGA-II 搜索。
+阶段 1.2 批量网格扫描入口：
+
+```bash
+cd /Users/kiki/astcok/factor_research
+python3 factory/run_factory.py --mode grid --limit 60 --top 20
+```
+
+结果会保存到：
+
+```text
+reports/factory_stage1_2.json
+```
+
+当前版本支持确定性候选网格、多目标评估、基础质量门槛和 Pareto 排序；还不是完整 NSGA-II 搜索。
 
 ## 当前最重要的下一步
 
-阶段 0 已收束到统一 `core/` 内核、`data_lake` 口径和真实成本模型。旧 `data_full/`、`data/` 缓存已清理。下一步是在此基础上进入阶段 1：多目标策略工厂化。
+阶段 0 已收束到统一 `core/` 内核、`data_lake` 口径和真实成本模型。旧 `data_full/`、`data/` 缓存已清理。当前阶段 1 先把工厂从确定性网格做稳，再接 NSGA-II 多目标搜索。
 
 建议顺序：
 
-1. 继续以 `strategy_lake.py` 和 `strategy_versions.json` 为准登记新版本。
-2. 用 `run_daily.py --no-update` 验证每日信号流程。
-3. 用 `scripts/research/cost_sensitivity.py`、`scripts/research/simulate_2025.py` 等脚本做交易成本、换手、融资和执行层验证。
-4. 对新增版本补充样本内/样本外和压力测试说明。
+1. 用 `factory/run_factory.py --mode grid` 批量扫描候选,先筛出低相关/低回撤/可解释的候选母策略。
+2. 对入围候选做样本内、样本外、压力测试和成本敏感性验证。
+3. 继续以 `strategy_lake.py` 和 `strategy_versions.json` 为准登记新版本。
+4. 用 `run_daily.py --no-update` 验证每日信号流程。
 
 ## 常见结果文件
 
@@ -143,6 +156,6 @@ reports/factory_stage1_1.json
 
 ## 注意事项
 
-- 这里不是 git 仓库，修改前后需要自己留意文件版本。
+- 本仓库已 git 化；数据湖和大体量运行产物不入库，重要阶段改动用提交固定。
 - 回测结果不是投资建议，实盘前还需要做更严格的交易成本、容量、停牌、涨跌停、滑点和组合换手验证。
 - 当前最新数据日期需要以 `run_daily.py` 或 `strategy_lake.py` 输出为准，运行前应确认数据是否已更新到目标日期。

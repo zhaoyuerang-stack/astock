@@ -54,6 +54,8 @@ OBJECTIVE_DIRECTIONS = {
     "corr_to_baseline": "min",
 }
 
+PARETO_KEYS = ["annual", "maxdd", "sharpe", "turnover_pa", "corr_to_baseline"]
+
 
 def _value(row, key):
     v = row.get(key)
@@ -62,38 +64,63 @@ def _value(row, key):
     return v
 
 
-def dominates(a, b, keys=None):
-    keys = keys or list(OBJECTIVE_DIRECTIONS)
+def eligible_for_front(row):
+    """Quality gate before Pareto marking.
+
+    The factory can generate intentionally broad grids. Without a basic gate,
+    weak rows may still become Pareto just because they are cheap, low-turnover
+    or low-correlation. This keeps the front focused on plausible candidates.
+    """
+    annual = row.get("annual", np.nan)
+    maxdd = row.get("maxdd", np.nan)
+    sharpe = row.get("sharpe", np.nan)
+    oos_annual = row.get("oos_annual", np.nan)
+    if not all(np.isfinite(v) for v in [annual, maxdd, sharpe]):
+        return False
+    if annual <= 0 or sharpe <= 0 or maxdd <= -0.35:
+        return False
+    if np.isfinite(oos_annual) and oos_annual <= -0.05:
+        return False
+    return True
+
+
+def dominates(a, b, keys=None, epsilon=1e-12):
+    keys = keys or PARETO_KEYS
     better_or_equal = True
     strictly_better = False
     for key in keys:
         av, bv = _value(a, key), _value(b, key)
         if OBJECTIVE_DIRECTIONS[key] == "max":
-            if av < bv:
+            if av < bv - epsilon:
                 better_or_equal = False
-            if av > bv:
+            if av > bv + epsilon:
                 strictly_better = True
         else:
-            if av > bv:
+            if av > bv + epsilon:
                 better_or_equal = False
-            if av < bv:
+            if av < bv - epsilon:
                 strictly_better = True
     return better_or_equal and strictly_better
 
 
 def pareto_front(rows, keys=None):
+    candidates = [row for row in rows if eligible_for_front(row)]
     front = []
-    for i, row in enumerate(rows):
-        if not any(dominates(other, row, keys) for j, other in enumerate(rows) if i != j):
+    for i, row in enumerate(candidates):
+        if not any(dominates(other, row, keys) for j, other in enumerate(candidates) if i != j):
             front.append(row)
     return front
 
 
 def scalar_rank(row):
     """Human-friendly sort for the first factory report."""
-    corr_penalty = 0 if np.isnan(row["corr_to_baseline"]) else 0.05 * abs(row["corr_to_baseline"])
+    corr = row.get("corr_to_baseline", np.nan)
+    oos = row.get("oos_annual", np.nan)
+    corr_penalty = 0 if np.isnan(corr) else 0.05 * abs(corr)
+    oos_bonus = 0 if np.isnan(oos) else 0.25 * oos
     return (
         row["annual"]
+        + oos_bonus
         + 0.10 * row["sharpe"]
         + row["maxdd"]
         - 0.02 * row["turnover_pa"]

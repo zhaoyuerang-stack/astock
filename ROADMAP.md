@@ -6,7 +6,7 @@
 ## 阶段 0 — 工程地基 ✅(已关闭)
 | # | 动作 | 要点 |
 |---|------|------|
-| 1 | **git 化** | 仍待做。现非 git;进阶段 1 前建议 `git init`,数据走 `.gitignore`。 |
+| 1 | **git 化** | ✅ 已在 `main` 初始化;数据湖和运行产物走 `.gitignore`。 |
 | 2 | **统一回测内核** | ✅ `core/backtest.py`;`strategy_lake` / `run_daily` / `simulate_2025` / `cost_sensitivity` 统一走 data_lake + 真实成本。 |
 | 3 | **evolve 真实化** | ✅ 旧 `evolve.py` 移除主线;旧口径 `data_full+data` 约 513M 已清理;后续工厂从 `core/` 重建。 |
 
@@ -14,6 +14,7 @@
 
 ## 阶段 1 — 工厂化:多目标产出多母策略 ⭐(当前焦点)
 - ✅ 1.1 最小骨架:`factory/` 候选空间 + 多目标评估 + Pareto 排序。
+- ✅ 1.2 批量扫描:`factory/run_factory.py --mode grid` 确定性候选网格 + 基础质量门槛 + Pareto 前沿报告。
 - 下一步:evolve fitness 单目标 → **NSGA-II 多目标**(多头 NDCG@k + 时序稳定 + 真实绩效 + 抗压回撤)。
 - 输出 **Pareto 前沿 = 候选母策略批**。
 - **隔离进化(岛屿模型)**:每个母策略独立种群 / git worktree,生态位差异化(不同数据源/因子族/regime);岛间不迁因子基因,只共享方法。

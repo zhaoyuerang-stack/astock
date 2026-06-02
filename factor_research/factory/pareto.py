@@ -1,5 +1,5 @@
 """Pareto front helpers."""
-from factory.objectives import pareto_front, scalar_rank
+from factory.objectives import eligible_for_front, pareto_front, scalar_rank
 
 
 def annotate_pareto(rows):
@@ -7,7 +7,8 @@ def annotate_pareto(rows):
     out = []
     for row in rows:
         copied = dict(row)
+        copied["front_eligible"] = eligible_for_front(row)
         copied["pareto"] = (row["family"], row["version"]) in front_ids
         copied["rank_score"] = scalar_rank(row)
         out.append(copied)
-    return sorted(out, key=lambda r: (not r["pareto"], -r["rank_score"]))
+    return sorted(out, key=lambda r: (not r["pareto"], not r["front_eligible"], -r["rank_score"]))
