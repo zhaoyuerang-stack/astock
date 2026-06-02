@@ -8,7 +8,7 @@
 |---|------|------|
 | 1 | **git 化** | 现非 git。`git init`,纳入 代码+台账+文档,数据走 `.gitignore`。版本管理的真地基。 |
 | 2 | **统一回测内核** | `evolve.backtest` / `strategy_lake` / `simulate_2025` 三套口径合一;data_lake 加载 + 成本表 = 单一事实源。 |
-| 3 | **evolve 真实化** | 数据迁 data_lake 最全口径(去 `active` 幸存者偏差),成本用真实费率(往返0.47%+融资)。 |
+| 3 | **evolve 真实化** | 数据迁 data_lake 最全口径(去 `active` 幸存者偏差),成本用真实费率;**完成后删旧口径 data_full+data(513M,先解耦 strategy_lake 等 7 处引用)**。 |
 
 **验收**:同配置重跑绩效落真实量级(~32% 而非 40% 水分);三套回测归一。
 
