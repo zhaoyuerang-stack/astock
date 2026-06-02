@@ -148,14 +148,31 @@ reports/factory_stage1_3_history.json
 
 当前版本支持确定性候选网格、最小 NSGA-II 多目标搜索、多目标评估、基础质量门槛和 Pareto 排序；岛屿模型和大规模长跑还待建设。
 
+阶段 1.4 生态位搜索入口：
+
+```bash
+cd /Users/kiki/astcok/factor_research
+python3 factory/run_factory.py --mode nsga2 --niche non_size --population 8 --generations 2 --top 20
+```
+
+结果会保存到：
+
+```text
+reports/factory_stage1_4_non_size.json
+reports/factory_stage1_4_non_size_history.json
+reports/factory_stage1_4_non_size_review.json
+```
+
+`--niche` 可选 `all`、`non_size`、`quality_location`、`reversal_liquidity`。`*_review.json` 只保留非纯小盘、相关性不过高、样本外非负且通过基础前沿门槛的复核候选。
+
 ## 当前最重要的下一步
 
-阶段 0 已收束到统一 `core/` 内核、`data_lake` 口径和真实成本模型。旧 `data_full/`、`data/` 缓存已清理。当前阶段 1 已有确定性网格和最小 NSGA-II 搜索，下一步是扩大搜索、做候选复核和低相关母策略筛选。
+阶段 0 已收束到统一 `core/` 内核、`data_lake` 口径和真实成本模型。旧 `data_full/`、`data/` 缓存已清理。当前阶段 1 已有确定性网格、最小 NSGA-II 搜索和生态位复核清单，下一步是对 shortlist 做压力测试和台账预审。
 
 建议顺序：
 
-1. 用 `factory/run_factory.py --mode nsga2` 扩大种群和代数,观察是否出现非 small-cap 的候选前沿。
-2. 对入围候选做样本内、样本外、压力测试和成本敏感性验证。
+1. 用 `factory/run_factory.py --mode nsga2 --niche non_size` 和 `--niche reversal_liquidity` 扩大种群和代数,观察是否出现非 small-cap 的候选前沿。
+2. 对 `reports/*_review.json` 入围候选做样本内、样本外、压力测试和成本敏感性验证。
 3. 继续以 `strategy_lake.py` 和 `strategy_versions.json` 为准登记新版本。
 4. 用 `run_daily.py --no-update` 验证每日信号流程。
 

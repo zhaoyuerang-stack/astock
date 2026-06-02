@@ -1,4 +1,4 @@
-"""Minimal NSGA-II search for stage 1.3."""
+"""Minimal NSGA-II search for stage 1."""
 from dataclasses import dataclass
 import math
 import random
@@ -8,10 +8,23 @@ from factory.search_space import Candidate, FACTOR_FAMILIES, _candidate_family
 
 
 FACTOR_NAMES = [name for names in FACTOR_FAMILIES.values() for name in names]
+NICHE_FAMILIES = {
+    "all": list(FACTOR_FAMILIES),
+    "non_size": [family for family in FACTOR_FAMILIES if family != "size"],
+    "reversal_liquidity": ["reversal", "liquidity-flow", "price-location"],
+    "quality_location": ["low-vol", "momentum-quality", "price-location"],
+}
 TOP_N_CHOICES = [15, 20, 25, 40, 60]
 REBALANCE_CHOICES = [10, 20, 40]
 LEVERAGE_CHOICES = [1.0, 1.25]
 MAX_FACTORS = 3
+
+
+def factor_pool_for_niche(niche):
+    families = NICHE_FAMILIES.get(niche)
+    if families is None:
+        raise ValueError(f"Unsupported niche: {niche}")
+    return [factor for family in families for factor in FACTOR_FAMILIES[family]]
 
 
 @dataclass(frozen=True)
@@ -32,9 +45,9 @@ def _normalize(weights):
     return tuple(round(w / total, 4) for w in weights)
 
 
-def _random_gene(rng):
+def _random_gene(rng, factor_pool):
     n = rng.randint(1, MAX_FACTORS)
-    factors = tuple(rng.sample(FACTOR_NAMES, n))
+    factors = tuple(rng.sample(factor_pool, min(n, len(factor_pool))))
     weights = _normalize([rng.uniform(0.15, 1.0) for _ in factors])
     leverage = 1.25 if "size60" in factors and rng.random() < 0.65 else rng.choice(LEVERAGE_CHOICES)
     return Gene(
@@ -46,16 +59,17 @@ def _random_gene(rng):
     )
 
 
-def _repair(gene):
+def _repair(gene, factor_pool=None):
+    factor_pool = factor_pool or FACTOR_NAMES
     pairs = []
     seen = set()
     for factor, weight in zip(gene.factors, gene.weights):
-        if factor not in FACTOR_NAMES or factor in seen:
+        if factor not in factor_pool or factor in seen:
             continue
         seen.add(factor)
         pairs.append((factor, abs(weight) or 0.1))
     if not pairs:
-        pairs = [("size60", 1.0)]
+        pairs = [(factor_pool[0], 1.0)]
     pairs = pairs[:MAX_FACTORS]
     factors, weights = zip(*pairs)
     return Gene(
@@ -67,16 +81,17 @@ def _repair(gene):
     )
 
 
-def _mutate(gene, rng, mutation_rate):
+def _mutate(gene, rng, mutation_rate, factor_pool=None):
+    factor_pool = factor_pool or FACTOR_NAMES
     factors = list(gene.factors)
     weights = list(gene.weights)
 
     if rng.random() < mutation_rate:
         op = rng.choice(["replace", "add", "drop"])
         if op == "replace" and factors:
-            factors[rng.randrange(len(factors))] = rng.choice(FACTOR_NAMES)
+            factors[rng.randrange(len(factors))] = rng.choice(factor_pool)
         elif op == "add" and len(factors) < MAX_FACTORS:
-            factors.append(rng.choice(FACTOR_NAMES))
+            factors.append(rng.choice(factor_pool))
             weights.append(rng.uniform(0.15, 1.0))
         elif op == "drop" and len(factors) > 1:
             idx = rng.randrange(len(factors))
@@ -98,15 +113,16 @@ def _mutate(gene, rng, mutation_rate):
     else:
         leverage = gene.leverage
 
-    return _repair(Gene(tuple(factors), tuple(weights), top_n, rebalance_days, leverage))
+    return _repair(Gene(tuple(factors), tuple(weights), top_n, rebalance_days, leverage), factor_pool)
 
 
-def _crossover(a, b, rng):
+def _crossover(a, b, rng, factor_pool=None):
+    factor_pool = factor_pool or FACTOR_NAMES
     factors = []
     weights = []
     for gene in [a, b]:
         for factor, weight in zip(gene.factors, gene.weights):
-            if factor not in factors and rng.random() < 0.55:
+            if factor in factor_pool and factor not in factors and rng.random() < 0.55:
                 factors.append(factor)
                 weights.append(weight)
     if not factors:
@@ -119,7 +135,7 @@ def _crossover(a, b, rng):
         rng.choice([a.top_n, b.top_n]),
         rng.choice([a.rebalance_days, b.rebalance_days]),
         rng.choice([a.leverage, b.leverage]),
-    ))
+    ), factor_pool)
 
 
 def candidate_from_gene(gene, version):
@@ -226,24 +242,26 @@ def _tournament(survivor_pairs, rng):
     return a[0] if scalar_rank(a[1]) >= scalar_rank(b[1]) else b[0]
 
 
-def next_generation(rows, genes, population_size, rng, mutation_rate):
+def next_generation(rows, genes, population_size, rng, mutation_rate, niche="all"):
+    factor_pool = factor_pool_for_niche(niche)
     survivor_pairs, diagnostics = select_survivors(rows, genes, population_size)
     survivors = [gene for gene, _ in survivor_pairs]
     children = []
     while len(children) < population_size:
         a = _tournament(survivor_pairs, rng)
         b = _tournament(survivor_pairs, rng)
-        child = _crossover(a, b, rng)
-        children.append(_mutate(child, rng, mutation_rate))
+        child = _crossover(a, b, rng, factor_pool)
+        children.append(_mutate(child, rng, mutation_rate, factor_pool))
     return dedupe_genes(survivors + children), diagnostics
 
 
-def initial_population(population_size, seed=42):
+def initial_population(population_size, seed=42, niche="all"):
     rng = random.Random(seed)
+    factor_pool = factor_pool_for_niche(niche)
     genes = []
     seen = set()
     while len(genes) < population_size:
-        gene = _random_gene(rng)
+        gene = _random_gene(rng, factor_pool)
         if gene.key() not in seen:
             genes.append(gene)
             seen.add(gene.key())

@@ -47,5 +47,5 @@ python3 scripts/research/cost_sensitivity.py  # 成本敏感性
 - 新母策略先 `register_family(...)` 声明假设/失效信号,再 `register(family, version, ...)` 登记版本(两层 schema 见 SPEC)。
 - 回测交付三段:样本内(2018-2026)/ 样本外(2023-2026)/ 压力测试(2010-2026)。
 - 实盘折扣:费率见上表;另评估 小盘容量、停牌/涨跌停、组合换手。
-- 非 git 仓库:改文件前后留意版本,重要改动先备份。
+- 已 git 化:重要阶段改动用提交固定;数据湖和大体量运行产物不入库。
 - 改了架构/进度,顺手更新 SPEC.md / STATUS.md;踩了坑记 LESSONS.md。
