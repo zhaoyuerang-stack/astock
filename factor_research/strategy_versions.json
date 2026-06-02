@@ -51,10 +51,10 @@
             "survivorship_bias": false
           },
           "metrics": {
-            "annual": 0.215,
+            "annual": 0.2125,
             "maxdd": -0.1621,
-            "sharpe": 1.24,
-            "calmar": 1.33,
+            "sharpe": 1.22,
+            "calmar": 1.31,
             "hit": false
           },
           "status": "在册",
@@ -82,10 +82,10 @@
             "survivorship_bias": false
           },
           "metrics": {
-            "annual": 0.2356,
-            "maxdd": -0.3393,
-            "sharpe": 1.14,
-            "calmar": 0.69,
+            "annual": 0.2312,
+            "maxdd": -0.3394,
+            "sharpe": 1.12,
+            "calmar": 0.68,
             "hit": false
           },
           "status": "参考",

@@ -108,7 +108,7 @@ def seed_registry():
                      "top_n": 25, "rebal_days": 20, "leverage": 1.25,
                      "cost": {"buy": 0.00225, "sell": 0.00275, "financing_rate": 0.065}},
              data_scope={"source": "data_lake", "period": "2018-2026", "survivorship_bias": False},
-             metrics={"annual": 0.2150, "maxdd": -0.1621, "sharpe": 1.24, "calmar": 1.33, "hit": False},
+             metrics={"annual": 0.2125, "maxdd": -0.1621, "sharpe": 1.22, "calmar": 1.31, "hit": False},
              status="在册",
              notes="✅真实成本基线：年均换手约32.1x，成本拖累约11.0%/年；阶段1需围绕收益/回撤/换手多目标优化")
 
@@ -117,7 +117,7 @@ def seed_registry():
                      "top_n": 25, "rebal_days": 20, "leverage": 1.25,
                      "cost": {"buy": 0.00225, "sell": 0.00275, "financing_rate": 0.065}},
              data_scope={"source": "data_lake", "period": "2010-2026", "survivorship_bias": False},
-             metrics={"annual": 0.2356, "maxdd": -0.3393, "sharpe": 1.14, "calmar": 0.69, "hit": False},
+             metrics={"annual": 0.2312, "maxdd": -0.3394, "sharpe": 1.12, "calmar": 0.68, "hit": False},
              status="参考",
              notes="真实成本压力测试：年均换手约32.9x，成本拖累约11.2%/年；2015小盘疯牛仍强，但长期回撤放大")
 

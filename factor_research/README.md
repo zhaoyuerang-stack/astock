@@ -5,7 +5,7 @@
 - 策略：小盘 60 日成交额因子 + 小盘股等权指数择时 + 1.25 倍杠杆
 - 目标：年化收益 >= 35%，最大回撤 <= 15%
 - 旧口径结果：`data_full` 年化约 40.4%，但含幸存者偏差水分
-- 真实成本基线：`data_lake` 2018-2026 年化约 21.5%，最大回撤约 -16.2%
+- 真实成本基线：`data_lake` 2018-2026 年化约 21.2%，最大回撤约 -16.2%
 - 阶段状态：阶段 0 已关闭；下一步进入阶段 1 多目标工厂化
 - 版本登记：`strategy_versions.json`
 
@@ -17,6 +17,7 @@
 - `test_load_lake.py`：轻量验证数据湖加载层。
 - `strategy_registry.py`：策略版本登记和对比。
 - `core/`：统一回测内核，负责 `data_lake` 加载、因子、择时、真实成本、融资成本和指标。
+- `factory/`：阶段 1 策略工厂骨架，负责候选空间、多目标评估和 Pareto 排序。
 - `scripts/data/`：数据构建、拉取和增量更新脚本。
 - `scripts/repair/`：数据修复和重校验脚本。
 - `scripts/research/`：研究验证、模拟、成本敏感性和旧研究遗留脚本。
@@ -102,6 +103,23 @@ python3 test_load_lake.py
 ```
 
 如果输出 `加载层验证通过`，说明数据湖加载层基础可用。
+
+## 运行策略工厂
+
+阶段 1.1 最小工厂入口：
+
+```bash
+cd /Users/kiki/astcok/factor_research
+python3 factory/run_factory.py
+```
+
+结果会保存到：
+
+```text
+reports/factory_stage1_1.json
+```
+
+当前版本只做少量候选母策略的多目标评估和 Pareto 排序，不是完整 NSGA-II 搜索。
 
 ## 当前最重要的下一步
 

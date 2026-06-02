@@ -61,11 +61,11 @@ def small_cap_factor(amount, window=60):
 
 
 def small_cap_timing(close, amount, ma_window=16):
-    ret = close.pct_change()
+    ret = close.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan)
     small_mask = amount.rolling(20).mean().rank(axis=1, pct=True) < 0.5
     small_idx = (ret * small_mask).sum(axis=1) / small_mask.sum(axis=1)
     small_nav = (1 + small_idx.fillna(0)).cumprod()
-    timing = (small_nav > small_nav.rolling(ma_window).mean()).shift(1).fillna(False)
+    timing = (small_nav > small_nav.rolling(ma_window).mean()).shift(1, fill_value=False).astype(bool)
     dist = small_nav / small_nav.rolling(ma_window).mean() - 1
     return timing, small_nav, dist
 
@@ -92,7 +92,11 @@ def build_rebalance_weights(factor, close, top_n, rebalance_days):
 
 def backtest_weights(close, scheduled_weights, timing_signal=None, config=StrategyConfig()):
     """Daily vector backtest with turnover, timing exits, leverage and financing."""
-    daily_ret = close.pct_change().fillna(0.0)
+    daily_ret = (
+        close.pct_change(fill_method=None)
+        .replace([np.inf, -np.inf], np.nan)
+        .fillna(0.0)
+    )
     dates = list(close.index)
     cols = list(close.columns)
     col_idx = {c: i for i, c in enumerate(cols)}
@@ -128,7 +132,12 @@ def backtest_weights(close, scheduled_weights, timing_signal=None, config=Strate
             + sell_turnover * config.cost.sell_cost
         ) * config.leverage
 
-        gross_ret = float(np.nan_to_num(daily_ret.iloc[i].values) @ target_weight) * config.leverage
+        day_ret = np.asarray(daily_ret.iloc[i].values, dtype="float64")
+        day_ret[~np.isfinite(day_ret)] = 0.0
+        # Bad source ticks can create impossible finite returns; keep evaluation stable.
+        day_ret = np.clip(day_ret, -1.0, 10.0)
+        held = target_weight != 0
+        gross_ret = float((day_ret[held] * target_weight[held]).sum()) * config.leverage
         financing = 0.0
         if target_weight.sum() > 0 and config.leverage > 1:
             financing = (config.leverage - 1.0) * config.cost.financing_rate / 252.0
