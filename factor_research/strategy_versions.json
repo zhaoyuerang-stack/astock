@@ -1,0 +1,92 @@
+{
+  "families": [
+    {
+      "id": "small-cap-size",
+      "versions": [
+        {
+          "version": "v1.0",
+          "date": "2026-06-02",
+          "desc": "原始达标策略（小盘60+小盘指数MA16择时+1.25x杠杆）",
+          "config": {
+            "factor": "size60(-log成交额60均)",
+            "timing": "小盘指数MA16",
+            "top_n": 25,
+            "rebal_days": 20,
+            "leverage": 1.25
+          },
+          "data_scope": {
+            "source": "data_full",
+            "period": "2018-2026",
+            "survivorship_bias": true
+          },
+          "metrics": {
+            "annual": 0.404,
+            "maxdd": -0.146,
+            "sharpe": 2.06,
+            "calmar": 2.77,
+            "hit": true
+          },
+          "status": "参考",
+          "notes": "❌含幸存者偏差水分(active过滤剔退市股)，高估约8.5%"
+        },
+        {
+          "version": "v2.0",
+          "date": "2026-06-02",
+          "desc": "v1.0迁移到data_lake准确数据（同配置，无幸存者偏差）",
+          "config": {
+            "factor": "size60",
+            "timing": "小盘指数MA16",
+            "top_n": 25,
+            "rebal_days": 20,
+            "leverage": 1.25
+          },
+          "data_scope": {
+            "source": "data_lake",
+            "period": "2018-2026",
+            "survivorship_bias": false
+          },
+          "metrics": {
+            "annual": 0.3192,
+            "maxdd": -0.1189,
+            "sharpe": 1.82,
+            "calmar": 2.68,
+            "hit": false
+          },
+          "status": "在册",
+          "notes": "✅真实基线：去水分后年化32%，夏普卡玛仍优秀，但未达35%目标"
+        },
+        {
+          "version": "v2.1",
+          "date": "2026-06-02",
+          "desc": "v2.0全历史压力测试（含2015股灾/2017小盘崩盘）",
+          "config": {
+            "factor": "size60",
+            "timing": "小盘指数MA16",
+            "top_n": 25,
+            "rebal_days": 20,
+            "leverage": 1.25
+          },
+          "data_scope": {
+            "source": "data_lake",
+            "period": "2010-2026",
+            "survivorship_bias": false
+          },
+          "metrics": {
+            "annual": 0.3396,
+            "maxdd": -0.2195,
+            "sharpe": 1.63,
+            "calmar": 1.55,
+            "hit": false
+          },
+          "status": "参考",
+          "notes": "2017+9%(择时扛住)✅；2015+389%已核查为真实小盘疯牛(月度符合历史/0极端单日/小盘指数+109%/持仓真实暴涨)，回撤22%可信"
+        }
+      ],
+      "name": "小盘成交额因子",
+      "hypothesis": "小盘流动性溢价 / size 因子（-log 60日均成交额，选小盘）",
+      "regime": "小盘占优市；小盘等权指数 > MA16 时持仓，否则空仓",
+      "decay_signal": "小盘等权指数滚动跑输沪深300 / size 因子 IC 转负（定量阈值待定）",
+      "status": "active"
+    }
+  ]
+}

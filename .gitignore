@@ -1,0 +1,23 @@
+# 数据缓存(大,可重新拉取/构建)
+factor_research/data/
+factor_research/data_full/
+factor_research/data_lake/
+
+# Python
+__pycache__/
+*.pyc
+
+# 系统
+.DS_Store
+
+# 回测产物(图/大 csv,可重新生成;保留 results/*.json 配置)
+factor_research/results/*.png
+factor_research/results/*.csv
+factor_research/reports/
+factor_research/signals/
+
+# Claude 本地配置
+.claude/settings.local.json
+
+# 研报/参考资料(二进制,不纳入,留磁盘)
+*.pdf
