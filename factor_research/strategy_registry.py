@@ -15,6 +15,7 @@
   register_family("momentum", "截面动量", hypothesis=..., regime=..., decay_signal=...)
   register("momentum", "v1.0", desc, config, data_scope, metrics, status="候选", notes=...)
 """
+import argparse
 import json
 from pathlib import Path
 from datetime import date
@@ -85,10 +86,8 @@ def show():
                   f"{m['sharpe']:>6.2f}{'✅' if m['hit'] else '❌':>5}{v.get('status',''):>6}  {v['notes']}")
 
 
-# ── 重建现有台账（v1/v2/v2.1 归入 small-cap-size 母策略）──
-if __name__ == "__main__":
-    import os; os.chdir(Path(__file__).parent)
-
+def seed_registry():
+    """初始化/更新基础台账（v1/v2/v2.1 归入 small-cap-size 母策略）。"""
     register_family(
         "small-cap-size", "小盘成交额因子",
         hypothesis="小盘流动性溢价 / size 因子（-log 60日均成交额，选小盘）",
@@ -104,21 +103,36 @@ if __name__ == "__main__":
              status="参考",
              notes="❌含幸存者偏差水分(active过滤剔退市股)，高估约8.5%")
 
-    register("small-cap-size", "v2.0", "v1.0迁移到data_lake准确数据（同配置，无幸存者偏差）",
+    register("small-cap-size", "v2.0", "v1.0迁移到data_lake准确数据（真实成本，无幸存者偏差）",
              config={"factor": "size60", "timing": "小盘指数MA16",
-                     "top_n": 25, "rebal_days": 20, "leverage": 1.25},
+                     "top_n": 25, "rebal_days": 20, "leverage": 1.25,
+                     "cost": {"buy": 0.00225, "sell": 0.00275, "financing_rate": 0.065}},
              data_scope={"source": "data_lake", "period": "2018-2026", "survivorship_bias": False},
-             metrics={"annual": 0.3192, "maxdd": -0.1189, "sharpe": 1.82, "calmar": 2.68, "hit": False},
+             metrics={"annual": 0.2150, "maxdd": -0.1621, "sharpe": 1.24, "calmar": 1.33, "hit": False},
              status="在册",
-             notes="✅真实基线：去水分后年化32%，夏普卡玛仍优秀，但未达35%目标")
+             notes="✅真实成本基线：年均换手约32.1x，成本拖累约11.0%/年；阶段1需围绕收益/回撤/换手多目标优化")
 
-    register("small-cap-size", "v2.1", "v2.0全历史压力测试（含2015股灾/2017小盘崩盘）",
+    register("small-cap-size", "v2.1", "v2.0全历史压力测试（真实成本，含2015股灾/2017小盘崩盘）",
              config={"factor": "size60", "timing": "小盘指数MA16",
-                     "top_n": 25, "rebal_days": 20, "leverage": 1.25},
+                     "top_n": 25, "rebal_days": 20, "leverage": 1.25,
+                     "cost": {"buy": 0.00225, "sell": 0.00275, "financing_rate": 0.065}},
              data_scope={"source": "data_lake", "period": "2010-2026", "survivorship_bias": False},
-             metrics={"annual": 0.3396, "maxdd": -0.2195, "sharpe": 1.63, "calmar": 1.55, "hit": False},
+             metrics={"annual": 0.2356, "maxdd": -0.3393, "sharpe": 1.14, "calmar": 0.69, "hit": False},
              status="参考",
-             notes="2017+9%(择时扛住)✅；2015+389%已核查为真实小盘疯牛(月度符合历史/0极端单日/小盘指数+109%/持仓真实暴涨)，回撤22%可信")
+             notes="真实成本压力测试：年均换手约32.9x，成本拖累约11.2%/年；2015小盘疯牛仍强，但长期回撤放大")
 
-    print("已重建母策略两层台账：\n")
+
+# ── 命令行入口 ──
+if __name__ == "__main__":
+    import os; os.chdir(Path(__file__).parent)
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--seed", action="store_true", help="初始化/更新基础母策略台账")
+    args = ap.parse_args()
+
+    if args.seed:
+        seed_registry()
+        print("已初始化/更新基础母策略台账：\n")
+    else:
+        print("当前母策略台账：\n")
     show()

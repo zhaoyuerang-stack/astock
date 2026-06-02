@@ -8,14 +8,22 @@ ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 import pandas as pd
+import akshare as ak
 from lake.sources.tencent import TencentDailyFetcher
 from lake.validator import DataValidator
 
 
+def get_codes():
+    existing = sorted(fp.stem for fp in Path("data_lake/price/daily").glob("*.parquet"))
+    if existing:
+        return existing
+    spot = ak.stock_zh_a_spot_em()
+    return sorted(spot["代码"].astype(str).str.zfill(6).tolist())
+
+
 def main():
-    # 全市场代码（复用现有 data_full 的 4957 只）
-    codes = sorted(f.stem.replace("kline_", "")
-                   for f in Path("data_full").glob("kline_*.parquet"))
+    # 全市场代码：优先复用 data_lake 已有 universe；首次构建则从 AkShare 获取。
+    codes = get_codes()
     print(f"全市场 {len(codes)} 只 | 腾讯后复权日线 | 回溯2010", flush=True)
 
     # 1. 下载（断点续传，已下的跳过）

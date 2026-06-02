@@ -12,27 +12,67 @@ import os, json, argparse
 from pathlib import Path
 from datetime import date
 os.chdir(Path(__file__).parent)
-import numpy as np, pandas as pd
-from lake.load_lake import load_prices
+import pandas as pd
+from core.backtest import StrategyConfig, latest_signal
 from lake.validator import DataValidator
-from evolve import safe_zscore, mad_clip
 
 SIGNALS = Path("signals"); SIGNALS.mkdir(exist_ok=True)
 LAST_REBAL = SIGNALS / "_last_rebalance.txt"
+STATE_FILE = SIGNALS / "state.json"
 
 # 策略参数（与 v2.0 一致）
-TOP_N, SIZE_WIN, TIMING_MA, REBAL_DAYS, LEVERAGE = 25, 60, 16, 20, 1.25
+CONFIG = StrategyConfig(start="2010-01-01")
+TOP_N = CONFIG.top_n
+TIMING_MA = CONFIG.timing_ma
+REBAL_DAYS = CONFIG.rebalance_days
+LEVERAGE = CONFIG.leverage
 
 
-def need_rebalance(trade_dates, last_date):
-    """距上次调仓 ≥ REBAL_DAYS 个交易日 → 今天调仓"""
-    if not LAST_REBAL.exists():
-        return True, "首次调仓"
-    last_rebal = pd.Timestamp(LAST_REBAL.read_text().strip())
+def load_state():
+    """读取账户状态；兼容旧版仅有 _last_rebalance.txt 的状态文件。"""
+    default = {
+        "current_position": "cash",      # cash / invested
+        "last_rebalance_date": None,
+        "last_signal_date": None,
+        "last_holdings": [],
+    }
+    if STATE_FILE.exists():
+        return {**default, **json.loads(STATE_FILE.read_text())}
+    if LAST_REBAL.exists():
+        # 旧状态无法判断是否仍持仓，保守视为空仓，不让空仓日阻止后续建仓。
+        default["last_rebalance_date"] = LAST_REBAL.read_text().strip()
+    return default
+
+
+def save_state(state):
+    STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2))
+    if state.get("last_rebalance_date"):
+        LAST_REBAL.write_text(state["last_rebalance_date"])
+    elif LAST_REBAL.exists():
+        LAST_REBAL.unlink()
+
+
+def decide_action(trade_dates, last_date, in_market, state):
+    """根据择时和真实持仓状态决定是否建仓/调仓/清仓/维持。"""
+    position = state.get("current_position", "cash")
+
+    if not in_market:
+        if position == "invested":
+            return True, "择时转空，清仓", "清仓"
+        return False, "当前空仓且择时为空，继续观望", "空仓观望"
+
+    if position != "invested":
+        return True, "择时转多，当前无持仓，建仓", "建仓买入"
+
+    last_rebal_raw = state.get("last_rebalance_date")
+    if not last_rebal_raw:
+        return True, "持仓状态缺少上次调仓日，重新调仓", "调仓买入"
+
+    last_rebal = pd.Timestamp(last_rebal_raw)
     gap = int(((trade_dates > last_rebal) & (trade_dates <= last_date)).sum())
     if gap >= REBAL_DAYS:
-        return True, f"距上次调仓 {gap} 交易日 (≥{REBAL_DAYS})"
-    return False, f"距上次调仓 {gap} 交易日 (<{REBAL_DAYS})，维持原仓位"
+        return True, f"距上次调仓 {gap} 交易日 (≥{REBAL_DAYS})", "调仓买入"
+    return False, f"距上次调仓 {gap} 交易日 (<{REBAL_DAYS})，维持原仓位", "维持原仓位"
 
 
 def main():
@@ -57,8 +97,8 @@ def main():
 
     # ② 加载 + 质量校验
     print("\n[2/6] 加载数据 + 质量校验...")
-    px = load_prices(start="2010-01-01")
-    close, amount = px["close"], px["amount"]
+    sig = latest_signal(CONFIG)
+    close = sig["result"]["close"]
     last = close.index[-1]
     cal = pd.read_parquet("data_lake/meta/trade_calendar.parquet")["date"]
     v = DataValidator(calendar=cal)
@@ -70,26 +110,19 @@ def main():
 
     # ③ 择时信号
     print("\n[3/6] 生成择时信号...")
-    ret = close.pct_change()
-    size = safe_zscore(mad_clip(-np.log(amount.rolling(SIZE_WIN).mean() + 1)))
-    small_mask = amount.rolling(20).mean().rank(axis=1, pct=True) < 0.5
-    small_idx = (ret * small_mask).sum(axis=1) / small_mask.sum(axis=1)
-    small_nav = (1 + small_idx.fillna(0)).cumprod()
-    ma = small_nav.rolling(TIMING_MA).mean()
-    in_market = bool(small_nav.iloc[-1] > ma.iloc[-1])
-    dist = small_nav.iloc[-1] / ma.iloc[-1] - 1
+    in_market = sig["in_market"]
+    dist = sig["timing_dist"]
     print(f"  小盘指数 vs MA{TIMING_MA}: {dist:+.2%} → {'🟢持仓' if in_market else '🔴空仓观望'}")
 
     # ④ 持仓清单
     print("\n[4/6] 持仓清单...")
-    f = size.loc[last].dropna()
-    active = close.loc[last].dropna().index
-    holdings = f.reindex(active).dropna().nlargest(TOP_N).index.tolist()
+    holdings = sig["holdings"]
 
     # ⑤ 调仓判断
     print("\n[5/6] 调仓判断...")
-    is_rebal, reason = need_rebalance(close.index, last)
-    print(f"  {'🔄 今日调仓' if is_rebal else '⏸ 不调仓'} — {reason}")
+    state = load_state()
+    is_rebal, reason, action = decide_action(close.index, last, in_market, state)
+    print(f"  {'🔄 今日执行' if is_rebal else '⏸ 不执行'} — {reason}")
 
     # ⑥ 保存 signals
     print("\n[6/6] 保存信号...")
@@ -98,24 +131,35 @@ def main():
         "timing": "持仓" if in_market else "空仓",
         "in_market": in_market,
         "small_index_vs_ma16": round(float(dist), 4),
-        "is_rebalance_day": is_rebal,
+        "is_execution_day": is_rebal,
+        "is_rebalance_day": bool(is_rebal and in_market),
         "rebalance_reason": reason,
-        "action": ("调仓买入" if (is_rebal and in_market) else
-                   "清仓" if not in_market else "维持原仓位"),
+        "action": action,
         "holdings": holdings if in_market else [],
         "top_n": TOP_N, "leverage": LEVERAGE,
         "strategy_version": "v2.0",
     }
     out = SIGNALS / f"{last.date()}.json"
     out.write_text(json.dumps(signal, ensure_ascii=False, indent=2))
-    if is_rebal:
-        LAST_REBAL.write_text(str(last.date()))   # 调仓日才更新基准
+
+    new_state = {
+        "current_position": "invested" if in_market else "cash",
+        "last_rebalance_date": (
+            str(last.date()) if (is_rebal and in_market)
+            else state.get("last_rebalance_date") if in_market
+            else None
+        ),
+        "last_signal_date": str(last.date()),
+        "last_holdings": holdings if in_market else [],
+        "last_action": action,
+    }
+    save_state(new_state)
 
     # ── 终端总结 ──
     print("\n" + "=" * 60)
     print(f"  日期      : {last.date()}")
     print(f"  择时      : {signal['timing']}  (小盘指数{dist:+.2%} vs MA16)")
-    print(f"  调仓      : {'是' if is_rebal else '否'} — {reason}")
+    print(f"  执行      : {'是' if is_rebal else '否'} — {reason}")
     print(f"  操作      : {signal['action']}")
     if in_market:
         print(f"  持仓({len(holdings)}只): {', '.join(holdings[:12])}{' ...' if len(holdings)>12 else ''}")

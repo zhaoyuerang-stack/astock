@@ -14,8 +14,7 @@ os.chdir(ROOT)
 import sys
 sys.path.insert(0, str(ROOT))
 import numpy as np, pandas as pd
-from lake.load_lake import load_prices
-from evolve import safe_zscore, mad_clip
+from core.backtest import StrategyConfig, run_small_cap_strategy
 
 INIT, LEV = 1_000_000, 1.25
 TOP_N, SIZE_WIN, TIMING_MA, REBAL = 25, 60, 16, 20
@@ -23,14 +22,10 @@ C_BUY, C_SELL = 0.00025 + 0.002, 0.0005 + 0.00025 + 0.002   # 0.225% / 0.275%
 FIN_DAILY = 0.065 / 252
 
 # ── 加载数据 + 算因子/择时 (2023起，给因子缓冲) ──
-px = load_prices(start="2023-01-01")
-close, amount = px["close"], px["amount"]
-ret = close.pct_change()
-size = safe_zscore(mad_clip(-np.log(amount.rolling(SIZE_WIN).mean() + 1)))
-small_mask = amount.rolling(20).mean().rank(axis=1, pct=True) < 0.5
-small_idx = (ret * small_mask).sum(axis=1) / small_mask.sum(axis=1)
-small_nav = (1 + small_idx.fillna(0)).cumprod()
-timing = (small_nav > small_nav.rolling(TIMING_MA).mean()).shift(1).fillna(False)
+core_result = run_small_cap_strategy(StrategyConfig(start="2023-01-01"))
+close = core_result["close"]
+size = core_result["factor"]
+timing = core_result["timing"]
 
 dates = close.loc["2025-01-01":"2025-12-31"].index
 rebal_days = set(dates[::REBAL])          # 2025年初起每20交易日调仓

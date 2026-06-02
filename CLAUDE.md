@@ -1,10 +1,11 @@
 # A股全市场因子量化研究
 
 > 给 AI 的**操作宪法(精简)**。系统设计/架构 → [SPEC.md](SPEC.md);分阶段路线 → [ROADMAP.md](ROADMAP.md);当前进度 → [STATUS.md](STATUS.md);踩过的坑 → [LESSONS.md](LESSONS.md)(+ auto-memory)。代码与操作手册在 `factor_research/`。
+> 每次接手先读本文件 + `STATUS.md`。
 
 ## 定位
 全市场、日频因子量化。真正的资产 = **数据基础设施 + 策略工厂 + 有效策略管理**;**任何策略默认会失效**,按**母策略**(独立 alpha 家族)组织,持续 发现 → 证伪 → 替换。
-- **口径**:以 `data_lake` 真实口径为准,绝不用 `data_full` 旧口径(幸存者偏差水分)凑达标。
+- **口径**:以 `data_lake` + `core/` 统一回测内核为准,绝不用 `data_full` 旧口径(幸存者偏差水分)凑达标。
 - **门槛**:单母策略入册 年化>15% / 回撤<20%;项目级(组合后)年化>35% / 回撤<15%。
 
 ## 铁律(违反 = 回测结果作废)
@@ -31,6 +32,7 @@
 | 融资利率 | 5%/年(1.25x → 拖累 ~1.25%/年) | 持仓日,仅杠杆部分 |
 
 **单边**:买 0.208% / 卖 0.258% → **往返 ≈ 0.47%**(另加融资)。冲击/滑点 0.2% 维持审慎,不下调。
+当前代码默认在 `core/backtest.py::CostModel` 固化真实成本近似:买 0.225% / 卖 0.275% / 融资 6.5%;若调整费率,必须同步台账备注。
 
 ## 常用命令(均在 `factor_research/` 下)
 ```bash
@@ -38,6 +40,7 @@ python3 run_daily.py --no-update   # 出当日信号(不联网);去掉 --no-upda
 python3 strategy_lake.py           # 真实口径复测(2018-2026 + 2010-2026 压力测试)
 python3 strategy_registry.py       # 母策略台账对比表
 python3 validate_final.py          # 数据质量校验 → data_lake/quality_report.json
+python3 scripts/research/cost_sensitivity.py  # 成本敏感性
 ```
 
 ## 工作约定
