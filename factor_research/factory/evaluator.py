@@ -1,6 +1,4 @@
 """Evaluate candidate strategies through the unified core."""
-from dataclasses import replace
-
 from core.backtest import (
     StrategyConfig,
     backtest_weights,
@@ -37,10 +35,19 @@ def evaluate_candidate(candidate, close, amount, library, benchmark_ret, start):
 
 
 def evaluate_candidates(candidates, start="2018-01-01"):
+    close, amount, library, benchmark_ret = prepare_context(start)
+    return evaluate_candidates_with_context(candidates, close, amount, library, benchmark_ret, start)
+
+
+def prepare_context(start="2018-01-01"):
     close, volume, amount = load_price_panels(start)
     library = factor_library(close, volume, amount)
     baseline = run_small_cap_strategy(StrategyConfig(start=start))
     benchmark_ret = baseline["returns"]
+    return close, amount, library, benchmark_ret
+
+
+def evaluate_candidates_with_context(candidates, close, amount, library, benchmark_ret, start="2018-01-01"):
     return [
         evaluate_candidate(c, close, amount, library, benchmark_ret, start)
         for c in candidates

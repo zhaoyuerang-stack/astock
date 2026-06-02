@@ -15,7 +15,8 @@
 ## 阶段 1 — 工厂化:多目标产出多母策略 ⭐(当前焦点)
 - ✅ 1.1 最小骨架:`factory/` 候选空间 + 多目标评估 + Pareto 排序。
 - ✅ 1.2 批量扫描:`factory/run_factory.py --mode grid` 确定性候选网格 + 基础质量门槛 + Pareto 前沿报告。
-- 下一步:evolve fitness 单目标 → **NSGA-II 多目标**(多头 NDCG@k + 时序稳定 + 真实绩效 + 抗压回撤)。
+- ✅ 1.3 最小 NSGA-II:`factory/run_factory.py --mode nsga2` 支持种群、代数、变异率、随机种子和 generation history。
+- 下一步:扩大 **NSGA-II 多目标** 搜索(多头 NDCG@k + 时序稳定 + 真实绩效 + 抗压回撤),并加入隔离岛屿。
 - 输出 **Pareto 前沿 = 候选母策略批**。
 - **隔离进化(岛屿模型)**:每个母策略独立种群 / git worktree,生态位差异化(不同数据源/因子族/regime);岛间不迁因子基因,只共享方法。
 - **验收**:≥2 个逻辑不同、收益低相关的候选母策略(非 small-cap 变体)。
