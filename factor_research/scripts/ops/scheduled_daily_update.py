@@ -15,6 +15,7 @@ import sys
 import traceback
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -28,6 +29,7 @@ LOCK_PATH = LOG_DIR / ".scheduled_daily_update.lock"
 PYTHON = "/usr/bin/python3"
 SAMPLE_CODES = ["600519", "000001", "300750", "600036", "601398"]
 CALENDAR_ANCHORS = ["600519", "601398", "000001", "600036", "600000", "601988"]
+CHINA_TZ = ZoneInfo("Asia/Shanghai")
 
 
 class Tee:
@@ -75,6 +77,27 @@ def file_lock(path):
 
 def now_iso():
     return datetime.now().isoformat(timespec="seconds")
+
+
+def china_now():
+    return datetime.now(CHINA_TZ)
+
+
+def should_run_for_china_time(not_before):
+    hour, minute = [int(part) for part in not_before.split(":", 1)]
+    now = china_now()
+    threshold = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    return now >= threshold, now, threshold
+
+
+def prior_success(report_path):
+    if not report_path.exists():
+        return False
+    try:
+        report = json.loads(report_path.read_text())
+    except Exception:
+        return False
+    return report.get("status") == "ok"
 
 
 def write_json(path, data):
@@ -204,15 +227,18 @@ def run_signal(report, dry_run=False):
 
 
 def run_daily_update(args):
-    run_date = datetime.now().date().isoformat()
+    run_date = china_now().date().isoformat()
     log_path = LOG_DIR / f"{run_date}.log"
     report_path = REPORT_DIR / f"{run_date}.json"
     report = {
         "run_date": run_date,
+        "run_date_timezone": "Asia/Shanghai",
         "started_at": now_iso(),
+        "started_at_china": china_now().isoformat(timespec="seconds"),
         "finished_at": None,
         "status": "running",
         "dry_run": args.dry_run,
+        "china_not_before": args.china_not_before,
     }
 
     with tee_log(log_path):
@@ -230,6 +256,18 @@ def run_daily_update(args):
                 return 2
 
             try:
+                time_ok, now_cn, threshold_cn = should_run_for_china_time(args.china_not_before)
+                report["china_now"] = now_cn.isoformat(timespec="seconds")
+                report["china_threshold"] = threshold_cn.isoformat(timespec="seconds")
+                if not args.force and not time_ok:
+                    report["status"] = "skipped_before_china_time"
+                    print(f"[time] skip: china_now={report['china_now']} threshold={report['china_threshold']}")
+                    return 0
+                if not args.force and prior_success(report_path):
+                    report["status"] = "skipped_already_ok"
+                    print(f"[dedupe] skip: {report_path} already has status=ok")
+                    return 0
+
                 before_latest = actual_latest_price_date()
                 calendar_max = rebuild_trade_calendar_from_prices()
                 expected, expected_source = expected_trade_date(args.today)
@@ -290,6 +328,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true", help="Do not update data or generate signals.")
     parser.add_argument("--today", help="Override local date for freshness tests, YYYY-MM-DD.")
+    parser.add_argument("--china-not-before", default="16:30", help="Do not run before this Asia/Shanghai wall time.")
+    parser.add_argument("--force", action="store_true", help="Ignore China-time gate and prior successful report.")
     args = parser.parse_args()
     raise SystemExit(run_daily_update(args))
 

@@ -81,7 +81,7 @@ scripts/ops/install_launchd_jobs.sh
 
 已配置的任务：
 
-- `com.astcok.daily-update`: 周一到周五本机 01:30 执行，对应中国时间盘后约 16:30/17:30。
+- `com.astcok.daily-update`: 周一到周五本机 00:30 和 01:30 触发;脚本内部按中国时间判断,未到 16:30 自动跳过,当天成功后第二次自动跳过。
 - `com.astcok.weekly-maintenance`: 周日本机 02:30 执行，重建周/月线、刷新不复权价、完整质量校验。
 
 手动触发：

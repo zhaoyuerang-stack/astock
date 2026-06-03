@@ -17,7 +17,7 @@ launchctl bootstrap "gui/$UID" "$AGENTS/com.astcok.daily-update.plist"
 launchctl bootstrap "gui/$UID" "$AGENTS/com.astcok.weekly-maintenance.plist"
 
 echo "Installed launchd jobs:"
-echo "  com.astcok.daily-update        daily 01:30 local time"
+echo "  com.astcok.daily-update        weekdays 00:30 and 01:30 local time; script gates at China 16:30"
 echo "  com.astcok.weekly-maintenance  Sunday 02:30 local time"
 echo
 echo "Manual trigger:"
