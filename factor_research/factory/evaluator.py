@@ -6,10 +6,10 @@ from core.backtest import (
     build_rebalance_weights,
     load_price_panels,
     run_small_cap_strategy,
-    small_cap_timing,
 )
 from factory.objectives import evaluate_objectives
 from factory.search_space import build_factor, factor_library
+from factory.timing import build_timing
 from lake.load_lake import FUND_FIELDS, load_fundamental_panel, load_raw_close
 
 
@@ -24,7 +24,7 @@ def run_candidate_returns(candidate, close, amount, library, start, cost_model=N
         cost=cost_model or CostModel(),
     )
     factor = build_factor(candidate, library)
-    timing, _, _ = small_cap_timing(close, amount, config.timing_ma)
+    timing = build_timing(candidate.timing, close, amount)
     scheduled = build_rebalance_weights(factor, close, config.top_n, config.rebalance_days)
     return backtest_weights(close, scheduled, timing, config)
 

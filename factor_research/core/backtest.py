@@ -113,16 +113,20 @@ def backtest_weights(close, scheduled_weights, timing_signal=None, config=Strate
         if dt in scheduled_weights:
             current_selected = scheduled_weights[dt]
 
-        in_market = True
+        # Timing signal is a daily exposure multiplier in [0, 1]. Binary masks
+        # (True/False) collapse to 1.0/0.0, so legacy small-cap timing is
+        # unchanged; vol-target genes pass a fractional exposure to de-risk.
+        exposure = 1.0
         if timing_signal is not None:
-            in_market = bool(timing_signal.reindex([dt]).fillna(False).iloc[0])
+            exposure = float(timing_signal.reindex([dt]).fillna(0.0).iloc[0])
+            exposure = min(max(exposure, 0.0), 1.0)
 
         target_weight = np.zeros(len(cols))
-        if in_market and len(current_selected):
+        if exposure > 0 and len(current_selected):
             for code, weight in current_selected.items():
                 j = col_idx.get(code)
                 if j is not None:
-                    target_weight[j] = weight
+                    target_weight[j] = weight * exposure
 
         delta = target_weight - current_weight
         buy_turnover = float(delta[delta > 0].sum())
