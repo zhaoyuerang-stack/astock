@@ -146,7 +146,7 @@ reports/factory_stage1_3.json
 reports/factory_stage1_3_history.json
 ```
 
-当前版本支持确定性候选网格、最小 NSGA-II 多目标搜索、多目标评估、基础质量门槛和 Pareto 排序；岛屿模型和大规模长跑还待建设。
+当前版本支持确定性候选网格、最小 NSGA-II 多目标搜索、多目标评估、基础质量门槛和 Pareto 排序。
 
 阶段 1.4 生态位搜索入口：
 
@@ -163,7 +163,9 @@ reports/factory_stage1_4_non_size_history.json
 reports/factory_stage1_4_non_size_review.json
 ```
 
-`--niche` 可选 `all`、`non_size`、`quality_location`、`reversal_liquidity`、`defensive_liquidity`、`trend_quality`。`*_review.json` 只保留非纯小盘、相关性不过高、样本外非负且通过基础前沿门槛的复核候选。
+`--niche` 可选 `all`、`non_size`、`quality_location`、`reversal_liquidity`、`defensive_liquidity`、`trend_quality`、`fundamental_quality`、`fundamental_value`、`orthogonal_fundamental`。`*_review.json` 只保留非纯小盘、相关性不过高、样本外非负且通过基础前沿门槛的复核候选。
+
+fundamental niche 使用 `data_lake/fundamental_batch.parquet` 中按 `avail_date` 对齐的财务质量/成长/价值因子。估值类因子用 `price/daily_raw` 不复权价计算;如果原始价缺失才退回复权 `close`。
 
 阶段 1.5 复核审计入口：
 
@@ -210,11 +212,11 @@ reports/islands/summary.json
 
 ## 当前最重要的下一步
 
-阶段 0 已收束到统一 `core/` 内核、`data_lake` 口径和真实成本模型。旧 `data_full/`、`data/` 缓存已清理。当前阶段 1 已有确定性网格、NSGA-II、生态位复核、复核审计、孵化池、岛屿编排和扩展非小盘因子池。当前小规模岛屿搜索暂无 `registry_precheck=true` 候选,验收条件尚未满足;孵化池已有非小盘弱候选。
+阶段 0 已收束到统一 `core/` 内核、`data_lake` 口径和真实成本模型。旧 `data_full/`、`data/` 缓存已清理。当前阶段 1 已有确定性网格、NSGA-II、生态位复核、复核审计、孵化池、岛屿编排、扩展非小盘价量因子池和 fundamental 正交因子池。当前小规模岛屿搜索暂无 `registry_precheck=true` 候选,验收条件尚未满足;孵化池已有非小盘弱候选。
 
 建议顺序：
 
-1. 用 `factory/run_islands.py` 做多岛正式长跑,优先观察 `defensive_liquidity` / `trend_quality` / `reversal_liquidity` 岛。
+1. 用 `factory/run_islands.py` 做多岛正式长跑,优先观察 `fundamental_quality` / `fundamental_value` / `defensive_liquidity` 岛。
 2. 对 `incubation_pool.json` 做降杠杆、降频、组合贡献测试;只把 `candidate_batch.json` 中的候选推入台账预审。
 3. 继续以 `strategy_lake.py` 和 `strategy_versions.json` 为准登记新版本。
 4. 用 `run_daily.py --no-update` 验证每日信号流程。

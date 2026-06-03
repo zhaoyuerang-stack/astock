@@ -2,6 +2,9 @@
 
 
 SIZE_FACTORS = {"size20", "size40", "size60"}
+FUNDAMENTAL_QUALITY_FACTORS = {"fund_roe_quality", "fund_gross_margin_quality", "fund_cfo_quality"}
+FUNDAMENTAL_GROWTH_FACTORS = {"fund_revenue_growth", "fund_profit_growth"}
+FUNDAMENTAL_VALUE_FACTORS = {"fund_eps_yield", "fund_bp_value"}
 
 
 def factor_names(row):
@@ -26,6 +29,18 @@ def niche_label(row):
         return "pure-size"
     if exposure > 0:
         return "size-blend"
+    has_fund_quality = "fundamental-quality" in families or any(f in FUNDAMENTAL_QUALITY_FACTORS for f in factors)
+    has_fund_growth = "fundamental-growth" in families or any(f in FUNDAMENTAL_GROWTH_FACTORS for f in factors)
+    has_fund_value = "fundamental-value" in families or any(f in FUNDAMENTAL_VALUE_FACTORS for f in factors)
+    fund_count = sum([has_fund_quality, has_fund_growth, has_fund_value])
+    if fund_count > 1:
+        return "fundamental-mixed"
+    if has_fund_quality:
+        return "fundamental-quality"
+    if has_fund_growth:
+        return "fundamental-growth"
+    if has_fund_value:
+        return "fundamental-value"
     if "reversal" in families or any("reversal" in factor for factor in factors):
         return "non-size-reversal"
     if "liquidity" in families or any("turnover" in factor for factor in factors):

@@ -20,9 +20,11 @@
 - ✅ 1.5 复核审计 + 孵化池:`factory/review_shortlist.py` 对 shortlist 做 2018/2023/2010 三段复测 + 成本上浮敏感性 + 台账预审/孵化标记。
 - ✅ 1.6 岛屿编排:`factory/run_islands.py` 每岛独立 niche/seed/种群/输出,可选 git worktree;只聚合 `registry_precheck=true`。
 - ✅ 1.7 扩因子池:新增流动性冷却/低 beta/波动压缩/趋势稳定因子,新增 defensive/trend 岛,扩大低换手 top_n/rebalance 搜索空间。
+- ✅ 1.8 孵化池校准:对弱候选做降杠杆、降频、组合贡献测试;未过预审则继续留池,不入册。
+- ✅ 1.9 fundamental 正交因子池:接入 `fundamental_batch.parquet` 的财务质量/成长/价值因子,新增 fundamental niche/island;财务按 `avail_date` 对齐,估值类因子用不复权价。
 - 输出 **Pareto 前沿 = `reports/islands/candidate_batch.json` 候选母策略批**;弱候选进入 `reports/islands/incubation_pool.json`,不直接入册。
 - **隔离进化(岛屿模型)**:每个母策略独立种群 / 可选 git worktree,生态位差异化(不同数据源/因子族/regime);岛间不迁因子基因,只共享方法。
-- **验收**:≥2 个逻辑不同、收益低相关的候选母策略(非 small-cap 变体)。当前小规模搜索未满足;孵化池已有弱候选,需继续降频/组合贡献/正交数据源。
+- **验收**:≥2 个逻辑不同、收益低相关的候选母策略(非 small-cap 变体)。当前小规模搜索未满足;下一步重点跑 fundamental 岛屿并复核是否真正贡献低相关收益。
 
 ## 阶段 2 — 有效管理:入册闸 + 失效监控
 - **三道入册闸**:绝对门槛(15%/20%)+ VIF 收益低相关 + `hypothesis` 逻辑独立。

@@ -3,6 +3,7 @@ from dataclasses import dataclass, asdict
 from typing import Sequence
 
 import numpy as np
+import pandas as pd
 
 from core.backtest import mad_clip, safe_zscore, small_cap_factor
 
@@ -23,7 +24,18 @@ class Candidate:
         return asdict(self)
 
 
-def factor_library(close, volume, amount):
+def _fund_panel(fundamentals, name, close):
+    if not fundamentals or name not in fundamentals or fundamentals[name].empty:
+        return pd.DataFrame(index=close.index, columns=close.columns, dtype=float)
+    return fundamentals[name].reindex(index=close.index, columns=close.columns)
+
+
+def _valuation_yield(value, price):
+    price = price.reindex(index=value.index, columns=value.columns).replace(0, np.nan)
+    return value.div(price).replace([np.inf, -np.inf], np.nan)
+
+
+def factor_library(close, volume, amount, fundamentals=None, raw_close=None):
     ret = close.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan)
     market_ret = ret.mean(axis=1)
     market_var60 = market_ret.rolling(60).var() + 1e-8
@@ -31,6 +43,14 @@ def factor_library(close, volume, amount):
     rel_amount20 = amount.rolling(20).mean() / (amount.rolling(120).mean() + 1e-6)
     vol20 = ret.rolling(20).std()
     trend60 = close / close.rolling(60).mean() - 1
+    roe = _fund_panel(fundamentals, "roe", close)
+    gross_margin = _fund_panel(fundamentals, "gross_margin", close)
+    cfo_ps = _fund_panel(fundamentals, "cfo_ps", close)
+    revenue_yoy = _fund_panel(fundamentals, "revenue_yoy", close)
+    net_profit_yoy = _fund_panel(fundamentals, "net_profit_yoy", close)
+    eps_ttm = _fund_panel(fundamentals, "eps_ttm", close)
+    bps = _fund_panel(fundamentals, "bps", close)
+    price_for_value = raw_close if raw_close is not None and not raw_close.empty else close
     return {
         "size20": small_cap_factor(amount, 20),
         "size40": small_cap_factor(amount, 40),
@@ -65,6 +85,13 @@ def factor_library(close, volume, amount):
         "range_compression20": safe_zscore(mad_clip(-ret.rolling(20).std() / (ret.rolling(60).std() + 1e-6))),
         "price_below_ma20": safe_zscore(mad_clip(-(close / close.rolling(20).mean() - 1))),
         "price_below_ma60": safe_zscore(mad_clip(-(close / close.rolling(60).mean() - 1))),
+        "fund_roe_quality": safe_zscore(mad_clip(roe)),
+        "fund_gross_margin_quality": safe_zscore(mad_clip(gross_margin)),
+        "fund_cfo_quality": safe_zscore(mad_clip(cfo_ps)),
+        "fund_revenue_growth": safe_zscore(mad_clip(revenue_yoy)),
+        "fund_profit_growth": safe_zscore(mad_clip(net_profit_yoy)),
+        "fund_eps_yield": safe_zscore(mad_clip(_valuation_yield(eps_ttm, price_for_value))),
+        "fund_bp_value": safe_zscore(mad_clip(_valuation_yield(bps, price_for_value))),
     }
 
 
@@ -100,6 +127,9 @@ FACTOR_FAMILIES = {
     "beta-defensive": ["low_beta60", "range_compression20"],
     "trend-stability": ["trend_stability60", "trend_stability120"],
     "price-location": ["price_below_ma20", "price_below_ma60"],
+    "fundamental-quality": ["fund_roe_quality", "fund_gross_margin_quality", "fund_cfo_quality"],
+    "fundamental-growth": ["fund_revenue_growth", "fund_profit_growth"],
+    "fundamental-value": ["fund_eps_yield", "fund_bp_value"],
 }
 
 
@@ -156,6 +186,10 @@ def grid_candidates(limit=None):
         (("low_turnover10", "low_vol20", "price_below_ma60"), (0.4, 0.3, 0.3)),
         (("liquidity_dryup20", "low_beta60", "price_below_ma60"), (0.4, 0.3, 0.3)),
         (("trend_stability60", "momentum_quality20", "range_compression20"), (0.4, 0.3, 0.3)),
+        (("fund_roe_quality", "fund_cfo_quality"), (0.5, 0.5)),
+        (("fund_revenue_growth", "fund_profit_growth"), (0.5, 0.5)),
+        (("fund_eps_yield", "fund_bp_value"), (0.5, 0.5)),
+        (("fund_roe_quality", "fund_eps_yield", "fund_cfo_quality"), (0.4, 0.3, 0.3)),
     ]
     for factors, weights in blend_specs:
         for top_n in top_ns:

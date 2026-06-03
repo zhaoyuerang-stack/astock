@@ -15,6 +15,9 @@ NICHE_FAMILIES = {
     "quality_location": ["low-vol", "momentum-quality", "price-location"],
     "defensive_liquidity": ["liquidity-quality", "beta-defensive", "price-location"],
     "trend_quality": ["trend-stability", "momentum-quality", "beta-defensive"],
+    "fundamental_quality": ["fundamental-quality", "fundamental-growth"],
+    "fundamental_value": ["fundamental-value", "fundamental-quality"],
+    "orthogonal_fundamental": ["fundamental-quality", "fundamental-growth", "fundamental-value"],
 }
 TOP_N_CHOICES = [15, 20, 25, 40, 60, 80, 120]
 REBALANCE_CHOICES = [10, 20, 40, 60, 80]

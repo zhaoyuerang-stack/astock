@@ -65,6 +65,22 @@ DEFAULT_ISLANDS = [
         generations=2,
         hypothesis="Stable trend continuation with quality and defensive filters.",
     ),
+    IslandSpec(
+        name="fundamental_quality_a",
+        niche="fundamental_quality",
+        seed=607,
+        population=8,
+        generations=2,
+        hypothesis="Accounting quality and growth as a non-price orthogonal alpha source.",
+    ),
+    IslandSpec(
+        name="fundamental_value_a",
+        niche="fundamental_value",
+        seed=709,
+        population=8,
+        generations=2,
+        hypothesis="Fundamental value and profitability as a non-size parent strategy source.",
+    ),
 ]
 
 
@@ -93,6 +109,14 @@ def small_islands(population=4, generations=1):
             population=population,
             generations=generations,
             hypothesis="Smoke island for defensive liquidity.",
+        ),
+        IslandSpec(
+            name="fundamental_quality_smoke",
+            niche="fundamental_quality",
+            seed=607,
+            population=population,
+            generations=generations,
+            hypothesis="Smoke island for fundamental quality/growth.",
         ),
     ]
 

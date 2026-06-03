@@ -20,6 +20,7 @@
 - **极端行情不可重复**:2025 +112%、2015 小盘疯牛是极端行情;回测含这些区间的高收益要单独核查、**不可外推**。
 - **岛屿搜索的瓶颈在审计闸**:NSGA-II 单代评估还能接受,但 `review_shortlist` 每个候选要跑 2018/2023/2010 + 成本上浮,多岛长跑会慢。正确姿势是先让 `review_candidate` 尽量窄,只审计有希望的候选;不能为了速度跳过压力测试和成本敏感性。
 - **孵化池不是入册池**:扩展流动性冷却/低 beta/趋势稳定后,非小盘弱候选能进入 `incubation_pool`;但只要 `registry_precheck=false`,就只能做降频/降杠杆/组合贡献研究,不能当有效母策略。
+- **fundamental 接入边界**:`fundamental_batch.parquet` 已有 `avail_date`,可直接按公告可用日 ffill 到交易日;估值收益率类因子必须用 `price/daily_raw` 不复权价。当前批量表没有 `debt_ratio`,两融目录也未稳定落表,暂不纳入 1.9 第一批正交因子。
 
 ## 关键决策
 - **文档治理**(2026-06):CLAUDE.md 精简(操作宪法)/ SPEC.md(架构)/ STATUS.md(进度)/ LESSONS.md(本文件)。别再把设计/进度往 CLAUDE.md 堆。
