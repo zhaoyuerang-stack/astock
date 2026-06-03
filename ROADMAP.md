@@ -24,9 +24,11 @@
 - ✅ 1.9 fundamental 正交因子池:接入 `fundamental_batch.parquet` 的财务质量/成长/价值因子,新增 fundamental niche/island;财务按 `avail_date` 对齐,估值类因子用不复权价。
 - ✅ 1.10 fundamental 岛屿长跑:三岛 `registry_precheck=0`,但形成 11 个孵化池弱候选,确认原始 fundamental 因子不够强。
 - ✅ 1.11 fundamental 因子工程升级:新增行业中性、行业内排名、财务变化率、估值分位、质量+价值 regime 过滤,并建立对应 niche/island。
+- ✅ 1.12 工程化 fundamental 岛屿长跑:四岛 `registry_precheck=0`,但形成 23 个孵化池弱候选,最高接近单母策略收益门槛但压力回撤不合格。
+- ✅ 1.13 孵化池自进化:新增 `factory/evolve_incubation.py`,对孵化池候选做按代变异、三段审计、幸存者选择和持续迭代;本地规则化运行,不调用 OpenAI API。
 - 输出 **Pareto 前沿 = `reports/islands/candidate_batch.json` 候选母策略批**;弱候选进入 `reports/islands/incubation_pool.json`,不直接入册。
 - **隔离进化(岛屿模型)**:每个母策略独立种群 / 可选 git worktree,生态位差异化(不同数据源/因子族/regime);岛间不迁因子基因,只共享方法。
-- **验收**:≥2 个逻辑不同、收益低相关的候选母策略(非 small-cap 变体)。当前小规模搜索未满足;下一步重点跑工程化 fundamental 岛屿并复核是否真正贡献低相关收益。
+- **验收**:≥2 个逻辑不同、收益低相关的候选母策略(非 small-cap 变体)。当前小规模搜索未满足;下一步重点跑孵化池自进化并复核是否能把弱候选推过审计闸。
 
 ## 阶段 2 — 有效管理:入册闸 + 失效监控
 - **三道入册闸**:绝对门槛(15%/20%)+ VIF 收益低相关 + `hypothesis` 逻辑独立。

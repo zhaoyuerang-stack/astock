@@ -210,14 +210,30 @@ reports/islands/summary.json
 
 `candidate_batch.json` 只保留 `registry_precheck=true` 的最终 Pareto 候选母策略批。`incubation_pool.json` 保留 `incubate=true` 的弱候选,用于后续再校准/降频/组合研究,不进入台账预审。`--create-worktrees` 可为每个岛创建 `.worktrees/island_name` 作为代码隔离锚点;搜索仍在主工作区运行,因为 `data_lake/` 是忽略数据,新 worktree 默认没有数据湖。
 
+阶段 1.13 孵化池自进化入口：
+
+```bash
+cd /Users/kiki/astcok/factor_research
+/usr/bin/python3 factory/evolve_incubation.py \
+  --input reports/islands_fundamental_1_12_parallel/incubation_pool.json \
+  --out-dir reports/incubation_evolution_1_13 \
+  --generations 3 \
+  --population 12 \
+  --survivors 6
+```
+
+这个程序从孵化池候选出发,每代做本地规则化变异(因子、权重、top_n、调仓频率、杠杆),然后重新走 2018/2023/2010 三段审计和成本上浮敏感性。它不调用 OpenAI API,不会因为本地长跑本身触发模型 429 限流。
+
+本机当前 `/opt/homebrew/bin/python3` 缺 pandas/pyarrow;回测和 parquet 读取优先用 `/usr/bin/python3`。
+
 ## 当前最重要的下一步
 
-阶段 0 已收束到统一 `core/` 内核、`data_lake` 口径和真实成本模型。旧 `data_full/`、`data/` 缓存已清理。当前阶段 1 已有确定性网格、NSGA-II、生态位复核、复核审计、孵化池、岛屿编排、扩展非小盘价量因子池、fundamental 正交因子池和 fundamental 因子工程升级。当前小规模岛屿搜索暂无 `registry_precheck=true` 候选,验收条件尚未满足;孵化池已有非小盘弱候选。
+阶段 0 已收束到统一 `core/` 内核、`data_lake` 口径和真实成本模型。旧 `data_full/`、`data/` 缓存已清理。当前阶段 1 已有确定性网格、NSGA-II、生态位复核、复核审计、孵化池、岛屿编排、扩展非小盘价量因子池、fundamental 正交因子池、fundamental 因子工程升级和孵化池自进化。当前小规模岛屿搜索暂无 `registry_precheck=true` 候选,验收条件尚未满足;孵化池已有非小盘弱候选。
 
 建议顺序：
 
-1. 用 `factory/run_islands.py` 做多岛正式长跑,优先观察 `fundamental_industry` / `fundamental_change` / `fundamental_regime` 岛。
-2. 对 `incubation_pool.json` 做降杠杆、降频、组合贡献测试;只把 `candidate_batch.json` 中的候选推入台账预审。
+1. 用 `factory/evolve_incubation.py` 对 1.12 的 `incubation_pool.json` 做按代自进化,优先观察 `fund_profit_growth_delta`、行业 BP 价值和估值分位组合。
+2. 对自进化输出的 `candidate_batch.json` 做台账预审;仍未过审的继续留在 `incubation_pool.json`。
 3. 继续以 `strategy_lake.py` 和 `strategy_versions.json` 为准登记新版本。
 4. 用 `run_daily.py --no-update` 验证每日信号流程。
 

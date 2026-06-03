@@ -3,8 +3,6 @@ import itertools
 import json
 from pathlib import Path
 
-import pandas as pd
-
 from core.backtest import CostModel, metrics
 from factory.evaluator import prepare_context, run_candidate_returns
 from factory.niches import annotate_niches
@@ -83,6 +81,8 @@ def _cost_up():
 
 
 def _combo_metrics(candidates, start, cost_model=None):
+    import pandas as pd
+
     close, amount, library, benchmark_ret = prepare_context(start)
     returns = []
     details = []
