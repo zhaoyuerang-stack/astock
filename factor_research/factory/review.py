@@ -158,6 +158,8 @@ def audit_candidates(shortlist, periods=None):
             periods["in_sample"], cost_model=cost_up,
         )
         audit.update(_summarize("cost_up", cost_row))
+        if audit.get("source_corr_to_baseline") is None:
+            audit["source_corr_to_baseline"] = audit.get("in_sample_corr_to_baseline")
         audit = annotate_niches([audit])[0]
         audit["registry_precheck"] = _review_pass(audit)
         audit = annotate_incubation(audit)
