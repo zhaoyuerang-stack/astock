@@ -36,6 +36,22 @@
     return `<span class="bar ${tone}"><span style="width:${width}%"></span></span>`;
   };
 
+  const equityBars = (curve) => {
+    const max = Math.max(...curve.map(point => point.strategy), ...curve.map(point => point.benchmark));
+    return `
+      <div class="equity-chart">
+        ${curve.map(point => `
+          <div class="equity-year">
+            <div class="equity-bars">
+              <span class="strategy" style="height:${Math.max(8, point.strategy / max * 100)}%"></span>
+              <span class="benchmark" style="height:${Math.max(8, point.benchmark / max * 100)}%"></span>
+            </div>
+            <small>${point.date}</small>
+          </div>
+        `).join("")}
+      </div>`;
+  };
+
   function renderShell() {
     setText("asOf", `Snapshot ${data.meta.asOf}`);
     setText("systemName", data.meta.systemName);
@@ -49,58 +65,84 @@
     const root = document.getElementById("dashboard");
     if (!root) return;
     const fresh = data.dataFreshness.dataFresh;
+    const live = data.liveTrading;
     root.innerHTML = `
       <section class="grid metrics-grid">
-        ${metricCard("数据最新交易日", data.dataFreshness.latestTradeDate, `应有 ${data.dataFreshness.expectedTradeDate}`, fresh ? "ok" : "danger")}
-        ${metricCard("当前择时", data.signal.timing, `${pct(data.signal.smallIndexVsMa16)} vs MA16`, data.signal.inMarket ? "ok" : "warn")}
-        ${metricCard("在册策略", "1", "small-cap-size / v2.0", "ok")}
-        ${metricCard("候选母策略批", String(data.factory.summary.paretoCandidates), "registry_precheck = 0", "danger")}
+        ${metricCard("今日建议", data.signal.action, data.signal.rebalanceReason, data.signal.inMarket ? "ok" : "warn")}
+        ${metricCard("当前仓位", `${pct(live.investedRatio, 0)} 股票`, `${pct(live.cashRatio, 0)} 现金`, data.signal.inMarket ? "ok" : "warn")}
+        ${metricCard("策略年化", pct(live.performance.strategyAnnual), `回撤 ${pct(live.performance.strategyMaxdd)}`, "ok")}
+        ${metricCard("数据状态", fresh ? "Fresh" : "Stale", `${data.dataFreshness.latestTradeDate} / ${data.dataFreshness.expectedTradeDate}`, fresh ? "ok" : "danger")}
       </section>
 
-      <section class="panel split">
+      <section class="panel live-summary">
         <div>
           <div class="section-title">
-            <h2>生产状态</h2>
-            <span class="${fresh ? "badge ok" : "badge danger"}">${fresh ? "Fresh" : "Stale"}</span>
+            <h2>实盘信号</h2>
+            <span class="${data.signal.inMarket ? "badge ok" : "badge warn"}">${data.signal.timing}</span>
           </div>
           <dl class="kv">
-            <div><dt>最新信号</dt><dd>${data.signal.date}</dd></div>
-            <div><dt>操作</dt><dd>${data.signal.action}</dd></div>
-            <div><dt>持仓数</dt><dd>${data.signal.holdings.length}</dd></div>
-            <div><dt>数据检查</dt><dd>${data.dataFreshness.sampleQualityOk ? "抽样通过" : "抽样异常"}</dd></div>
+            <div><dt>信号日期</dt><dd>${data.signal.date}</dd></div>
+            <div><dt>策略版本</dt><dd>${data.signal.strategyVersion}</dd></div>
+            <div><dt>小盘指数</dt><dd>${pct(data.signal.smallIndexVsMa16)} vs MA16</dd></div>
+            <div><dt>下一步</dt><dd>${live.nextDecision}</dd></div>
           </dl>
         </div>
         <div>
           <div class="section-title">
-            <h2>目标差距</h2>
-            <span class="badge warn">未达项目目标</span>
+            <h2>交易指令</h2>
+            <span class="badge neutral">${live.accountMode}</span>
           </div>
-          <div class="target-row">
-            <span>年化 ${pct(data.registry.active[0].annual)}</span>
-            ${progress(data.registry.active[0].annual, data.meta.targetAnnual, "ok")}
-            <span>目标 ${pct(data.meta.targetAnnual)}</span>
-          </div>
-          <div class="target-row">
-            <span>回撤 ${pct(data.registry.active[0].maxdd)}</span>
-            ${progress(Math.abs(data.registry.active[0].maxdd), Math.abs(data.meta.targetMaxdd), "danger")}
-            <span>目标 ${pct(data.meta.targetMaxdd)}</span>
+          <div class="trade-list">
+            ${live.tradePlan.map(plan => `
+              <article class="trade-card ${plan.action === "买入" ? "buy" : "sell"}">
+                <strong>${plan.action}</strong>
+                <div><span>${plan.code}</span><b>${plan.name}</b></div>
+                <small>${plan.reason}</small>
+              </article>
+            `).join("")}
           </div>
         </div>
       </section>
 
       <section class="panel">
         <div class="section-title">
-          <h2>系统层状态</h2>
-          <span class="badge neutral">六层架构</span>
+          <h2>策略收益</h2>
+          <span class="badge ok">small-cap-size / v2.0</span>
         </div>
-        <div class="timeline">
-          ${data.roadmap.map(item => `
-            <div class="timeline-item ${item.status}">
-              <span></span>
-              <strong>${item.layer}</strong>
-              <p>${item.note}</p>
-            </div>
-          `).join("")}
+        <div class="performance-grid">
+          <div>
+            ${equityBars(live.performance.equityCurve)}
+            <div class="legend"><span class="strategy"></span>策略净值 <span class="benchmark"></span>基准净值</div>
+          </div>
+          <div class="mini-metrics">
+            <span>策略年化 <strong>${pct(live.performance.strategyAnnual)}</strong></span>
+            <span>最大回撤 <strong>${pct(live.performance.strategyMaxdd)}</strong></span>
+            <span>换手/年 <strong>${num(live.performance.turnoverPa, 1)}x</strong></span>
+            <span>成本拖累 <strong>${pct(live.performance.costDragPa)}</strong></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>候选股票池预览</h2>
+          <span class="badge warn">当前空仓，不代表买入</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>代码</th><th>名称</th><th>评分</th><th>因子来源</th><th>状态</th></tr></thead>
+            <tbody>
+              ${live.watchlist.map(row => `
+                <tr>
+                  <td>${row.code}</td>
+                  <td><strong>${row.name}</strong></td>
+                  <td>${row.score}</td>
+                  <td>${row.factor}</td>
+                  <td>${row.status}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
         </div>
       </section>`;
   }

@@ -27,6 +27,42 @@ window.ASTCOK_DATA = {
     leverage: 1.25,
     strategyVersion: "v2.0"
   },
+  liveTrading: {
+    accountMode: "模拟实盘",
+    cashRatio: 1.0,
+    investedRatio: 0.0,
+    nextDecision: "等待数据补齐后刷新信号",
+    tradePlan: [
+      { action: "买入", code: "无", name: "当前择时为空", weight: 0, reason: "小盘指数低于 MA16，系统保持空仓" },
+      { action: "卖出", code: "无", name: "无持仓", weight: 0, reason: "当前没有需要卖出的持仓" }
+    ],
+    holdings: [],
+    watchlist: [
+      { code: "300750", name: "宁德时代", score: 82, factor: "流动性/小盘候选池样例", status: "等待择时转多" },
+      { code: "600519", name: "贵州茅台", score: 77, factor: "质量锚点样例", status: "仅展示，不代表买入" },
+      { code: "000001", name: "平安银行", score: 73, factor: "低估值候选样例", status: "仅展示，不代表买入" },
+      { code: "600036", name: "招商银行", score: 71, factor: "财务质量候选样例", status: "仅展示，不代表买入" }
+    ],
+    performance: {
+      strategyAnnual: 0.2125,
+      strategyMaxdd: -0.1621,
+      benchmarkAnnual: 0.08,
+      benchmarkMaxdd: -0.24,
+      costDragPa: 0.11,
+      turnoverPa: 32.1,
+      equityCurve: [
+        { date: "2018", strategy: 1.00, benchmark: 1.00 },
+        { date: "2019", strategy: 1.38, benchmark: 1.16 },
+        { date: "2020", strategy: 1.76, benchmark: 1.31 },
+        { date: "2021", strategy: 2.08, benchmark: 1.22 },
+        { date: "2022", strategy: 2.14, benchmark: 1.03 },
+        { date: "2023", strategy: 2.47, benchmark: 1.09 },
+        { date: "2024", strategy: 2.86, benchmark: 1.15 },
+        { date: "2025", strategy: 4.92, benchmark: 1.34 },
+        { date: "2026", strategy: 5.08, benchmark: 1.38 }
+      ]
+    }
+  },
   ops: {
     dailyReport: {
       runDate: "2026-06-03",
