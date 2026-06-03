@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>策略工厂 - A股策略工厂控制台</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body data-page="factory">
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">AST</div><div><strong>策略工厂</strong><span>本地控制台原型</span></div></div>
+      <nav class="nav">
+        <a class="nav-link" data-page="dashboard" href="index.html">总览</a>
+        <a class="nav-link" data-page="factory" href="factory.html">策略工厂</a>
+        <a class="nav-link" data-page="ops" href="ops.html">运维调度</a>
+        <a class="nav-link" data-page="registry" href="registry.html">策略台账</a>
+      </nav>
+      <div class="sidebar-note">只展示候选发现和证伪结果；不把孵化池候选当有效策略。</div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><h1 id="systemName">A股策略工厂控制台</h1><div class="topbar-meta"><span id="asOf"></span><span class="badge warn">Stage 1</span></div></header>
+      <div class="content">
+        <div class="page-head"><div><h2>策略工厂</h2><p>查看岛屿搜索、孵化池和审计闸结果。当前 fundamental/defensive 候选只能作为组合分散件继续研究。</p></div></div>
+        <div id="factory"></div>
+      </div>
+    </main>
+  </div>
+  <script src="assets/mock-data.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>
