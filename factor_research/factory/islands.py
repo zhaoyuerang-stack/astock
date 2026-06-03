@@ -183,16 +183,22 @@ def audit_pareto(rows):
 def aggregate_islands(manifests, audits, out_dir="reports/islands"):
     out_root = Path(out_dir)
     precheck = [row for row in audits if row.get("registry_precheck")]
+    incubation = sorted(
+        [row for row in audits if row.get("incubate")],
+        key=lambda row: -row.get("incubation_score", -9),
+    )
     front = audit_pareto(precheck)
     annotate_pairwise_correlation(front)
     summary = {
         "islands": manifests,
         "total_registry_precheck": len(precheck),
+        "total_incubate": len(incubation),
         "pareto_candidates": len(front),
         "acceptance_met": _acceptance_met(front),
     }
     _write_json(out_root / "summary.json", summary)
     _write_json(out_root / "candidate_batch.json", front)
+    _write_json(out_root / "incubation_pool.json", incubation)
     return summary, front
 
 

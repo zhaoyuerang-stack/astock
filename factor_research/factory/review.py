@@ -70,6 +70,58 @@ def _review_pass(audit_row):
     )
 
 
+def _incubation_score(audit_row):
+    score = 0.0
+    score += max(audit_row.get("in_sample_annual", 0), -0.10)
+    score += 0.35 * max(audit_row.get("oos_annual", 0), -0.10)
+    score += 0.20 * max(audit_row.get("cost_up_annual", 0), -0.10)
+    score += 0.10 * audit_row.get("in_sample_sharpe", 0)
+    score += 0.15 * (1.0 - abs(audit_row.get("source_corr_to_baseline") or 1.0))
+    score += audit_row.get("in_sample_maxdd", -1)
+    return score
+
+
+def _incubation_reason(audit_row):
+    reasons = []
+    if audit_row.get("size_exposure", 1) < 1:
+        reasons.append("non_pure_size")
+    corr = audit_row.get("source_corr_to_baseline")
+    if corr is not None and abs(corr) < 0.75:
+        reasons.append("low_baseline_corr")
+    if audit_row.get("oos_annual", -1) > 0:
+        reasons.append("oos_positive")
+    if audit_row.get("pressure_maxdd", -1) > -0.50:
+        reasons.append("pressure_not_broken")
+    if audit_row.get("cost_up_annual", -1) > 0:
+        reasons.append("cost_up_positive")
+    if audit_row.get("in_sample_annual", 0) > 0.03:
+        reasons.append("weak_positive_alpha")
+    return reasons
+
+
+def _incubate(audit_row):
+    if audit_row.get("registry_precheck"):
+        return False
+    reasons = _incubation_reason(audit_row)
+    if audit_row.get("size_exposure", 1) >= 1:
+        return False
+    if "low_baseline_corr" not in reasons:
+        return False
+    return (
+        "oos_positive" in reasons
+        or "pressure_not_broken" in reasons
+        or "cost_up_positive" in reasons
+        or audit_row.get("in_sample_annual", 0) > 0.05
+    )
+
+
+def annotate_incubation(audit_row):
+    audit_row["incubation_score"] = _incubation_score(audit_row)
+    audit_row["incubation_reason"] = _incubation_reason(audit_row)
+    audit_row["incubate"] = _incubate(audit_row)
+    return audit_row
+
+
 def audit_candidates(shortlist, periods=None):
     periods = periods or DEFAULT_PERIODS
     contexts = {
@@ -106,8 +158,16 @@ def audit_candidates(shortlist, periods=None):
         audit.update(_summarize("cost_up", cost_row))
         audit = annotate_niches([audit])[0]
         audit["registry_precheck"] = _review_pass(audit)
+        audit = annotate_incubation(audit)
         audits.append(audit)
-    return sorted(audits, key=lambda row: (not row["registry_precheck"], -row.get("in_sample_annual", -9)))
+    return sorted(
+        audits,
+        key=lambda row: (
+            not row["registry_precheck"],
+            not row["incubate"],
+            -row.get("incubation_score", -9),
+        ),
+    )
 
 
 def write_audit(input_path, output_path=None, include_all=False):

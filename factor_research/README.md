@@ -179,7 +179,7 @@ cd /Users/kiki/astcok/factor_research
 python3 factory/review_shortlist.py reports/factory_stage1_4_non_size.json --include-all --out reports/factory_stage1_5_non_size_audit.json
 ```
 
-审计会复测 2018 主样本、2023 样本外、2010 压力样本,并跑成本上浮 50% 敏感性;`registry_precheck=true` 才值得进入台账预审。
+审计会复测 2018 主样本、2023 样本外、2010 压力样本,并跑成本上浮 50% 敏感性;`registry_precheck=true` 才值得进入台账预审。`incubate=true` 表示低相关/有逻辑/局部有潜力,只进孵化池继续研究,不能直接入册。
 
 阶段 1.6 岛屿模型入口：
 
@@ -202,19 +202,20 @@ reports/islands/*/front.json
 reports/islands/*/review.json
 reports/islands/*/audit.json
 reports/islands/candidate_batch.json
+reports/islands/incubation_pool.json
 reports/islands/summary.json
 ```
 
-`candidate_batch.json` 只保留 `registry_precheck=true` 的最终 Pareto 候选母策略批。`--create-worktrees` 可为每个岛创建 `.worktrees/island_name` 作为代码隔离锚点;搜索仍在主工作区运行,因为 `data_lake/` 是忽略数据,新 worktree 默认没有数据湖。
+`candidate_batch.json` 只保留 `registry_precheck=true` 的最终 Pareto 候选母策略批。`incubation_pool.json` 保留 `incubate=true` 的弱候选,用于后续再校准/降频/组合研究,不进入台账预审。`--create-worktrees` 可为每个岛创建 `.worktrees/island_name` 作为代码隔离锚点;搜索仍在主工作区运行,因为 `data_lake/` 是忽略数据,新 worktree 默认没有数据湖。
 
 ## 当前最重要的下一步
 
-阶段 0 已收束到统一 `core/` 内核、`data_lake` 口径和真实成本模型。旧 `data_full/`、`data/` 缓存已清理。当前阶段 1 已有确定性网格、NSGA-II、生态位复核、复核审计和岛屿编排。当前小规模岛屿搜索暂无 `registry_precheck=true` 候选,验收条件尚未满足。
+阶段 0 已收束到统一 `core/` 内核、`data_lake` 口径和真实成本模型。旧 `data_full/`、`data/` 缓存已清理。当前阶段 1 已有确定性网格、NSGA-II、生态位复核、复核审计、孵化池和岛屿编排。当前小规模岛屿搜索暂无 `registry_precheck=true` 候选,验收条件尚未满足。
 
 建议顺序：
 
 1. 用 `factory/run_islands.py` 做多岛正式长跑,优先扩大 `reversal_liquidity` / `quality_location` 岛。
-2. 只把 `reports/islands/candidate_batch.json` 中的候选推入台账预审;若为空,继续扩因子池或放宽候选生成,不要跳过审计闸。
+2. 只把 `reports/islands/candidate_batch.json` 中的候选推入台账预审;`incubation_pool.json` 只做研究队列,若正式批为空,继续扩因子池或放宽候选生成,不要跳过审计闸。
 3. 继续以 `strategy_lake.py` 和 `strategy_versions.json` 为准登记新版本。
 4. 用 `run_daily.py --no-update` 验证每日信号流程。
 

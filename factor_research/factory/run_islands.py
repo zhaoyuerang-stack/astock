@@ -46,6 +46,7 @@ def main():
     summary, front = aggregate_islands(manifests, audits, out_dir=args.out_dir)
     print(
         f"\nStage 1.6 islands total_precheck={summary['total_registry_precheck']} "
+        f"incubate={summary['total_incubate']} "
         f"pareto_candidates={summary['pareto_candidates']} acceptance_met={summary['acceptance_met']}"
     )
     if front:
@@ -66,6 +67,7 @@ def main():
             "pairwise_corr_max": lambda x: "" if pd.isna(x) else f"{x:+.2f}",
         }))
     print(f"\nSaved: {Path(args.out_dir) / 'candidate_batch.json'}")
+    print(f"Incubation: {Path(args.out_dir) / 'incubation_pool.json'}")
     print(f"Summary: {Path(args.out_dir) / 'summary.json'}")
 
 

@@ -26,9 +26,10 @@ def main():
     if audits:
         view = pd.DataFrame(audits)
         cols = [
-            "registry_precheck", "niche", "size_exposure", "family", "version", "desc",
+            "registry_precheck", "incubate", "niche", "size_exposure", "family", "version", "desc",
             "in_sample_annual", "in_sample_maxdd", "oos_annual", "pressure_maxdd",
             "cost_up_annual", "cost_up_cost_drag_pa", "source_corr_to_baseline",
+            "incubation_score", "incubation_reason",
         ]
         print(view[cols].head(args.top).to_string(index=False, formatters={
             "size_exposure": "{:.0%}".format,
@@ -39,6 +40,7 @@ def main():
             "cost_up_annual": "{:+.1%}".format,
             "cost_up_cost_drag_pa": "{:.1%}".format,
             "source_corr_to_baseline": lambda x: "" if pd.isna(x) else f"{x:+.2f}",
+            "incubation_score": "{:+.2f}".format,
         }))
     print(f"\nSaved: {out}")
 
