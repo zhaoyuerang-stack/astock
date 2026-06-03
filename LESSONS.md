@@ -24,6 +24,7 @@
 - **原始 fundamental 不够强**:1.10 三岛长跑 `registry_precheck=0`,弱 alpha 主要来自 `fund_bp_value`,但收益不足、压力回撤偏大、与小盘 baseline 相关约 0.7-0.8。后续 fundamental 必须做行业相对、时间分位、财务改善和 regime 过滤,不能只扩大原始 ROE/BPS/EPS 搜索。
 - **行业字段不是全覆盖**:`fundamental_batch.parquet` 有 `industry`,但缺失约 34.5%。行业内排名/行业中性只能对有行业标签的股票生效;缺失行业不应强行填充为同一类,否则会制造伪行业暴露。
 - **自进化必须先证伪**:孵化池自进化只能本地规则化变异 + 三段审计 + 成本上浮,不能让 LLM 直接“脑补”好策略。长跑程序不调用 OpenAI API;若出现 429,优先查 Codex/LLM 并发请求,不是本地回测进程。
+- **定时更新要先过 stale gate**:`run_daily.py` 会在更新失败后继续用旧数据出信号,生产定时不能裸跑它。包装脚本必须先更新数据、重建/检查交易日历、确认最新价量达到应有交易日,再用 `run_daily.py --no-update` 生成信号。
 
 ## 关键决策
 - **文档治理**(2026-06):CLAUDE.md 精简(操作宪法)/ SPEC.md(架构)/ STATUS.md(进度)/ LESSONS.md(本文件)。别再把设计/进度往 CLAUDE.md 堆。

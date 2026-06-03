@@ -12,7 +12,7 @@
 | 统一回测内核 `core/` | ✅ | data_lake + 小盘因子/择时 + 真实换手成本 + 融资成本 |
 | 策略工厂 | ⏳ | 阶段 1.1 最小骨架;阶段 1.2 网格;阶段 1.3 NSGA-II;阶段 1.4 生态位;阶段 1.5 审计+孵化池;阶段 1.6 岛屿;阶段 1.7 扩价量因子池;阶段 1.8 孵化池校准;阶段 1.9 fundamental 正交因子池;阶段 1.10 fundamental 岛屿长跑;阶段 1.11 fundamental 因子工程升级;阶段 1.12 工程化 fundamental 岛屿;阶段 1.13 孵化池自进化;候选验收未达 |
 | 有效策略管理 | ✅台账 / ○监控 | 两层台账已建;失效信号还是文本、无定量阈值 |
-| 中央调度层 | ○ | 未建 |
+| 中央调度层 | ⏳ | 已新增 launchd 定时增量更新/周维护入口;更完整事件驱动调度未建 |
 | 组合层 | ○ | 未建 |
 | 展示层 | ○ | 未建 |
 
@@ -36,5 +36,6 @@
 - 已完成 1.11:fundamental 因子工程升级,新增行业内排名、行业中性、财务变化率、估值分位和质量+价值 regime 因子,并新增对应 niche/island。
 - 已完成 1.12:工程化 fundamental 四岛并发长跑,`review=24` / `registry_precheck=0` / `incubate=23`;最好候选接近 15% 年化但压力回撤失控。
 - 已完成 1.13:新增 `factory/evolve_incubation.py` 孵化池自进化程序,从孵化池读取候选,按代做本地规则化变异→三段审计→幸存者选择→继续进化;不调用 OpenAI API。
+- 已完成 ops:新增 `scripts/ops/scheduled_daily_update.py`、周维护入口和 launchd plist;每日更新先过 stale gate,避免旧数据覆盖信号状态。
 - 当前结论:`candidate_batch.json` 仍为空;**尚未满足 ≥2 个非 small-cap 低相关候选母策略**。
 - 下一焦点:用 1.12 的 `incubation_pool.json` 跑自进化,定向优化 `fund_profit_growth_delta`、行业 BP 价值和估值分位组合;`debt_ratio` 和两融因子需等批量数据稳定落表后再接。

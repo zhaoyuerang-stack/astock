@@ -56,6 +56,52 @@ cd /Users/kiki/astcok/factor_research
 python3 run_daily.py
 ```
 
+## 定时增量更新
+
+生产定时入口不要直接裸跑 `run_daily.py`，使用包装脚本先更新数据、校验新鲜度，再生成信号：
+
+```bash
+cd /Users/kiki/astcok/factor_research
+/usr/bin/python3 scripts/ops/scheduled_daily_update.py
+```
+
+dry run 不会更新数据或生成信号，只验证锁、日历、日志和报告链路：
+
+```bash
+cd /Users/kiki/astcok/factor_research
+/usr/bin/python3 scripts/ops/scheduled_daily_update.py --dry-run
+```
+
+安装 macOS `launchd` 定时任务：
+
+```bash
+cd /Users/kiki/astcok/factor_research
+scripts/ops/install_launchd_jobs.sh
+```
+
+已配置的任务：
+
+- `com.astcok.daily-update`: 周一到周五本机 01:30 执行，对应中国时间盘后约 16:30/17:30。
+- `com.astcok.weekly-maintenance`: 周日本机 02:30 执行，重建周/月线、刷新不复权价、完整质量校验。
+
+手动触发：
+
+```bash
+launchctl kickstart -k gui/$UID/com.astcok.daily-update
+launchctl kickstart -k gui/$UID/com.astcok.weekly-maintenance
+```
+
+查看日志和报告：
+
+```text
+logs/daily_update/YYYY-MM-DD.log
+logs/daily_update/launchd.out.log
+logs/daily_update/launchd.err.log
+reports/ops/daily_update/YYYY-MM-DD.json
+```
+
+包装脚本会在数据落后应有交易日时跳过信号生成，避免用旧数据覆盖 `signals/state.json`。
+
 ## 复测真实口径策略
 
 运行 `data_lake` 口径复测：
