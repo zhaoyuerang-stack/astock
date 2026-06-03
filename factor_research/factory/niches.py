@@ -5,6 +5,17 @@ SIZE_FACTORS = {"size20", "size40", "size60"}
 FUNDAMENTAL_QUALITY_FACTORS = {"fund_roe_quality", "fund_gross_margin_quality", "fund_cfo_quality"}
 FUNDAMENTAL_GROWTH_FACTORS = {"fund_revenue_growth", "fund_profit_growth"}
 FUNDAMENTAL_VALUE_FACTORS = {"fund_eps_yield", "fund_bp_value"}
+FUNDAMENTAL_INDUSTRY_FACTORS = {
+    "fund_roe_ind_rank", "fund_gross_margin_ind_rank", "fund_cfo_ind_rank",
+    "fund_revenue_growth_ind_rank", "fund_profit_growth_ind_rank",
+    "fund_eps_yield_ind_rank", "fund_bp_value_ind_rank",
+    "fund_roe_ind_neutral", "fund_profit_growth_ind_neutral", "fund_bp_value_ind_neutral",
+}
+FUNDAMENTAL_CHANGE_FACTORS = {
+    "fund_roe_delta", "fund_gross_margin_delta", "fund_cfo_delta", "fund_profit_growth_delta",
+}
+FUNDAMENTAL_PCTILE_FACTORS = {"fund_bp_value_pctile", "fund_eps_yield_pctile"}
+FUNDAMENTAL_REGIME_FACTORS = {"fund_quality_value_regime", "fund_growth_value_regime"}
 
 
 def factor_names(row):
@@ -29,6 +40,14 @@ def niche_label(row):
         return "pure-size"
     if exposure > 0:
         return "size-blend"
+    if "fundamental-regime" in families or any(f in FUNDAMENTAL_REGIME_FACTORS for f in factors):
+        return "fundamental-regime"
+    if "fundamental-industry" in families or any(f in FUNDAMENTAL_INDUSTRY_FACTORS for f in factors):
+        return "fundamental-industry"
+    if "fundamental-change" in families or any(f in FUNDAMENTAL_CHANGE_FACTORS for f in factors):
+        return "fundamental-change"
+    if "fundamental-value-pctile" in families or any(f in FUNDAMENTAL_PCTILE_FACTORS for f in factors):
+        return "fundamental-value-pctile"
     has_fund_quality = "fundamental-quality" in families or any(f in FUNDAMENTAL_QUALITY_FACTORS for f in factors)
     has_fund_growth = "fundamental-growth" in families or any(f in FUNDAMENTAL_GROWTH_FACTORS for f in factors)
     has_fund_value = "fundamental-value" in families or any(f in FUNDAMENTAL_VALUE_FACTORS for f in factors)

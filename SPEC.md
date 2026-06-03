@@ -10,7 +10,7 @@
 ## 架构(自下而上;✅已建 / ⏳进行中 / ○未建)
 1. **数据基础设施** `data_lake` ✅ — 全市场+全历史+含退市股的最全口径。
 2. **统一回测内核** `core/` ✅ — `data_lake` 加载 + 因子/择时 + 真实买卖成本 + 融资成本 + 指标,作为生产与研究单一事实源。
-3. **策略工厂** ⏳ — 已建确定性网格、最小 NSGA-II、生态位搜索、review audit、孵化池、岛屿编排、扩展非小盘价量因子池和 fundamental 正交因子池;下一步围绕 fundamental 岛屿做候选发现 + 自动证伪(过拟合/幸存者偏差/特定行情);**按母策略隔离进化(岛屿模型,见下「防同质化」)**。当前小规模搜索尚未产出 ≥2 个通过预审的非 small-cap 低相关候选。
+3. **策略工厂** ⏳ — 已建确定性网格、最小 NSGA-II、生态位搜索、review audit、孵化池、岛屿编排、扩展非小盘价量因子池、fundamental 正交因子池和 fundamental 因子工程升级;下一步围绕工程化 fundamental 岛屿做候选发现 + 自动证伪(过拟合/幸存者偏差/特定行情);**按母策略隔离进化(岛屿模型,见下「防同质化」)**。当前小规模搜索尚未产出 ≥2 个通过预审的非 small-cap 低相关候选。
 4. **有效策略管理** ✅台账 / ○监控 — 母策略两层台账,跟踪 有效/衰减/退役。
 5. **中央调度层** ○ — event-driven 编排:数据就绪 / 市场状态切换 / 失效信号触发 → 启动或停用 对应母策略/组合;并负责定时/条件拉取数据。
 6. **组合层** ○ — 从「有效」母策略组合(低相关加权 / 轮换,机制待定)。
@@ -24,7 +24,7 @@
 - **增量更新** ✅:`scripts/data/update_lake.py::update_prices()`,集成于 `run_daily.py` 第①步。
 - **维护** ✅:`scripts/data/build_*`(建湖/财务/ST历史)、`scripts/repair/*`(日历/坏值修复)、`validate_final.py`(质量校验 ~99.9%)。
 - **数据源** `lake/sources/`:tencent(主力后复权)、sina、em_fin(东财批量财务 `yjbb_em`)、exchange(两融)。
-- **fundamental 因子池**:策略工厂使用 `fundamental_batch.parquet` 的 ROE、毛利率、经营现金流、收入/利润增速、EPS TTM、BPS,按 `avail_date` 对齐;价值类收益率因子用不复权价计算,避免复权价估值量纲错误。
+- **fundamental 因子池**:策略工厂使用 `fundamental_batch.parquet` 的 ROE、毛利率、经营现金流、收入/利润增速、EPS TTM、BPS、industry,按 `avail_date` 对齐;价值类收益率因子用不复权价计算,避免复权价估值量纲错误。工程化因子包括行业内排名、行业中性残差、财务变化率、估值时间分位、质量+价值 regime 过滤。
 - **缺口** ○:定时拉取(cron/launchd 收盘后触发 `run_daily`)、事件驱动(归入中央调度层)。
 
 ## 母策略台账 schema(两层,`strategy_registry.py`)

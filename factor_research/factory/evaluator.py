@@ -10,7 +10,7 @@ from core.backtest import (
 )
 from factory.objectives import evaluate_objectives
 from factory.search_space import build_factor, factor_library
-from lake.load_lake import load_fundamental_panel, load_raw_close
+from lake.load_lake import FUND_FIELDS, load_fundamental_panel, load_raw_close
 
 
 def run_candidate_returns(candidate, close, amount, library, start, cost_model=None):
@@ -49,7 +49,7 @@ def evaluate_candidates(candidates, start="2018-01-01"):
 def prepare_context(start="2018-01-01"):
     close, volume, amount = load_price_panels(start)
     codes = list(close.columns)
-    fundamentals = load_fundamental_panel(close.index, codes=codes)
+    fundamentals = load_fundamental_panel(close.index, codes=codes, fields=FUND_FIELDS + ["industry"])
     raw_close = load_raw_close(codes=codes, start=start)
     if not raw_close.empty:
         raw_close = raw_close.reindex(index=close.index, columns=close.columns)

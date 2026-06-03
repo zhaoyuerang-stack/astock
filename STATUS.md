@@ -10,7 +10,7 @@
 |----|------|------|
 | 数据基础设施 | ✅ | data_lake 全市场+全历史+含退市股,质量 ~99.9%;旧 data_full/data 已删 |
 | 统一回测内核 `core/` | ✅ | data_lake + 小盘因子/择时 + 真实换手成本 + 融资成本 |
-| 策略工厂 | ⏳ | 阶段 1.1 最小骨架;阶段 1.2 网格;阶段 1.3 NSGA-II;阶段 1.4 生态位;阶段 1.5 审计+孵化池;阶段 1.6 岛屿;阶段 1.7 扩价量因子池;阶段 1.8 孵化池校准;阶段 1.9 fundamental 正交因子池;候选验收未达 |
+| 策略工厂 | ⏳ | 阶段 1.1 最小骨架;阶段 1.2 网格;阶段 1.3 NSGA-II;阶段 1.4 生态位;阶段 1.5 审计+孵化池;阶段 1.6 岛屿;阶段 1.7 扩价量因子池;阶段 1.8 孵化池校准;阶段 1.9 fundamental 正交因子池;阶段 1.10 fundamental 岛屿长跑;阶段 1.11 fundamental 因子工程升级;候选验收未达 |
 | 有效策略管理 | ✅台账 / ○监控 | 两层台账已建;失效信号还是文本、无定量阈值 |
 | 中央调度层 | ○ | 未建 |
 | 组合层 | ○ | 未建 |
@@ -32,5 +32,7 @@
 - 已完成 1.7:扩展非 small-cap 因子池(流动性冷却/低 beta/波动压缩/趋势稳定),新增 `defensive_liquidity` / `trend_quality` 生态位,并扩大 top_n/rebalance 低换手搜索空间。
 - 已完成 1.8:孵化池候选降杠杆/降频/组合贡献测试,`registry_precheck=0`;低相关弱候选仍只能留在孵化池。
 - 已完成 1.9:接入 `fundamental_batch.parquet` 的 quality/growth/value 正交因子池,新增 `fundamental_quality` / `fundamental_value` / `orthogonal_fundamental` niche 和 fundamental 岛屿。
-- 当前结论:上一轮岛屿/孵化校准 `registry_precheck=0`,`candidate_batch.json` 为空;**尚未满足 ≥2 个非 small-cap 低相关候选母策略**。
-- 下一焦点:运行 fundamental 岛屿搜索,看财务质量/成长/价值能否提供真正低相关候选;`debt_ratio` 和两融因子需等批量数据稳定落表后再接。
+- 已完成 1.10:fundamental 三岛长跑,`review=11` / `registry_precheck=0` / `incubate=11`;弱 alpha 集中在 `fund_bp_value`,但收益、回撤和相关性均未达母策略预审。
+- 已完成 1.11:fundamental 因子工程升级,新增行业内排名、行业中性、财务变化率、估值分位和质量+价值 regime 因子,并新增对应 niche/island。
+- 当前结论:`candidate_batch.json` 仍为空;**尚未满足 ≥2 个非 small-cap 低相关候选母策略**。
+- 下一焦点:跑 1.11 工程化 fundamental 岛屿,验证行业相对/变化率/regime 是否能把弱候选推过审计闸;`debt_ratio` 和两融因子需等批量数据稳定落表后再接。

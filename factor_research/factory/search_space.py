@@ -35,6 +35,43 @@ def _valuation_yield(value, price):
     return value.div(price).replace([np.inf, -np.inf], np.nan)
 
 
+def _industry_rank(panel, industry):
+    if industry is None or industry.empty:
+        return pd.DataFrame(index=panel.index, columns=panel.columns, dtype=float)
+    industry = industry.reindex(index=panel.index, columns=panel.columns)
+    ranked = pd.DataFrame(index=panel.index, columns=panel.columns, dtype=float)
+    for date in panel.index:
+        values = panel.loc[date]
+        groups = industry.loc[date]
+        valid = values.notna() & groups.notna()
+        if valid.any():
+            ranked.loc[date, valid] = values[valid].groupby(groups[valid]).rank(pct=True)
+    return ranked
+
+
+def _industry_neutral(panel, industry):
+    if industry is None or industry.empty:
+        return pd.DataFrame(index=panel.index, columns=panel.columns, dtype=float)
+    industry = industry.reindex(index=panel.index, columns=panel.columns)
+    neutral = pd.DataFrame(index=panel.index, columns=panel.columns, dtype=float)
+    for date in panel.index:
+        values = panel.loc[date]
+        groups = industry.loc[date]
+        valid = values.notna() & groups.notna()
+        if valid.any():
+            medians = values[valid].groupby(groups[valid]).transform("median")
+            neutral.loc[date, valid] = values[valid] - medians
+    return neutral
+
+
+def _ts_percentile(panel, window=756):
+    return panel.rolling(window, min_periods=max(60, window // 4)).rank(pct=True)
+
+
+def _fund_delta(panel, window=252):
+    return panel - panel.shift(window)
+
+
 def factor_library(close, volume, amount, fundamentals=None, raw_close=None):
     ret = close.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan)
     market_ret = ret.mean(axis=1)
@@ -50,7 +87,12 @@ def factor_library(close, volume, amount, fundamentals=None, raw_close=None):
     net_profit_yoy = _fund_panel(fundamentals, "net_profit_yoy", close)
     eps_ttm = _fund_panel(fundamentals, "eps_ttm", close)
     bps = _fund_panel(fundamentals, "bps", close)
+    industry = _fund_panel(fundamentals, "industry", close)
     price_for_value = raw_close if raw_close is not None and not raw_close.empty else close
+    eps_yield = _valuation_yield(eps_ttm, price_for_value)
+    bp_value = _valuation_yield(bps, price_for_value)
+    quality_value_regime = _industry_rank(roe, industry) * _ts_percentile(bp_value)
+    growth_value_regime = _industry_rank(net_profit_yoy, industry) * _ts_percentile(bp_value)
     return {
         "size20": small_cap_factor(amount, 20),
         "size40": small_cap_factor(amount, 40),
@@ -90,8 +132,26 @@ def factor_library(close, volume, amount, fundamentals=None, raw_close=None):
         "fund_cfo_quality": safe_zscore(mad_clip(cfo_ps)),
         "fund_revenue_growth": safe_zscore(mad_clip(revenue_yoy)),
         "fund_profit_growth": safe_zscore(mad_clip(net_profit_yoy)),
-        "fund_eps_yield": safe_zscore(mad_clip(_valuation_yield(eps_ttm, price_for_value))),
-        "fund_bp_value": safe_zscore(mad_clip(_valuation_yield(bps, price_for_value))),
+        "fund_eps_yield": safe_zscore(mad_clip(eps_yield)),
+        "fund_bp_value": safe_zscore(mad_clip(bp_value)),
+        "fund_roe_ind_rank": safe_zscore(mad_clip(_industry_rank(roe, industry))),
+        "fund_gross_margin_ind_rank": safe_zscore(mad_clip(_industry_rank(gross_margin, industry))),
+        "fund_cfo_ind_rank": safe_zscore(mad_clip(_industry_rank(cfo_ps, industry))),
+        "fund_revenue_growth_ind_rank": safe_zscore(mad_clip(_industry_rank(revenue_yoy, industry))),
+        "fund_profit_growth_ind_rank": safe_zscore(mad_clip(_industry_rank(net_profit_yoy, industry))),
+        "fund_eps_yield_ind_rank": safe_zscore(mad_clip(_industry_rank(eps_yield, industry))),
+        "fund_bp_value_ind_rank": safe_zscore(mad_clip(_industry_rank(bp_value, industry))),
+        "fund_roe_ind_neutral": safe_zscore(mad_clip(_industry_neutral(roe, industry))),
+        "fund_profit_growth_ind_neutral": safe_zscore(mad_clip(_industry_neutral(net_profit_yoy, industry))),
+        "fund_bp_value_ind_neutral": safe_zscore(mad_clip(_industry_neutral(bp_value, industry))),
+        "fund_roe_delta": safe_zscore(mad_clip(_fund_delta(roe))),
+        "fund_gross_margin_delta": safe_zscore(mad_clip(_fund_delta(gross_margin))),
+        "fund_cfo_delta": safe_zscore(mad_clip(_fund_delta(cfo_ps))),
+        "fund_profit_growth_delta": safe_zscore(mad_clip(_fund_delta(net_profit_yoy))),
+        "fund_bp_value_pctile": safe_zscore(mad_clip(_ts_percentile(bp_value))),
+        "fund_eps_yield_pctile": safe_zscore(mad_clip(_ts_percentile(eps_yield))),
+        "fund_quality_value_regime": safe_zscore(mad_clip(quality_value_regime)),
+        "fund_growth_value_regime": safe_zscore(mad_clip(growth_value_regime)),
     }
 
 
@@ -130,6 +190,19 @@ FACTOR_FAMILIES = {
     "fundamental-quality": ["fund_roe_quality", "fund_gross_margin_quality", "fund_cfo_quality"],
     "fundamental-growth": ["fund_revenue_growth", "fund_profit_growth"],
     "fundamental-value": ["fund_eps_yield", "fund_bp_value"],
+    "fundamental-industry-rank": [
+        "fund_roe_ind_rank", "fund_gross_margin_ind_rank", "fund_cfo_ind_rank",
+        "fund_revenue_growth_ind_rank", "fund_profit_growth_ind_rank",
+        "fund_eps_yield_ind_rank", "fund_bp_value_ind_rank",
+    ],
+    "fundamental-industry-neutral": [
+        "fund_roe_ind_neutral", "fund_profit_growth_ind_neutral", "fund_bp_value_ind_neutral",
+    ],
+    "fundamental-change": [
+        "fund_roe_delta", "fund_gross_margin_delta", "fund_cfo_delta", "fund_profit_growth_delta",
+    ],
+    "fundamental-value-pctile": ["fund_bp_value_pctile", "fund_eps_yield_pctile"],
+    "fundamental-regime": ["fund_quality_value_regime", "fund_growth_value_regime"],
 }
 
 
@@ -190,6 +263,11 @@ def grid_candidates(limit=None):
         (("fund_revenue_growth", "fund_profit_growth"), (0.5, 0.5)),
         (("fund_eps_yield", "fund_bp_value"), (0.5, 0.5)),
         (("fund_roe_quality", "fund_eps_yield", "fund_cfo_quality"), (0.4, 0.3, 0.3)),
+        (("fund_roe_ind_rank", "fund_bp_value_ind_rank"), (0.5, 0.5)),
+        (("fund_profit_growth_ind_rank", "fund_bp_value_pctile"), (0.5, 0.5)),
+        (("fund_roe_delta", "fund_gross_margin_delta"), (0.5, 0.5)),
+        (("fund_quality_value_regime", "fund_profit_growth_ind_rank"), (0.6, 0.4)),
+        (("fund_growth_value_regime", "fund_bp_value_ind_neutral"), (0.6, 0.4)),
     ]
     for factors, weights in blend_specs:
         for top_n in top_ns:

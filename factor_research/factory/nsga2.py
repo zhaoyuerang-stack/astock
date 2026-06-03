@@ -18,6 +18,16 @@ NICHE_FAMILIES = {
     "fundamental_quality": ["fundamental-quality", "fundamental-growth"],
     "fundamental_value": ["fundamental-value", "fundamental-quality"],
     "orthogonal_fundamental": ["fundamental-quality", "fundamental-growth", "fundamental-value"],
+    "fundamental_industry": [
+        "fundamental-industry-rank", "fundamental-industry-neutral",
+        "fundamental-quality", "fundamental-value",
+    ],
+    "fundamental_change": ["fundamental-change", "fundamental-growth", "fundamental-quality"],
+    "fundamental_value_pctile": ["fundamental-value-pctile", "fundamental-value", "fundamental-industry-rank"],
+    "fundamental_regime": [
+        "fundamental-regime", "fundamental-value-pctile",
+        "fundamental-industry-rank", "fundamental-industry-neutral",
+    ],
 }
 TOP_N_CHOICES = [15, 20, 25, 40, 60, 80, 120]
 REBALANCE_CHOICES = [10, 20, 40, 60, 80]

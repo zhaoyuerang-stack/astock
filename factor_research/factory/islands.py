@@ -81,6 +81,30 @@ DEFAULT_ISLANDS = [
         generations=2,
         hypothesis="Fundamental value and profitability as a non-size parent strategy source.",
     ),
+    IslandSpec(
+        name="fundamental_industry_a",
+        niche="fundamental_industry",
+        seed=823,
+        population=8,
+        generations=2,
+        hypothesis="Industry-relative accounting strength to reduce sector concentration bias.",
+    ),
+    IslandSpec(
+        name="fundamental_change_a",
+        niche="fundamental_change",
+        seed=907,
+        population=8,
+        generations=2,
+        hypothesis="Financial improvement signals as an orthogonal catalyst source.",
+    ),
+    IslandSpec(
+        name="fundamental_regime_a",
+        niche="fundamental_regime",
+        seed=1013,
+        population=8,
+        generations=2,
+        hypothesis="Quality/value regime filters to avoid weak raw fundamental exposure.",
+    ),
 ]
 
 
@@ -117,6 +141,14 @@ def small_islands(population=4, generations=1):
             population=population,
             generations=generations,
             hypothesis="Smoke island for fundamental quality/growth.",
+        ),
+        IslandSpec(
+            name="fundamental_regime_smoke",
+            niche="fundamental_regime",
+            seed=1013,
+            population=population,
+            generations=generations,
+            hypothesis="Smoke island for engineered fundamental regime factors.",
         ),
     ]
 
