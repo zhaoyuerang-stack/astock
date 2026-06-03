@@ -25,6 +25,12 @@ class Candidate:
 
 def factor_library(close, volume, amount):
     ret = close.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan)
+    market_ret = ret.mean(axis=1)
+    market_var60 = market_ret.rolling(60).var() + 1e-8
+    beta60 = ret.mul(market_ret, axis=0).rolling(60).mean().div(market_var60, axis=0)
+    rel_amount20 = amount.rolling(20).mean() / (amount.rolling(120).mean() + 1e-6)
+    vol20 = ret.rolling(20).std()
+    trend60 = close / close.rolling(60).mean() - 1
     return {
         "size20": small_cap_factor(amount, 20),
         "size40": small_cap_factor(amount, 40),
@@ -47,6 +53,16 @@ def factor_library(close, volume, amount):
         "low_turnover20": safe_zscore(
             mad_clip(-(amount / (amount.rolling(60).mean() + 1e-6)).rolling(20).mean())
         ),
+        "liquidity_dryup20": safe_zscore(mad_clip(-rel_amount20)),
+        "liquidity_dryup60": safe_zscore(mad_clip(
+            -(amount.rolling(60).mean() / (amount.rolling(180).mean() + 1e-6))
+        )),
+        "low_beta60": safe_zscore(mad_clip(-beta60)),
+        "trend_stability60": safe_zscore(mad_clip(trend60 / (vol20 + 1e-6))),
+        "trend_stability120": safe_zscore(mad_clip(
+            (close / close.rolling(120).mean() - 1) / (ret.rolling(40).std() + 1e-6)
+        )),
+        "range_compression20": safe_zscore(mad_clip(-ret.rolling(20).std() / (ret.rolling(60).std() + 1e-6))),
         "price_below_ma20": safe_zscore(mad_clip(-(close / close.rolling(20).mean() - 1))),
         "price_below_ma60": safe_zscore(mad_clip(-(close / close.rolling(60).mean() - 1))),
     }
@@ -80,6 +96,9 @@ FACTOR_FAMILIES = {
     "reversal": ["reversal5", "reversal10", "reversal20"],
     "momentum-quality": ["momentum_quality10", "momentum_quality20", "momentum_quality40"],
     "liquidity-flow": ["low_turnover5", "low_turnover10", "low_turnover20"],
+    "liquidity-quality": ["liquidity_dryup20", "liquidity_dryup60"],
+    "beta-defensive": ["low_beta60", "range_compression20"],
+    "trend-stability": ["trend_stability60", "trend_stability120"],
     "price-location": ["price_below_ma20", "price_below_ma60"],
 }
 
@@ -107,8 +126,8 @@ def grid_candidates(limit=None):
     breadth and rebalance frequency. This is still enumeration, not NSGA-II.
     """
     candidates = []
-    top_ns = [20, 25, 40]
-    rebalances = [10, 20, 40]
+    top_ns = [20, 25, 40, 80]
+    rebalances = [10, 20, 40, 60]
 
     base_factors = [name for names in FACTOR_FAMILIES.values() for name in names]
     i = 1
@@ -130,8 +149,13 @@ def grid_candidates(limit=None):
         (("low_vol20", "reversal20"), (0.5, 0.5)),
         (("low_turnover10", "low_vol20"), (0.5, 0.5)),
         (("low_turnover10", "price_below_ma60"), (0.5, 0.5)),
+        (("liquidity_dryup20", "low_beta60"), (0.5, 0.5)),
+        (("trend_stability60", "range_compression20"), (0.5, 0.5)),
+        (("liquidity_dryup60", "price_below_ma60"), (0.5, 0.5)),
         (("size60", "low_vol20", "reversal20"), (0.4, 0.3, 0.3)),
         (("low_turnover10", "low_vol20", "price_below_ma60"), (0.4, 0.3, 0.3)),
+        (("liquidity_dryup20", "low_beta60", "price_below_ma60"), (0.4, 0.3, 0.3)),
+        (("trend_stability60", "momentum_quality20", "range_compression20"), (0.4, 0.3, 0.3)),
     ]
     for factors, weights in blend_specs:
         for top_n in top_ns:

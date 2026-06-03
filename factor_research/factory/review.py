@@ -88,6 +88,8 @@ def _incubation_reason(audit_row):
     corr = audit_row.get("source_corr_to_baseline")
     if corr is not None and abs(corr) < 0.75:
         reasons.append("low_baseline_corr")
+    elif corr is not None and abs(corr) < 0.85:
+        reasons.append("diversifying_corr")
     if audit_row.get("oos_annual", -1) > 0:
         reasons.append("oos_positive")
     if audit_row.get("pressure_maxdd", -1) > -0.50:
@@ -105,7 +107,7 @@ def _incubate(audit_row):
     reasons = _incubation_reason(audit_row)
     if audit_row.get("size_exposure", 1) >= 1:
         return False
-    if "low_baseline_corr" not in reasons:
+    if "low_baseline_corr" not in reasons and "diversifying_corr" not in reasons:
         return False
     return (
         "oos_positive" in reasons

@@ -13,9 +13,11 @@ NICHE_FAMILIES = {
     "non_size": [family for family in FACTOR_FAMILIES if family != "size"],
     "reversal_liquidity": ["reversal", "liquidity-flow", "price-location"],
     "quality_location": ["low-vol", "momentum-quality", "price-location"],
+    "defensive_liquidity": ["liquidity-quality", "beta-defensive", "price-location"],
+    "trend_quality": ["trend-stability", "momentum-quality", "beta-defensive"],
 }
-TOP_N_CHOICES = [15, 20, 25, 40, 60]
-REBALANCE_CHOICES = [10, 20, 40]
+TOP_N_CHOICES = [15, 20, 25, 40, 60, 80, 120]
+REBALANCE_CHOICES = [10, 20, 40, 60, 80]
 LEVERAGE_CHOICES = [1.0, 1.25]
 MAX_FACTORS = 3
 

@@ -49,6 +49,22 @@ DEFAULT_ISLANDS = [
         generations=2,
         hypothesis="Broad non-size alternative alpha pool.",
     ),
+    IslandSpec(
+        name="defensive_liquidity_a",
+        niche="defensive_liquidity",
+        seed=401,
+        population=8,
+        generations=2,
+        hypothesis="Lower-turnover defensive liquidity and beta compression.",
+    ),
+    IslandSpec(
+        name="trend_quality_a",
+        niche="trend_quality",
+        seed=503,
+        population=8,
+        generations=2,
+        hypothesis="Stable trend continuation with quality and defensive filters.",
+    ),
 ]
 
 
@@ -69,6 +85,14 @@ def small_islands(population=4, generations=1):
             population=population,
             generations=generations,
             hypothesis="Smoke island for non-size quality/location.",
+        ),
+        IslandSpec(
+            name="defensive_liquidity_smoke",
+            niche="defensive_liquidity",
+            seed=401,
+            population=population,
+            generations=generations,
+            hypothesis="Smoke island for defensive liquidity.",
         ),
     ]
 

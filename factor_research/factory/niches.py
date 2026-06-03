@@ -30,6 +30,10 @@ def niche_label(row):
         return "non-size-reversal"
     if "liquidity" in families or any("turnover" in factor for factor in factors):
         return "non-size-liquidity"
+    if "beta-defensive" in families or any("beta" in factor or "compression" in factor for factor in factors):
+        return "non-size-defensive"
+    if "trend-stability" in families or any("trend_stability" in factor for factor in factors):
+        return "non-size-trend"
     if "low-vol" in families or any("vol" in factor for factor in factors):
         return "non-size-quality"
     if "price-location" in families or any("price_below" in factor for factor in factors):
