@@ -10,7 +10,7 @@
 |----|------|------|
 | 数据基础设施 | ✅ | data_lake 全市场+全历史+含退市股,质量 ~99.9%;旧 data_full/data 已删 |
 | 统一回测内核 `core/` | ✅ | data_lake + 小盘因子/择时 + 真实换手成本 + 融资成本 |
-| 策略工厂 | ⏳ | 阶段 1.1 最小骨架;阶段 1.2 网格;阶段 1.3 NSGA-II;阶段 1.4 生态位搜索+复核清单;岛屿模型待建 |
+| 策略工厂 | ⏳ | 阶段 1.1 最小骨架;阶段 1.2 网格;阶段 1.3 NSGA-II;阶段 1.4 生态位搜索;阶段 1.5 复核审计流水线;岛屿模型待建 |
 | 有效策略管理 | ✅台账 / ○监控 | 两层台账已建;失效信号还是文本、无定量阈值 |
 | 中央调度层 | ○ | 未建 |
 | 组合层 | ○ | 未建 |
@@ -26,4 +26,6 @@
 - 已完成 1.2: `factory/run_factory.py --mode grid` 可做确定性批量扫描,输出 `reports/factory_stage1_2.json`;Pareto 先过正收益/正 Sharpe/回撤/OOS 基础门槛。
 - 已完成 1.3: `factory/run_factory.py --mode nsga2` 可跑最小 NSGA-II 多目标搜索,输出 `reports/factory_stage1_3.json` 和 generation history。
 - 已完成 1.4: `--niche non_size/reversal_liquidity/quality_location` 支持生态位搜索,并输出 `*_review.json` 复核清单。
-- 下一焦点:对 review shortlist 做压力测试、成本敏感性和台账预审,确认是否有非 small-cap 候选母策略值得登记。
+- 已完成 1.5: `factory/review_shortlist.py` 可对 review shortlist 做 2018/2023/2010 三段复测 + 成本上浮 50% 敏感性 + `registry_precheck`。
+- 当前结论:`reports/factory_stage1_5_non_size_audit.json` 中 8 个 non-size 小样本候选均未通过台账预审,主要败在压力回撤和成本上浮。
+- 下一焦点:扩大 `reversal_liquidity` / `quality_location` 生态位搜索,只把 `registry_precheck=true` 的候选推入台账预审。

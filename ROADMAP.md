@@ -17,7 +17,8 @@
 - ✅ 1.2 批量扫描:`factory/run_factory.py --mode grid` 确定性候选网格 + 基础质量门槛 + Pareto 前沿报告。
 - ✅ 1.3 最小 NSGA-II:`factory/run_factory.py --mode nsga2` 支持种群、代数、变异率、随机种子和 generation history。
 - ✅ 1.4 生态位搜索:`--niche non_size/reversal_liquidity/quality_location` + `*_review.json` 复核清单,避免只产出 small-cap 变体。
-- 下一步:对 review shortlist 做压力测试/成本敏感性/台账预审,再扩大 **NSGA-II 多目标** 搜索并加入隔离岛屿。
+- ✅ 1.5 复核审计:`factory/review_shortlist.py` 对 shortlist 做 2018/2023/2010 三段复测 + 成本上浮敏感性 + 台账预审标记。
+- 下一步:扩大 **NSGA-II 多目标** 搜索,只保留 `registry_precheck=true` 候选,再加入隔离岛屿。
 - 输出 **Pareto 前沿 = 候选母策略批**。
 - **隔离进化(岛屿模型)**:每个母策略独立种群 / git worktree,生态位差异化(不同数据源/因子族/regime);岛间不迁因子基因,只共享方法。
 - **验收**:≥2 个逻辑不同、收益低相关的候选母策略(非 small-cap 变体)。

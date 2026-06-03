@@ -1,5 +1,6 @@
 """Evaluate candidate strategies through the unified core."""
 from core.backtest import (
+    CostModel,
     StrategyConfig,
     backtest_weights,
     build_rebalance_weights,
@@ -11,7 +12,7 @@ from factory.objectives import evaluate_objectives
 from factory.search_space import build_factor, factor_library
 
 
-def evaluate_candidate(candidate, close, amount, library, benchmark_ret, start):
+def evaluate_candidate(candidate, close, amount, library, benchmark_ret, start, cost_model=None):
     config = StrategyConfig(
         family=candidate.family,
         version=candidate.version,
@@ -19,6 +20,7 @@ def evaluate_candidate(candidate, close, amount, library, benchmark_ret, start):
         top_n=candidate.top_n,
         rebalance_days=candidate.rebalance_days,
         leverage=candidate.leverage,
+        cost=cost_model or CostModel(),
     )
     factor = build_factor(candidate, library)
     timing, _, _ = small_cap_timing(close, amount, config.timing_ma)
