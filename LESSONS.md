@@ -7,6 +7,7 @@
 - **akshare hang**:某些请求卡死整个流程。唯一可靠超时 = **daemon 线程 + join(timeout)**(超时后后台自灭);ThreadPoolExecutor(shutdown 会等 hang)、socket.setdefaulttimeout、requests monkey-patch 都无效。
 - **代理**:本地 clash(7897)下 **新浪源可用、东财 push2 被拦**(ProxyError/502);加 `DOMAIN-SUFFIX,eastmoney.com,DIRECT` 可恢复东财。联网需 `dangerouslyDisableSandbox`。
 - **代码列表偏差**:旧 stocks.json 只有沪市主板(60开头)→ 严重样本偏差(纯蓝筹天花板仅 17%)。必须全市场(`ak.stock_info_a_code_name()`;新浪源加 sh/sz 前缀,北交所 4/8 跳过)。
+- **Python 解释器**:回测/工厂脚本必须用 **`/usr/bin/python3`**(系统 Python,有 pandas/numpy);homebrew 的 `/opt/homebrew/bin/python3` 没装,会 `ModuleNotFoundError: pandas`。只用标准库的脚本(如 `strategy_registry`)两个都能跑,**容易掩盖这个坑**——跑回测一律 `/usr/bin/python3 -m ...`。
 
 ## 数据正确性
 - **防未来函数**:财务用**公告日(ann_date)**对齐交易日 ffill,T 日只用 T 日前已披露。验证:ROE 变化点应落在财报披露日之后(茅台年报在 4 月)。
@@ -22,7 +23,7 @@
 - **孵化池不是入册池**:扩展流动性冷却/低 beta/趋势稳定后,非小盘弱候选能进入 `incubation_pool`;但只要 `registry_precheck=false`,就只能做降频/降杠杆/组合贡献研究,不能当有效母策略。
 - **fundamental 接入边界**:`fundamental_batch.parquet` 已有 `avail_date`,可直接按公告可用日 ffill 到交易日;估值收益率类因子必须用 `price/daily_raw` 不复权价。当前批量表没有 `debt_ratio`,两融目录也未稳定落表,暂不纳入 1.9 第一批正交因子。
 - **原始 fundamental 不够强**:1.10 三岛长跑 `registry_precheck=0`,弱 alpha 主要来自 `fund_bp_value`,但收益不足、压力回撤偏大、与小盘 baseline 相关约 0.7-0.8。后续 fundamental 必须做行业相对、时间分位、财务改善和 regime 过滤,不能只扩大原始 ROE/BPS/EPS 搜索。
-- **低相关与控回撤是结构性矛盾,钥匙在择时层**(从 worktree agent 跑捞回):候选默认都套 `small_cap_ma16` → 熊市同步空仓 → 与 baseline 收益相关被抬到 0.72+;剥掉择时后 fundamental/defensive 候选真低相关(~0.4)但 2018 熊市裸奔回撤 -27%~-62%。**根因不在因子在择时**——1.10→1.12 一路深挖因子仍 `registry_precheck=0`、都败在压力回撤,正是这个矛盾。出路:给非小盘族配**独立 regime/vol-target 择时**(非 small_cap_ma16,用全市场波动/信用利差等不同 regime 变量),或把低相关 sleeve 当组合分散件(小权重混入,样本外能同时降基线回撤+提夏普)。
+- **fundamental/defensive 的高回撤是因子层结构性病,择时救不了,定位组合分散件**(独立择时 full sweep 验证,2026-06):剥掉共享的 `small_cap_ma16` 后 fundamental 候选真低相关(~0.4),但 2018/压力期裸奔回撤 -27%~-74%。**配独立择时(全市场趋势/vol-target/回撤止损,13 基因 × 9 候选 = 117 组合)0 过三道闸**:择时能把相关压到 0.3-0.4,却救不了回撤——fundamental 回撤与全市场 regime 不同步(价值陷阱/暴雷常在大盘平静时发生),`mkt_dd_stop` 止损反而在底部割肉、把年化打负、回撤打更深。**结论:别再给 fundamental 配择时凑达标;它们定位组合分散件(低相关小权重混入,样本外降组合回撤+提夏普),归孵化池/组合层(阶段3)。找第 2 个母策略要换思路——找本身回撤就可控的正交 alpha,而非靠择时事后救。** `factory/timing.py`(13 个独立择时基因)作可复用资产保留。
 - **行业字段不是全覆盖**:`fundamental_batch.parquet` 有 `industry`,但缺失约 34.5%。行业内排名/行业中性只能对有行业标签的股票生效;缺失行业不应强行填充为同一类,否则会制造伪行业暴露。
 - **自进化必须先证伪**:孵化池自进化只能本地规则化变异 + 三段审计 + 成本上浮,不能让 LLM 直接“脑补”好策略。长跑程序不调用 OpenAI API;若出现 429,优先查 Codex/LLM 并发请求,不是本地回测进程。
 - **定时更新要先过 stale gate**:`run_daily.py` 会在更新失败后继续用旧数据出信号,生产定时不能裸跑它。包装脚本必须先更新数据、重建/检查交易日历、确认最新价量达到应有交易日,再用 `run_daily.py --no-update` 生成信号。

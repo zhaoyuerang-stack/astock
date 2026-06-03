@@ -37,5 +37,6 @@
 - 已完成 1.12:工程化 fundamental 四岛并发长跑,`review=24` / `registry_precheck=0` / `incubate=23`;最好候选接近 15% 年化但压力回撤失控。
 - 已完成 1.13:新增 `factory/evolve_incubation.py` 孵化池自进化程序,从孵化池读取候选,按代做本地规则化变异→三段审计→幸存者选择→继续进化;不调用 OpenAI API。
 - 已完成 ops:新增 `scripts/ops/scheduled_daily_update.py`、周维护入口和 launchd plist;每日更新先过 stale gate,避免旧数据覆盖信号状态。
+- 已完成 1.14:独立择时验证(`factory/timing.py` 13 个全市场 regime/vol-target/止损基因 × 9 fundamental/defensive 候选 = 117 组合)→ **0 过三道闸**。择时能把相关压到 0.3-0.4,但救不了 fundamental 的结构性压力回撤(与全市场 regime 不同步,`mkt_dd_stop` 止损反而双杀)。**结论:fundamental/defensive 转组合分散件定位(非独立母策略),`timing.py` 作可复用资产保留;找第 2 个母策略需换思路——找本身回撤就可控的正交 alpha**(详见 LESSONS)。
 - 当前结论:`candidate_batch.json` 仍为空;**尚未满足 ≥2 个非 small-cap 低相关候选母策略**。
 - 下一焦点:用 1.12 的 `incubation_pool.json` 跑自进化,定向优化 `fund_profit_growth_delta`、行业 BP 价值和估值分位组合;`debt_ratio` 和两融因子需等批量数据稳定落表后再接。
