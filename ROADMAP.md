@@ -18,10 +18,10 @@
 - ✅ 1.3 最小 NSGA-II:`factory/run_factory.py --mode nsga2` 支持种群、代数、变异率、随机种子和 generation history。
 - ✅ 1.4 生态位搜索:`--niche non_size/reversal_liquidity/quality_location` + `*_review.json` 复核清单,避免只产出 small-cap 变体。
 - ✅ 1.5 复核审计:`factory/review_shortlist.py` 对 shortlist 做 2018/2023/2010 三段复测 + 成本上浮敏感性 + 台账预审标记。
-- 下一步:扩大 **NSGA-II 多目标** 搜索,只保留 `registry_precheck=true` 候选,再加入隔离岛屿。
-- 输出 **Pareto 前沿 = 候选母策略批**。
-- **隔离进化(岛屿模型)**:每个母策略独立种群 / git worktree,生态位差异化(不同数据源/因子族/regime);岛间不迁因子基因,只共享方法。
-- **验收**:≥2 个逻辑不同、收益低相关的候选母策略(非 small-cap 变体)。
+- ✅ 1.6 岛屿编排:`factory/run_islands.py` 每岛独立 niche/seed/种群/输出,可选 git worktree;只聚合 `registry_precheck=true`。
+- 输出 **Pareto 前沿 = `reports/islands/candidate_batch.json` 候选母策略批**。
+- **隔离进化(岛屿模型)**:每个母策略独立种群 / 可选 git worktree,生态位差异化(不同数据源/因子族/regime);岛间不迁因子基因,只共享方法。
+- **验收**:≥2 个逻辑不同、收益低相关的候选母策略(非 small-cap 变体)。当前小规模搜索未满足,需扩大长跑/因子池。
 
 ## 阶段 2 — 有效管理:入册闸 + 失效监控
 - **三道入册闸**:绝对门槛(15%/20%)+ VIF 收益低相关 + `hypothesis` 逻辑独立。

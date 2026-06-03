@@ -181,14 +181,40 @@ python3 factory/review_shortlist.py reports/factory_stage1_4_non_size.json --inc
 
 审计会复测 2018 主样本、2023 样本外、2010 压力样本,并跑成本上浮 50% 敏感性;`registry_precheck=true` 才值得进入台账预审。
 
+阶段 1.6 岛屿模型入口：
+
+```bash
+cd /Users/kiki/astcok/factor_research
+python3 factory/run_islands.py --smoke --population 4 --generations 2
+```
+
+正式配置去掉 `--smoke`：
+
+```bash
+cd /Users/kiki/astcok/factor_research
+python3 factory/run_islands.py
+```
+
+结果会保存到：
+
+```text
+reports/islands/*/front.json
+reports/islands/*/review.json
+reports/islands/*/audit.json
+reports/islands/candidate_batch.json
+reports/islands/summary.json
+```
+
+`candidate_batch.json` 只保留 `registry_precheck=true` 的最终 Pareto 候选母策略批。`--create-worktrees` 可为每个岛创建 `.worktrees/island_name` 作为代码隔离锚点;搜索仍在主工作区运行,因为 `data_lake/` 是忽略数据,新 worktree 默认没有数据湖。
+
 ## 当前最重要的下一步
 
-阶段 0 已收束到统一 `core/` 内核、`data_lake` 口径和真实成本模型。旧 `data_full/`、`data/` 缓存已清理。当前阶段 1 已有确定性网格、最小 NSGA-II 搜索、生态位复核清单和复核审计流水线。当前 `non_size` 小样本审计暂无台账预审通过项。
+阶段 0 已收束到统一 `core/` 内核、`data_lake` 口径和真实成本模型。旧 `data_full/`、`data/` 缓存已清理。当前阶段 1 已有确定性网格、NSGA-II、生态位复核、复核审计和岛屿编排。当前小规模岛屿搜索暂无 `registry_precheck=true` 候选,验收条件尚未满足。
 
 建议顺序：
 
-1. 用 `factory/run_factory.py --mode nsga2 --niche reversal_liquidity` 和 `--niche quality_location` 扩大种群和代数,观察是否出现非 small-cap 的候选前沿。
-2. 对 `reports/*_review.json` 入围候选运行 `factory/review_shortlist.py`,只把 `registry_precheck=true` 的候选推入台账预审。
+1. 用 `factory/run_islands.py` 做多岛正式长跑,优先扩大 `reversal_liquidity` / `quality_location` 岛。
+2. 只把 `reports/islands/candidate_batch.json` 中的候选推入台账预审;若为空,继续扩因子池或放宽候选生成,不要跳过审计闸。
 3. 继续以 `strategy_lake.py` 和 `strategy_versions.json` 为准登记新版本。
 4. 用 `run_daily.py --no-update` 验证每日信号流程。
 

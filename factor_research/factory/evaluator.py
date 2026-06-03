@@ -12,7 +12,7 @@ from factory.objectives import evaluate_objectives
 from factory.search_space import build_factor, factor_library
 
 
-def evaluate_candidate(candidate, close, amount, library, benchmark_ret, start, cost_model=None):
+def run_candidate_returns(candidate, close, amount, library, start, cost_model=None):
     config = StrategyConfig(
         family=candidate.family,
         version=candidate.version,
@@ -25,7 +25,11 @@ def evaluate_candidate(candidate, close, amount, library, benchmark_ret, start, 
     factor = build_factor(candidate, library)
     timing, _, _ = small_cap_timing(close, amount, config.timing_ma)
     scheduled = build_rebalance_weights(factor, close, config.top_n, config.rebalance_days)
-    ret, detail = backtest_weights(close, scheduled, timing, config)
+    return backtest_weights(close, scheduled, timing, config)
+
+
+def evaluate_candidate(candidate, close, amount, library, benchmark_ret, start, cost_model=None):
+    ret, detail = run_candidate_returns(candidate, close, amount, library, start, cost_model=cost_model)
     obj = evaluate_objectives(ret, detail, benchmark_ret)
     return {
         "family": candidate.family,

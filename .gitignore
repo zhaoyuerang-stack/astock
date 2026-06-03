@@ -18,6 +18,7 @@ factor_research/signals/
 
 # Claude 本地配置
 .claude/settings.local.json
+.worktrees/
 
 # 研报/参考资料(二进制,不纳入,留磁盘)
 *.pdf
