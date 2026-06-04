@@ -103,23 +103,23 @@ def seed_registry():
              status="参考",
              notes="❌含幸存者偏差水分(active过滤剔退市股)，高估约8.5%")
 
-    register("small-cap-size", "v2.0", "v1.0迁移到data_lake准确数据（真实成本，无幸存者偏差）",
+    register("small-cap-size", "v2.0", "data_lake 干净口径(不复权成交额)+真实成本+预热",
              config={"factor": "size60", "timing": "小盘指数MA16",
                      "top_n": 25, "rebal_days": 20, "leverage": 1.25,
                      "cost": {"buy": 0.00225, "sell": 0.00275, "financing_rate": 0.065}},
              data_scope={"source": "data_lake", "period": "2018-2026", "survivorship_bias": False},
-             metrics={"annual": 0.2125, "maxdd": -0.1621, "sharpe": 1.22, "calmar": 1.31, "hit": False},
+             metrics={"annual": 0.222, "maxdd": -0.200, "sharpe": 1.38, "calmar": 1.11, "hit": False},
              status="在册",
-             notes="✅真实成本基线：年均换手约32.1x，成本拖累约11.0%/年；阶段1需围绕收益/回撤/换手多目标优化")
+             notes="✅干净口径(修复amount复权污染)+预热(从2010切2018)。达满意线未达卓越；剔极端年(15/21/25)常态仅15%/夏普0.9，满意线靠小盘疯牛年；容量~2千万小资金可实盘。(旧污染口径曾报21.2%/夏普1.22)")
 
     register("small-cap-size", "v2.1", "v2.0全历史压力测试（真实成本，含2015股灾/2017小盘崩盘）",
              config={"factor": "size60", "timing": "小盘指数MA16",
                      "top_n": 25, "rebal_days": 20, "leverage": 1.25,
                      "cost": {"buy": 0.00225, "sell": 0.00275, "financing_rate": 0.065}},
              data_scope={"source": "data_lake", "period": "2010-2026", "survivorship_bias": False},
-             metrics={"annual": 0.2312, "maxdd": -0.3394, "sharpe": 1.12, "calmar": 0.68, "hit": False},
+             metrics={"annual": 0.242, "maxdd": -0.317, "sharpe": 1.27, "calmar": 0.76, "hit": False},
              status="参考",
-             notes="真实成本压力测试：年均换手约32.9x，成本拖累约11.2%/年；2015小盘疯牛仍强，但长期回撤放大")
+             notes="干净口径压力测试：剔极端年常态仅12%/夏普0.71；2011/2018小盘逆风长期阴跌(-32%回撤)；超额强依赖2015/2021/2025疯牛年")
 
 
 # ── 命令行入口 ──
