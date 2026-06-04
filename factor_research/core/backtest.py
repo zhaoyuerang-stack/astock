@@ -54,9 +54,9 @@ def mad_clip(df, n=5):
 def load_price_panels(start="2010-01-01"):
     px = load_prices(start=start, fields=("close", "volume"))
     raw = load_raw_close(start=start)
-    # 成交额按【不复权价】重算:原 amount=volume×复权close,复权因子逐股不同,
-    # 会污染 small_cap_factor/small_cap_timing 的截面排序(偏向复权因子小的次新/老股)。
-    amount = px["volume"] * raw.reindex(index=px["volume"].index, columns=px["volume"].columns)
+    # 成交额按【不复权价】重算(原 amount=volume×复权close,复权因子逐股不同,会污染
+    # small_cap_factor/timing 的截面排序);volume 单位是手,×100 还原成股得真实成交额(元)。
+    amount = px["volume"] * 100 * raw.reindex(index=px["volume"].index, columns=px["volume"].columns)
     return px["close"], px["volume"], amount
 
 
