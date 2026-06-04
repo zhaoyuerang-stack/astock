@@ -58,16 +58,37 @@ print(f"  ① size因子 滚动12 RankIC : {cur_ic:+.3f}   (历史均 {ic.mean()
 print(f"  ② 小盘相对动量(6月)      : {cur_rel:+.1%}   (<0 = 小盘逆风,v2.0 命门)")
 print(f"  ③ v2.0 滚动12月夏普      : {cur_sh:.2f}   (历史均 {roll_sharpe.mean():.2f})")
 
-flags = []
+# 前瞻分级:每信号 0健康/1观察/2预警。IC 不等转负——见顶下行即观察。
+ic_peak = float(roll_ic.dropna().iloc[-12:].max())
+grades, msgs = [], []
 if cur_ic < 0:
-    flags.append("size因子IC转负")
+    grades.append(2); msgs.append("size因子IC转负(已失效)")
+elif cur_ic < ic.mean() * 0.4 or (ic_peak > 0 and cur_ic / ic_peak - 1 < -0.5):
+    grades.append(1); msgs.append("size因子IC见顶下行")
+else:
+    grades.append(0)
 if cur_rel < -0.05:
-    flags.append("小盘逆风")
+    grades.append(2); msgs.append("小盘逆风")
+elif cur_rel < 0:
+    grades.append(1); msgs.append("小盘走弱")
+else:
+    grades.append(0)
 if cur_sh < 0.5:
-    flags.append("滚动夏普<0.5")
-status = "🔴 预警(建议减仓/复审退役)" if len(flags) >= 2 else ("🟡 观察" if flags else "🟢 健康")
-print(f"\n  当前状态: {status}" + (f"  触发: {', '.join(flags)}" if flags else ""))
-print("  阈值:① 滚动IC<0 ② 小盘相对动量<-5% ③ 滚动夏普<0.5;任一=观察,≥2 同时触发=预警")
+    grades.append(2); msgs.append("滚动夏普<0.5")
+elif cur_sh < roll_sharpe.mean() * 0.6:
+    grades.append(1); msgs.append("夏普回落")
+else:
+    grades.append(0)
+n_warn, n_watch = grades.count(2), grades.count(1)
+if n_warn >= 1 or n_watch >= 2:
+    status = "🔴 预警(减仓/复审退役)"
+elif n_watch == 1:
+    status = "🟡 观察"
+else:
+    status = "🟢 健康"
+print(f"\n  当前状态: {status}" + (f"  触发: {', '.join(msgs)}" if msgs else ""))
+print("  前瞻阈值:IC<历史均×0.4 或从近12月峰值回落>50%=观察(转负=预警);"
+      "小盘动量<0=观察(<-5%=预警);夏普<历史均×0.6=观察(<0.5=预警)。任一预警或≥2观察→🔴")
 
 fig, ax = plt.subplots(3, 1, figsize=(12, 9), sharex=True)
 ax[0].plot(roll_ic.index, roll_ic.values)
