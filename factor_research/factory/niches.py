@@ -16,6 +16,14 @@ FUNDAMENTAL_CHANGE_FACTORS = {
 }
 FUNDAMENTAL_PCTILE_FACTORS = {"fund_bp_value_pctile", "fund_eps_yield_pctile"}
 FUNDAMENTAL_REGIME_FACTORS = {"fund_quality_value_regime", "fund_growth_value_regime"}
+MARGIN_FLOW_FACTORS = {
+    "margin_balance_chg5", "margin_balance_chg20", "margin_balance_drop20",
+    "margin_buy_ratio20", "margin_buy_ratio_drop20",
+}
+SHORT_FLOW_FACTORS = {"short_balance_chg20", "short_balance_drop20"}
+NORTHBOUND_FLOW_FACTORS = {
+    "north_hold_chg5", "north_hold_chg20", "north_value_chg1", "north_value_chg20",
+}
 
 
 def factor_names(row):
@@ -40,6 +48,12 @@ def niche_label(row):
         return "pure-size"
     if exposure > 0:
         return "size-blend"
+    if any(f in NORTHBOUND_FLOW_FACTORS for f in factors):
+        return "northbound-flow"
+    if any(f in MARGIN_FLOW_FACTORS for f in factors):
+        return "margin-flow"
+    if any(f in SHORT_FLOW_FACTORS for f in factors):
+        return "short-flow"
     if "fundamental-regime" in families or any(f in FUNDAMENTAL_REGIME_FACTORS for f in factors):
         return "fundamental-regime"
     if "fundamental-industry" in families or any(f in FUNDAMENTAL_INDUSTRY_FACTORS for f in factors):

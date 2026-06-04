@@ -72,7 +72,13 @@ def _fund_delta(panel, window=252):
     return panel - panel.shift(window)
 
 
-def factor_library(close, volume, amount, fundamentals=None, raw_close=None):
+def _capital_panel(capital, name, close):
+    if not capital or name not in capital or capital[name].empty:
+        return pd.DataFrame(index=close.index, columns=close.columns, dtype=float)
+    return capital[name].reindex(index=close.index, columns=close.columns)
+
+
+def factor_library(close, volume, amount, fundamentals=None, raw_close=None, capital=None):
     ret = close.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan)
     market_ret = ret.mean(axis=1)
     market_var60 = market_ret.rolling(60).var() + 1e-8
@@ -93,6 +99,19 @@ def factor_library(close, volume, amount, fundamentals=None, raw_close=None):
     bp_value = _valuation_yield(bps, price_for_value)
     quality_value_regime = _industry_rank(roe, industry) * _ts_percentile(bp_value)
     growth_value_regime = _industry_rank(net_profit_yoy, industry) * _ts_percentile(bp_value)
+    margin_balance = _capital_panel(capital, "margin_balance", close)
+    margin_buy = _capital_panel(capital, "margin_buy", close)
+    short_balance = _capital_panel(capital, "short_balance", close)
+    north_hold_pct = _capital_panel(capital, "northbound_hold_pct", close)
+    north_hold_value = _capital_panel(capital, "northbound_hold_value", close)
+    north_value_chg_1d = _capital_panel(capital, "northbound_value_chg_1d", close)
+    margin_balance_chg5 = margin_balance.pct_change(5, fill_method=None)
+    margin_balance_chg20 = margin_balance.pct_change(20, fill_method=None)
+    margin_buy_ratio20 = margin_buy.rolling(20).sum() / (amount.rolling(20).sum() + 1e-6)
+    short_balance_chg20 = short_balance.pct_change(20, fill_method=None)
+    north_hold_chg5 = north_hold_pct - north_hold_pct.shift(5)
+    north_hold_chg20 = north_hold_pct - north_hold_pct.shift(20)
+    north_value_chg20 = north_hold_value.pct_change(20, fill_method=None)
     return {
         "size20": small_cap_factor(amount, 20),
         "size40": small_cap_factor(amount, 40),
@@ -152,6 +171,17 @@ def factor_library(close, volume, amount, fundamentals=None, raw_close=None):
         "fund_eps_yield_pctile": safe_zscore(mad_clip(_ts_percentile(eps_yield))),
         "fund_quality_value_regime": safe_zscore(mad_clip(quality_value_regime)),
         "fund_growth_value_regime": safe_zscore(mad_clip(growth_value_regime)),
+        "margin_balance_chg5": safe_zscore(mad_clip(margin_balance_chg5)),
+        "margin_balance_chg20": safe_zscore(mad_clip(margin_balance_chg20)),
+        "margin_balance_drop20": safe_zscore(mad_clip(-margin_balance_chg20)),
+        "margin_buy_ratio20": safe_zscore(mad_clip(margin_buy_ratio20)),
+        "margin_buy_ratio_drop20": safe_zscore(mad_clip(-margin_buy_ratio20)),
+        "short_balance_chg20": safe_zscore(mad_clip(short_balance_chg20)),
+        "short_balance_drop20": safe_zscore(mad_clip(-short_balance_chg20)),
+        "north_hold_chg5": safe_zscore(mad_clip(north_hold_chg5)),
+        "north_hold_chg20": safe_zscore(mad_clip(north_hold_chg20)),
+        "north_value_chg1": safe_zscore(mad_clip(north_value_chg_1d)),
+        "north_value_chg20": safe_zscore(mad_clip(north_value_chg20)),
     }
 
 
@@ -203,6 +233,14 @@ FACTOR_FAMILIES = {
     ],
     "fundamental-value-pctile": ["fund_bp_value_pctile", "fund_eps_yield_pctile"],
     "fundamental-regime": ["fund_quality_value_regime", "fund_growth_value_regime"],
+    "margin-flow": [
+        "margin_balance_chg5", "margin_balance_chg20", "margin_balance_drop20",
+        "margin_buy_ratio20", "margin_buy_ratio_drop20",
+    ],
+    "short-flow": ["short_balance_chg20", "short_balance_drop20"],
+    "northbound-flow": [
+        "north_hold_chg5", "north_hold_chg20", "north_value_chg1", "north_value_chg20",
+    ],
 }
 
 
@@ -268,6 +306,10 @@ def grid_candidates(limit=None):
         (("fund_roe_delta", "fund_gross_margin_delta"), (0.5, 0.5)),
         (("fund_quality_value_regime", "fund_profit_growth_ind_rank"), (0.6, 0.4)),
         (("fund_growth_value_regime", "fund_bp_value_ind_neutral"), (0.6, 0.4)),
+        (("margin_balance_chg20", "margin_buy_ratio20"), (0.5, 0.5)),
+        (("margin_balance_drop20", "low_beta60"), (0.5, 0.5)),
+        (("north_hold_chg20", "north_value_chg20"), (0.5, 0.5)),
+        (("margin_balance_chg20", "north_hold_chg20"), (0.5, 0.5)),
     ]
     for factors, weights in blend_specs:
         for top_n in top_ns:

@@ -28,6 +28,9 @@ NICHE_FAMILIES = {
         "fundamental-regime", "fundamental-value-pctile",
         "fundamental-industry-rank", "fundamental-industry-neutral",
     ],
+    "capital_flow": ["margin-flow", "short-flow", "northbound-flow"],
+    "margin_flow": ["margin-flow", "short-flow"],
+    "smart_money": ["northbound-flow", "margin-flow", "fundamental-industry-rank"],
 }
 TOP_N_CHOICES = [15, 20, 25, 40, 60, 80, 120]
 REBALANCE_CHOICES = [10, 20, 40, 60, 80]

@@ -15,7 +15,7 @@ from core.backtest import (
 from factory.objectives import evaluate_objectives
 from factory.search_space import build_factor, factor_library
 from factory.timing import build_timing
-from lake.load_lake import FUND_FIELDS, load_fundamental_panel, load_raw_close
+from lake.load_lake import FUND_FIELDS, load_capital_panel, load_fundamental_panel, load_raw_close
 
 DEFAULT_WARMUP_START = "2010-01-01"
 
@@ -67,10 +67,16 @@ def prepare_context(start="2018-01-01", warmup_start=DEFAULT_WARMUP_START):
     close, volume, amount = load_price_panels(load_start)
     codes = list(close.columns)
     fundamentals = load_fundamental_panel(close.index, codes=codes, fields=FUND_FIELDS + ["industry"])
+    capital = load_capital_panel(close.index, codes=codes, start=load_start)
     raw_close = load_raw_close(codes=codes, start=load_start)
     if not raw_close.empty:
         raw_close = raw_close.reindex(index=close.index, columns=close.columns)
-    library = factor_library(close, volume, amount, fundamentals=fundamentals, raw_close=raw_close)
+    library = factor_library(
+        close, volume, amount,
+        fundamentals=fundamentals,
+        raw_close=raw_close,
+        capital=capital,
+    )
     baseline_config = StrategyConfig(start=start)
     baseline_factor = small_cap_factor(amount, baseline_config.size_window)
     baseline_timing, _, _ = small_cap_timing(close, amount, baseline_config.timing_ma)

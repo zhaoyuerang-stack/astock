@@ -21,6 +21,7 @@ sys.path.insert(0, str(ROOT))
 import pandas as pd
 import akshare as ak
 from lake.sources.tencent import TencentDailyFetcher
+from lake.sources.exchange import MarginFetcher, merge_margin
 
 LAKE = Path("data_lake")
 MANIFEST = LAKE / "_manifest.json"
@@ -108,17 +109,44 @@ def update_fundamental():
     return {"fundamental": {"last_check": str(date.today()), "new_periods": missing}}
 
 
+def update_capital_margin():
+    """补两融到最新交易日；北向依赖 eastmoney 稳定性，走 build_capital.py 单独维护。"""
+    cal_fp = LAKE / "meta/trade_calendar.parquet"
+    if not cal_fp.exists():
+        return {}
+    cal = pd.read_parquet(cal_fp)
+    trade_dates = pd.to_datetime(cal["date"])
+    margin_dir = LAKE / "capital/margin"
+    margin_dir.mkdir(parents=True, exist_ok=True)
+    existing = sorted(margin_dir.glob("*.parquet"))
+    if existing:
+        last = pd.to_datetime(existing[-1].stem)
+        keys = trade_dates[trade_dates > last].dt.strftime("%Y%m%d").tolist()
+    else:
+        keys = trade_dates.dt.strftime("%Y%m%d").tolist()
+    if not keys:
+        print("[两融] 已最新，无新交易日", flush=True)
+        return {"capital_margin": {"last_check": str(date.today()), "updated_days": 0}}
+    fetcher = MarginFetcher(max_workers=3, timeout=30, retries=2)
+    stats = fetcher.run(keys, skip_existing=True, progress_every=50)
+    merge_margin()
+    return {"capital_margin": {"last_check": str(date.today()), "updated_days": stats.get("ok", 0), "empty": stats.get("empty", 0), "error": stats.get("error", 0)}}
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--prices", action="store_true")
     ap.add_argument("--fundamental", action="store_true")
+    ap.add_argument("--capital", action="store_true", help="Update margin financing data only.")
     args = ap.parse_args()
-    do_all = not (args.prices or args.fundamental)
+    do_all = not (args.prices or args.fundamental or args.capital)
 
     m = load_manifest()
     if do_all or args.prices:
         m.update(update_prices())
     if do_all or args.fundamental:
         m.update(update_fundamental())
+    if args.capital:
+        m.update(update_capital_margin())
     save_manifest(m)
     print(f"\n增量更新完成，manifest: {MANIFEST}", flush=True)

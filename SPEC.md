@@ -10,7 +10,7 @@
 ## 架构(自下而上;✅已建 / ⏳进行中 / ○未建)
 1. **数据基础设施** `data_lake` ✅ — 全市场+全历史+含退市股的最全口径。
 2. **统一回测内核** `core/` ✅ — `data_lake` 加载 + 因子/择时 + 真实买卖成本 + 融资成本 + 指标,作为生产与研究单一事实源。
-3. **策略工厂** ⏳ — 已建确定性网格、最小 NSGA-II、生态位搜索、review audit、孵化池、岛屿编排、扩展非小盘价量因子池、fundamental 正交因子池、fundamental 因子工程升级和孵化池自进化;下一步围绕弱候选做本地规则化持续进化 + 自动证伪(过拟合/幸存者偏差/特定行情);**按母策略隔离进化(岛屿模型,见下「防同质化」)**。当前小规模搜索尚未产出 ≥2 个通过预审的非 small-cap 低相关候选。
+3. **策略工厂** ⏳ — 已建确定性网格、最小 NSGA-II、生态位搜索、review audit、孵化池、岛屿编排、扩展非小盘价量因子池、fundamental 正交因子池、fundamental 因子工程升级、两融资金面因子池和孵化池自进化;下一步围绕弱候选做本地规则化持续进化 + 自动证伪(过拟合/幸存者偏差/特定行情);**按母策略隔离进化(岛屿模型,见下「防同质化」)**。当前小规模搜索尚未产出 ≥2 个通过预审的非 small-cap 低相关候选。
 4. **有效策略管理** ✅台账 / ○监控 — 母策略两层台账,跟踪 有效/衰减/退役。
 5. **中央调度层** ⏳ — 最小 launchd 定时拉取已建;event-driven 编排待建:数据就绪 / 市场状态切换 / 失效信号触发 → 启动或停用 对应母策略/组合。
 6. **组合层** ○ — 从「有效」母策略组合(低相关加权 / 轮换,机制待定)。
@@ -23,8 +23,9 @@
 - **口径**:全市场+全历史+含退市股(`data_lake`);估值用不复权价、财务按公告日对齐(防未来函数)。
 - **增量更新** ✅:`scripts/data/update_lake.py::update_prices()`,集成于 `run_daily.py` 第①步。
 - **维护** ✅:`scripts/data/build_*`(建湖/财务/ST历史)、`scripts/repair/*`(日历/坏值修复)、`validate_final.py`(质量校验 ~99.9%)。
-- **数据源** `lake/sources/`:tencent(主力后复权)、sina、em_fin(东财批量财务 `yjbb_em`)、exchange(两融)。
+- **数据源** `lake/sources/`:tencent(主力后复权)、sina、em_fin(东财批量财务 `yjbb_em`)、exchange(两融/北向)。
 - **fundamental 因子池**:策略工厂使用 `fundamental_batch.parquet` 的 ROE、毛利率、经营现金流、收入/利润增速、EPS TTM、BPS、industry,按 `avail_date` 对齐;价值类收益率因子用不复权价计算,避免复权价估值量纲错误。工程化因子包括行业内排名、行业中性残差、财务变化率、估值时间分位、质量+价值 regime 过滤。
+- **capital 因子池**:两融已落 `data_lake/capital/margin_all.parquet`,字段包括融资余额/融资买入额/融券余额/融券余量;factory 按 T+1 可用对齐,构造融资余额变化率、融资买入占比、融券余额变化等资金面因子。北向个股持股源代码已接,但 Eastmoney 当前返回 9701/None,需网络恢复后补完整 `northbound_all.parquet` 再验证。
 - **调度** ⏳:`scripts/ops/scheduled_daily_update.py` 每日盘后执行价量/财务增量 + stale gate + 信号生成;`scripts/ops/scheduled_weekly_maintenance.py` 做周/月线、不复权价、完整质量校验。完整事件驱动仍归入中央调度层。
 
 ## 母策略台账 schema(两层,`strategy_registry.py`)
