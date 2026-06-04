@@ -3,6 +3,7 @@
 ③ v2.0 滚动 12 月夏普。两项同时触发 → 预警/复审退役。
 用法(cwd=factor_research): /usr/bin/python3 -m scripts.research.decay_monitor
 """
+import json
 import os
 import sys
 from pathlib import Path
@@ -89,6 +90,14 @@ else:
 print(f"\n  当前状态: {status}" + (f"  触发: {', '.join(msgs)}" if msgs else ""))
 print("  前瞻阈值:IC<历史均×0.4 或从近12月峰值回落>50%=观察(转负=预警);"
       "小盘动量<0=观察(<-5%=预警);夏普<历史均×0.6=观察(<0.5=预警)。任一预警或≥2观察→🔴")
+
+Path("reports").mkdir(exist_ok=True)
+Path("reports/decay_status.json").write_text(json.dumps({
+    "status": status, "ic": round(cur_ic, 4), "ic_hist": round(float(ic.mean()), 4),
+    "rel_mom": round(cur_rel, 4), "roll_sharpe": round(cur_sh, 2),
+    "msgs": msgs, "updated": str(roll_ic.dropna().index[-1].date()),
+}, ensure_ascii=False, indent=2))
+print("  → 状态已写 reports/decay_status.json")
 
 fig, ax = plt.subplots(3, 1, figsize=(12, 9), sharex=True)
 ax[0].plot(roll_ic.index, roll_ic.values)
