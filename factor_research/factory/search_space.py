@@ -105,6 +105,7 @@ def factor_library(close, volume, amount, fundamentals=None, raw_close=None, cap
     north_hold_pct = _capital_panel(capital, "northbound_hold_pct", close)
     north_hold_value = _capital_panel(capital, "northbound_hold_value", close)
     north_value_chg_1d = _capital_panel(capital, "northbound_value_chg_1d", close)
+    north_buy_value_1d = _capital_panel(capital, "northbound_buy_value_1d", close)
     margin_balance_chg5 = margin_balance.pct_change(5, fill_method=None)
     margin_balance_chg20 = margin_balance.pct_change(20, fill_method=None)
     margin_buy_ratio20 = margin_buy.rolling(20).sum() / (amount.rolling(20).sum() + 1e-6)
@@ -112,6 +113,7 @@ def factor_library(close, volume, amount, fundamentals=None, raw_close=None, cap
     north_hold_chg5 = north_hold_pct - north_hold_pct.shift(5)
     north_hold_chg20 = north_hold_pct - north_hold_pct.shift(20)
     north_value_chg20 = north_hold_value.pct_change(20, fill_method=None)
+    north_buy_ratio20 = north_buy_value_1d.rolling(20).sum() / (amount.rolling(20).sum() + 1e-6)
     return {
         "size20": small_cap_factor(amount, 20),
         "size40": small_cap_factor(amount, 40),
@@ -180,6 +182,11 @@ def factor_library(close, volume, amount, fundamentals=None, raw_close=None, cap
         "short_balance_drop20": safe_zscore(mad_clip(-short_balance_chg20)),
         "north_hold_chg5": safe_zscore(mad_clip(north_hold_chg5)),
         "north_hold_chg20": safe_zscore(mad_clip(north_hold_chg20)),
+        "north_hold_drop20": safe_zscore(mad_clip(-north_hold_chg20)),
+        "north_hold_pct_level": safe_zscore(mad_clip(north_hold_pct)),
+        "north_hold_value_level": safe_zscore(mad_clip(np.log(north_hold_value + 1))),
+        "north_buy_ratio20": safe_zscore(mad_clip(north_buy_ratio20)),
+        "north_sell_ratio20": safe_zscore(mad_clip(-north_buy_ratio20)),
         "north_value_chg1": safe_zscore(mad_clip(north_value_chg_1d)),
         "north_value_chg20": safe_zscore(mad_clip(north_value_chg20)),
     }
@@ -239,7 +246,10 @@ FACTOR_FAMILIES = {
     ],
     "short-flow": ["short_balance_chg20", "short_balance_drop20"],
     "northbound-flow": [
-        "north_hold_chg5", "north_hold_chg20", "north_value_chg1", "north_value_chg20",
+        "north_hold_chg5", "north_hold_chg20", "north_hold_drop20",
+        "north_hold_pct_level", "north_hold_value_level",
+        "north_buy_ratio20", "north_sell_ratio20",
+        "north_value_chg1", "north_value_chg20",
     ],
 }
 
@@ -310,6 +320,8 @@ def grid_candidates(limit=None):
         (("margin_balance_drop20", "low_beta60"), (0.5, 0.5)),
         (("north_hold_chg20", "north_value_chg20"), (0.5, 0.5)),
         (("margin_balance_chg20", "north_hold_chg20"), (0.5, 0.5)),
+        (("north_hold_pct_level", "north_buy_ratio20"), (0.5, 0.5)),
+        (("north_hold_value_level", "north_hold_chg20"), (0.5, 0.5)),
     ]
     for factors, weights in blend_specs:
         for top_n in top_ns:

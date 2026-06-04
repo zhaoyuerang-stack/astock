@@ -24,9 +24,13 @@ NORTHBOUND_RENAME = {
     "持股数量": "northbound_hold_shares",
     "持股市值": "northbound_hold_value",
     "持股数量占发行股百分比": "northbound_hold_pct",
+    "持股数量占A股百分比": "northbound_hold_pct",
     "持股市值变化-1日": "northbound_value_chg_1d",
     "持股市值变化-5日": "northbound_value_chg_5d",
     "持股市值变化-10日": "northbound_value_chg_10d",
+    "今日增持股数": "northbound_hold_shares_chg_1d",
+    "今日增持资金": "northbound_buy_value_1d",
+    "今日持股市值变化": "northbound_value_chg_1d",
 }
 
 
@@ -115,6 +119,38 @@ class NorthboundFetcher(Fetcher):
         return df[[c for c in keep if c in df.columns]]
 
 
+class NorthboundIndividualFetcher(Fetcher):
+    """北向单股完整持股历史，key 是股票代码。"""
+
+    def __init__(self, out_dir: str = "data_lake/capital/northbound_stock", **kw):
+        super().__init__(
+            name="northbound_stock", out_dir=out_dir,
+            limiter=RateLimiter(min_interval=0.8, jitter=(0.2, 0.6)),
+            max_workers=kw.pop("max_workers", 1), **kw,
+        )
+
+    def fetch_one(self, code: str):
+        df = ak.stock_hsgt_individual_em(symbol=str(code).zfill(6))
+        if df is None or df.empty:
+            return None
+        df = df.rename(columns=NORTHBOUND_RENAME)
+        if "date" not in df.columns:
+            return None
+        df["date"] = pd.to_datetime(df["date"])
+        df["code"] = str(code).zfill(6)
+        df = _to_numeric(df, [
+            "close", "pct_chg", "northbound_hold_shares", "northbound_hold_value",
+            "northbound_hold_pct", "northbound_hold_shares_chg_1d",
+            "northbound_buy_value_1d", "northbound_value_chg_1d",
+        ])
+        keep = [
+            "date", "code", "northbound_hold_shares", "northbound_hold_value",
+            "northbound_hold_pct", "northbound_hold_shares_chg_1d",
+            "northbound_buy_value_1d", "northbound_value_chg_1d",
+        ]
+        return df[[c for c in keep if c in df.columns]]
+
+
 def merge_margin(margin_dir: str = "data_lake/capital/margin",
                  out: str = "data_lake/capital/margin_all.parquet"):
     """把按日期的两融文件合并成一个长表 (date×code)"""
@@ -138,4 +174,18 @@ def merge_northbound(northbound_dir: str = "data_lake/capital/northbound",
     df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
     df.to_parquet(out, index=False)
     print(f"[northbound] 合并 {len(files)}个交易日 → {len(df)}行")
+    return df
+
+
+def merge_northbound_stock(northbound_dir: str = "data_lake/capital/northbound_stock",
+                           out: str = "data_lake/capital/northbound_all.parquet"):
+    """把按股票代码的北向历史文件合并成一个长表 (date×code)。"""
+    from pathlib import Path
+    files = sorted(Path(northbound_dir).glob("*.parquet"))
+    if not files:
+        return None
+    df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+    df = df.drop_duplicates(["date", "code"], keep="last").sort_values(["date", "code"])
+    df.to_parquet(out, index=False)
+    print(f"[northbound_stock] 合并 {len(files)}只 → {len(df)}行")
     return df

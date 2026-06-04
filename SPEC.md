@@ -25,7 +25,7 @@
 - **维护** ✅:`scripts/data/build_*`(建湖/财务/ST历史)、`scripts/repair/*`(日历/坏值修复)、`validate_final.py`(质量校验 ~99.9%)。
 - **数据源** `lake/sources/`:tencent(主力后复权)、sina、em_fin(东财批量财务 `yjbb_em`)、exchange(两融/北向)。
 - **fundamental 因子池**:策略工厂使用 `fundamental_batch.parquet` 的 ROE、毛利率、经营现金流、收入/利润增速、EPS TTM、BPS、industry,按 `avail_date` 对齐;价值类收益率因子用不复权价计算,避免复权价估值量纲错误。工程化因子包括行业内排名、行业中性残差、财务变化率、估值时间分位、质量+价值 regime 过滤。
-- **capital 因子池**:两融已落 `data_lake/capital/margin_all.parquet`,字段包括融资余额/融资买入额/融券余额/融券余量;factory 按 T+1 可用对齐,构造融资余额变化率、融资买入占比、融券余额变化等资金面因子。北向个股持股源代码已接,但 Eastmoney 当前返回 9701/None,需网络恢复后补完整 `northbound_all.parquet` 再验证。
+- **capital 因子池**:两融已落 `data_lake/capital/margin_all.parquet`,字段包括融资余额/融资买入额/融券余额/融券余量;北向 fallback 已落 `data_lake/capital/northbound_all.parquet`,覆盖 2017-2024 的高流动性北向持股历史。factory 按 T+1 可用对齐,构造融资余额变化率、融资买入占比、融券余额变化、北向持股占比/市值/变化/净买入强度等资金面因子。验证结论:两融和北向均未产生合格第二母策略。
 - **调度** ⏳:`scripts/ops/scheduled_daily_update.py` 每日盘后执行价量/财务增量 + stale gate + 信号生成;`scripts/ops/scheduled_weekly_maintenance.py` 做周/月线、不复权价、完整质量校验。完整事件驱动仍归入中央调度层。
 
 ## 母策略台账 schema(两层,`strategy_registry.py`)

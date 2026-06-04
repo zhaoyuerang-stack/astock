@@ -25,8 +25,10 @@ sys.path.insert(0, str(ROOT))
 from lake.sources.exchange import (  # noqa: E402
     MarginFetcher,
     NorthboundFetcher,
+    NorthboundIndividualFetcher,
     merge_margin,
     merge_northbound,
+    merge_northbound_stock,
 )
 
 LAKE = Path("data_lake")
@@ -46,6 +48,22 @@ def write_report(path, report):
     path.write_text(json.dumps(report, ensure_ascii=False, indent=2))
 
 
+def top_liquidity_codes(limit=1000, lookback_days=120):
+    daily = sorted((LAKE / "price/daily").glob("*.parquet"))
+    rows = []
+    for fp in daily:
+        try:
+            df = pd.read_parquet(fp, columns=["date", "amount"])
+        except Exception:
+            continue
+        if df.empty:
+            continue
+        tail = df.sort_values("date").tail(lookback_days)
+        rows.append((fp.stem, float(tail["amount"].mean())))
+    rows = sorted(rows, key=lambda row: row[1], reverse=True)
+    return [code for code, _ in rows[:limit]]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--start", default="2010-01-01")
@@ -55,12 +73,14 @@ def main():
     ap.add_argument("--no-skip-existing", dest="skip_existing", action="store_false")
     ap.add_argument("--margin", action="store_true")
     ap.add_argument("--northbound", action="store_true")
+    ap.add_argument("--northbound-stock", action="store_true", help="Fallback: fetch full northbound history by stock code.")
+    ap.add_argument("--code-limit", type=int, default=1000, help="Top-liquidity stocks for --northbound-stock.")
     ap.add_argument("--workers", type=int, default=3)
     args = ap.parse_args()
 
     end = args.end or pd.Timestamp.today().strftime("%Y-%m-%d")
     keys = trade_date_keys(args.start, end, limit=args.limit)
-    do_all = not (args.margin or args.northbound)
+    do_all = not (args.margin or args.northbound or args.northbound_stock)
     report = {
         "started_at": datetime.now().isoformat(timespec="seconds"),
         "start": args.start,
@@ -81,6 +101,19 @@ def main():
         stats = fetcher.run(keys, skip_existing=args.skip_existing, progress_every=20)
         merged = merge_northbound()
         report["northbound"] = stats
+        report["outputs"]["northbound_all"] = "data_lake/capital/northbound_all.parquet" if merged is not None else None
+
+    if args.northbound_stock:
+        codes = top_liquidity_codes(limit=args.code_limit)
+        fetcher = NorthboundIndividualFetcher(max_workers=args.workers, timeout=30, retries=2)
+        stats = fetcher.run(codes, skip_existing=args.skip_existing, progress_every=50)
+        merged = merge_northbound_stock()
+        report["northbound_stock"] = {
+            **stats,
+            "code_limit": args.code_limit,
+            "universe": "top_liquidity_by_recent_amount",
+            "note": "fallback per-stock history endpoint; use only because Eastmoney daily aggregate returned 9701/None",
+        }
         report["outputs"]["northbound_all"] = "data_lake/capital/northbound_all.parquet" if merged is not None else None
 
     report["finished_at"] = datetime.now().isoformat(timespec="seconds")

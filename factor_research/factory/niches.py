@@ -22,7 +22,10 @@ MARGIN_FLOW_FACTORS = {
 }
 SHORT_FLOW_FACTORS = {"short_balance_chg20", "short_balance_drop20"}
 NORTHBOUND_FLOW_FACTORS = {
-    "north_hold_chg5", "north_hold_chg20", "north_value_chg1", "north_value_chg20",
+    "north_hold_chg5", "north_hold_chg20", "north_hold_drop20",
+    "north_hold_pct_level", "north_hold_value_level",
+    "north_buy_ratio20", "north_sell_ratio20",
+    "north_value_chg1", "north_value_chg20",
 }
 
 

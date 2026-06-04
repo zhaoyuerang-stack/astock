@@ -93,6 +93,7 @@ CAPITAL_FIELDS = [
     "margin_balance", "margin_buy", "short_balance", "short_vol",
     "northbound_hold_shares", "northbound_hold_value", "northbound_hold_pct",
     "northbound_value_chg_1d", "northbound_value_chg_5d", "northbound_value_chg_10d",
+    "northbound_hold_shares_chg_1d", "northbound_buy_value_1d",
 ]
 
 
