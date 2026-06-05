@@ -16,6 +16,7 @@ factor_research/results/*.csv
 factor_research/reports/
 factor_research/signals/
 factor_research/logs/
+factor_research/paper/
 
 # Claude 本地配置
 .claude/settings.local.json

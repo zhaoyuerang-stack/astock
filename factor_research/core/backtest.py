@@ -57,7 +57,19 @@ def load_price_panels(start="2010-01-01"):
     # 成交额按【不复权价】重算(原 amount=volume×复权close,复权因子逐股不同,会污染
     # small_cap_factor/timing 的截面排序);volume 单位是手,×100 还原成股得真实成交额(元)。
     amount = px["volume"] * 100 * raw.reindex(index=px["volume"].index, columns=px["volume"].columns)
-    return px["close"], px["volume"], amount
+    close, volume = px["close"], px["volume"]
+    # 截断尾部数据不完整的交易日:① 当天盘后增量更新可能只抓到少数股;② 不复权 raw
+    # (daily_raw,目前周度维护)常滞后于后复权 daily,使最新日 amount=volume×raw 全 NaN。
+    # factor/timing 实际依赖 amount(不是 close),故按 amount 完整性截断:取最近 60 日
+    # 有效股数中位为常态,截断到最后一个 amount 有效股数 ≥0.7×常态 的交易日。
+    valid = amount.notna().sum(axis=1)
+    if len(valid) > 5:
+        typical = valid.iloc[-60:].median()
+        good = valid[valid >= typical * 0.7]
+        if len(good):
+            cutoff = good.index[-1]
+            close, volume, amount = close.loc[:cutoff], volume.loc[:cutoff], amount.loc[:cutoff]
+    return close, volume, amount
 
 
 def small_cap_factor(amount, window=60):

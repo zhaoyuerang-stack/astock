@@ -226,6 +226,31 @@ def run_signal(report, dry_run=False):
         report["signal"]["error"] = proc.stderr[-1000:]
 
 
+def run_paper_trade(report, dry_run=False):
+    if dry_run:
+        print("[paper] skip paper_trade")
+        report["paper_trade"] = {"ran": False, "dry_run": True}
+        return
+
+    print("[paper] paper_trade → Obsidian 模拟盘卡片")
+    proc = subprocess.run(
+        [PYTHON, "-m", "scripts.ops.paper_trade"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    print(proc.stdout)
+    if proc.stderr:
+        print(proc.stderr, file=sys.stderr)
+    report["paper_trade"] = {
+        "ran": proc.returncode == 0,
+        "returncode": proc.returncode,
+    }
+    if proc.returncode != 0:
+        report["paper_trade"]["error"] = proc.stderr[-1000:]
+
+
 def run_daily_update(args):
     run_date = china_now().date().isoformat()
     log_path = LOG_DIR / f"{run_date}.log"
@@ -301,6 +326,8 @@ def run_daily_update(args):
 
                 if fresh:
                     run_signal(report, dry_run=args.dry_run)
+                    if args.dry_run or report.get("signal", {}).get("generated"):
+                        run_paper_trade(report, dry_run=args.dry_run)
                 else:
                     report["signal"] = {
                         "generated": False,

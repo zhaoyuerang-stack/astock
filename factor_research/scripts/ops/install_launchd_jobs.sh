@@ -19,6 +19,8 @@ launchctl bootstrap "gui/$UID" "$AGENTS/com.astcok.weekly-maintenance.plist"
 echo "Installed launchd jobs:"
 echo "  com.astcok.daily-update        weekdays 00:30 and 01:30 local time; script gates at China 16:30"
 echo "  com.astcok.weekly-maintenance  Sunday 02:30 local time"
+echo "    steps: aggregate → raw_close → quality → decay_monitor → tradability → live_readiness"
+echo "    decay_monitor writes reports/decay_status.json (read by live_readiness + run_daily)"
 echo
 echo "Manual trigger:"
 echo "  launchctl kickstart -k gui/$UID/com.astcok.daily-update"

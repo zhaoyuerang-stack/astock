@@ -101,9 +101,25 @@ def run_weekly(args):
                 [PYTHON, "validate_final.py"],
                 dry_run=args.dry_run,
             )
+            # v2.0 实盘监控三件套:失效监控 → 容量/可成交 → 就绪卡
+            report["decay_monitor"] = run_subprocess(
+                "v2.0 decay monitor (失效监控 → reports/decay_status.json)",
+                [PYTHON, "-m", "scripts.research.decay_monitor"],
+                dry_run=args.dry_run,
+            )
+            report["tradability"] = run_subprocess(
+                "v2.0 tradability (容量/可成交率)",
+                [PYTHON, "-m", "scripts.research.tradability"],
+                dry_run=args.dry_run,
+            )
+            report["live_readiness"] = run_subprocess(
+                "v2.0 live readiness (实盘就绪卡)",
+                [PYTHON, "-m", "scripts.research.live_readiness"],
+                dry_run=args.dry_run,
+            )
             report["status"] = "ok" if all(
                 report[name].get("ok")
-                for name in ["aggregate", "raw_close", "quality"]
+                for name in ["aggregate", "raw_close", "quality", "decay_monitor"]
             ) else "failed"
             return 0 if report["status"] == "ok" else 1
         except Exception as exc:
