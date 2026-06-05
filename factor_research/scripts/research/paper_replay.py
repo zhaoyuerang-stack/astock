@@ -27,7 +27,8 @@ print(f"加载回测内核(算 factor/timing,约 1-2 分钟)...", flush=True)
 res = run_small_cap_strategy(StrategyConfig(start="2010-01-01"))
 close, factor, timing = res["close"], res["factor"], res["timing"]
 names = pt.load_names()
-raw_close = load_raw_close(start="2023-06-01")   # 盯市用不复权收盘
+raw_start = (pd.Timestamp(REPLAY_START) - pd.Timedelta(days=400)).strftime("%Y-%m-%d")
+raw_close = load_raw_close(start=raw_start)       # 盯市用不复权收盘(跟随重放区间,提前预热)
 
 dates = close.index[(close.index >= REPLAY_START) & (close.index <= REPLAY_END)]
 print(f"重放区间 {dates[0].date()} ~ {dates[-1].date()},{len(dates)} 交易日", flush=True)
