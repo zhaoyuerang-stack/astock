@@ -6,32 +6,10 @@
 import akshare as ak
 import pandas as pd
 from lake.base import Fetcher, RateLimiter
+from lake.schema import MARGIN_RENAME, NORTHBOUND_RENAME
 
-# 沪深字段名差异 → 统一英文
-RENAME = {
-    "标的证券代码": "code", "证券代码": "code",
-    "融资余额": "margin_balance", "融资买入额": "margin_buy",
-    "融券余量": "short_vol", "融券余额": "short_balance",
-    "融券卖出量": "short_sell",
-}
-
-NORTHBOUND_RENAME = {
-    "持股日期": "date",
-    "股票代码": "code",
-    "股票简称": "name",
-    "当日收盘价": "close",
-    "当日涨跌幅": "pct_chg",
-    "持股数量": "northbound_hold_shares",
-    "持股市值": "northbound_hold_value",
-    "持股数量占发行股百分比": "northbound_hold_pct",
-    "持股数量占A股百分比": "northbound_hold_pct",
-    "持股市值变化-1日": "northbound_value_chg_1d",
-    "持股市值变化-5日": "northbound_value_chg_5d",
-    "持股市值变化-10日": "northbound_value_chg_10d",
-    "今日增持股数": "northbound_hold_shares_chg_1d",
-    "今日增持资金": "northbound_buy_value_1d",
-    "今日持股市值变化": "northbound_value_chg_1d",
-}
+# RENAME mappings now live in lake.schema; module aliases for brevity.
+RENAME = MARGIN_RENAME
 
 
 def _to_numeric(df, cols):

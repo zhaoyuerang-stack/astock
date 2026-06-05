@@ -12,19 +12,13 @@ import sys
 sys.path.insert(0, str(ROOT))
 import akshare as ak
 import pandas as pd
+from lake.schema import YJBB_RENAME
 
 # 报告期列表（2010Q1 ~ 2026Q1）
 periods = [f"{y}{md}" for y in range(2010, 2027) for md in ["0331","0630","0930","1231"]]
 periods = [p for p in periods if p <= "20260331"]
 
-RENAME = {
-    "股票代码": "code", "每股收益": "eps",
-    "营业总收入-营业总收入": "revenue", "营业总收入-同比增长": "revenue_yoy",
-    "净利润-净利润": "net_profit", "净利润-同比增长": "net_profit_yoy",
-    "每股净资产": "bps", "净资产收益率": "roe",
-    "每股经营现金流量": "cfo_ps", "销售毛利率": "gross_margin",
-    "所处行业": "industry", "最新公告日期": "ann_date",
-}
+RENAME = YJBB_RENAME
 KEEP = ["code","report_date","ann_date","eps","revenue","revenue_yoy",
         "net_profit","net_profit_yoy","bps","roe","cfo_ps","gross_margin","industry"]
 

@@ -1,6 +1,6 @@
 # A股全市场因子量化研究
 
-> 给 AI 的**操作宪法(精简)**。系统设计/架构 → [SPEC.md](SPEC.md);分阶段路线 → [ROADMAP.md](ROADMAP.md);当前进度 → [STATUS.md](STATUS.md);踩过的坑 → [LESSONS.md](LESSONS.md)(+ auto-memory)。代码与操作手册在 `factor_research/`。
+> 给 AI 的**操作宪法(精简)**。系统设计/架构 → [SPEC.md](SPEC.md);分阶段路线 → [ROADMAP.md](ROADMAP.md);当前进度 → [STATUS.md](STATUS.md);踩过的坑 → [LESSONS.md](LESSONS.md)(+ auto-memory)。代码与操作手册在 `factor_research/`。数据基础设施详情 → `factor_research/docs/data_infrastructure.md` + `factor_research/data_lake/README.md`。
 > 每次接手先读本文件 + `STATUS.md`。
 
 ## 定位

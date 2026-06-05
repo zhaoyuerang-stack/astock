@@ -18,7 +18,8 @@ from strategies.small_cap import build_rebalance_weights, load_price_panels
 from factory.objectives import evaluate_objectives_engine
 from factory.search_space import build_factor, factor_library
 from factory.timing import build_timing
-from lake.load_lake import FUND_FIELDS, load_capital_panel, load_fundamental_panel, load_raw_close
+from lake.schema import FUNDAMENTAL_FIELDS
+from lake.load_lake import load_capital_panel, load_fundamental_panel, load_raw_close
 
 DEFAULT_WARMUP_START = "2010-01-01"
 
@@ -43,7 +44,7 @@ def prepare_context(start="2018-01-01", warmup_start=DEFAULT_WARMUP_START):
     prices = PricePanel(close=close, volume=volume, amount=amount)
 
     codes = list(close.columns)
-    fundamentals = load_fundamental_panel(close.index, codes=codes, fields=FUND_FIELDS + ["industry"])
+    fundamentals = load_fundamental_panel(close.index, codes=codes, fields=FUNDAMENTAL_FIELDS + ["industry"])
     capital = load_capital_panel(close.index, codes=codes, start=load_start)
     raw_close = load_raw_close(codes=codes, start=load_start)
     if not raw_close.empty:

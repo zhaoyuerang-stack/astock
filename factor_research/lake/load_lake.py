@@ -29,12 +29,11 @@ def load_prices(codes=None, start="2010-01-01", fields=("close", "volume", "amou
     return {f: long.pivot(index="date", columns="code", values=f) for f in fields}
 
 
+from lake.schema import FUNDAMENTAL_FIELDS
+
 # ── 财务面板（批量长表，防未来函数对齐）──
-FUND_FIELDS = ["roe", "eps", "eps_ttm", "bps", "revenue", "net_profit",
-               "gross_margin", "cfo_ps", "revenue_yoy", "net_profit_yoy"]
 
-
-def load_fundamental_panel(trade_dates, codes=None, fields=FUND_FIELDS):
+def load_fundamental_panel(trade_dates, codes=None, fields=FUNDAMENTAL_FIELDS):
     """
     从批量长表 fundamental_batch.parquet 加载，对齐到交易日面板 {field: date×code}。
     用 avail_date(公告日) 作为生效日 ffill，确保 T 日只用 T 日前已披露的财务（防未来函数）。
@@ -88,14 +87,9 @@ def load_raw_close(codes=None, start="2010-01-01"):
     return long.pivot(index="date", columns="code", values="raw_close")
 
 
-# ── 资金面面板（两融/北向，按披露可用日滞后一日防未来函数）──
-CAPITAL_FIELDS = [
-    "margin_balance", "margin_buy", "short_balance", "short_vol",
-    "northbound_hold_shares", "northbound_hold_value", "northbound_hold_pct",
-    "northbound_value_chg_1d", "northbound_value_chg_5d", "northbound_value_chg_10d",
-    "northbound_hold_shares_chg_1d", "northbound_buy_value_1d",
-]
+from lake.schema import CAPITAL_FIELDS
 
+# ── 资金面面板（两融/北向，按披露可用日滞后一日防未来函数）──
 
 def _load_capital_long(name, codes=None, start="2010-01-01"):
     fp = LAKE / "capital" / f"{name}_all.parquet"
