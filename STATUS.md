@@ -9,7 +9,7 @@
 | 层 | 状态 | 说明 |
 |----|------|------|
 | 数据基础设施 | ✅ | data_lake 全市场+全历史+含退市股,质量 ~99.9%;旧 data_full/data 已删;两融已落 `data_lake/capital/margin_all.parquet`;北向 fallback 已落 `data_lake/capital/northbound_all.parquet`(2017-2024,774只) |
-| 统一回测内核 `core/` | ✅ | data_lake + 小盘因子/择时 + 真实换手成本 + 融资成本;`amount=volume×100×不复权价` |
+| 统一回测内核 `core/` | ✅ | `core/engine.BacktestEngine` 统一接口已落地;`core/backtest.py` 核心逻辑内部走 engine,旧函数标记 deprecated;`amount=volume×100×不复权价` |
 | 策略工厂 | ⏳ | 阶段 1.1-1.13 已建;2026-06-03 已按干净 amount + 2010 预热重跑 fundamental 1.9-1.13;2026-06-04 已接两融/北向资金面并验证;候选验收仍未达 |
 | 有效策略管理 | ✅台账 / ✅监控 / ✅模拟盘 | 两层台账已建;失效监控 `decay_monitor` 把 decay_signal 定量化(size因子IC衰减/小盘动量/滚动夏普 + 前瞻阈值,当前 v2.0 🔴预警);实盘就绪卡 `live_readiness`(操作+容量+失效);**模拟盘 `scripts/ops/paper_trade.py`=真实盘口径:T+1 不复权开盘价成交 + pending order 跨天结算 + 停牌/一字涨跌停不可成交;100万本金/1.0x,写 Obsidian `30.output/A股v2.0模拟盘/`,`--preview` 出次日开盘建仓清单。回测口径(收盘撮合)不动** |
 | 中央调度层 | ⏳ | launchd 每日增量更新已接 `paper_trade`;周维护已接 `decay_monitor`/`tradability`/`live_readiness`;更完整事件驱动调度未建 |
@@ -19,6 +19,23 @@
 ## 在册策略(详见 `strategy_versions.json`)
 - `small-cap-size / v2.0`(data_lake 2018-2026,干净 amount + 2010 预热 + 真实成本):年化 **22.2%** / 回撤 **-20.0%** / 夏普 **1.38** / 卡玛 1.11 → **已达项目级满意线**(年化≥20% & 夏普≥1.0),未达卓越线(28% 或卡玛 1.6);status=在册。
 - v1.0(data_full)幸存者偏差水分 → 参考;v2.1 全历史压力测试 → 参考。
+
+## 回测平台标准化(2026-06-05)
+
+**状态:已完成。** 统一接口 `core/engine.BacktestEngine` 已落地,所有主流程已迁移:
+
+| 模块 | 状态 |
+|------|------|
+| `core/engine.py` 统一接口层 | ✅ `BacktestEngine`/`Signal`/`BacktestResult`/`PricePanel` |
+| `strategy_lake.py` | ✅ 已迁移到 engine |
+| `run_daily.py` 生产入口 | ✅ 已迁移到 engine |
+| `factory/evaluator.py` 工厂主入口 | ✅ `evaluate_candidates()` 走 engine;`prepare_context()` 内部 benchmark 走 engine |
+| `engine/backtest.py` → `factor_analysis.py` | ✅ 重命名,职责清晰(IC/分层) |
+| `engine/portfolio.py` + `composer.py` | ✅ 接入 `to_signal()` 桥接;独立回测逻辑 deprecated |
+| 兼容层 | ⚠️ `core/backtest.py`(backtest_weights)/`factory/evaluator.py`(run_candidate_returns等)/`engine/portfolio.py`(top_n_portfolio) 标记 deprecated,保留至调用方迁移完成 |
+| 文档 | ✅ `factor_research/docs/engine_usage.md` |
+| 测试 | ✅ `test_engine.py` 6项回归测试全部通过 |
+| 数值漂移 | ✅ 零漂移:strategy_lake/run_daily/factory baseline/registry 全部验证一致 |
 
 ## 当前阶段
 **阶段 1 — 多目标策略工厂化**。完整路线见 [ROADMAP.md](ROADMAP.md)。

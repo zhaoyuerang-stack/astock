@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
-from factory.evaluator import prepare_context, run_candidate_returns
+from factory.evaluator import prepare_context, run_candidate
 from factory.niches import annotate_niches
 from factory.objectives import dominates
 from factory.review import candidate_from_config, write_audit
@@ -287,12 +287,12 @@ def annotate_pairwise_correlation(front, start="2018-01-01"):
         for row in front:
             row["pairwise_corr_max"] = None
         return front
-    close, amount, library, _ = prepare_context(start)
+    engine, library, baseline_result = prepare_context(start)
     returns = []
     for i, row in enumerate(front, 1):
         candidate = candidate_from_config(row["config"], f"front.{i:03d}")
-        ret, _ = run_candidate_returns(candidate, close, amount, library, start)
-        returns.append(ret)
+        result = run_candidate(candidate, engine, library, start)
+        returns.append(result.returns)
     for i, row in enumerate(front):
         corrs = []
         for j, other in enumerate(returns):

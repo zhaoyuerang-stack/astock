@@ -126,11 +126,11 @@ def run_experiment(seeds, genes, out_dir="reports/timing"):
                 "config": cand.to_dict(),
             }
             for label, start in PERIODS.items():
-                close, amount, library, bench = contexts[label]
-                row = evaluate_candidate(cand, close, amount, library, bench, start)
+                engine, library, baseline_result = contexts[label]
+                row = evaluate_candidate(cand, engine, library, baseline_result, start)
                 audit.update(_summarize(label, row))
-            close, amount, library, bench = contexts["in_sample"]
-            cost_row = evaluate_candidate(cand, close, amount, library, bench,
+            engine, library, baseline_result = contexts["in_sample"]
+            cost_row = evaluate_candidate(cand, engine, library, baseline_result,
                                           PERIODS["in_sample"], cost_model=cost_up)
             audit["cost_up_annual"] = cost_row["annual"]
             audit["cost_up_maxdd"] = cost_row["maxdd"]

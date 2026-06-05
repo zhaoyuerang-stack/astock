@@ -1,5 +1,11 @@
-"""
-因子回测引擎：IC分析 + 分层收益
+"""Factor-analysis utilities: IC calculation & stratified return tests.
+
+This module contains **research-level** factor diagnostics (IC, stratify,
+long-short).  For production portfolio backtests use ``core/engine.BacktestEngine``.
+
+Renamed from ``engine/backtest.py`` (2026-06) to eliminate the naming clash
+with ``core/backtest.py`` — "backtest" now refers exclusively to the portfolio-
+weight simulation in ``core/``.
 """
 import numpy as np
 import pandas as pd

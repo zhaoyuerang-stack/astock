@@ -4,6 +4,7 @@ from pathlib import Path
 
 from core.backtest import CostModel
 from factory.evaluator import evaluate_candidate, prepare_context
+from core.engine import BacktestEngine
 from factory.niches import annotate_niches
 from factory.search_space import Candidate
 
@@ -148,13 +149,13 @@ def audit_candidates(shortlist, periods=None):
             "source_rank_score": source_row.get("rank_score"),
         }
         for label, start in periods.items():
-            close, amount, library, benchmark_ret = contexts[label]
-            row = evaluate_candidate(candidate, close, amount, library, benchmark_ret, start)
+            engine, library, baseline_result = contexts[label]
+            row = evaluate_candidate(candidate, engine, library, baseline_result, start)
             audit.update(_summarize(label, row))
 
-        close, amount, library, benchmark_ret = contexts["in_sample"]
+        engine, library, baseline_result = contexts["in_sample"]
         cost_row = evaluate_candidate(
-            candidate, close, amount, library, benchmark_ret,
+            candidate, engine, library, baseline_result,
             periods["in_sample"], cost_model=cost_up,
         )
         audit.update(_summarize("cost_up", cost_row))

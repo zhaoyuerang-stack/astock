@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT))
 
 import pandas as pd
 
-from factory.evaluator import evaluate_candidates, evaluate_candidates_with_context, prepare_context
+from factory.evaluator import evaluate_candidates, prepare_context
 from factory.niches import annotate_niches
 from factory.nsga2 import NICHE_FAMILIES, genes_to_candidates, initial_population, next_generation
 from factory.pareto import annotate_pareto
@@ -53,14 +53,14 @@ def run_nsga2(args):
         raise ValueError("--mutation-rate must be between 0 and 1.")
 
     rng = random.Random(args.seed)
-    close, amount, library, benchmark_ret = prepare_context(args.start)
+    engine, library, baseline_result = prepare_context(args.start)
     genes = initial_population(args.population, seed=args.seed, niche=args.niche)
     history = []
 
     final_ranked = []
     for generation in range(1, args.generations + 1):
         candidates = genes_to_candidates(genes, prefix=f"nsga2.g{generation}")
-        rows = evaluate_candidates_with_context(candidates, close, amount, library, benchmark_ret, args.start)
+        rows = evaluate_candidates(candidates, args.start)
         ranked = annotate_niches(annotate_pareto(rows), max_corr=args.review_corr)
         for row in ranked:
             row["generation"] = generation

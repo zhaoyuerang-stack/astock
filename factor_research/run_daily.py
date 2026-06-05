@@ -13,7 +13,15 @@ from pathlib import Path
 from datetime import date
 os.chdir(Path(__file__).parent)
 import pandas as pd
-from core.backtest import StrategyConfig, latest_signal
+
+# Phase-2: use unified BacktestEngine instead of legacy core.backtest
+from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
+from core.backtest import (
+    load_price_panels,
+    small_cap_factor,
+    small_cap_timing,
+    build_rebalance_weights,
+)
 from lake.validator import DataValidator
 
 SIGNALS = Path("signals"); SIGNALS.mkdir(exist_ok=True)
@@ -21,11 +29,12 @@ LAST_REBAL = SIGNALS / "_last_rebalance.txt"
 STATE_FILE = SIGNALS / "state.json"
 
 # 策略参数（与 v2.0 一致）
-CONFIG = StrategyConfig(start="2010-01-01")
-TOP_N = CONFIG.top_n
-TIMING_MA = CONFIG.timing_ma
-REBAL_DAYS = CONFIG.rebalance_days
-LEVERAGE = CONFIG.leverage
+TOP_N = 25
+TIMING_MA = 16
+REBAL_DAYS = 20
+LEVERAGE = 1.25
+SIZE_WINDOW = 60
+START = "2010-01-01"
 
 
 def load_state():
@@ -97,8 +106,8 @@ def main():
 
     # ② 加载 + 质量校验
     print("\n[2/6] 加载数据 + 质量校验...")
-    sig = latest_signal(CONFIG)
-    close = sig["result"]["close"]
+    close, volume, amount = load_price_panels(START)
+    prices = PricePanel(close=close, volume=volume, amount=amount)
     last = close.index[-1]
     cal = pd.read_parquet("data_lake/meta/trade_calendar.parquet")["date"]
     v = DataValidator(calendar=cal)
@@ -110,13 +119,22 @@ def main():
 
     # ③ 择时信号
     print("\n[3/6] 生成择时信号...")
-    in_market = sig["in_market"]
-    dist = sig["timing_dist"]
+    factor = small_cap_factor(amount, SIZE_WINDOW)
+    timing, _, _ = small_cap_timing(close, amount, TIMING_MA)
+    # Recalculate dist directly (same as small_cap_timing returns)
+    ret = close.pct_change(fill_method=None).replace([float('inf'), float('-inf')], float('nan'))
+    small_mask = amount.rolling(20).mean().rank(axis=1, pct=True) < 0.5
+    small_idx = (ret * small_mask).sum(axis=1) / small_mask.sum(axis=1)
+    small_nav = (1 + small_idx.fillna(0)).cumprod()
+    dist = small_nav.iloc[-1] / small_nav.iloc[-TIMING_MA:].mean() - 1
+    in_market = bool(timing.loc[last])
     print(f"  小盘指数 vs MA{TIMING_MA}: {dist:+.2%} → {'🟢持仓' if in_market else '🔴空仓观望'}")
 
     # ④ 持仓清单
     print("\n[4/6] 持仓清单...")
-    holdings = sig["holdings"]
+    f = factor.loc[last].dropna()
+    active = close.loc[last].dropna().index
+    holdings = f.reindex(active).dropna().nlargest(TOP_N).index.tolist()
 
     # ⑤ 调仓判断
     print("\n[5/6] 调仓判断...")

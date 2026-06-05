@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from core.backtest import CostModel, metrics
-from factory.evaluator import prepare_context, run_candidate_returns
+from factory.evaluator import prepare_context, run_candidate
 from factory.niches import annotate_niches
 from factory.review import audit_candidates, candidate_from_config
 
@@ -83,13 +83,13 @@ def _cost_up():
 def _combo_metrics(candidates, start, cost_model=None):
     import pandas as pd
 
-    close, amount, library, benchmark_ret = prepare_context(start)
+    engine, library, baseline_result = prepare_context(start)
     returns = []
     details = []
     for candidate in candidates:
-        ret, detail = run_candidate_returns(candidate, close, amount, library, start, cost_model=cost_model)
-        returns.append(ret)
-        details.append(detail)
+        result = run_candidate(candidate, engine, library, start, cost_model=cost_model)
+        returns.append(result.returns)
+        details.append(result.detail)
     common = returns[0].index
     for ret in returns[1:]:
         common = common.intersection(ret.index)

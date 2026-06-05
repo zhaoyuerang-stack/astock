@@ -43,6 +43,53 @@ def evaluate_objectives(ret, detail, benchmark_ret=None):
     }
 
 
+# ---------------------------------------------------------------------------
+# Phase-2: BacktestResult-based API
+# ---------------------------------------------------------------------------
+
+def evaluate_objectives_engine(result, benchmark=None):
+    """Evaluate objectives from a ``BacktestResult`` (engine output).
+
+    Parameters
+    ----------
+    result : BacktestResult
+        Output of ``BacktestEngine.run()``.
+    benchmark : BacktestResult, optional
+        Baseline result for correlation calculation.
+
+    Returns
+    -------
+    dict
+        Same keys as ``evaluate_objectives()``.
+    """
+    ret = result.returns
+    detail = result.detail
+    m = result.metrics
+    yearly = ret.groupby(ret.index.year).apply(lambda x: (1 + x).prod() - 1)
+    oos = ret[ret.index >= pd.Timestamp("2023-01-01")]
+    pressure = ret[ret.index < pd.Timestamp("2018-01-01")]
+
+    corr = np.nan
+    if benchmark is not None:
+        common = ret.index.intersection(benchmark.returns.index)
+        if len(common) > 100:
+            corr = float(ret.loc[common].corr(benchmark.returns.loc[common]))
+
+    return {
+        "annual": float(m["annual"]),
+        "maxdd": float(m["maxdd"]),
+        "sharpe": float(m["sharpe"]),
+        "calmar": float(m["calmar"]),
+        "turnover_pa": float(detail["turnover"].mean() * 252),
+        "cost_drag_pa": float(detail["cost"].mean() * 252),
+        "oos_annual": float(metrics(oos)["annual"]) if len(oos) >= 100 else np.nan,
+        "pressure_maxdd": max_drawdown(pressure) if len(pressure) >= 100 else np.nan,
+        "yearly_stability": stability_score(yearly),
+        "corr_to_baseline": corr,
+        "hit_single": bool(m["annual"] > 0.15 and abs(m["maxdd"]) < 0.20),
+    }
+
+
 OBJECTIVE_DIRECTIONS = {
     "annual": "max",
     "maxdd": "max",          # less negative is better

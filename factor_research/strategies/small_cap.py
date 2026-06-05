@@ -1,0 +1,192 @@
+"""Small-cap size strategy implementation.
+
+This is the canonical implementation of the small-cap-size v2.0 strategy.
+It uses core.engine.BacktestEngine as the unified backtest path.
+"""
+from dataclasses import dataclass, asdict
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
+from factors.small_cap import small_cap_factor, small_cap_timing
+from factors.utils import safe_zscore, mad_clip
+from lake.load_lake import load_prices, load_raw_close
+
+
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class StrategyConfig:
+    family: str = "small-cap-size"
+    version: str = "v2.0"
+    start: str = "2018-01-01"
+    size_window: int = 60
+    timing_ma: int = 16
+    top_n: int = 25
+    rebalance_days: int = 20
+    leverage: float = 1.25
+    cost: CostModel = CostModel()
+
+    def to_dict(self):
+        return asdict(self)
+
+
+# ---------------------------------------------------------------------------
+# Data loading
+# ---------------------------------------------------------------------------
+
+def load_price_panels(start="2010-01-01"):
+    """Load close/volume/amount panels.  Amount is recomputed with unadjusted price."""
+    px = load_prices(start=start, fields=("close", "volume"))
+    raw = load_raw_close(start=start)
+    # amount = volume(手) * 100 * raw_close(元)  — 用不复权价避免复权因子污染截面排序
+    amount = px["volume"] * 100 * raw.reindex(index=px["volume"].index, columns=px["volume"].columns)
+    close, volume = px["close"], px["volume"]
+    # Truncate tail where raw prices may lag (causing NaN amount on latest days)
+    valid = amount.notna().sum(axis=1)
+    if len(valid) > 5:
+        typical = valid.iloc[-60:].median()
+        good = valid[valid >= typical * 0.7]
+        if len(good):
+            cutoff = good.index[-1]
+            close, volume, amount = close.loc[:cutoff], volume.loc[:cutoff], amount.loc[:cutoff]
+    return close, volume, amount
+
+
+# ---------------------------------------------------------------------------
+# Weight construction
+# ---------------------------------------------------------------------------
+
+def build_rebalance_weights(factor, close, top_n, rebalance_days):
+    """Convert factor panel to scheduled target weights."""
+    fdates = factor.dropna(how="all").index.intersection(close.index)
+    if len(fdates) < 100:
+        return {}
+
+    weights = {}
+    for rd in list(fdates[::rebalance_days]):
+        pos = close.index.get_loc(rd)
+        if pos + 1 >= len(close.index):
+            continue
+        effective = close.index[pos + 1]
+        f = factor.loc[rd].dropna()
+        active = close.loc[rd].dropna().index
+        f = f.reindex(active).dropna()
+        if len(f) < top_n:
+            continue
+        weights[effective] = pd.Series(1.0 / top_n, index=f.nlargest(top_n).index)
+    return weights
+
+
+# ---------------------------------------------------------------------------
+# Strategy execution via unified engine
+# ---------------------------------------------------------------------------
+
+def run_small_cap_strategy(config=StrategyConfig()):
+    """Run small-cap-size strategy via BacktestEngine."""
+    close, volume, amount = load_price_panels(config.start)
+    prices = PricePanel(close=close, volume=volume, amount=amount)
+    if not load_raw_close(start=config.start).empty:
+        raw = load_raw_close(start=config.start).reindex(index=close.index, columns=close.columns)
+        prices = PricePanel(close=close, volume=volume, amount=amount, raw_close=raw)
+
+    factor = small_cap_factor(amount, config.size_window)
+    timing, small_nav, timing_dist = small_cap_timing(close, amount, config.timing_ma)
+    scheduled = build_rebalance_weights(factor, close, config.top_n, config.rebalance_days)
+
+    engine_config = BacktestConfig(
+        start=config.start,
+        cost=CostModel(
+            buy_cost=config.cost.buy_cost,
+            sell_cost=config.cost.sell_cost,
+            financing_rate=config.cost.financing_rate,
+        ),
+        leverage=config.leverage,
+    )
+    engine = BacktestEngine(prices=prices, config=engine_config)
+    signal = Signal(
+        weights=scheduled,
+        timing=timing,
+        family=config.family,
+        version=config.version,
+    )
+    result = engine.run(signal)
+
+    return {
+        "close": close,
+        "volume": volume,
+        "amount": amount,
+        "factor": factor,
+        "timing": timing,
+        "timing_dist": timing_dist,
+        "scheduled_weights": scheduled,
+        "returns": result.returns,
+        "detail": result.detail,
+        "engine_result": result,
+    }
+
+
+def latest_signal(config=StrategyConfig()):
+    """Latest signal for live trading."""
+    result = run_small_cap_strategy(config)
+    close = result["close"]
+    factor = result["factor"]
+    timing = result["timing"]
+    dist = result["timing_dist"]
+    last = close.index[-1]
+    f = factor.loc[last].dropna()
+    active = close.loc[last].dropna().index
+    holdings = f.reindex(active).dropna().nlargest(config.top_n).index.tolist()
+    return {
+        "date": last,
+        "in_market": bool(timing.loc[last]),
+        "timing_dist": float(dist.loc[last]),
+        "holdings": holdings,
+        "result": result,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Legacy compat: delegate to engine
+# ---------------------------------------------------------------------------
+
+def backtest_weights(close, scheduled_weights, timing_signal=None, config=StrategyConfig()):
+    """.. deprecated:: Use core.engine.BacktestEngine.run() instead.
+
+    Kept as a thin compatibility wrapper for research scripts that have not
+    yet migrated.  Internally delegates to BacktestEngine for identical
+    numerical results.
+    """
+    import warnings
+    warnings.warn(
+        "backtest_weights is deprecated. Use core.engine.BacktestEngine.run() for new code.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    # Build dummy volume/amount matching close shape (engine needs them as PricePanel
+    # fields, but the portfolio backtest logic only uses close for returns)
+    dummy = pd.DataFrame(1.0, index=close.index, columns=close.columns)
+    prices = PricePanel(close=close, volume=dummy, amount=dummy)
+    engine_config = BacktestConfig(
+        start=config.start,
+        cost=CostModel(
+            buy_cost=config.cost.buy_cost,
+            sell_cost=config.cost.sell_cost,
+            financing_rate=config.cost.financing_rate,
+        ),
+        leverage=config.leverage,
+    )
+    engine = BacktestEngine(prices=prices, config=engine_config)
+
+    # Convert dict-of-Series weights to DataFrame if necessary
+    if isinstance(scheduled_weights, dict):
+        from core.engine import _dict_weights_to_df
+        scheduled_weights = _dict_weights_to_df(scheduled_weights, close.index)
+
+    signal = Signal(weights=scheduled_weights, timing=timing_signal)
+    result = engine.run(signal)
+    return result.returns, result.detail

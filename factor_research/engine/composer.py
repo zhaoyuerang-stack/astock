@@ -30,7 +30,7 @@ def ic_weight(
     滚动IC加权：用过去ic_window期的IC均值作为各因子权重。
     IC为负的因子自动取反方向。
     """
-    from engine.backtest import calc_ic
+    from engine.factor_analysis import calc_ic
 
     # 先算各因子的IC时间序列
     ic_series = {name: calc_ic(f, forward_ret) for name, f in factors.items()}
@@ -120,3 +120,36 @@ def factor_corr_matrix(
         count += 1
 
     return (corr_accum / max(count, 1)).round(3)
+
+
+# ---------------------------------------------------------------------------
+# Signal helpers — bridge composer output to BacktestEngine
+# ---------------------------------------------------------------------------
+
+def to_signal(
+    factor: pd.DataFrame,
+    top_n: int = 25,
+    direction: int = 1,
+    rebalance_freq: str = "20D",
+    timing: pd.Series = None,
+    family: str = "",
+    version: str = "",
+):
+    """Wrap a composed factor into a ``core.engine.Signal``.
+
+    Usage::
+
+        composite = equal_weight(factor_dict)
+        signal = to_signal(composite, top_n=25)
+        result = engine.run(signal)
+    """
+    from core.engine import Signal
+    return Signal(
+        factor=factor,
+        top_n=top_n,
+        direction=direction,
+        rebalance_freq=rebalance_freq,
+        timing=timing,
+        family=family,
+        version=version,
+    )
