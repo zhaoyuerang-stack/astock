@@ -13,7 +13,21 @@ LAKE = Path(__file__).parent.parent / "data_lake"
 
 # ── 价量面板 ──
 def load_prices(codes=None, start="2010-01-01", fields=("close", "volume", "amount")):
-    """加载日线 → {field: date×code 宽表}"""
+    """加载日线 → {field: date×code 宽表}。
+
+    优先读取 daily_all.parquet（大表），不存在则 fallback 到逐只文件。
+    """
+    all_fp = LAKE / "price/daily_all.parquet"
+    if all_fp.exists():
+        cols = ["date", "code"] + list(fields)
+        df = pd.read_parquet(all_fp, columns=cols)
+        df["date"] = pd.to_datetime(df["date"])
+        df = df[df["date"] >= pd.Timestamp(start)]
+        if codes:
+            df = df[df["code"].isin(codes)]
+        return {f: df.pivot(index="date", columns="code", values=f) for f in fields}
+
+    # fallback: 逐只 parquet
     daily = LAKE / "price/daily"
     files = ([daily / f"{c}.parquet" for c in codes] if codes
              else sorted(daily.glob("*.parquet")))
@@ -69,7 +83,20 @@ def compute_valuation(close, eps, bps):
 
 # ── 不复权价加载（估值专用，通达信原始价）──
 def load_raw_close(codes=None, start="2010-01-01"):
-    """加载不复权close → date×code（PE/PB自算必须用不复权价）"""
+    """加载不复权close → date×code（PE/PB自算必须用不复权价）。
+
+    优先读取 daily_raw_all.parquet（大表），不存在则 fallback 到逐只文件。
+    """
+    all_fp = LAKE / "price/daily_raw_all.parquet"
+    if all_fp.exists():
+        df = pd.read_parquet(all_fp, columns=["date", "code", "raw_close"])
+        df["date"] = pd.to_datetime(df["date"])
+        df = df[df["date"] >= pd.Timestamp(start)]
+        if codes:
+            df = df[df["code"].isin(codes)]
+        return df.pivot(index="date", columns="code", values="raw_close")
+
+    # fallback: 逐只 parquet
     raw_dir = LAKE / "price/daily_raw"
     files = ([raw_dir / f"{c}.parquet" for c in codes] if codes
              else sorted(raw_dir.glob("*.parquet")))

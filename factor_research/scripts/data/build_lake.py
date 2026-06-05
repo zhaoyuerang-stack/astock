@@ -46,6 +46,12 @@ def main():
         if (i + 1) % 1000 == 0:
             print(f"  校验 {i+1}/{len(files)}", flush=True)
 
+    # 3. 合并大表
+    print("\n合并 daily 大表...", flush=True)
+    from lake.compact import compact_prices, compact_raw_prices
+    compact_prices("data_lake/price/daily", "data_lake/price/daily_all.parquet")
+    compact_raw_prices("data_lake/price/daily_raw", "data_lake/price/daily_raw_all.parquet")
+
     report = v.quality_report(results, save_path="data_lake/quality_report.json")
     print(f"\n=== 质量报告 ===", flush=True)
     print(f"总数={report['total']} 干净={report['clean']} ({report['clean_ratio']:.1%})", flush=True)

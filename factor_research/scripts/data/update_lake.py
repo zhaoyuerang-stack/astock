@@ -61,6 +61,13 @@ def update_prices():
         if (i + 1) % 500 == 0:
             print(f"  价量 {i+1}/{len(files)} (更新{updated} 跳过{skipped})", flush=True)
     print(f"[价量] 更新{updated}只, 跳过{skipped}只(已最新)", flush=True)
+
+    # 增量更新后重新合并大表
+    if updated > 0:
+        print("重新合并 daily 大表...", flush=True)
+        from lake.compact import compact_prices
+        compact_prices(LAKE / "price/daily", LAKE / "price/daily_all.parquet")
+
     return {"price_daily": {"last_check": str(date.today()), "updated": updated}}
 
 
@@ -80,11 +87,8 @@ def update_fundamental():
         print("[财务] 已最新，无新报告期", flush=True)
         return {"fundamental": {"last_check": str(date.today())}}
 
-    RENAME = {"股票代码":"code","每股收益":"eps","营业总收入-营业总收入":"revenue",
-              "营业总收入-同比增长":"revenue_yoy","净利润-净利润":"net_profit",
-              "净利润-同比增长":"net_profit_yoy","每股净资产":"bps","净资产收益率":"roe",
-              "每股经营现金流量":"cfo_ps","销售毛利率":"gross_margin",
-              "所处行业":"industry","最新公告日期":"ann_date"}
+    from lake.schema import YJBB_RENAME
+    RENAME = YJBB_RENAME
     KEEP = list(set(RENAME.values()) | {"report_date","avail_date"})
     new_frames = []
     for p in missing:
@@ -133,13 +137,31 @@ def update_capital_margin():
     return {"capital_margin": {"last_check": str(date.today()), "updated_days": stats.get("ok", 0), "empty": stats.get("empty", 0), "error": stats.get("error", 0)}}
 
 
+def update_weekly_monthly():
+    """重新生成周/月线聚合。"""
+    from lake.aggregate import build_periodic
+    build_periodic("data_lake/price/daily")
+    return {"periodic": {"last_check": str(date.today())}}
+
+
+def run_validate():
+    """运行数据质量校验。"""
+    import subprocess
+    result = subprocess.run([sys.executable, "validate_final.py"], cwd=ROOT, capture_output=True, text=True)
+    ok = result.returncode == 0 and "干净" in result.stdout
+    return {"validate": {"last_check": str(date.today()), "ok": ok}}
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--prices", action="store_true")
-    ap.add_argument("--fundamental", action="store_true")
+    ap.add_argument("--prices", action="store_true", help="Update price data only.")
+    ap.add_argument("--fundamental", action="store_true", help="Update fundamental data only.")
     ap.add_argument("--capital", action="store_true", help="Update margin financing data only.")
+    ap.add_argument("--weekly-monthly", action="store_true", help="Rebuild weekly/monthly aggregates.")
+    ap.add_argument("--validate", action="store_true", help="Run data quality validation.")
+    ap.add_argument("--all", action="store_true", help="Run all updates.")
     args = ap.parse_args()
-    do_all = not (args.prices or args.fundamental or args.capital)
+    do_all = args.all or not (args.prices or args.fundamental or args.capital or args.weekly_monthly or args.validate)
 
     m = load_manifest()
     if do_all or args.prices:
@@ -148,5 +170,9 @@ if __name__ == "__main__":
         m.update(update_fundamental())
     if args.capital:
         m.update(update_capital_margin())
+    if do_all or args.weekly_monthly:
+        m.update(update_weekly_monthly())
+    if do_all or args.validate:
+        m.update(run_validate())
     save_manifest(m)
     print(f"\n增量更新完成，manifest: {MANIFEST}", flush=True)
