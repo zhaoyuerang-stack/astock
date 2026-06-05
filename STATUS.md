@@ -11,7 +11,7 @@
 | 数据基础设施 | ✅ | data_lake 全市场+全历史+含退市股,质量 ~99.9%;旧 data_full/data 已删;两融已落 `data_lake/capital/margin_all.parquet`;北向 fallback 已落 `data_lake/capital/northbound_all.parquet`(2017-2024,774只) |
 | 统一回测内核 `core/` | ✅ | data_lake + 小盘因子/择时 + 真实换手成本 + 融资成本;`amount=volume×100×不复权价` |
 | 策略工厂 | ⏳ | 阶段 1.1-1.13 已建;2026-06-03 已按干净 amount + 2010 预热重跑 fundamental 1.9-1.13;2026-06-04 已接两融/北向资金面并验证;候选验收仍未达 |
-| 有效策略管理 | ✅台账 / ✅监控 / ✅模拟盘 | 两层台账已建;失效监控 `decay_monitor` 把 decay_signal 定量化(size因子IC衰减/小盘动量/滚动夏普 + 前瞻阈值,当前 v2.0 🔴预警);实盘就绪卡 `live_readiness`(操作+容量+失效);**模拟盘 `scripts/ops/paper_trade.py`(100万本金,读当日 signal 模拟成交+真实成本,写 Obsidian `30.output/A股v2.0模拟盘/`,`--preview` 出建仓清单),用不复权价算股数** |
+| 有效策略管理 | ✅台账 / ✅监控 / ✅模拟盘 | 两层台账已建;失效监控 `decay_monitor` 把 decay_signal 定量化(size因子IC衰减/小盘动量/滚动夏普 + 前瞻阈值,当前 v2.0 🔴预警);实盘就绪卡 `live_readiness`(操作+容量+失效);**模拟盘 `scripts/ops/paper_trade.py`=真实盘口径:T+1 不复权开盘价成交 + pending order 跨天结算 + 停牌/一字涨跌停不可成交;100万本金/1.0x,写 Obsidian `30.output/A股v2.0模拟盘/`,`--preview` 出次日开盘建仓清单。回测口径(收盘撮合)不动** |
 | 中央调度层 | ⏳ | launchd 每日增量更新已接 `paper_trade`;周维护已接 `decay_monitor`/`tradability`/`live_readiness`;更完整事件驱动调度未建 |
 | 组合层 | ○ | 未建 |
 | 展示层 | ○ | 未建 |
@@ -42,4 +42,5 @@
 - 已完成 1.14:独立择时验证(`factory/timing.py` 13 个全市场 regime/vol-target/止损基因 × 9 fundamental/defensive 候选 = 117 组合)→ **0 过三道闸**。择时能把相关压到 0.3-0.4,但救不了 fundamental 的结构性压力回撤(与全市场 regime 不同步,`mkt_dd_stop` 止损反而双杀)。**结论:fundamental/defensive 转组合分散件定位(非独立母策略),`timing.py` 作可复用资产保留;找第 2 个母策略需换思路——找本身回撤就可控的正交 alpha**(详见 LESSONS)。
 - 当前结论:`candidate_batch.json` 仍为空;**尚未满足 ≥2 个非 small-cap 低相关候选母策略**。fundamental 汇总见 `reports/factory_clean_rerun_summary.json`;两融汇总见 `reports/capital_flow_validation_summary.json`;北向汇总见 `reports/northbound_validation_summary.json`。
 - 下一焦点:接受当前数据基础下"A股稳定 alpha 主要只有小盘"的现实,把 `small-cap-size/v2.0` 当唯一母策略做实盘化/风控/容量/失效监控;fundamental/两融/北向只保留为组合分散件或监控辅助,不再围绕这些方向硬凑第 2 母策略。
-- 已落地 实盘部署(2026-06-04):`scripts/ops/paper_trade.py` 模拟盘(100万本金,1.0x,读当日 signal 模拟成交+真实成本,写 Obsidian `30.output/A股v2.0模拟盘/今日操作.md`+`历史/`,`--preview` 出建仓清单),已接每日 launchd;周维护接入 `decay_monitor`/`tradability`/`live_readiness`。**期间修两个生产 bug**:① 当天数据残缺(不复权 raw 滞后于后复权 daily + 盘后部分抓取)使最新日 `amount` 全 NaN → 选不出 top25、择时值脏,`load_price_panels` 改按 **amount 完整性**截断尾部不完整日;② 模拟盘下单股数误用后复权价(虚高数倍)→ 买 0 股,改用 `daily_raw` 不复权价。详见 LESSONS。**遗留**:raw 滞后使信号用 amount 完整日(当前滞后到 06-02),根治需 daily 同步更新 daily_raw。
+- 已落地 实盘部署(2026-06-04):`scripts/ops/paper_trade.py` 模拟盘(100万本金,1.0x,读当日 signal 模拟成交+真实成本,写 Obsidian `30.output/A股v2.0模拟盘/今日操作.md`+`历史/`,`--preview` 出建仓清单),已接每日 launchd;周维护接入 `decay_monitor`/`tradability`/`live_readiness`。**期间修两个生产 bug**:① 当天数据残缺(不复权 raw 滞后于后复权 daily + 盘后部分抓取)使最新日 `amount` 全 NaN → 选不出 top25、择时值脏,`load_price_panels` 改按 **amount 完整性**截断尾部不完整日;② 模拟盘下单股数误用后复权价(虚高数倍)→ 买 0 股,改用 `daily_raw` 不复权价。详见 LESSONS。
+- 已落地 真实盘成交重构(2026-06-05):按"模拟=真实盘"要求,`paper_trade` 改 **T+1 不复权开盘价成交 + pending order + 停牌/一字涨跌停约束**(回测归回测、成交归真实买卖);`fetch_raw_close` 改拉**不复权 OHLC + 增量**,`daily_update` 每日同步 `daily_raw`(raw 滞后已根治)。端到端 6 项验证通过,期间修:涨跌停价须按分 `round(×1.1,2)`(否则 7.403 漏判 7.40 涨停)、卡片字符串中文引号语法错。

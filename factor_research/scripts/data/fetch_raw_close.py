@@ -16,11 +16,15 @@ from lake.base import Fetcher, RateLimiter
 
 
 class TdxRawFetcher(Fetcher):
-    """通达信不复权日线close。单次800条，分批回溯到2010。"""
-    def __init__(self, **kw):
+    """通达信不复权日线 OHLC。全量:6批×800 回溯2010;增量:只拉最近 inc_offset 条并 merge 现有。"""
+    COLS = {"open": "raw_open", "high": "raw_high", "low": "raw_low", "close": "raw_close"}
+
+    def __init__(self, incremental=False, inc_offset=20, **kw):
         super().__init__(name="tdx_raw", out_dir="data_lake/price/daily_raw",
                          limiter=RateLimiter(0.05, (0, 0.05)),
                          max_workers=kw.pop("max_workers", 4), timeout=20, **kw)
+        self.incremental = incremental
+        self.inc_offset = inc_offset
         self._local = threading.local()
 
     @property
@@ -29,30 +33,57 @@ class TdxRawFetcher(Fetcher):
             self._local.c = Quotes.factory(market="std")
         return self._local.c
 
+    def _to_ohlc(self, frames):
+        allf = pd.concat(frames).reset_index(drop=True)
+        allf["date"] = pd.to_datetime(allf["datetime"]).dt.floor("D")
+        out = (allf[["date"] + list(self.COLS)].rename(columns=self.COLS)
+               .drop_duplicates("date").sort_values("date"))
+        return out[out["date"] >= pd.Timestamp("2010-01-01")].reset_index(drop=True)
+
     def fetch_one(self, code):
-        frames = []
-        for b in range(6):                       # 6批×800 回溯到2010
+        if self.incremental:                      # 增量:最近 inc_offset 条 + merge 现有
+            df = self.client.bars(symbol=code, frequency=9, start=0, offset=self.inc_offset)
+            if df is None or df.empty:
+                return None
+            new = self._to_ohlc([df])
+            fp = self.out_path(code)
+            if fp.exists():
+                old = pd.read_parquet(fp)
+                new = (pd.concat([old, new]).drop_duplicates("date", keep="last")
+                       .sort_values("date").reset_index(drop=True))
+            return new if len(new) else None
+        frames = []                               # 全量:6批×800 回溯2010
+        for b in range(6):
             df = self.client.bars(symbol=code, frequency=9, start=b * 800, offset=800)
             if df is None or df.empty:
                 break
             frames.append(df)
             if len(df) < 800:
                 break
-        if not frames:
-            return None
-        allf = pd.concat(frames).reset_index(drop=True)
-        allf["date"] = pd.to_datetime(allf["datetime"]).dt.floor("D")
-        out = (allf[["date", "close"]].rename(columns={"close": "raw_close"})
-               .drop_duplicates("date").sort_values("date"))
-        out = out[out["date"] >= pd.Timestamp("2010-01-01")].reset_index(drop=True)
-        return out if len(out) else None
+        return self._to_ohlc(frames) if frames else None
+
+
+def update_raw_prices(inc_offset=20, max_workers=4):
+    """增量更新全市场 daily_raw 到最新(带 OHLC),消除 raw 滞后(供每日 daily_update 调用)。"""
+    codes = sorted(fp.stem for fp in Path("data_lake/price/daily_raw").glob("*.parquet"))
+    print(f"通达信增量更新不复权 OHLC: {len(codes)}只", flush=True)
+    f = TdxRawFetcher(incremental=True, inc_offset=inc_offset, max_workers=max_workers)
+    stats = f.run(codes, skip_existing=False)
+    if stats.get("failures"):
+        f.retry_failures(stats["failures"])
+    print(f"[raw] 增量完成 ok={stats['ok']} empty={stats['empty']} err={stats['error']}", flush=True)
+    return stats
 
 
 if __name__ == "__main__":
-    codes = sorted(fp.stem for fp in Path("data_lake/price/daily").glob("*.parquet"))
-    print(f"通达信下载不复权close: {len(codes)}只", flush=True)
-    f = TdxRawFetcher()
-    stats = f.run(codes)
-    if stats["failures"]:
-        f.retry_failures(stats["failures"])
-    print(f"✅ 不复权close: {len(list(Path('data_lake/price/daily_raw').glob('*.parquet')))}只", flush=True)
+    import sys
+    if "--incremental" in sys.argv:
+        update_raw_prices()
+    else:
+        codes = sorted(fp.stem for fp in Path("data_lake/price/daily").glob("*.parquet"))
+        print(f"通达信全量下载不复权 OHLC: {len(codes)}只", flush=True)
+        f = TdxRawFetcher()
+        stats = f.run(codes)
+        if stats["failures"]:
+            f.retry_failures(stats["failures"])
+        print(f"✅ 不复权 OHLC: {len(list(Path('data_lake/price/daily_raw').glob('*.parquet')))}只", flush=True)

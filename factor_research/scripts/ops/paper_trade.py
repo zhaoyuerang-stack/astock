@@ -1,13 +1,14 @@
-"""v2.0 模拟盘 (paper trading):读当日 signal → 模拟成交(真实成本)→ 更新账户 → 写 Obsidian 卡片。
+"""v2.0 模拟盘(真实盘成交逻辑):T+1 开盘价成交 + pending order + 停牌/涨跌停约束。
 
-口径(第一版,均可调):
-  · 本金 100 万,1.0x(满仓=本金,不融资;策略默认 1.25x)
-  · 成交价 = 信号日收盘价 + 真实成本(买0.225%/卖0.275%);实盘需次日开盘执行,有隔夜跳空偏差
-  · 等权 1/top_n;A股 100 股整数倍;调仓日全部换新名单
-  · 卖出由规则触发:择时转空→清仓;每 20 交易日调仓→卖掉出名单的
-状态: paper/account.json + paper/trades.csv + paper/nav.csv
+真实盘口径(你要求"所有模拟按真实盘"):
+  · T 日盘后出信号 → 记 pending → **T+1 开盘按不复权开盘价成交**(收盘后才看到信号,只能次日买)
+  · 停牌(当天无开盘价)不可买卖;一字涨停(开盘=涨停价)买不进、一字跌停卖不出
+  · 等权 1/top_n,A股 100 股整数倍;成交/估值全用不复权价(daily_raw 的 raw_open/raw_close)
+  · 本金 100 万,1.0x;成本 买 0.225% / 卖 0.275%
+  · 回测口径(core 的 run_small_cap_strategy 收盘撮合)不动——回测归回测,成交归真实买卖
+状态: paper/account.json(含 pending) + trades.csv + nav.csv
 输出: <OBSIDIAN>/今日操作.md(覆盖) + 历史/YYYY-MM-DD.md(归档)
-用法(cwd=factor_research): /usr/bin/python3 -m scripts.ops.paper_trade
+用法(cwd=factor_research): /usr/bin/python3 -m scripts.ops.paper_trade [--preview]
 """
 import argparse
 import csv
@@ -24,30 +25,88 @@ sys.path.insert(0, str(ROOT))
 import pandas as pd  # noqa: E402
 
 INIT_CAPITAL = 1_000_000.0
-LEVERAGE = 1.0          # 满仓=本金;改 1.25 复现策略默认融资版
+LEVERAGE = 1.0
 BUY_COST = 0.00225
 SELL_COST = 0.00275
-LOT = 100               # A股最小交易单位
+LOT = 100
 
 SIGNALS = ROOT / "signals"
 PAPER = ROOT / "paper"
 ACCOUNT_FP = PAPER / "account.json"
 TRADES_FP = PAPER / "trades.csv"
 NAV_FP = PAPER / "nav.csv"
+RAW = ROOT / "data_lake/price/daily_raw"
 OBSIDIAN = Path("/Users/kiki/Personal Wiki/30.output/A股v2.0模拟盘")
 
 
-def get_price(code, date):
-    """取 code 在 date(含)之前最近一个【不复权】收盘价(真实股价,用于算股数/成交/估值;
-    后复权价虚高数倍会让 100 股预算买成 0 股)。停牌则用最近收盘估值。"""
-    fp = ROOT / f"data_lake/price/daily_raw/{code}.parquet"
-    if not fp.exists():
+# ── 价格:全部不复权(daily_raw)──
+def _raw(code):
+    fp = RAW / f"{code}.parquet"
+    return pd.read_parquet(fp) if fp.exists() else None
+
+
+def get_close(code, date):
+    """date(含)前最近不复权收盘——估值用。"""
+    df = _raw(code)
+    if df is None:
         return None
-    df = pd.read_parquet(fp, columns=["date", "raw_close"])
     df = df[pd.to_datetime(df["date"]) <= pd.Timestamp(date)]
     return float(df["raw_close"].iloc[-1]) if len(df) else None
 
 
+def get_open(code, date):
+    """date 当天不复权开盘——T+1 成交价;停牌(当天无数据/无 open)返回 None。"""
+    df = _raw(code)
+    if df is None or "raw_open" not in df.columns:
+        return None
+    row = df[pd.to_datetime(df["date"]) == pd.Timestamp(date)]
+    if not len(row):
+        return None
+    o = row["raw_open"].iloc[0]
+    return float(o) if pd.notna(o) and o > 0 else None
+
+
+def get_prev_close(code, date):
+    """date 前一交易日不复权收盘——算涨跌停基准。"""
+    df = _raw(code)
+    if df is None:
+        return None
+    df = df[pd.to_datetime(df["date"]) < pd.Timestamp(date)]
+    return float(df["raw_close"].iloc[-1]) if len(df) else None
+
+
+# ── 涨跌停(按板块)──
+def limit_pct(code, name):
+    if name and "ST" in str(name).upper():
+        return 0.05
+    if code[:3] in ("300", "301", "688"):   # 创业板/科创
+        return 0.20
+    return 0.10                              # 主板(北交所已不在universe)
+
+
+def buyable_open(code, date, name):
+    """T+1 可买入开盘价:未停牌且非开盘涨停;否则 None(买不进)。"""
+    o = get_open(code, date)
+    if o is None:
+        return None
+    pc = get_prev_close(code, date)
+    if pc and o >= round(pc * (1 + limit_pct(code, name)), 2) - 1e-6:   # 开盘即涨停(涨停价按分四舍五入)
+        return None
+    return o
+
+
+def sellable_open(code, date, name):
+    """T+1 可卖出开盘价:未停牌且非开盘跌停;否则 None(卖不出)。"""
+    o = get_open(code, date)
+    if o is None:
+        return None
+    pc = get_prev_close(code, date)
+    if pc and o <= round(pc * (1 - limit_pct(code, name)), 2) + 1e-6:   # 开盘即跌停(跌停价按分四舍五入)
+        return None
+    return o
+
+
+# ── account / 流水 IO ──
 def load_names():
     fp = ROOT / "data_lake/meta/codes.parquet"
     if fp.exists():
@@ -59,13 +118,8 @@ def load_names():
 def load_account():
     if ACCOUNT_FP.exists():
         return json.loads(ACCOUNT_FP.read_text())
-    return {
-        "init_capital": INIT_CAPITAL,
-        "inception": None,
-        "cash": INIT_CAPITAL,
-        "positions": {},          # code -> {"shares": int, "avg_cost": float}
-        "last_date": None,
-    }
+    return {"init_capital": INIT_CAPITAL, "inception": None, "cash": INIT_CAPITAL,
+            "positions": {}, "pending": None, "last_date": None}
 
 
 def save_account(acc):
@@ -99,25 +153,32 @@ def upsert_nav(date, nav, cash, pos_value, ret):
             w.writerow(rows[d])
 
 
-def sell_all(acc, date, names, trades):
-    for code, pos in list(acc["positions"].items()):
-        price = get_price(code, date)
-        if price is None:
+# ── T+1 开盘成交:把持仓调到 target ──
+def execute_to_target(acc, date, target, top_n, names, trades, blocked):
+    target = set(target)
+    # 1. 卖出:持仓中不在 target 的(掉出名单),用 date 开盘价
+    for code in list(acc["positions"]):
+        if code in target:
             continue
+        price = sellable_open(code, date, names.get(code))
+        if price is None:
+            blocked.append(("卖出", code, names.get(code, code), "停牌/一字跌停,卖不出"))
+            continue
+        pos = acc["positions"].pop(code)
         notional = pos["shares"] * price
         cost = notional * SELL_COST
         acc["cash"] += notional - cost
         trades.append([date, code, names.get(code, code), "SELL", pos["shares"],
                        round(price, 3), round(notional, 2), round(cost, 2), round(acc["cash"], 2)])
-    acc["positions"] = {}
-
-
-def buy_basket(acc, date, holdings, top_n, names, trades):
-    equity = acc["cash"]                      # 调仓前已全部卖出,equity≈cash
-    budget_each = equity * LEVERAGE / top_n
-    for code in holdings:
-        price = get_price(code, date)
-        if price is None or price <= 0:
+    # 2. 买入:target 中未持有的(新进名单),等权 total_equity/top_n,用 date 开盘价
+    pos_value = sum(p["shares"] * (get_close(c, date) or p["avg_cost"]) for c, p in acc["positions"].items())
+    budget_each = (acc["cash"] + pos_value) * LEVERAGE / top_n
+    for code in target:
+        if code in acc["positions"]:
+            continue
+        price = buyable_open(code, date, names.get(code))
+        if price is None:
+            blocked.append(("买入", code, names.get(code, code), "停牌/一字涨停,买不进"))
             continue
         shares = int(budget_each / price // LOT) * LOT
         if shares <= 0:
@@ -136,62 +197,94 @@ def valuation(acc, date):
     pos_value = 0.0
     detail = []
     for code, pos in acc["positions"].items():
-        price = get_price(code, date)
+        price = get_close(code, date)
         mv = pos["shares"] * price if price else 0.0
         pos_value += mv
         pnl = (price - pos["avg_cost"]) * pos["shares"] if price else 0.0
         detail.append({"code": code, "shares": pos["shares"], "cost": pos["avg_cost"],
                        "price": price, "mv": mv, "pnl": pnl})
-    nav = acc["cash"] + pos_value
-    return nav, pos_value, detail
+    return acc["cash"] + pos_value, pos_value, detail
+
+
+def estimate_basket(date, codes, equity, top_n, names):
+    """按参考价(date 收盘)估算等权建仓清单——给"明日计划"/预览展示,实际按 T+1 开盘成交。"""
+    budget_each = equity * LEVERAGE / top_n
+    rows = []
+    for code in codes:
+        ref = get_close(code, date)
+        if not ref:
+            continue
+        shares = int(budget_each / ref // LOT) * LOT
+        if shares > 0:
+            rows.append((code, names.get(code, code), shares, ref, shares * ref))
+    return rows
 
 
 def fmt(x):
     return f"{x:,.0f}"
 
 
-def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, names):
+def read_decay():
+    dp = ROOT / "reports/decay_status.json"
+    return json.loads(dp.read_text()) if dp.exists() else None
+
+
+def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocked, names, exec_from):
     ret = nav / acc["init_capital"] - 1
-    action = signal["action"]
+    buys = [t for t in trades if t[3] == "BUY"]
+    sells = [t for t in trades if t[3] == "SELL"]
     lines = [
         f"# A股 v2.0 模拟盘 · {date}",
         "",
-        f"> 自动生成 {datetime.now():%Y-%m-%d %H:%M} | 策略 small-cap-size/v2.0 | 本金 {fmt(acc['init_capital'])} | 杠杆 {LEVERAGE}x",
+        f"> 自动生成 {datetime.now():%Y-%m-%d %H:%M} | small-cap-size/v2.0 | 本金 {fmt(acc['init_capital'])} | "
+        f"杠杆 {LEVERAGE}x | 真实盘 T+1 开盘成交",
         "",
-        "## 📋 今日操作",
+        "## 📋 今日开盘成交" + (f"(执行 {exec_from} 信号)" if exec_from else ""),
+        "",
     ]
-    buys = [t for t in trades if t[3] == "BUY"]
-    sells = [t for t in trades if t[3] == "SELL"]
-    if action in ("空仓观望",):
-        lines += ["**空仓观望,不建仓**(择时🔴)。今日无买卖,继续持币。", ""]
-    elif action == "维持原仓位":
-        lines += ["**维持原仓位**,今日无买卖(距上次调仓不足 20 交易日)。", ""]
+    if not exec_from:
+        lines += ["今日无待执行订单(模拟盘首日或上一信号为空仓)。", ""]
+    elif not trades and not blocked:
+        lines += ["目标与持仓一致,今日开盘无买卖。", ""]
     else:
-        lines += [f"**{action}**", ""]
         if sells:
-            lines += [f"**卖出 ({len(sells)} 只):**", "", "| 代码 | 名称 | 股数 | 价格 | 金额 |", "|--|--|--|--|--|"]
+            lines += [f"**卖出 {len(sells)} 只(开盘价):**", "", "| 代码 | 名称 | 股数 | 开盘价 | 金额 |", "|--|--|--|--|--|"]
             lines += [f"| {t[1]} | {t[2]} | {t[4]} | {t[5]} | {fmt(t[6])} |" for t in sells]
             lines += [""]
         if buys:
             tot = sum(t[6] for t in buys)
-            lines += [f"**买入 ({len(buys)} 只,合计 ≈ {fmt(tot)}):**", "",
-                      "| 代码 | 名称 | 股数 | 参考价 | 金额 |", "|--|--|--|--|--|"]
+            lines += [f"**买入 {len(buys)} 只(开盘价,合计 ≈ {fmt(tot)}):**", "",
+                      "| 代码 | 名称 | 股数 | 开盘价 | 金额 |", "|--|--|--|--|--|"]
             lines += [f"| {t[1]} | {t[2]} | {t[4]} | {t[5]} | {fmt(t[6])} |" for t in buys]
             lines += [""]
+        if blocked:
+            lines += [f"**⛔ 未成交 {len(blocked)} 笔(真实盘约束):**", "", "| 方向 | 代码 | 名称 | 原因 |", "|--|--|--|--|"]
+            lines += [f"| {b[0]} | {b[1]} | {b[2]} | {b[3]} |" for b in blocked]
+            lines += [""]
+
+    # 明日计划(本日信号 → 次日开盘执行)
+    pend = acc.get("pending") or {}
+    target = pend.get("target") or []
+    lines += ["## 📅 明日开盘计划" + f"(本日 {date} 信号 → 次日开盘执行)", ""]
+    if signal["in_market"] and target:
+        plan = estimate_basket(date, target, nav, signal["top_n"], names)
+        lines += [f"目标持仓 {len(target)} 只等权;次日开盘买入(参考价=今收,实际按开盘价):", "",
+                  "| 代码 | 名称 | 预计股数 | 参考价 | 预计金额 |", "|--|--|--|--|--|"]
+        lines += [f"| {r[0]} | {r[1]} | {r[2]} | {r[3]:.2f} | {fmt(r[4])} |" for r in plan]
+        lines += [""]
+    else:
+        lines += ["**空仓观望**,明日开盘不建仓(若有持仓则次日开盘清仓)。", ""]
 
     lines += [
-        "## 💰 账户",
-        "",
-        "| 指标 | 值 |",
-        "|--|--|",
+        "## 💰 账户", "", "| 指标 | 值 |", "|--|--|",
         f"| 总资产 | {fmt(nav)} |",
         f"| 现金 | {fmt(acc['cash'])} |",
         f"| 持仓市值 | {fmt(pos_value)} |",
         f"| 累计收益 | {ret:+.2%} |",
         f"| 持仓数 | {len(detail)} 只 |",
+        f"| 起始日 | {acc.get('inception')} |",
         "",
     ]
-
     if detail:
         lines += ["## 📦 当前持仓", "", "| 代码 | 名称 | 股数 | 成本 | 现价 | 市值 | 浮盈 |", "|--|--|--|--|--|--|--|"]
         for d in sorted(detail, key=lambda x: -x["mv"]):
@@ -203,75 +296,57 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, names)
         lines += ["## 📦 当前持仓", "", "(空仓,持币观望)", ""]
 
     dist = signal.get("small_index_vs_ma16", 0)
-    lines += [
-        "## 📈 择时 & 失效监控",
-        "",
-        f"- 择时: {'🟢 持仓' if signal['in_market'] else '🔴 空仓'}  (小盘指数 vs MA16: {dist:+.2%})",
-    ]
+    lines += ["## 📈 择时 & 失效监控", "",
+              f"- 择时: {'🟢 持仓' if signal['in_market'] else '🔴 空仓'}  (小盘指数 vs MA16: {dist:+.2%})"]
     if decay:
-        warn = str(decay.get("status", "")).startswith("🔴")
         lines += [f"- 失效: {decay['status']}  (IC {decay['ic']} vs 历史 {decay['ic_hist']} | "
                   f"小盘动量 {decay['rel_mom']:+.1%} | 滚动夏普 {decay['roll_sharpe']})  更新 {decay.get('updated')}"]
         if decay.get("msgs"):
             lines += [f"  - 触发: {', '.join(decay['msgs'])}"]
     else:
-        warn = False
         lines += ["- 失效: (decay_status.json 缺失,跑 decay_monitor 刷新)"]
 
     lines += [
-        "",
-        "## 📖 卖出规则(系统自动执行)",
-        "",
-        "- 择时转空(小盘指数跌破 MA16)→ **全部清仓**",
-        "- 调仓日(每 20 交易日)→ 卖掉**掉出 top25 名单**的股票,换入新进的",
+        "", "## 📖 卖出规则(系统自动执行)", "",
+        "- 择时转空(小盘指数跌破 MA16)→ 次日开盘**全部清仓**",
+        "- 调仓日(每 20 交易日)→ 次日开盘卖掉**掉出 top25** 的、买入新进的",
         "- 无单只止盈止损(截面策略,靠分散+调仓控制风险)",
-        "",
-        "## ⚠️ 口径声明",
-        "",
-        "- **成交价 = 信号日收盘价**;你 16:30 收盘后才看到信号,实盘需**次日开盘**买入,会有隔夜跳空偏差",
-        f"- 成本: 买 {BUY_COST:.3%} / 卖 {SELL_COST:.3%}(含佣金/印花税/过户费/滑点)",
-        f"- 杠杆 {LEVERAGE}x(满仓=本金;策略默认 1.25x 融资版,如需告诉我)",
-        f"- 容量: 本金 {fmt(acc['init_capital'])} ≪ 策略容量 ~2000万,无冲击成本压力",
+        "", "## ⚠️ 口径声明", "",
+        "- **真实盘成交**:T 日盘后出信号 → **T+1 开盘价**成交(你收盘后才看到信号,只能次日买)",
+        "- **停牌/涨跌停**:停牌不可买卖;一字涨停买不进、一字跌停卖不出(见上「未成交」)",
+        f"- 成交/估值用**不复权价**(daily_raw);成本 买 {BUY_COST:.3%} / 卖 {SELL_COST:.3%}",
+        f"- 杠杆 {LEVERAGE}x;容量:本金 {fmt(acc['init_capital'])} ≪ 策略容量 ~2000万",
+        "- 回测口径(收盘撮合)另算——回测归回测,本卡是真实买卖逻辑",
     ]
-    if signal["in_market"] and warn:
-        lines += ["", "> ⚠️ **失效预警期**:此为模拟盘;真上实盘建议半仓起步,盯紧 IC 与小盘动量,恶化即退。"]
     return "\n".join(lines) + "\n"
 
 
-def read_decay():
-    dp = ROOT / "reports/decay_status.json"
-    return json.loads(dp.read_text()) if dp.exists() else None
-
-
 def build_preview(names):
-    """假设择时转多,用当前 top25 名单生成建仓预览卡片(不碰正式账户)。"""
+    """假设择时转多:展示「次日开盘建仓清单」(不碰正式账户)。"""
     from core.backtest import latest_signal, StrategyConfig
     print("[preview] 加载数据 + 计算当前 top25 名单(约 1-2 分钟)...")
     sig = latest_signal(StrategyConfig(start="2010-01-01"))
     date = str(sig["date"].date())
-    psig = {"date": date, "action": "建仓买入", "in_market": sig["in_market"],
-            "holdings": sig["holdings"], "top_n": 25,
-            "small_index_vs_ma16": sig["timing_dist"]}
-    acc = {"init_capital": INIT_CAPITAL, "inception": date, "cash": INIT_CAPITAL,
-           "positions": {}, "last_date": None}
-    trades = []
-    buy_basket(acc, date, psig["holdings"], psig["top_n"], names, trades)
-    nav, pos_value, detail = valuation(acc, date)
-    card = render_card(date, psig, read_decay(), acc, nav, pos_value, detail, trades, names)
-    warn = (f"> 🔮 **建仓预览** —— 这是「假如今天择时转多」系统会给出的可执行指令。\n"
+    plan = estimate_basket(date, sig["holdings"], INIT_CAPITAL, 25, names)
+    tot = sum(r[4] for r in plan)
+    warn = (f"> 🔮 **建仓预览** —— 假如择时转多,系统会在**次日开盘**按此清单建仓。\n"
             f"> ⛔ **当前实际择时 🔴 空仓({sig['timing_dist']:+.2%} vs MA16),切勿照此买入!**\n"
-            f"> 仅展示买入清单格式、仓位分配与参考价。真实建仓信号到来时会自动写入「今日操作.md」。\n\n")
+            f"> 参考价=信号日({date})收盘,实际按 T+1 开盘价成交。\n\n")
+    lines = [warn, f"# 建仓预览 · {date}", "",
+             f"**目标 {len(plan)} 只等权,合计 ≈ {fmt(tot)},剩余 ≈ {fmt(INIT_CAPITAL - tot)}**", "",
+             "| 代码 | 名称 | 预计股数 | 参考价 | 预计金额 |", "|--|--|--|--|--|"]
+    lines += [f"| {r[0]} | {r[1]} | {r[2]} | {r[3]:.2f} | {fmt(r[4])} |" for r in plan]
     OBSIDIAN.mkdir(parents=True, exist_ok=True)
-    (OBSIDIAN / "建仓预览.md").write_text(warn + card)
-    print(f"=== 建仓预览 {date}(假设转多)===")
-    print(f"  买入 {len(trades)} 只 | 合计 {fmt(sum(t[6] for t in trades))} | 剩余现金 {fmt(acc['cash'])}")
-    print(f"  → Obsidian: {OBSIDIAN/'建仓预览.md'}")
+    (OBSIDIAN / "建仓预览.md").write_text("\n".join(lines) + "\n")
+    print(f"=== 建仓预览 {date}(假设转多,次日开盘建仓)===")
+    print(f"  目标 {len(plan)} 只 | 合计 {fmt(tot)} | 剩余 {fmt(INIT_CAPITAL - tot)}")
+    print(f"  → Obsidian: {OBSIDIAN / '建仓预览.md'}")
     return 0
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--preview", action="store_true", help="生成建仓预览(假设择时转多),不碰正式账户")
+    ap.add_argument("--preview", action="store_true", help="生成次日开盘建仓预览,不碰正式账户")
     args = ap.parse_args()
     if args.preview:
         return build_preview(load_names())
@@ -282,27 +357,25 @@ def main():
         return 1
     signal = json.loads(sig_files[-1].read_text())
     date = signal["date"]
-
-    decay = read_decay()
     names = load_names()
+    decay = read_decay()
     acc = load_account()
     if acc["inception"] is None:
         acc["inception"] = date
 
-    trades = []
-    already = acc["last_date"] == date
-    if already:
-        print(f"[skip] {date} 已处理过,仅刷新估值与卡片(不重复成交)")
-    else:
-        action = signal["action"]
-        if action in ("建仓买入", "调仓买入"):
-            sell_all(acc, date, names, trades)
-            buy_basket(acc, date, signal["holdings"], signal["top_n"], names, trades)
-        elif action == "清仓":
-            sell_all(acc, date, names, trades)
-        # 空仓观望 / 维持原仓位 → 无成交
-        if trades:
-            append_trades(trades)
+    trades, blocked = [], []
+    exec_from = None
+    if acc["last_date"] != date:
+        # 1. 结算上次 pending:用 date(=上个信号的次日)开盘价执行上个信号的目标
+        pend = acc.get("pending")
+        if pend:
+            exec_from = pend["signal_date"]
+            execute_to_target(acc, date, pend["target"], signal["top_n"], names, trades, blocked)
+            if trades:
+                append_trades(trades)
+        # 2. 记录新 pending:本信号 → 下个交易日开盘执行
+        target = signal["holdings"] if signal["in_market"] else []
+        acc["pending"] = {"signal_date": date, "target": target}
         acc["last_date"] = date
 
     nav, pos_value, detail = valuation(acc, date)
@@ -310,16 +383,19 @@ def main():
     upsert_nav(date, nav, acc["cash"], pos_value, ret)
     save_account(acc)
 
-    card = render_card(date, signal, decay, acc, nav, pos_value, detail, trades, names)
+    card = render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocked, names, exec_from)
     OBSIDIAN.mkdir(parents=True, exist_ok=True)
     (OBSIDIAN / "今日操作.md").write_text(card)
     (OBSIDIAN / "历史").mkdir(exist_ok=True)
     (OBSIDIAN / "历史" / f"{date}.md").write_text(card)
 
-    print(f"=== v2.0 模拟盘 {date} ===")
-    print(f"  操作: {signal['action']}  成交 {len(trades)} 笔")
+    print(f"=== v2.0 模拟盘(真实盘 T+1){date} ===")
+    print(f"  今日开盘成交: 买{len([t for t in trades if t[3]=='BUY'])} 卖{len([t for t in trades if t[3]=='SELL'])} "
+          f"受阻{len(blocked)}" + (f"(执行{exec_from}信号)" if exec_from else "(无待执行)"))
+    nxt = (acc.get("pending") or {}).get("target") or []
+    print(f"  明日开盘计划: {'建仓/持有 '+str(len(nxt))+' 只' if (signal['in_market'] and nxt) else '空仓观望'}")
     print(f"  总资产 {fmt(nav)} | 现金 {fmt(acc['cash'])} | 持仓 {len(detail)}只 {fmt(pos_value)} | 累计 {ret:+.2%}")
-    print(f"  → Obsidian: {OBSIDIAN/'今日操作.md'}")
+    print(f"  → Obsidian: {OBSIDIAN / '今日操作.md'}")
     return 0
 
 

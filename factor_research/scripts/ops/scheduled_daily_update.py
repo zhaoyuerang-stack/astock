@@ -185,6 +185,16 @@ def run_updates(report, dry_run=False):
         traceback.print_exc()
 
     try:
+        print("[update] raw OHLC (不复权,模拟盘 T+1 开盘成交用 + 消除 amount 滞后)")
+        from scripts.data.fetch_raw_close import update_raw_prices
+        stats = update_raw_prices()
+        report["raw_update"] = {"ok": True, "ok_n": stats.get("ok", 0), "err_n": stats.get("error", 0)}
+    except Exception as exc:
+        report["raw_update"] = {"ok": False, "error": str(exc)}
+        print(f"[update] raw failed: {exc}")
+        traceback.print_exc()
+
+    try:
         print("[update] fundamental")
         result = update_lake.update_fundamental()
         manifest.update(result)
