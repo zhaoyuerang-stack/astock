@@ -83,7 +83,7 @@ if __name__ == "__main__":
         codes = sorted(fp.stem for fp in Path("data_lake/price/daily").glob("*.parquet"))
         print(f"通达信全量下载不复权 OHLC: {len(codes)}只", flush=True)
         f = TdxRawFetcher()
-        stats = f.run(codes)
+        stats = f.run(codes, skip_existing=False)   # 强制重拉,补全历史 OHLC(旧文件只有 raw_close)
         if stats["failures"]:
             f.retry_failures(stats["failures"])
         print(f"✅ 不复权 OHLC: {len(list(Path('data_lake/price/daily_raw').glob('*.parquet')))}只", flush=True)
