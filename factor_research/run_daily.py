@@ -23,18 +23,21 @@ from core.backtest import (
     build_rebalance_weights,
 )
 from lake.validator import DataValidator
+from app_config.settings import get_settings
+
+_cfg = get_settings().strategy
 
 SIGNALS = Path("signals"); SIGNALS.mkdir(exist_ok=True)
 LAST_REBAL = SIGNALS / "_last_rebalance.txt"
 STATE_FILE = SIGNALS / "state.json"
 
-# 策略参数（与 v2.0 一致）
-TOP_N = 25
-TIMING_MA = 16
-REBAL_DAYS = 20
-LEVERAGE = 1.25
-SIZE_WINDOW = 60
-START = "2010-01-01"
+# 策略参数（从 config/settings.py 读取，默认与 v2.0 一致）
+TOP_N = _cfg.top_n
+TIMING_MA = _cfg.timing_ma
+REBAL_DAYS = _cfg.rebalance_days
+LEVERAGE = _cfg.leverage
+SIZE_WINDOW = _cfg.size_window
+START = get_settings().data.warmup_start
 
 
 def load_state():

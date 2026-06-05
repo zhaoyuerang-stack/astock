@@ -8,7 +8,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-import yaml
+try:
+    import yaml
+except ImportError:
+    yaml = None
 
 # ---------------------------------------------------------------------------
 # Cost model
@@ -74,6 +77,8 @@ class Settings:
     @classmethod
     def from_yaml(cls, path: Optional[str] = None):
         """Load settings from YAML, with optional env override."""
+        if yaml is None:
+            return cls()
         path = path or _env_config_path()
         if path and Path(path).exists():
             with open(path) as f:

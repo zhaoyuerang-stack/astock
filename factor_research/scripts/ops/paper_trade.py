@@ -24,10 +24,14 @@ sys.path.insert(0, str(ROOT))
 
 import pandas as pd  # noqa: E402
 
+from app_config.settings import get_settings
+
+_cost_cfg = get_settings().cost
+
 INIT_CAPITAL = 1_000_000.0
-LEVERAGE = 1.0
-BUY_COST = 0.00225
-SELL_COST = 0.00275
+LEVERAGE = 1.0  # 模拟盘固定 1.0x
+BUY_COST = _cost_cfg.buy_cost
+SELL_COST = _cost_cfg.sell_cost
 LOT = 100
 
 SIGNALS = ROOT / "signals"
