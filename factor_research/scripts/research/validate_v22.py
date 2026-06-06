@@ -50,7 +50,7 @@ print("回测 v2.2 (MA16 × PureTrend tw=2)...", flush=True)
 mkt = (close.pct_change(fill_method=None)
        .replace([float("inf"), float("-inf")], float("nan"))
        .mean(axis=1).fillna(0.0))
-exposure = (mkt.rolling(2).sum() >= 0).astype(float)
+exposure = (mkt.rolling(2).sum() >= 0).shift(1, fill_value=True).astype(float)  # shift(1): T日仓位用T-1日信号
 ret_v22, _ = backtest_weights(close, scheduled, timing.astype(float) * exposure, cfg)
 
 # ── 指标函数 ──────────────────────────────────────────────────────────

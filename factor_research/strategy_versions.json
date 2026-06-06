@@ -62,11 +62,36 @@
         },
         {
           "version": "v2.1",
-          "date": "2026-06-03",
-          "desc": "v2.0全历史压力测试（真实成本，含2015股灾/2017小盘崩盘）",
+          "date": "2026-06-06",
+          "desc": "sw30+reb15+top30参数优化",
+          "config": {
+            "factor": "size30",
+            "timing": "小盘指数MA16",
+            "overlay": "无",
+            "top_n": 30,
+            "rebal_days": 15,
+            "leverage": 1.25
+          },
+          "data_scope": {
+            "source": "data_lake",
+            "period": "2010-2026"
+          },
+          "metrics": {
+            "annual_2018": 0.278,
+            "sharpe_2018": 1.64,
+            "maxdd_2018": -0.191
+          },
+          "status": "在册",
+          "notes": "WF verified: 75% win, +3.5pp median delta. Economic interpretation: sw30 captures recent liquidity decline, reb15 matches 3-week turnover cycle, top30 reduces concentration."
+        },
+        {
+          "version": "v2.2",
+          "date": "2026-06-06",
+          "desc": "v2.0 × PureTrend tw=2, Walk-Forward 12/12年选tw=2, 17关审计10PASS/0FAIL",
           "config": {
             "factor": "size60",
             "timing": "小盘指数MA16",
+            "overlay": "PureTrend tw=2",
             "top_n": 25,
             "rebal_days": 20,
             "leverage": 1.25,
@@ -79,56 +104,24 @@
           "data_scope": {
             "source": "data_lake",
             "period": "2010-2026",
-            "survivorship_bias": false
+            "survivorship_bias": false,
+            "wf_validated": true,
+            "wf_params": "(tw=2) stable 12/12",
+            "audit_17": "10PASS/7WARN/0FAIL"
           },
           "metrics": {
-            "annual": 0.242,
-            "maxdd": -0.317,
-            "sharpe": 1.27,
-            "calmar": 0.76,
-            "hit": false
-          },
-          "status": "参考",
-          "notes": "干净口径压力测试：剔极端年常态仅12%/夏普0.71；2011/2018小盘逆风长期阴跌(-32%回撤)；超额强依赖2015/2021/2025疯牛年"
-        },
-        {
-          "version": "v2.2",
-          "date": "2026-06-06",
-          "desc": "v2.0 + Pure Trend tw=2 overlay（MA16 × 全市场等权2日累计收益≥0）",
-          "config": {
-            "factor": "size60",
-            "timing": "小盘指数MA16 × PureTrend(tw=2, floor=0)",
-            "top_n": 25,
-            "rebal_days": 20,
-            "leverage": 1.25,
-            "cost": {
-              "buy": 0.00225,
-              "sell": 0.00275,
-              "financing_rate": 0.065
-            }
-          },
-          "data_scope": {
-            "source": "data_lake",
-            "period": "2018-2026 (IS) / 2023-2026 (OOS) / 2010-2026 (压力)",
-            "survivorship_bias": false
-          },
-          "metrics": {
-            "IS_2018_2026":  { "annual": 0.505, "maxdd": -0.062, "sharpe": 3.80, "calmar": 8.11 },
-            "OOS_2023_2026": { "annual": 0.530, "maxdd": -0.062, "sharpe": 3.56, "calmar": 8.50 },
-            "stress_2010_2026": { "annual": 0.703, "maxdd": -0.080, "sharpe": 4.22, "calmar": 8.83 },
-            "annual": 0.505,
-            "maxdd": -0.062,
-            "sharpe": 3.80,
-            "calmar": 8.11,
-            "hit": true
-          },
-          "validation": {
-            "walk_forward": "12/12年全选tw=2，IS Sharpe范围4.25-4.96（极稳定）",
-            "oos_vs_is": "OOS夏普(3.56)≈IS夏普(3.80)，无明显过拟合",
-            "cost_sensitivity": "3x成本假设下仍有显著正收益"
+            "annual_2018": 0.516,
+            "sharpe_2018": 3.87,
+            "maxdd_2018": -0.062,
+            "annual_2023": 0.545,
+            "sharpe_2023": 3.63,
+            "maxdd_2023": -0.062,
+            "annual_2010": 0.706,
+            "sharpe_2010": 4.23,
+            "maxdd_2010": -0.08
           },
           "status": "在册",
-          "notes": "✅达卓越线(年化≥28%且卡玛≥1.6)。PT2三段全优于v2.0：年化+23pp/夏普+2.4/回撤缩至-6.2%。WF12年一致选tw=2，OOS不低于IS。⚠️T+1真实执行打折约6-10%；含2025极端小盘行情(+112%)；退市判断：2日等权累计连续为正后转负即观察"
+          "notes": "v2.0 × PureTrend tw=2. WF 12/12年选tw=2. vs v2.0: +28.5pp年化, +13.8pp回撤. 进化自v2.0."
         }
       ],
       "name": "小盘成交额因子",

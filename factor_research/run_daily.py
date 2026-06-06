@@ -137,7 +137,7 @@ def main():
 
     # Pure Trend overlay (tw=2, WF validated 12/12 years, Sharpe 3.40 vs HMM 2.23)
     _pt = PureTrendOverlay(trend_window=2)
-    pure_trend_block = _pt.signal(last, close) == 0.0
+    pure_trend_block = _pt.signal(last, close) == 0.0  # signal() 内部已用 T-1 趋势
     mkt_ret_2d = ret.mean(axis=1).fillna(0.0).rolling(2).sum()
     pure_trend_val = float(mkt_ret_2d.loc[last]) if last in mkt_ret_2d.index else 0.0
 
