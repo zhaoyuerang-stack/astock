@@ -1,14 +1,14 @@
 # STATUS — 当前进度
 
-> 更新:2026-06-03。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md);系统设计见 [SPEC.md](SPEC.md)。
+> 更新:2026-06-06。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md);系统设计见 [SPEC.md](SPEC.md)。
 
 ## 一句话
-阶段 0 已关闭:数据基础设施 + 统一 `core/` 回测内核 + 两层台账已建,旧 `data_full/data` 已清理。当前处于**阶段 1 多目标工厂化复验后**;在册母策略仅 `small-cap-size`,factory 已用干净 amount + 2010 预热重跑 fundamental、两融和北向资金面,仍未产出合格新母策略。
+阶段 0 已关闭。**2026-06-06 重大升级**:Pure Trend tw=2 overlay 经三段回测验证后注册为 `small-cap-size/v2.2`(年化50.5%/夏普3.80/回撤-6.2%,全面超越v2.0);生产代码(`run_daily.py`)已同步集成。
 
 ## 各层状态
 | 层 | 状态 | 说明 |
 |----|------|------|
-| 数据基础设施 | ✅ | data_lake 全市场+全历史+含退市股,质量 ~99.9%;旧 data_full/data 已删;两融已落 `data_lake/capital/margin_all.parquet`;北向 fallback 已落 `data_lake/capital/northbound_all.parquet`(2017-2024,774只) |
+| 数据基础设施 | ✅ | data_lake 全市场+全历史+含退市股,质量 ~99.9%;旧 data_full/data 已删;两融已落 `data_lake/capital/margin_all.parquet`;北向 fallback 已落 `data_lake/capital/northbound_all.parquet`(2017-2024,774只)。**2026-06-05 标准化修**:①`update_raw_prices()` 更新逐只后补调 `compact_raw_prices` 重建大表(日增量/全量两处);②`merge_northbound()` 输出改 `northbound_daily_all.parquet`,防覆盖 `merge_northbound_stock()` 构建的正确大表 |
 | 统一回测内核 `core/` | ✅ | `core/engine.BacktestEngine` 统一接口已落地;`core/backtest.py` 核心逻辑内部走 engine,旧函数标记 deprecated;`amount=volume×100×不复权价` |
 | 策略工厂 | ⏳ | 阶段 1.1-1.13 已建;2026-06-03 已按干净 amount + 2010 预热重跑 fundamental 1.9-1.13;2026-06-04 已接两融/北向资金面并验证;候选验收仍未达 |
 | 有效策略管理 | ✅台账 / ✅监控 / ✅模拟盘 | 两层台账已建;失效监控 `decay_monitor` 把 decay_signal 定量化(size因子IC衰减/小盘动量/滚动夏普 + 前瞻阈值,当前 v2.0 🔴预警);实盘就绪卡 `live_readiness`(操作+容量+失效);**模拟盘 `scripts/ops/paper_trade.py`=真实盘口径:T+1 不复权开盘价成交 + pending order 跨天结算 + 停牌/一字涨跌停不可成交;100万本金/1.0x,写 Obsidian `30.output/A股v2.0模拟盘/`,`--preview` 出次日开盘建仓清单。回测口径(收盘撮合)不动** |
@@ -17,8 +17,9 @@
 | 展示层 | ○ | 未建 |
 
 ## 在册策略(详见 `strategy_versions.json`)
-- `small-cap-size / v2.0`(data_lake 2018-2026,干净 amount + 2010 预热 + 真实成本):年化 **22.2%** / 回撤 **-20.0%** / 夏普 **1.38** / 卡玛 1.11 → **已达项目级满意线**(年化≥20% & 夏普≥1.0),未达卓越线(28% 或卡玛 1.6);status=在册。
-- v1.0(data_full)幸存者偏差水分 → 参考;v2.1 全历史压力测试 → 参考。
+- `small-cap-size / v2.2`(2026-06-06,**当前生产版本**):MA16 × PureTrend(tw=2) overlay — IS 年化 **50.5%** / 回撤 **-6.2%** / 夏普 **3.80** / 卡玛 8.11;OOS 53.0%/3.56/-6.2%;压力 70.3%/4.22/-8.0% → **达卓越线**;WF 12年100%选tw=2,OOS≈IS无过拟合。⚠️T+1真实执行打折约6-10%。
+- v2.0(MA16 alone,干净口径):年化22.2%/夏普1.38/回撤-20.0% → 参考(已被v2.2超越)。
+- v1.0(data_full,幸存者偏差)→ 参考;v2.1(压力测试参考)→ 参考。
 
 ## 回测平台标准化(2026-06-05)
 
@@ -36,6 +37,7 @@
 | 文档 | ✅ `factor_research/docs/engine_usage.md` |
 | 测试 | ✅ `test_engine.py` 6项回归测试全部通过 |
 | 数值漂移 | ✅ 零漂移:strategy_lake/run_daily/factory baseline/registry 全部验证一致 |
+| **hit 阈值对齐(2026-06-05修)** | ✅ `engine/metrics.py` TARGET_ANNUAL/MAXDD 从旧 35%/15%(data_full 水分已退役)更新为 15%/20%;`BacktestConfig` 默认阈值同步;`BacktestResult.hit` @property 修 Python 参数 bug(伪参数不生效);边界改用严格 `>`/`<` 与 `factory/objectives.py` 一致 |
 
 ## 当前阶段
 **阶段 1 — 多目标策略工厂化**。完整路线见 [ROADMAP.md](ROADMAP.md)。

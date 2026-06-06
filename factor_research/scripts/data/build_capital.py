@@ -99,9 +99,9 @@ def main():
     if do_all or args.northbound:
         fetcher = NorthboundFetcher(max_workers=1, timeout=30, retries=2)
         stats = fetcher.run(keys, skip_existing=args.skip_existing, progress_every=20)
-        merged = merge_northbound()
+        merged = merge_northbound()   # writes to northbound_daily_all.parquet (不覆盖 stock 版)
         report["northbound"] = stats
-        report["outputs"]["northbound_all"] = "data_lake/capital/northbound_all.parquet" if merged is not None else None
+        report["outputs"]["northbound_daily_all"] = "data_lake/capital/northbound_daily_all.parquet" if merged is not None else None
 
     if args.northbound_stock:
         codes = top_liquidity_codes(limit=args.code_limit)

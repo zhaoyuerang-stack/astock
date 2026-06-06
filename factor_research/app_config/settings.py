@@ -41,6 +41,16 @@ class StrategyConfig:
     cost: CostModelConfig = field(default_factory=CostModelConfig)
 
 
+@dataclass(frozen=True)
+class HMMStressConfig:
+    enabled: bool = True
+    lookback: int = 1260
+    retrain_days: int = 60
+    threshold: float = 0.15
+    max_iter: int = 35
+    filter_days: int = 60
+
+
 # ---------------------------------------------------------------------------
 # Data loading defaults
 # ---------------------------------------------------------------------------
@@ -71,6 +81,7 @@ class FactoryConfig:
 class Settings:
     cost: CostModelConfig = field(default_factory=CostModelConfig)
     strategy: StrategyConfig = field(default_factory=StrategyConfig)
+    hmm_stress: HMMStressConfig = field(default_factory=HMMStressConfig)
     data: DataConfig = field(default_factory=DataConfig)
     factory: FactoryConfig = field(default_factory=FactoryConfig)
 
@@ -91,6 +102,7 @@ class Settings:
         return cls(
             cost=CostModelConfig(**d.get("cost", {})),
             strategy=StrategyConfig(**d.get("strategy", {})),
+            hmm_stress=HMMStressConfig(**d.get("hmm_stress", {})),
             data=DataConfig(**d.get("data", {})),
             factory=FactoryConfig(**d.get("factory", {})),
         )

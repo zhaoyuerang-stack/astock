@@ -1,39 +1,55 @@
 {
-  "_updated": "2026-06-05T02:09:38",
+  "_updated": "2026-06-06T01:50:01",
   "_version": "2.0",
   "price_daily": {
-    "last_check": "2026-06-05",
-    "updated": 4828,
-    "source": "tencent_fqkline",
-    "fields": ["date", "open", "high", "low", "close", "volume", "amount"],
-    "format": "per-code parquet",
-    "path": "data_lake/price/daily"
+    "last_check": "2026-06-06",
+    "updated": 4953
   },
   "price_daily_raw": {
     "last_check": "2026-06-05",
     "source": "tdx_mootdx",
-    "fields": ["date", "raw_open", "raw_high", "raw_low", "raw_close"],
+    "fields": [
+      "date",
+      "raw_open",
+      "raw_high",
+      "raw_low",
+      "raw_close"
+    ],
     "format": "per-code parquet",
     "path": "data_lake/price/daily_raw"
   },
   "fundamental": {
-    "last_check": "2026-06-05",
-    "source": "eastmoney_yjbb",
-    "fields": ["code", "report_date", "ann_date", "avail_date", "roe", "eps", "eps_ttm", "bps", "revenue", "net_profit", "gross_margin", "cfo_ps", "revenue_yoy", "net_profit_yoy", "industry"],
-    "format": "single parquet",
-    "path": "data_lake/fundamental_batch.parquet"
+    "last_check": "2026-06-06"
   },
   "capital_margin": {
     "last_check": "2026-06-05",
     "source": "exchange_sse_szse",
-    "fields": ["date", "code", "margin_balance", "margin_buy", "short_balance", "short_vol"],
+    "fields": [
+      "date",
+      "code",
+      "margin_balance",
+      "margin_buy",
+      "short_balance",
+      "short_vol"
+    ],
     "format": "single parquet",
     "path": "data_lake/capital/margin_all.parquet"
   },
   "capital_northbound": {
     "last_check": "2026-06-05",
     "source": "eastmoney_hsgt",
-    "fields": ["date", "code", "northbound_hold_shares", "northbound_hold_value", "northbound_hold_pct", "northbound_value_chg_1d", "northbound_value_chg_5d", "northbound_value_chg_10d", "northbound_hold_shares_chg_1d", "northbound_buy_value_1d"],
+    "fields": [
+      "date",
+      "code",
+      "northbound_hold_shares",
+      "northbound_hold_value",
+      "northbound_hold_pct",
+      "northbound_value_chg_1d",
+      "northbound_value_chg_5d",
+      "northbound_value_chg_10d",
+      "northbound_hold_shares_chg_1d",
+      "northbound_buy_value_1d"
+    ],
     "format": "single parquet",
     "path": "data_lake/capital/northbound_all.parquet"
   },

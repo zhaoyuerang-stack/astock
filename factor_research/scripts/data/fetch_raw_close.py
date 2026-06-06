@@ -64,7 +64,11 @@ class TdxRawFetcher(Fetcher):
 
 
 def update_raw_prices(inc_offset=20, max_workers=4):
-    """增量更新全市场 daily_raw 到最新(带 OHLC),消除 raw 滞后(供每日 daily_update 调用)。"""
+    """增量更新全市场 daily_raw 到最新(带 OHLC),消除 raw 滞后(供每日 daily_update 调用)。
+
+    更新个股文件后重建 daily_raw_all.parquet，保证 load_raw_close() 读大表时不滞后。
+    （对应 update_prices() 更新 daily 后调用 compact_prices() 的逻辑。）
+    """
     codes = sorted(fp.stem for fp in Path("data_lake/price/daily_raw").glob("*.parquet"))
     print(f"通达信增量更新不复权 OHLC: {len(codes)}只", flush=True)
     f = TdxRawFetcher(incremental=True, inc_offset=inc_offset, max_workers=max_workers)
@@ -72,6 +76,12 @@ def update_raw_prices(inc_offset=20, max_workers=4):
     if stats.get("failures"):
         f.retry_failures(stats["failures"])
     print(f"[raw] 增量完成 ok={stats['ok']} empty={stats['empty']} err={stats['error']}", flush=True)
+
+    # 重建大表（load_raw_close 优先读 daily_raw_all.parquet，不重建则滞后一日）
+    if stats.get("ok", 0) > 0:
+        from lake.compact import compact_raw_prices
+        compact_raw_prices("data_lake/price/daily_raw", "data_lake/price/daily_raw_all.parquet")
+
     return stats
 
 
@@ -87,3 +97,6 @@ if __name__ == "__main__":
         if stats["failures"]:
             f.retry_failures(stats["failures"])
         print(f"✅ 不复权 OHLC: {len(list(Path('data_lake/price/daily_raw').glob('*.parquet')))}只", flush=True)
+        # 全量重建大表
+        from lake.compact import compact_raw_prices
+        compact_raw_prices("data_lake/price/daily_raw", "data_lake/price/daily_raw_all.parquet")

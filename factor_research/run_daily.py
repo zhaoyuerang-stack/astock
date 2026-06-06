@@ -22,10 +22,13 @@ from core.backtest import (
     small_cap_timing,
     build_rebalance_weights,
 )
+from factors.market_stress import HMMStressConfig, build_market_features, latest_hmm_stress
+from core.overlays import PureTrendOverlay
 from lake.validator import DataValidator
 from app_config.settings import get_settings
 
 _cfg = get_settings().strategy
+_hmm_cfg = get_settings().hmm_stress
 
 SIGNALS = Path("signals"); SIGNALS.mkdir(exist_ok=True)
 LAST_REBAL = SIGNALS / "_last_rebalance.txt"
@@ -130,8 +133,39 @@ def main():
     small_idx = (ret * small_mask).sum(axis=1) / small_mask.sum(axis=1)
     small_nav = (1 + small_idx.fillna(0)).cumprod()
     dist = small_nav.iloc[-1] / small_nav.iloc[-TIMING_MA:].mean() - 1
-    in_market = bool(timing.loc[last])
-    print(f"  小盘指数 vs MA{TIMING_MA}: {dist:+.2%} → {'🟢持仓' if in_market else '🔴空仓观望'}")
+    base_in_market = bool(timing.loc[last])
+
+    # Pure Trend overlay (tw=2, WF validated 12/12 years, Sharpe 3.40 vs HMM 2.23)
+    _pt = PureTrendOverlay(trend_window=2)
+    pure_trend_block = _pt.signal(last, close) == 0.0
+    mkt_ret_2d = ret.mean(axis=1).fillna(0.0).rolling(2).sum()
+    pure_trend_val = float(mkt_ret_2d.loc[last]) if last in mkt_ret_2d.index else 0.0
+
+    # HMM overlay (optional, kept for reference)
+    stress_info = {"prob_stress": 0.0, "stress_state": None, "cache_key": None}
+    stress_block = False
+    if _hmm_cfg.enabled:
+        market_features = build_market_features(close, amount)
+        stress_info = latest_hmm_stress(
+            market_features,
+            target_date=last,
+            cfg=HMMStressConfig(
+                lookback=_hmm_cfg.lookback,
+                retrain_days=_hmm_cfg.retrain_days,
+                threshold=_hmm_cfg.threshold,
+                max_iter=_hmm_cfg.max_iter,
+                filter_days=_hmm_cfg.filter_days,
+            ),
+        )
+        stress_block = stress_info["prob_stress"] > _hmm_cfg.threshold
+
+    in_market = bool(base_in_market and not pure_trend_block and not stress_block)
+    print(f"  小盘指数 vs MA{TIMING_MA}: {dist:+.2%} → {'🟢持仓' if base_in_market else '🔴空仓观望'}")
+    pt_verdict = "🔴风控空仓" if pure_trend_block else "🟢通过"
+    print(f"  纯趋势 tw=2: 2日累计={pure_trend_val:+.3%} → {pt_verdict}")
+    if _hmm_cfg.enabled:
+        verdict = "风控空仓" if stress_block else "通过"
+        print(f"  HMM流动性压力: {stress_info['prob_stress']:.2%} / 阈值{_hmm_cfg.threshold:.0%} → {verdict}")
 
     # ④ 持仓清单
     print("\n[4/6] 持仓清单...")
@@ -143,6 +177,15 @@ def main():
     print("\n[5/6] 调仓判断...")
     state = load_state()
     is_rebal, reason, action = decide_action(close.index, last, in_market, state)
+    if pure_trend_block or stress_block:
+        if pure_trend_block and stress_block:
+            reason = f"纯趋势tw2={pure_trend_val:+.3%}<0 & HMM压力{stress_info['prob_stress']:.2%}，风控空仓"
+        elif pure_trend_block:
+            reason = f"纯趋势tw2={pure_trend_val:+.3%}<0，风控空仓"
+        else:
+            reason = f"HMM流动性压力 {stress_info['prob_stress']:.2%} > {_hmm_cfg.threshold:.0%}，风控空仓"
+        action = "清仓" if state.get("current_position") == "invested" else "空仓观望"
+        is_rebal = state.get("current_position") == "invested"
     print(f"  {'🔄 今日执行' if is_rebal else '⏸ 不执行'} — {reason}")
 
     # ⑥ 保存 signals
@@ -151,14 +194,22 @@ def main():
         "date": str(last.date()),
         "timing": "持仓" if in_market else "空仓",
         "in_market": in_market,
+        "base_in_market": base_in_market,
         "small_index_vs_ma16": round(float(dist), 4),
+        "pure_trend_tw2": round(pure_trend_val, 6),
+        "pure_trend_block": bool(pure_trend_block),
+        "hmm_stress_enabled": bool(_hmm_cfg.enabled),
+        "hmm_stress_prob": round(float(stress_info["prob_stress"]), 6),
+        "hmm_stress_threshold": float(_hmm_cfg.threshold),
+        "hmm_stress_block": bool(stress_block),
+        "hmm_stress_state": stress_info["stress_state"],
         "is_execution_day": is_rebal,
         "is_rebalance_day": bool(is_rebal and in_market),
         "rebalance_reason": reason,
         "action": action,
         "holdings": holdings if in_market else [],
         "top_n": TOP_N, "leverage": LEVERAGE,
-        "strategy_version": "v2.0",
+        "strategy_version": "v2.0+pt2",
     }
     out = SIGNALS / f"{last.date()}.json"
     out.write_text(json.dumps(signal, ensure_ascii=False, indent=2))
@@ -180,6 +231,9 @@ def main():
     print("\n" + "=" * 60)
     print(f"  日期      : {last.date()}")
     print(f"  择时      : {signal['timing']}  (小盘指数{dist:+.2%} vs MA16)")
+    print(f"  纯趋势tw2 : {'空仓' if pure_trend_block else '持仓'}  (2日累计{pure_trend_val:+.3%})")
+    if _hmm_cfg.enabled:
+        print(f"  HMM压力   : {stress_info['prob_stress']:.2%} / 阈值{_hmm_cfg.threshold:.0%}")
     print(f"  执行      : {'是' if is_rebal else '否'} — {reason}")
     print(f"  操作      : {signal['action']}")
     if in_market:

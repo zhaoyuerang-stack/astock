@@ -45,9 +45,10 @@ class BacktestConfig:
     start: str = "2018-01-01"
     cost: CostModel = field(default_factory=CostModel)
     leverage: float = 1.25
-    # Evaluation thresholds (aligned with project targets)
-    target_annual: float = 0.35
-    target_maxdd: float = 0.15
+    # Evaluation thresholds — single-strategy entry bar (年化>15% / 回撤<20%)
+    # Original 35%/15% was anchored to data_full survivorship bias, retired.
+    target_annual: float = 0.15
+    target_maxdd: float = 0.20
 
 
 @dataclass(frozen=True)
@@ -180,8 +181,12 @@ class BacktestResult:
         return self.annual / abs(self.maxdd) if self.maxdd < 0 else 0.0
 
     @property
-    def hit(self, target_annual: float = 0.35, target_maxdd: float = 0.15) -> bool:
-        return (self.annual >= target_annual) and (abs(self.maxdd) <= target_maxdd)
+    def hit(self) -> bool:
+        # Use thresholds from the stored config if available; else fall back to defaults.
+        # NOTE: @property cannot accept extra arguments — thresholds come from self.config.
+        t_annual = self.config.target_annual if self.config else 0.15
+        t_maxdd = self.config.target_maxdd if self.config else 0.20
+        return (self.annual >= t_annual) and (abs(self.maxdd) <= t_maxdd)
 
     @property
     def metrics(self) -> dict:

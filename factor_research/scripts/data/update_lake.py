@@ -40,15 +40,43 @@ def update_prices():
     daily = LAKE / "price/daily"
     today = pd.Timestamp(date.today())
     f = TencentDailyFetcher()
+
+    # ── 发现缺失代码(退市股等)，尝试首次下载 ──
+    codes_fp = LAKE / "meta/codes.parquet"
+    added = 0
+    if codes_fp.exists():
+        all_codes = set(pd.read_parquet(codes_fp)["code"].tolist())
+        existing = {fp.stem for fp in daily.glob("*.parquet")
+                    if fp.stem.isdigit() and len(fp.stem) == 6}
+        missing = all_codes - existing
+        # 过滤北交所(920xxx, 腾讯API无数据)
+        missing = {c for c in missing if not c.startswith("92")}
+        if missing:
+            print(f"[价量] 缺失代码 {len(missing)} 只(退市/停更)，尝试下载...", flush=True)
+            f.start = "2010-01-01"
+            for i, code in enumerate(sorted(missing)):
+                try:
+                    df = f.fetch_one(code)
+                    if df is not None and len(df) > 20:
+                        df.to_parquet(daily / f"{code}.parquet", index=False)
+                        added += 1
+                except Exception:
+                    continue
+                if (i + 1) % 50 == 0:
+                    print(f"  缺失下载 {i+1}/{len(missing)} (新增{added})", flush=True)
+            if added > 0:
+                print(f"[价量] 新增退市/缺失股 {added} 只", flush=True)
+
+    # ── 增量更新已有文件 ──
     files = sorted(daily.glob("*.parquet"))
     updated, skipped = 0, 0
     for i, fp in enumerate(files):
         df = pd.read_parquet(fp)
         last = df["date"].max()
-        if last >= today - pd.Timedelta(days=1):   # 已是最新交易日
+        if last >= today - pd.Timedelta(days=1):
             skipped += 1
             continue
-        f.start = (last + pd.Timedelta(days=1)).strftime("%Y-%m-%d")   # 从last+1增量
+        f.start = (last + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
         try:
             new = f.fetch_one(fp.stem)
         except Exception:
@@ -62,13 +90,14 @@ def update_prices():
             print(f"  价量 {i+1}/{len(files)} (更新{updated} 跳过{skipped})", flush=True)
     print(f"[价量] 更新{updated}只, 跳过{skipped}只(已最新)", flush=True)
 
-    # 增量更新后重新合并大表
-    if updated > 0:
-        print("重新合并 daily 大表...", flush=True)
+    # ── 增量更新后重新合并大表(含退市股) ──
+    if updated > 0 or added > 0:
+        print("重新合并 daily_all.parquet ...", flush=True)
         from lake.compact import compact_prices
-        compact_prices(LAKE / "price/daily", LAKE / "price/daily_all.parquet")
+        compact_prices(daily, LAKE / "price/daily_all.parquet")
 
-    return {"price_daily": {"last_check": str(date.today()), "updated": updated}}
+    return {"price_daily": {"last_check": str(date.today()),
+                            "updated": updated, "added_delisted": added}}
 
 
 # ── 财务增量（按报告期补新季度）──

@@ -2,8 +2,8 @@
 import numpy as np
 import pandas as pd
 
-TARGET_ANNUAL = 0.35
-TARGET_MAXDD = 0.15
+TARGET_ANNUAL = 0.15   # 单母策略入册门槛（年化>15% / 回撤<20%）
+TARGET_MAXDD = 0.20    # 原 35%/15% 锚定 data_full 水分，已退役
 
 
 def max_drawdown(ret):
@@ -32,7 +32,7 @@ def metrics(ret):
     cum = (1 + ret).cumprod()
     maxdd = (cum / cum.cummax() - 1).min()
     calmar = annual / abs(maxdd) if maxdd < 0 else 0
-    hit = (annual >= TARGET_ANNUAL) and (abs(maxdd) <= TARGET_MAXDD)
+    hit = (annual > TARGET_ANNUAL) and (abs(maxdd) < TARGET_MAXDD)
     return {
         "annual": annual,
         "vol": vol,

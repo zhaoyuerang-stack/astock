@@ -25,7 +25,13 @@ os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
 from core.backtest import StrategyConfig, backtest_weights, metrics, run_small_cap_strategy  # noqa: E402
-from scripts.research.hmm_exit_smallcap import ConstrainedGaussianHMM, row_for, standardize  # noqa: E402
+from factors.market_stress import (  # noqa: E402
+    HMMStressConfig,
+    build_market_features,
+    guard_exposure as market_stress_guard_exposure,
+    hmm_stress_probability,
+)
+from scripts.research.hmm_exit_smallcap import row_for  # noqa: E402
 
 
 OUT_DIR = ROOT / "reports" / "research"
@@ -33,107 +39,18 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @dataclass(frozen=True)
-class StressGuardConfig:
+class StressGuardConfig(HMMStressConfig):
     lookback: int = 1260
     retrain_days: int = 60
     threshold: float = 0.15
     max_iter: int = 35
+    filter_days: int = 60
     mode: str = "binary"
     stress_floor: float = 0.0
 
 
-def build_market_features(close, amount):
-    px = close
-    ret = close.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan)
-    active = amount.gt(0) & close.notna()
-
-    ma20 = px.rolling(20).mean()
-    valid_ma20 = ma20.notna()
-    ma_diffusion = (px.gt(ma20) & valid_ma20).sum(axis=1) / valid_ma20.sum(axis=1).replace(0, np.nan)
-    ma_diffusion = ma_diffusion.fillna(0.5).round(4)
-
-    up_ratio = (px.gt(px.shift(1)) & active).sum(axis=1) / active.sum(axis=1).replace(0, np.nan)
-    risk_appetite = up_ratio.fillna(0.5)
-
-    market_amount = amount.sum(axis=1, min_count=1)
-    liquidity = (market_amount / market_amount.rolling(20).mean()).replace([np.inf, -np.inf], np.nan).fillna(1.0)
-
-    market_ret = ret.where(active).mean(axis=1)
-    volatility = market_ret.rolling(20).std().fillna(0.0).round(6)
-
-    out = pd.DataFrame(index=close.index)
-    out["risk_appetite"] = risk_appetite
-    out["volatility"] = volatility
-    out["liquidity"] = liquidity
-    out["ma_diffusion"] = ma_diffusion
-    return out.replace([np.inf, -np.inf], np.nan).dropna()
-
-
-def stress_score_from_train(features, post):
-    labels = post.argmax(axis=1)
-    scores = []
-    for state in range(post.shape[1]):
-        mask = labels == state
-        if not mask.any():
-            scores.append(-np.inf)
-            continue
-        f = features.iloc[mask]
-        score = (
-            -float(f["risk_appetite"].mean())
-            + float(f["volatility"].mean())
-            - float(f["liquidity"].mean())
-            - float(f["ma_diffusion"].mean())
-        )
-        scores.append(score)
-    return int(np.argmax(scores)), scores
-
-
-def hmm_stress_probability(features, cfg):
-    dates = features.index
-    prob = pd.Series(np.nan, index=dates, dtype="float64")
-    state_trace = pd.Series(np.nan, index=dates, dtype="float64")
-    stress_state_trace = pd.Series(np.nan, index=dates, dtype="float64")
-    refit_dates = list(dates[cfg.lookback :: cfg.retrain_days])
-
-    for pos, refit_date in enumerate(refit_dates):
-        train_end = dates.get_loc(refit_date)
-        train = features.iloc[train_end - cfg.lookback : train_end]
-        if pos + 1 < len(refit_dates):
-            next_pos = dates.get_loc(refit_dates[pos + 1])
-        else:
-            next_pos = len(dates)
-        block = features.iloc[train_end:next_pos]
-        if len(train) < cfg.lookback or block.empty:
-            continue
-
-        train_x = standardize(train, train).values
-        block_x = standardize(train, pd.concat([train.tail(1), block])).values
-        try:
-            model = ConstrainedGaussianHMM(max_iter=cfg.max_iter).fit(train_x)
-            train_post = model.filter_posteriors(train_x)
-            train_std = pd.DataFrame(train_x, index=train.index, columns=train.columns)
-            stress_state, _ = stress_score_from_train(train_std, train_post)
-            post = model.filter_posteriors(block_x)[1:]
-            block_prob = post[:, stress_state]
-        except FloatingPointError:
-            post = np.zeros((len(block), 3), dtype="float64")
-            block_prob = np.zeros(len(block), dtype="float64")
-            stress_state = np.nan
-
-        prob.loc[block.index] = block_prob
-        state_trace.loc[block.index] = post.argmax(axis=1)
-        stress_state_trace.loc[block.index] = stress_state
-
-    # T close features can only affect T+1 exposure.
-    return prob.shift(1), state_trace.shift(1), stress_state_trace.shift(1)
-
-
 def guard_exposure(prob, cfg):
-    if cfg.mode == "binary":
-        return (prob.fillna(1.0) <= cfg.threshold).astype(float)
-    if cfg.mode == "floor":
-        return pd.Series(np.where(prob.fillna(1.0) > cfg.threshold, cfg.stress_floor, 1.0), index=prob.index)
-    raise ValueError(f"unknown mode: {cfg.mode}")
+    return market_stress_guard_exposure(prob, cfg.threshold, cfg.mode, cfg.stress_floor)
 
 
 def fmt(row):

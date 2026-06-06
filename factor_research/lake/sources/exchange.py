@@ -143,7 +143,7 @@ def merge_margin(margin_dir: str = "data_lake/capital/margin",
 
 
 def merge_northbound(northbound_dir: str = "data_lake/capital/northbound",
-                     out: str = "data_lake/capital/northbound_all.parquet"):
+                     out: str = "data_lake/capital/northbound_daily_all.parquet"):
     """把按日期的北向文件合并成一个长表 (date×code)。"""
     from pathlib import Path
     files = sorted(Path(northbound_dir).glob("*.parquet"))
