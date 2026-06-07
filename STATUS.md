@@ -1,88 +1,81 @@
 # STATUS — 当前进度
 
-> 更新:2026-06-06。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md);系统设计见 [SPEC.md](SPEC.md)。
+> 更新:2026-06-06。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
 
-**2026-06-06 重大升级**: 发现 v2.2 偷看→退役; 建立 `workflow/` 自动化发现流水线; 三轮探索 45 候选→9 在册版本; **illiquidity v1.0 成为生产基线**; 验证 6 种择时方案→**PureTrend MA16 为通用最优开关**; 明确策略风险矩阵。
+**2026-06-06**: v2.2 偷看退役, 建 workflow 自动化流水线, 三轮探索 45 候选, illiquidity v1.0 成为生产基线, PureTrend MA16 证实为通用最优开关, A 股日频 alpha = 小盘/非流动单维度。
 
 ## 各层状态
 
 | 层 | 状态 | 说明 |
 |----|------|------|
-| 数据基础设施 | ✅ | data_lake 全市场+全历史+含退市股。amount=volume×100×不复权价 |
-| 统一回测内核 `core/` | ✅ | BacktestEngine 统一接口; Phase-2 迁移完成 |
-| 策略发现 `workflow/` | ✅ | Phase1 合成数据穿越→Phase2 三段回测→Phase3 WF→Phase4 注册+教训回流 |
-| 策略库 | ✅ | 4 家族 9 版本 (详情见下) |
-| 有效策略管理 | ✅ | 台账 + decay_monitor + paper_trade(T+1 真实盘) |
-| 生产入口 | ✅ | `run_daily.py` → illiquidity v1.0 |
-| 中央调度层 | ⏳ | launchd 每日增量+周维护 |
-| 组合层 | ✅ | `portfolio/` 3种组合算法 + 贡献分解 + regime分析 |
-| 展示层 | ○ | 未建 |
+| 数据基础设施 | ✅ | data_lake 全市场+全历史+含退市股 |
+| 回测内核 | ✅ | BacktestEngine 统一接口 |
+| 策略发现 | ✅ | workflow/ Phase1-4 + explore.py 并行探索 |
+| 策略库 | ✅ | 4 家族 9 版本 |
+| 生产入口 | ✅ | run_daily.py → illiquidity v1.0 |
+| 模拟盘 | ✅ | paper_trade.py → illiquidity v1.0 |
+| 失效监控 | ✅ | decay_monitor.py → illiquidity |
+| 健康检查 | ✅ | health_check.py + 桌面通知 + Obsidian |
+| 组合层 | ✅ | portfolio/ 3 算法 + 贡献分解 |
+| 调度层 | ⏳ | launchd 待配置 |
 
-## 策略库 (详见 `strategy_versions.json`)
+## 今日核心结论
+
+### 1. A 股日频 alpha 是单维度的
+
+三轮探索 45 候选 × 11 生态位 → 全部收敛在小盘/非流动维度。
+基本面/低波/动量/资金面/量价/行业内 → 全灭。
+不同因子只是不同篮子装同一个因子。
+
+### 2. PureTrend MA16 是生存必需，不是可选开关
+
+8 策略在无择时下测试：回撤全部 43-86%。
+PureTrend 用 ~2% 年化代价换 40+pp 回撤保护。
+6 种备选开关（宏观 7 通道/早期退出/低波轮动/PT×Macro）全部不如 PureTrend。
+
+### 3. 组合多元化在纯 A 股权益内不可行
+
+4 策略相关性 0.81-0.997。等权组合夏普 1.33 < 单 illiquidity 1.35。
+真正的多元化需要跨资产（债券/商品/港股）。
+
+## 策略库
 
 ```
-■ illiquidity (Amihud 非流动性)          ← 生产基线
-  v1.0  基准 20d  +32.3%  -15.4%  1.78
-  v1.1  Top50    +30.0%  -18.0%  1.65  夏普最高
-  v1.2  周频调仓  +30.0%  -22.0%  1.55
-  v1.3  +size   +28.0%  -16.0%  1.55  回撤最小
+■ illiquidity v1.0        +32.3%  -15.4%  1.78  生产基线
+  v1.1 Top50             +30.0%  -18.0%  1.65
+  v1.2 周频              +30.0%  -22.0%  1.55
+  v1.3 +size             +28.0%  -16.0%  1.55
 
-■ size-low-vol (小盘低波)                ← 新
-  v1.0  20d低波  +19.2%  -20.0%  1.27
-  v1.1  40d低波  +19.3%  -20.0%  1.27
-
-■ size-earnings (小盘+盈利增长)          ← 防御
-  v1.0          +15.1%  -18.3%  1.05
-
-■ small-cap-size (参考)
-  v2.0          +22.2%  -20.0%  1.38  被超越
+■ size-low-vol v1.0      +19.2%  -20.0%  1.27
+■ size-earnings v1.0     +15.1%  -18.3%  1.05  最低回撤
+■ small-cap-size v2.0    +22.2%  -20.0%  1.38  参考(被超越)
 ```
 
-## workflow/ 策略发现流水线
+## workflow/ 发现流水线
 
 ```
-Phase 1  合成数据数值穿越    5项检查, 秒级, 并行
-Phase 2  不重叠三段回测      3段+成本+相关性, 分钟级, 并行
-Phase 3  Walk-Forward       12窗口滚动, 小时级, 顺序
+Phase 1  合成数据数值穿越    5 项检查, 秒级, 8 核并行
+Phase 2  不重叠三段回测      3 段+成本+相关性, 分钟级, 4 核并行
+Phase 3  Walk-Forward       12 窗口滚动, 小时级, 顺序
 Phase 4  自动注册+教训回流   去重机制, 可复现元信息
 ```
-
-三轮探索: 45 候选 → 11 生态位 → 9 在册版本。核心发现: A 股 alpha 高度集中于小盘/非流动性维度, 不同因子只是不同篮子装同一个因子。
-
-## 择时开关验证 (2026-06-06)
-
-测试 6 种择时方案 × 4 个策略的交叉组合。**结论：PureTrend MA16 在所有策略上都是最优开关，没有例外。**
-
-| 择时方案 | illiquidity | size-low-vol | size-earnings | illiq+size | 说明 |
-|----------|:----------:|:----------:|:------------:|:--------:|------|
-| **PureTrend MA16** | **+29.7%** | **+23.9%** | **+19.1%** | **+25.1%** | ✅ 通用最优 |
-| Always invested | +31.3% | +24.6% | +18.8% | +26.2% | DD 失控 (62-73%) |
-| PT × Macro | +20.1% | +18.1% | +13.5% | +19.1% | DD 略降但收益大减 |
-| Macro 7-ch binary | +16.3% | +13.2% | +8.1% | +14.2% | 最差 |
-| Low-vol rotation | +22.9% | — | — | — | DD -76.5% |
-| Early exit overlay | +19.2% | — | — | — | 牛市中误退 |
-
-**策略风险矩阵** (统一 PureTrend MA16 开关下):
-
-| 风险偏好 | 策略 | 年化 | 最大回撤 | 夏普 | 定位 |
-|----------|------|:----:|:------:|:----:|------|
-| 激进 | illiquidity v1.0 | +29.7% | -30.5% | 1.35 | 最高收益 |
-| 成长 | illiq+size v1.3 | +25.1% | -32.9% | 1.30 | 双因子 |
-| 均衡 | size-low-vol v1.0 | +23.9% | -32.4% | 1.25 | 低波过滤 |
-| 保守 | size-earnings v1.0 | +19.1% | -21.6% | 1.09 | 最低回撤 |
 
 ## 生产入口
 
 ```bash
-python3 run_daily.py --no-update   # 出当日 illiquidity 信号
-python3 strategy_registry.py       # 策略台账对比表
-python3 workflow/explore.py        # 并行探索新策略
+python3 run_daily.py --no-update        # 出当日 illiquidity 信号
+python3 scripts/ops/paper_trade.py      # 模拟盘 T+1 执行
+python3 scripts/ops/health_check.py     # 健康检查 + 通知
+python3 scripts/research/decay_monitor.py  # 失效监控
+python3 workflow/explore.py             # 并行探索新策略
+python3 apps/portfolio_cli.py --analyze # 组合分析
 ```
 
 ## 关键教训 (详见 LESSONS.md)
 
-- **v2.2 偷看**: `exposure = condition.astype(float)` 缺 `shift(1)`, T 日仓位用 T 日收益 → 50%假年化。任何涉及当日行情数据的信号必须验证 shift(1)。
-- **真实盘 T+1 摩擦**: 回测收盘撮合高估 ~27%。illiquidity 回测 32.3%→真实 20.0%, v2.0 回测 22.2%→真实 17.5%。
-- **A 股 alpha 高度集中**: 基本面/资金面/低波/动量 全灭。只有非流动性/小盘维度有统计显著性。
+- **v2.2 偷看**: 缺 shift(1), T 日仓位用 T 日收益 → 50%→2.2%。任何行情信号必须验证 shift(1)。
+- **PureTrend 是生存必需**: 无 PT 任何因子 DD >43%。PT 通用最优, 无例外。
+- **真实盘 T+1 摩擦**: 回测高估 ~27%。illiquidity 回测 32%→真实 20%。
+- **A 股 alpha 单维**: 45 候选, 唯一赢家是非流动性。基本面/低波/动量/资金面全灭。
