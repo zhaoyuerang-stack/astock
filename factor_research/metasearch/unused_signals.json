@@ -1,0 +1,2411 @@
+{
+  "summary": {
+    "small_cap_timing": {
+      "n_calls": 40,
+      "total_outputs": 3,
+      "discard_counts": [
+        1,
+        40,
+        35
+      ],
+      "discard_rates": [
+        0.025,
+        1.0,
+        0.875
+      ],
+      "patterns": [
+        "timing, _, _ = small_cap_timing(...)",
+        "timing, _, _ = small_cap_timing(...)",
+        "timing, _, _ = small_cap_timing(...)"
+      ]
+    },
+    "spearmanr": {
+      "n_calls": 21,
+      "total_outputs": 2,
+      "discard_counts": [
+        0,
+        21
+      ],
+      "discard_rates": [
+        0.0,
+        1.0
+      ],
+      "patterns": [
+        "ic, _ = spearmanr(...)",
+        "ic, _ = spearmanr(...)",
+        "ic, _ = spearmanr(...)"
+      ]
+    },
+    "np.linalg.lstsq": {
+      "n_calls": 1,
+      "total_outputs": 4,
+      "discard_counts": [
+        0,
+        1,
+        1,
+        1
+      ],
+      "discard_rates": [
+        0.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "patterns": [
+        "coef, _, _, _ = np.linalg.lstsq(...)"
+      ]
+    },
+    "compose": {
+      "n_calls": 1,
+      "total_outputs": 2,
+      "discard_counts": [
+        0,
+        1
+      ],
+      "discard_rates": [
+        0.0,
+        1.0
+      ],
+      "patterns": [
+        "port_ret, _ = compose(...)"
+      ]
+    },
+    "run_strategy": {
+      "n_calls": 4,
+      "total_outputs": 2,
+      "discard_counts": [
+        0,
+        4
+      ],
+      "discard_rates": [
+        0.0,
+        1.0
+      ],
+      "patterns": [
+        "ret_il, _ = run_strategy(...)",
+        "ret_slv, _ = run_strategy(...)",
+        "ret_se, _ = run_strategy(...)"
+      ]
+    },
+    "backtest_weights": {
+      "n_calls": 72,
+      "total_outputs": 2,
+      "discard_counts": [
+        0,
+        72
+      ],
+      "discard_rates": [
+        0.0,
+        1.0
+      ],
+      "patterns": [
+        "ret_v20, _ = backtest_weights(...)",
+        "ret_v22, _ = backtest_weights(...)",
+        "ret_nb, _ = backtest_weights(...)"
+      ]
+    },
+    "hmm_exit_signal": {
+      "n_calls": 2,
+      "total_outputs": 3,
+      "discard_counts": [
+        2,
+        0,
+        0
+      ],
+      "discard_rates": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "patterns": [
+        "_, risk_prob, state_trace = hmm_exit_signal(...)",
+        "_, risk_prob, state_trace = hmm_exit_signal(...)"
+      ]
+    },
+    "backtest_execution_overlay": {
+      "n_calls": 3,
+      "total_outputs": 3,
+      "discard_counts": [
+        0,
+        0,
+        3
+      ],
+      "discard_rates": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "patterns": [
+        "overlay_ret, detail, _ = backtest_execution_overlay(...)",
+        "ret, detail, _ = backtest_execution_overlay(...)",
+        "overlay_ret, overlay_detail, _ = backtest_execution_overlay(...)"
+      ]
+    },
+    "nav_and_dd": {
+      "n_calls": 2,
+      "total_outputs": 2,
+      "discard_counts": [
+        2,
+        0
+      ],
+      "discard_rates": [
+        1.0,
+        0.0
+      ],
+      "patterns": [
+        "_, b_dd = nav_and_dd(...)",
+        "_, o_dd = nav_and_dd(...)"
+      ]
+    },
+    "stress_onsets": {
+      "n_calls": 13,
+      "total_outputs": 2,
+      "discard_counts": [
+        0,
+        13
+      ],
+      "discard_rates": [
+        0.0,
+        1.0
+      ],
+      "patterns": [
+        "default_onsets, _ = stress_onsets(...)",
+        "onsets, _ = stress_onsets(...)",
+        "onsets, _ = stress_onsets(...)"
+      ]
+    },
+    "replay_with_cost": {
+      "n_calls": 2,
+      "total_outputs": 5,
+      "discard_counts": [
+        0,
+        0,
+        0,
+        0,
+        2
+      ],
+      "discard_rates": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "patterns": [
+        "base, overlay_ret, detail, triggers, _ = replay_with_cost(...)",
+        "base, overlay_ret, detail, triggers, _ = replay_with_cost(...)"
+      ]
+    },
+    "load_price_panels": {
+      "n_calls": 9,
+      "total_outputs": 3,
+      "discard_counts": [
+        2,
+        8,
+        1
+      ],
+      "discard_rates": [
+        0.2222222222222222,
+        0.8888888888888888,
+        0.1111111111111111
+      ],
+      "patterns": [
+        "close, _, amount = load_price_panels(...)",
+        "close, _, amount = load_price_panels(...)",
+        "_, _, amount = load_price_panels(...)"
+      ]
+    },
+    "self._forward_backward": {
+      "n_calls": 10,
+      "total_outputs": 3,
+      "discard_counts": [
+        0,
+        10,
+        10
+      ],
+      "discard_rates": [
+        0.0,
+        1.0,
+        1.0
+      ],
+      "patterns": [
+        "gamma, _, _ = self._forward_backward(...)",
+        "gamma, _, _ = self._forward_backward(...)",
+        "gamma, _, _ = self._forward_backward(...)"
+      ]
+    },
+    "build_factors": {
+      "n_calls": 5,
+      "total_outputs": 4,
+      "discard_counts": [
+        0,
+        4,
+        5,
+        5
+      ],
+      "discard_rates": [
+        0.0,
+        0.8,
+        1.0,
+        1.0
+      ],
+      "patterns": [
+        "comp, univ, _, _ = build_factors(...)",
+        "factor_500, _, _, _ = build_factors(...)",
+        "factor_500, _, _, _ = build_factors(...)"
+      ]
+    },
+    "fast_returns": {
+      "n_calls": 3,
+      "total_outputs": 2,
+      "discard_counts": [
+        0,
+        3
+      ],
+      "discard_rates": [
+        0.0,
+        1.0
+      ],
+      "patterns": [
+        "ret, _ = fast_returns(...)",
+        "fast, _ = fast_returns(...)",
+        "ret, _ = fast_returns(...)"
+      ]
+    },
+    "build_breadth_dd20_score": {
+      "n_calls": 1,
+      "total_outputs": 2,
+      "discard_counts": [
+        0,
+        1
+      ],
+      "discard_rates": [
+        0.0,
+        1.0
+      ],
+      "patterns": [
+        "score, _ = build_breadth_dd20_score(...)"
+      ]
+    },
+    "run_candidate_returns": {
+      "n_calls": 1,
+      "total_outputs": 2,
+      "discard_counts": [
+        0,
+        1
+      ],
+      "discard_rates": [
+        0.0,
+        1.0
+      ],
+      "patterns": [
+        "sleeve_ret, _ = run_candidate_returns(...)"
+      ]
+    },
+    "run_combo": {
+      "n_calls": 1,
+      "total_outputs": 3,
+      "discard_counts": [
+        0,
+        1,
+        0
+      ],
+      "discard_rates": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "patterns": [
+        "ret, _, mask = run_combo(...)"
+      ]
+    },
+    "run_one_config": {
+      "n_calls": 2,
+      "total_outputs": 2,
+      "discard_counts": [
+        2,
+        0
+      ],
+      "discard_rates": [
+        1.0,
+        0.0
+      ],
+      "patterns": [
+        "_, fixed_ret = run_one_config(...)",
+        "_, ret_pt2 = run_one_config(...)"
+      ]
+    },
+    "run_single_combo": {
+      "n_calls": 1,
+      "total_outputs": 2,
+      "discard_counts": [
+        0,
+        1
+      ],
+      "discard_rates": [
+        0.0,
+        1.0
+      ],
+      "patterns": [
+        "single_ret, _ = run_single_combo(...)"
+      ]
+    },
+    "run_vote_combo": {
+      "n_calls": 1,
+      "total_outputs": 2,
+      "discard_counts": [
+        0,
+        1
+      ],
+      "discard_rates": [
+        0.0,
+        1.0
+      ],
+      "patterns": [
+        "ret, _ = run_vote_combo(...)"
+      ]
+    },
+    "replay_fixed": {
+      "n_calls": 1,
+      "total_outputs": 5,
+      "discard_counts": [
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "discard_rates": [
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      "patterns": [
+        "base, overlay_ret, _, triggers, channels = replay_fixed(...)"
+      ]
+    }
+  },
+  "events": [
+    {
+      "caller_file": "factor_research/strategy_lake.py",
+      "caller_line": 34,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/test_engine.py",
+      "caller_line": 41,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/test_engine.py",
+      "caller_line": 99,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/ic_decay_plot.py",
+      "caller_line": 29,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ic, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/ic_decay_analysis.py",
+      "caller_line": 36,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ic, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/core/engine.py",
+      "caller_line": 481,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ic, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/workflow/explore.py",
+      "caller_line": 40,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "t, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/workflow/phase2_backtest.py",
+      "caller_line": 275,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "bl_timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/portfolio/strategy_runners.py",
+      "caller_line": 73,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/engine/factor_analysis.py",
+      "caller_line": 31,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ic, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/engine/neutralize.py",
+      "caller_line": 60,
+      "callee_name": "np.linalg.lstsq",
+      "discarded_indices": [
+        1,
+        2,
+        3
+      ],
+      "total_outputs": 4,
+      "full_pattern": "coef, _, _, _ = np.linalg.lstsq(...)"
+    },
+    {
+      "caller_file": "factor_research/apps/contribution_dashboard.py",
+      "caller_line": 69,
+      "callee_name": "compose",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "port_ret, _ = compose(...)"
+    },
+    {
+      "caller_file": "factor_research/apps/portfolio_cli.py",
+      "caller_line": 93,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "pt, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/apps/portfolio_cli.py",
+      "caller_line": 99,
+      "callee_name": "run_strategy",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_il, _ = run_strategy(...)"
+    },
+    {
+      "caller_file": "factor_research/apps/portfolio_cli.py",
+      "caller_line": 104,
+      "callee_name": "run_strategy",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_slv, _ = run_strategy(...)"
+    },
+    {
+      "caller_file": "factor_research/apps/portfolio_cli.py",
+      "caller_line": 112,
+      "callee_name": "run_strategy",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_se, _ = run_strategy(...)"
+    },
+    {
+      "caller_file": "factor_research/apps/portfolio_cli.py",
+      "caller_line": 117,
+      "callee_name": "run_strategy",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_isz, _ = run_strategy(...)"
+    },
+    {
+      "caller_file": "factor_research/factory/evaluator.py",
+      "caller_line": 75,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "baseline_timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/factory/lines/line3_marginal/marginal_eval.py",
+      "caller_line": 107,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/factory/lines/line3_marginal/marginal_eval.py",
+      "caller_line": 110,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/validate_v22.py",
+      "caller_line": 41,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/validate_v22.py",
+      "caller_line": 47,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_v20, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/validate_v22.py",
+      "caller_line": 54,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_v22, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/northbound_factor.py",
+      "caller_line": 100,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_nb, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/northbound_factor.py",
+      "caller_line": 107,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing_sc, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/northbound_factor.py",
+      "caller_line": 109,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_sc, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/northbound_factor.py",
+      "caller_line": 74,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ic, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_exit_smallcap_optimize.py",
+      "caller_line": 128,
+      "callee_name": "hmm_exit_signal",
+      "discarded_indices": [
+        0
+      ],
+      "total_outputs": 3,
+      "full_pattern": "_, risk_prob, state_trace = hmm_exit_signal(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_exit_smallcap_optimize.py",
+      "caller_line": 135,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/breadth_dd20_mainline_validation.py",
+      "caller_line": 102,
+      "callee_name": "backtest_execution_overlay",
+      "discarded_indices": [
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "overlay_ret, detail, _ = backtest_execution_overlay(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/breadth_dd20_mainline_validation.py",
+      "caller_line": 335,
+      "callee_name": "nav_and_dd",
+      "discarded_indices": [
+        0
+      ],
+      "total_outputs": 2,
+      "full_pattern": "_, b_dd = nav_and_dd(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/breadth_dd20_mainline_validation.py",
+      "caller_line": 336,
+      "callee_name": "nav_and_dd",
+      "discarded_indices": [
+        0
+      ],
+      "total_outputs": 2,
+      "full_pattern": "_, o_dd = nav_and_dd(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/breadth_dd20_mainline_validation.py",
+      "caller_line": 396,
+      "callee_name": "stress_onsets",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "default_onsets, _ = stress_onsets(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/breadth_dd20_mainline_validation.py",
+      "caller_line": 205,
+      "callee_name": "replay_with_cost",
+      "discarded_indices": [
+        4
+      ],
+      "total_outputs": 5,
+      "full_pattern": "base, overlay_ret, detail, triggers, _ = replay_with_cost(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/breadth_dd20_mainline_validation.py",
+      "caller_line": 307,
+      "callee_name": "stress_onsets",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "onsets, _ = stress_onsets(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/breadth_dd20_mainline_validation.py",
+      "caller_line": 183,
+      "callee_name": "stress_onsets",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "onsets, _ = stress_onsets(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/midcap_factor.py",
+      "caller_line": 24,
+      "callee_name": "load_price_panels",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 3,
+      "full_pattern": "close, _, amount = load_price_panels(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/midcap_factor.py",
+      "caller_line": 101,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_mid, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/midcap_factor.py",
+      "caller_line": 106,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "t21, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/midcap_factor.py",
+      "caller_line": 107,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret21, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/midcap_factor.py",
+      "caller_line": 70,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ic, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/midcap_factor.py",
+      "caller_line": 75,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "co, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/size_npy_walkforward.py",
+      "caller_line": 117,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "pt_timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/size_npy_walkforward.py",
+      "caller_line": 309,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "pt_te, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/size_npy_walkforward.py",
+      "caller_line": 277,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "pt_tr, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/band_timing_test.py",
+      "caller_line": 58,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "pt, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/band_timing_test.py",
+      "caller_line": 63,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        0,
+        1
+      ],
+      "total_outputs": 3,
+      "full_pattern": "_, _, dist = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_single_tw3_walkforward.py",
+      "caller_line": 213,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_single_tw3_walkforward.py",
+      "caller_line": 134,
+      "callee_name": "self._forward_backward",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "gamma, _, _ = self._forward_backward(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/abcd_direction_C.py",
+      "caller_line": 162,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/momentum_probe.py",
+      "caller_line": 33,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "r, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/audit_v3.py",
+      "caller_line": 56,
+      "callee_name": "build_factors",
+      "discarded_indices": [
+        2,
+        3
+      ],
+      "total_outputs": 4,
+      "full_pattern": "comp, univ, _, _ = build_factors(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/audit_v3.py",
+      "caller_line": 127,
+      "callee_name": "build_factors",
+      "discarded_indices": [
+        1,
+        2,
+        3
+      ],
+      "total_outputs": 4,
+      "full_pattern": "factor_500, _, _, _ = build_factors(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/audit_v3.py",
+      "caller_line": 150,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "v30_pt2, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/build_largecap_value_quality.py",
+      "caller_line": 161,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ic, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/gap_reversal_strategy.py",
+      "caller_line": 93,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "sc_timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/gap_reversal_strategy.py",
+      "caller_line": 66,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/gap_reversal_strategy.py",
+      "caller_line": 228,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "t, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_exit.py",
+      "caller_line": 154,
+      "callee_name": "self._forward_backward",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "gamma, _, _ = self._forward_backward(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/state_transition_signal_search.py",
+      "caller_line": 186,
+      "callee_name": "stress_onsets",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "onsets, _ = stress_onsets(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/ah_premium_full.py",
+      "caller_line": 154,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ic, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/ah_premium_full.py",
+      "caller_line": 166,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "c, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/state_transition_signal_discovery_v2.py",
+      "caller_line": 168,
+      "callee_name": "stress_onsets",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "onsets, _ = stress_onsets(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/analyst_factor.py",
+      "caller_line": 89,
+      "callee_name": "load_price_panels",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 3,
+      "full_pattern": "close, _, amount = load_price_panels(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/analyst_factor.py",
+      "caller_line": 186,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_analyst, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/analyst_factor.py",
+      "caller_line": 199,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "t21, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/analyst_factor.py",
+      "caller_line": 200,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret21, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/analyst_factor.py",
+      "caller_line": 59,
+      "callee_name": "load_price_panels",
+      "discarded_indices": [
+        0,
+        1
+      ],
+      "total_outputs": 3,
+      "full_pattern": "_, _, amount = load_price_panels(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/analyst_factor.py",
+      "caller_line": 163,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "c, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/analyst_factor.py",
+      "caller_line": 148,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ic, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_exit_smallcap.py",
+      "caller_line": 352,
+      "callee_name": "hmm_exit_signal",
+      "discarded_indices": [
+        0
+      ],
+      "total_outputs": 3,
+      "full_pattern": "_, risk_prob, state_trace = hmm_exit_signal(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/multi_strategy_search.py",
+      "caller_line": 42,
+      "callee_name": "load_price_panels",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 3,
+      "full_pattern": "close, _, amount = load_price_panels(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/multi_strategy_search.py",
+      "caller_line": 97,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "t21, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/multi_strategy_search.py",
+      "caller_line": 99,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret21, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/multi_strategy_search.py",
+      "caller_line": 84,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_s, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/multi_strategy_search.py",
+      "caller_line": 115,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ic, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/multi_strategy_search.py",
+      "caller_line": 120,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "co, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/breadth_dd20_final_bakeoff.py",
+      "caller_line": 138,
+      "callee_name": "stress_onsets",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "onsets, _ = stress_onsets(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/breadth_dd20_final_bakeoff.py",
+      "caller_line": 182,
+      "callee_name": "stress_onsets",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "onsets, _ = stress_onsets(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_multi_window.py",
+      "caller_line": 336,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_multi_window.py",
+      "caller_line": 139,
+      "callee_name": "self._forward_backward",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "gamma, _, _ = self._forward_backward(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/v21_strategy_analysis.py",
+      "caller_line": 30,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/fundamental_midcap.py",
+      "caller_line": 37,
+      "callee_name": "load_price_panels",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 3,
+      "full_pattern": "close, _, amount = load_price_panels(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/fundamental_midcap.py",
+      "caller_line": 133,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_s, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/fundamental_midcap.py",
+      "caller_line": 113,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ic, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/pure_trend_liquidity_cap_wf.py",
+      "caller_line": 55,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/pure_trend_liquidity_cap_wf.py",
+      "caller_line": 105,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/ah_premium_overlay.py",
+      "caller_line": 29,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/ah_premium_overlay.py",
+      "caller_line": 31,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret21, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/ah_premium_overlay.py",
+      "caller_line": 117,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/cost_slippage_sensitivity.py",
+      "caller_line": 68,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/cost_slippage_sensitivity.py",
+      "caller_line": 88,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/cost_slippage_sensitivity.py",
+      "caller_line": 114,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_base, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/optimize_v20_combo.py",
+      "caller_line": 38,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "t, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/optimize_v20_combo.py",
+      "caller_line": 45,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_stress_guard_walk_forward.py",
+      "caller_line": 86,
+      "callee_name": "fast_returns",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = fast_returns(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/mkt_diffusion_robustness.py",
+      "caller_line": 74,
+      "callee_name": "backtest_execution_overlay",
+      "discarded_indices": [
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "ret, detail, _ = backtest_execution_overlay(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/mkt_diffusion_robustness.py",
+      "caller_line": 260,
+      "callee_name": "stress_onsets",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "base_onsets, _ = stress_onsets(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/mkt_diffusion_robustness.py",
+      "caller_line": 192,
+      "callee_name": "replay_with_cost",
+      "discarded_indices": [
+        4
+      ],
+      "total_outputs": 5,
+      "full_pattern": "base, overlay_ret, detail, triggers, _ = replay_with_cost(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/mkt_diffusion_robustness.py",
+      "caller_line": 169,
+      "callee_name": "stress_onsets",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "onsets, _ = stress_onsets(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/breadth_dd20_combo_trigger.py",
+      "caller_line": 220,
+      "callee_name": "stress_onsets",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "onsets, _ = stress_onsets(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/breadth_dd20_combo_trigger.py",
+      "caller_line": 271,
+      "callee_name": "build_breadth_dd20_score",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "score, _ = build_breadth_dd20_score(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_yearly_analysis.py",
+      "caller_line": 111,
+      "callee_name": "self._forward_backward",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "gamma, _, _ = self._forward_backward(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/alpha101_screening.py",
+      "caller_line": 104,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ic, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/alpha101_screening.py",
+      "caller_line": 111,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "co, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/portfolio_combo.py",
+      "caller_line": 41,
+      "callee_name": "run_candidate_returns",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "sleeve_ret, _ = run_candidate_returns(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/ah_premium_factor.py",
+      "caller_line": 138,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ic, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/ah_premium_factor.py",
+      "caller_line": 156,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "c, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/optimize_v20.py",
+      "caller_line": 90,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing_base, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/optimize_v20.py",
+      "caller_line": 93,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_base, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/optimize_v20.py",
+      "caller_line": 114,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "t, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/optimize_v20.py",
+      "caller_line": 70,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/lob_multi_channel_detector.py",
+      "caller_line": 141,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/lob_multi_channel_detector.py",
+      "caller_line": 146,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_v20, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/lob_multi_channel_detector.py",
+      "caller_line": 164,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_walkforward.py",
+      "caller_line": 137,
+      "callee_name": "self._forward_backward",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "gamma, _, _ = self._forward_backward(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_walkforward.py",
+      "caller_line": 253,
+      "callee_name": "run_combo",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 3,
+      "full_pattern": "ret, _, mask = run_combo(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/state_transition_execution_explore.py",
+      "caller_line": 254,
+      "callee_name": "stress_onsets",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "onsets, _ = stress_onsets(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/largecap_analyst_timing.py",
+      "caller_line": 117,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_s, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/live_readiness.py",
+      "caller_line": 32,
+      "callee_name": "load_price_panels",
+      "discarded_indices": [
+        0,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "_, volume, _ = load_price_panels(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/decay_monitor.py",
+      "caller_line": 75,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "pt, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_stress_guard_v2.py",
+      "caller_line": 199,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_stress_guard_v2.py",
+      "caller_line": 210,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_v20, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_stress_guard_v2.py",
+      "caller_line": 224,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_amount_weighted_walkforward.py",
+      "caller_line": 223,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_amount_weighted_walkforward.py",
+      "caller_line": 131,
+      "callee_name": "self._forward_backward",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "gamma, _, _ = self._forward_backward(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/mkt_diffusion_transition_refine.py",
+      "caller_line": 150,
+      "callee_name": "stress_onsets",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "onsets, _ = stress_onsets(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/abcd_quick.py",
+      "caller_line": 68,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_ref, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/abcd_quick.py",
+      "caller_line": 131,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_hmm, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/abcd_quick.py",
+      "caller_line": 149,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_a1, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/abcd_quick.py",
+      "caller_line": 158,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_a2, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/abcd_quick.py",
+      "caller_line": 168,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_a3, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/abcd_quick.py",
+      "caller_line": 178,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_a4, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/abcd_quick.py",
+      "caller_line": 225,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_c0, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/abcd_quick.py",
+      "caller_line": 238,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_c1, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/abcd_quick.py",
+      "caller_line": 252,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_c2, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/abcd_quick.py",
+      "caller_line": 271,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_c3, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/abcd_quick.py",
+      "caller_line": 285,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_d0, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/abcd_quick.py",
+      "caller_line": 294,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_d1, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/abcd_quick.py",
+      "caller_line": 303,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_d2, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/abcd_quick.py",
+      "caller_line": 312,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_d3, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/abcd_quick.py",
+      "caller_line": 322,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_d4, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/abcd_quick.py",
+      "caller_line": 332,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_d5, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/abcd_quick.py",
+      "caller_line": 200,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_b, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_trend_filter.py",
+      "caller_line": 317,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_trend_filter.py",
+      "caller_line": 134,
+      "callee_name": "self._forward_backward",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "gamma, _, _ = self._forward_backward(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/pure_trend_walkforward.py",
+      "caller_line": 47,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/validate_v30.py",
+      "caller_line": 85,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_pt2, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/validate_v30.py",
+      "caller_line": 88,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_pure, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/validate_v30.py",
+      "caller_line": 133,
+      "callee_name": "build_factors",
+      "discarded_indices": [
+        1,
+        2,
+        3
+      ],
+      "total_outputs": 4,
+      "full_pattern": "factor_500, _, _, _ = build_factors(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/validate_v30.py",
+      "caller_line": 134,
+      "callee_name": "run_one_config",
+      "discarded_indices": [
+        0
+      ],
+      "total_outputs": 2,
+      "full_pattern": "_, fixed_ret = run_one_config(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/validate_v30.py",
+      "caller_line": 238,
+      "callee_name": "build_factors",
+      "discarded_indices": [
+        1,
+        2,
+        3
+      ],
+      "total_outputs": 4,
+      "full_pattern": "factor, _, _, _ = build_factors(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/validate_v30.py",
+      "caller_line": 268,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "v30_pt2, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/validate_v30.py",
+      "caller_line": 115,
+      "callee_name": "build_factors",
+      "discarded_indices": [
+        1,
+        2,
+        3
+      ],
+      "total_outputs": 4,
+      "full_pattern": "factor, _, _, _ = build_factors(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/validate_v30.py",
+      "caller_line": 116,
+      "callee_name": "run_one_config",
+      "discarded_indices": [
+        0
+      ],
+      "total_outputs": 2,
+      "full_pattern": "_, ret_pt2 = run_one_config(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/validate_v30.py",
+      "caller_line": 255,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "rp, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/validate_v30.py",
+      "caller_line": 256,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "rn, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_stress_guard_fast_optimize.py",
+      "caller_line": 196,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "full, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_stress_guard_fast_optimize.py",
+      "caller_line": 197,
+      "callee_name": "fast_returns",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "fast, _ = fast_returns(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_stress_guard_fast_optimize.py",
+      "caller_line": 221,
+      "callee_name": "fast_returns",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = fast_returns(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/build_quality_growth.py",
+      "caller_line": 120,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ic, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/build_quality_growth.py",
+      "caller_line": 196,
+      "callee_name": "spearmanr",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ic, _ = spearmanr(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_threshold_sweep.py",
+      "caller_line": 287,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_threshold_sweep.py",
+      "caller_line": 119,
+      "callee_name": "self._forward_backward",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "gamma, _, _ = self._forward_backward(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_threshold_sweep.py",
+      "caller_line": 316,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_y, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_stress_guard_smallcap.py",
+      "caller_line": 103,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/lob_detector_walkforward.py",
+      "caller_line": 35,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/lob_detector_walkforward.py",
+      "caller_line": 86,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_s, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/lob_detector_walkforward.py",
+      "caller_line": 120,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_v20_y, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_vote_walkforward.py",
+      "caller_line": 215,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_vote_walkforward.py",
+      "caller_line": 224,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_vote_walkforward.py",
+      "caller_line": 272,
+      "callee_name": "run_single_combo",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "single_ret, _ = run_single_combo(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_vote_walkforward.py",
+      "caller_line": 136,
+      "callee_name": "self._forward_backward",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "gamma, _, _ = self._forward_backward(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/hmm_macro_vote_walkforward.py",
+      "caller_line": 269,
+      "callee_name": "run_vote_combo",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = run_vote_combo(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/lob_detector_tuning.py",
+      "caller_line": 28,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/lob_detector_tuning.py",
+      "caller_line": 33,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_v20, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/lob_detector_tuning.py",
+      "caller_line": 110,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_s, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/lob_detector_tuning.py",
+      "caller_line": 129,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_s, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/lob_detector_tuning.py",
+      "caller_line": 149,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_s, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/lob_detector_tuning.py",
+      "caller_line": 169,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret_s, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/mkt_diffusion_followup_validation.py",
+      "caller_line": 50,
+      "callee_name": "backtest_execution_overlay",
+      "discarded_indices": [
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "overlay_ret, overlay_detail, _ = backtest_execution_overlay(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/mkt_diffusion_followup_validation.py",
+      "caller_line": 189,
+      "callee_name": "replay_fixed",
+      "discarded_indices": [
+        2
+      ],
+      "total_outputs": 5,
+      "full_pattern": "base, overlay_ret, _, triggers, channels = replay_fixed(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/research/mkt_diffusion_followup_validation.py",
+      "caller_line": 131,
+      "callee_name": "stress_onsets",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "onsets, _ = stress_onsets(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/ops/signal_check.py",
+      "caller_line": 41,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, dist = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/ops/signal_check.py",
+      "caller_line": 99,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/ops/signal_check.py",
+      "caller_line": 116,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, _ = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/ops/signal_check.py",
+      "caller_line": 139,
+      "callee_name": "load_price_panels",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 3,
+      "full_pattern": "close, _, amount = load_price_panels(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/ops/dashboard.py",
+      "caller_line": 281,
+      "callee_name": "load_price_panels",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 3,
+      "full_pattern": "close, _, amount = load_price_panels(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/ops/dashboard.py",
+      "caller_line": 284,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, dist = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/ops/dashboard.py",
+      "caller_line": 286,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/ops/dashboard.py",
+      "caller_line": 314,
+      "callee_name": "backtest_weights",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "ret20, _ = backtest_weights(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/ops/dashboard.py",
+      "caller_line": 366,
+      "callee_name": "load_price_panels",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 3,
+      "full_pattern": "close, _, amount = load_price_panels(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/ops/dashboard.py",
+      "caller_line": 367,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, dist = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/scripts/ops/paper_trade.py",
+      "caller_line": 345,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing_raw, _, timing_dist = small_cap_timing(...)"
+    },
+    {
+      "caller_file": "factor_research/core/overlays/hmm_macro_overlay.py",
+      "caller_line": 190,
+      "callee_name": "self._forward_backward",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "gamma, _, _ = self._forward_backward(...)"
+    },
+    {
+      "caller_file": "factor_research/portfolio/strategy_runners.py",
+      "caller_line": 73,
+      "callee_name": "small_cap_timing",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "timing, _, _ = small_cap_timing(...)"
+    }
+  ]
+}

@@ -73,6 +73,114 @@
 - **engine clip 陷阱**(2026-06-07):BacktestEngine `_run_weight_backtest` 原把 timing 强制 `min(max(x, 0.0), 1.0)`,boost timing > 1.0 全被吞——结果与 binary 完全相同。已加 `Signal.exposure_cap` 字段 (默认 1.0,Band 传 1.5)。教训: 引擎假设是隐藏约束,任何 timing > 1.0 设计**必须先验证 engine 不 clip**。
 - **复现 timing 必须先核对 leverage**(2026-06-07):用户给 Band 公式描述时未明说 leverage 改成了 1.0,我用 1.25 跑出加杠杆型 (sharpe ↓),与用户报告的减仓型 (sharpe ↑) 方向相反——浪费了 2 小时尝试各种 mapping 直到看 `scripts/research/band_timing_test.py` 才发现 `lev=1.0`。教训: **timing + leverage 不可分离讨论**,公式描述必须含 leverage。
 
+## 自动化质疑机制 (2026-06-07 Band 反思)
+
+### 为什么 6 周工厂跑不出 Band,但人 30 分钟想出来
+
+**5 层失败模式** (按隐蔽性排序):
+1. **API 误导**: `small_cap_timing` 返回 `(timing, small_nav, dist)`,所有调用方 `_, _, dist = ...` 丢弃 dist。**输出位置传递重要性暗示**——dist 作为"输出 #3"被默认忽略。
+2. **底层约束塑造思维**: `core/engine.py` 硬编码 `exposure = min(max(exp, 0.0), 1.0)`,boost > 1.0 全被吞——6 周里没人想过"为什么是 [0,1]"。**底层约束的隐性传播**: 工具假设某维度是常量时,那个维度永远不会被发现。
+3. **搜索空间预设**: 工厂 mutate_existing.py `timing_kind ∈ {"none", "small_cap_ma16", "small_cap_ma8"}` 三选一离散。**工厂结构性地"看不见" timing 是连续变量**。
+4. **强结论封顶**: "PT 通用最优,无例外" → "已解决"标签 → 关闭探索。**已解决的问题是探索的坟墓**。
+5. **mental model 解耦**: leverage 在 config / timing 在 signal,binary 思维下天然分离。Band 揭示 **timing 可以同时编码 exposure 和 dynamic leverage**——一旦突破 0/1,timing 吃掉了 leverage 功能。**变量边界的"自然分类"未必是最优分类**。
+
+**meta-lesson**: 6 周扩展工厂(加 L3 / 加 regime / 加 LIVE_D),**没花 30 分钟质疑工厂的搜索空间假设**。"扩展工具"是默认动作,"质疑工具假设"是被忽略的动作。
+
+### 5 个自动化质疑模块设计
+
+**Line 0 (MetaSearch)** = 在 Line 1-3 之前,质疑预设搜索空间本身。`factor_research/metasearch/` 已建。
+
+1. **Signal Flow Tracer** (Phase 1 ✅ PoC 已跑通,定位 Band 根因)
+   - AST 扫描 `a, _, b = some_call(...)` 模式
+   - 自动报告"被丢弃 ≥50% 的输出"
+   - 已发现: `small_cap_timing` output[2] (dist) 88% 被丢,output[1] (small_nav) 100% 被丢——**第二个 Band 候选已自动浮出**
+   - `python3 -m metasearch.signal_flow_tracer` 一行命令
+   - 也发现 spearmanr p-value 100% 被丢 (21 处),应该按显著性过滤 IC
+
+2. **Constant Auditor** (Phase 2,1 周)
+   - AST 找所有硬编码常量 + `.clip(low, high)` 上下界
+   - 列表 "硬约束清单",每月人审
+   - 如发现 engine 的 `exposure_cap=1.0`、`leverage=1.25 scalar`、`top_n=25 hardcoded` 等
+   - 防止下一个"timing ∈ [0,1] 6 周没人质疑"
+
+3. **Continuization Auto-Sweep** (Phase 3,2 周)
+   - 给定 Binary 信号 `x > threshold`,自动生成 5-6 个连续版本 (linear/sigmoid/cap)
+   - 每个跑 walk-forward 自动比较
+   - **如果 Band 这个工具一年前存在,5 分钟就能找到**
+   - 输入: 任何 `(bool, optional_continuous)` 信号
+
+4. **Conclusion Expiry** (Phase 4,1 周)
+   - LESSONS.md 强结论加 frontmatter: `expires: 3-months`
+   - 每月自动跑 adversarial 实验试图证伪
+   - 防止"PT 通用最优"封顶持续阻断探索
+
+5. **Variable Coupling Detector** (Phase 5,3 周)
+   - Dataflow analysis BacktestEngine
+   - 找"独立但耦合"的变量对 (如 timing × leverage 出现在同一处乘积)
+   - 建议合并实验
+   - 发现下一个"timing 和 leverage 可合并"机会
+
+### 工厂 vs 人的本质分工
+
+| | 工厂(机器) | 人 | MetaSearch (新) |
+|---|---|---|---|
+| 擅长 | **广度搜索** — 预设空间内枚举 | **深度复用** — 重理解已有变量 | **质疑预设** — 找搜索空间外缺口 |
+| Band 案例 | 6 周 55 hyp 0 实用 | 30 分钟想出 | 1 秒 PoC 定位根因 + 提示候选 |
+
+**Phase 2 应有 1 周/月预算用于 MetaSearch,不只是扩展 Line 1 generators**。
+
+### 信息熵框架 — small_nav 失败暴露的更深定理 (2026-06-07)
+
+small_nav 5 实验全失败,本质是数学定理:**dist 是 small_nav 对 timing 决策的充分统计量,条件互信息 ≈ 0**。这把整个 plan 从"经验工程"提升到"信息论框架":
+
+**框架核心 (4 LIVE 实测 MI 矩阵确认):**
+- 4 策略两两 MI 1.5-1.8 bits (上限 3 bits, 共享 50%+) — 信息论独立给出与 corr 0.83 相同诊断
+- 顺序 cond_mi: small-cap 1.57 → size-low-vol 0.15 → size-earnings 0.27 — 与 marginal_sharpe +0.10/-0.12/-0.28 **完美同向衰减**
+- **A 股 alpha 的"独立信息预算"有限**: 受市场 beta + 行业 beta 上限约束。工厂努力多 ≠ 挤更多独立信息;要找尚未被利用的数据源 (基本面/资金流/行业/港股)
+
+**MI auditor 的关键边界 (Band 案例暴露):**
+- Band vs Binary: MI 完全相同 (2.77 bit), cond_mi=0 → REDUNDANT
+- 但实测 Band Calmar +13% 真实价值
+- 原因: **MI 测"两变量依赖", 不测"如何用同一份信息"**。Binary 和 Band 派生自同一 dist, 信息内容相同但与 PnL 的**函数关系不同**
+
+**框架定位修正 — MI 是必要不充分:**
+- 低 MI → 必然 REDUNDANT (放心关闭)
+- 高 MI → 不保证 VALUABLE (还需测方向 + 用法)
+- MetaSearch 是双层:
+  - Lower (MI): 信息含量,毫秒级,过滤冗余
+  - Upper (Sharpe): 信息使用,回测级,测方向
+
+**这就是 plan 的 L−1 关 (在 L0 IC scan 之前)**: 工厂前端最便宜的过滤器。`factor_research/metasearch/mi_auditor.py` 已实现,等待集成到 L0 之前。
+
+### small_nav 已审计 — 无独立价值 (2026-06-07)
+
+MetaSearch PoC 提示 `small_cap_timing` output[1] `small_nav` 100% 被丢。1-2 小时跑 5 实验:
+  - V1 rolling 252d drawdown gate
+  - V2 slope-driven boost (代替 dist boost)
+  - V3 small_nav / mkt_nav 相对强度 gate
+  - V4 adaptive exposure_cap (NAV 滚动 vol 控制)
+  - V5 Binary × NAV vol-target 30%
+
+**全部失败** (全段 Sharpe 不改善或下降)。V2 slope boost 全段 -0.4 sharpe 是最强证据: A 股小盘的 timing 信号在"相对均线位置 (dist)"层,不在"短期变化率 (slope)"层。
+
+**结论: dist 已充分提取 small_nav 的全部时序信息,nav 自身/派生信号都被 dist 包含或对偶**。`scripts/research/small_nav_experiments.py` 作可复用资产。
+
+**这是 MetaSearch 路径的价值证明 —— 不仅找到 Band 类升级,也 1-2 小时快速证伪 small_nav 类幻觉,关闭分支**。未来再有人想挖 small_nav,LESSONS 直接告诉他"已审计无价值"。
+
+### 实证: PoC 输出 (2026-06-07)
+
+```
+HIGH PRIORITY — 默认被忽略的输出
+  callee                       #calls  output[i]   discard%
+  small_cap_timing                 40    1/2         100%   ← small_nav 全丢
+  small_cap_timing                 40    2/2          88%   ← dist (Band 来源!)
+  spearmanr                        21    1/1         100%   ← p-value 全丢
+  load_price_panels                 9    1/2          89%   ← volume? 全丢
+  backtest_weights                 72    1/1         100%   ← detail 全丢
+```
+
+下一步: 逐个审 small_nav / spearmanr p-value / backtest detail 能不能成下个 Band。
+
 ## 科学性 / 参数 robustness
 - **MA16 是 plateau 不是 spike**(2026-06-07 grid 测试 2010-2026):
   - MA10-20 sharpe 1.26-1.45 都 work(plateau)

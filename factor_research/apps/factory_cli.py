@@ -39,6 +39,53 @@ def cmd_generate(args):
     return 0
 
 
+def cmd_mi_audit(args):
+    """L-1 MI 关: 信息冗余簇识别."""
+    from metasearch.factor_mi_audit import (
+        audit_hypothesis_pool, mi_matrix, cluster_by_redundancy,
+    )
+
+    print(f"L−1 MI audit (max_hyps={args.max_hyps}, threshold={args.threshold} bits)")
+    print("Loading data lake...")
+    t0 = time.time()
+    close, volume, amount = _load_data_panel("2018-01-01")
+    print(f"  {close.shape}, {time.time()-t0:.1f}s")
+
+    ics = audit_hypothesis_pool(close, volume, amount, max_hyps=args.max_hyps)
+    if not ics:
+        print("⚠ no candidates with valid IC")
+        return 0
+
+    print("Computing MI matrix...")
+    t1 = time.time()
+    mat = mi_matrix(ics)
+    print(f"  {mat.shape}, {time.time()-t1:.1f}s")
+
+    # Distribution summary
+    off = [mat.iloc[i,j] for i in range(len(mat)) for j in range(i+1, len(mat))]
+    import numpy as np
+    off = np.array(off)
+    print(f"\n  MI distribution (off-diag):")
+    print(f"    min/med/max: {off.min():.2f} / {np.median(off):.2f} / {off.max():.2f}")
+    print(f"    redundant pairs (>{args.threshold}): {(off > args.threshold).sum()}")
+
+    # Clusters
+    clusters = cluster_by_redundancy(mat, threshold=args.threshold)
+    print(f"\n  Info clusters: {len(clusters)} (from {len(ics)} candidates)")
+    for i, c in enumerate(clusters):
+        marker = "🔴" if len(c) > 1 else "🟢"
+        if len(c) > 1:
+            print(f"  {marker} Cluster {i+1} (n={len(c)}, redundant):")
+            for n in c:
+                print(f"      {n}")
+        else:
+            print(f"  {marker} Independent: {c[0]}")
+
+    saving = 1 - len(clusters) / len(ics)
+    print(f"\n💡 L-1 算力节省: {saving:.0%} ({len(ics)} → {len(clusters)} 独立)")
+    return 0
+
+
 def cmd_status(args):
     from factory.pool import HypothesisPool
     from factory.repositories import ExperimentLog
@@ -619,6 +666,13 @@ def main():
 
     p = sub.add_parser("status", help="pool + log summary")
     p.set_defaults(func=cmd_status)
+
+    p = sub.add_parser("mi-audit",
+                       help="L-1 关: 信息冗余簇识别 (跑 L0 之前过滤)")
+    p.add_argument("--max-hyps", type=int, default=50)
+    p.add_argument("--threshold", type=float, default=2.0,
+                   help="MI 冗余阈值 (bits), 默认 2.0 = log2(8)*2/3")
+    p.set_defaults(func=cmd_mi_audit)
 
     p = sub.add_parser("inspect", help="show single hypothesis")
     p.add_argument("id_prefix", help="hypothesis id prefix (≥4 chars)")
