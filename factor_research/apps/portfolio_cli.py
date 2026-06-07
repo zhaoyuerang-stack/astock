@@ -5,6 +5,7 @@ Usage:
   python3 apps/portfolio_cli.py --compose risk_parity
   python3 apps/portfolio_cli.py --compose regime_adaptive
   python3 apps/portfolio_cli.py --analyze
+  python3 apps/portfolio_cli.py --marginal   # regime-aware eval
 """
 import argparse, os, sys
 from pathlib import Path
@@ -27,6 +28,8 @@ from portfolio.composer import compose, metrics as port_metrics
 from portfolio.analysis import (
     correlation_matrix, contribution_decompose, regime_breakdown, rolling_correlation,
 )
+from portfolio.regime import classify, regime_stats
+from portfolio.marginal import evaluate as marginal_evaluate
 
 
 # ═══════════════════════════════════════════════════
@@ -186,6 +189,141 @@ def cmd_analyze(returns, regime):
               f"<0.5: {(rc<0.5).mean():.0%}")
 
 
+def cmd_marginal(returns, regime_signal):
+    """Regime-aware marginal contribution evaluation."""
+    # Use small-cap index as market proxy for regime classification
+    close, volume, amount = load_price_panels("2010-01-01")
+    mkt_ret = close.pct_change(fill_method=None).mean(axis=1).fillna(0.0)
+
+    # Regime distribution
+    regimes = classify(mkt_ret)
+    stats = regime_stats(mkt_ret, regimes)
+
+    print(f"\n{'='*60}")
+    print(f"  REGIME-AWARE MARGINAL EVALUATION")
+    print(f"{'='*60}")
+
+    print(f"\n  Market Regime Distribution (2010-2026):")
+    for idx, row in stats.iterrows():
+        print(f"    {idx:<18} {row['pct_days']:>5.0%}  ann={row['annual']:>+6.1%}  "
+              f"vol={row['vol']:.0%}  sharpe={row['sharpe']:>+5.2f}  n={row['n_days']}d")
+
+    # Build existing LIVE pool (all 4 strategies)
+    live_pool = returns.copy()
+
+    print(f"\n  Evaluating each strategy against LIVE pool (4 strategies):")
+
+    # Test: add defensive candidates (low-vol, amplitude, quality)
+    from factors.utils import safe_zscore, mad_clip
+    ret_daily = close.pct_change(fill_method=None).replace([np.inf,-np.inf],np.nan)
+
+    # Low vol variants
+    lo_vol_20 = safe_zscore(mad_clip(-ret_daily.rolling(20).std()))
+    lo_vol_60 = safe_zscore(mad_clip(-ret_daily.rolling(60).std()))
+    # Amplitude mean (low intraday range = defensive)
+    raw_all = pd.read_parquet("data_lake/price/daily_raw_all.parquet",
+                               columns=["date","code","raw_high","raw_low"])
+    raw_all["date"] = pd.to_datetime(raw_all["date"])
+    raw_all = raw_all[raw_all["date"] >= pd.Timestamp("2010-01-01")]
+    raw_all["code"] = raw_all["code"].astype(str).str.zfill(6)
+    raw_high = raw_all.pivot(index="date", columns="code", values="raw_high").reindex(index=close.index)
+    raw_low = raw_all.pivot(index="date", columns="code", values="raw_low").reindex(index=close.index)
+    amplitude = (raw_high - raw_low) / raw_low.replace(0, np.nan)
+    amp_mean = safe_zscore(mad_clip(-amplitude.rolling(60).mean()))
+
+    # Large-cap bias (top 50% by amount)
+    amt_rank = amount.rolling(60).mean().rank(axis=1, pct=True)
+    lc_lo_vol = safe_zscore(mad_clip(-ret_daily.rolling(60).std() * (amt_rank > 0.50)))
+
+    test_factors = {
+        "low_vol_n20": lo_vol_20,
+        "low_vol_n60": lo_vol_60,
+        "amplitude_n60": amp_mean,
+        "largecap_lowvol": lc_lo_vol,
+    }
+
+    def wts(f, c, n=25, reb=20):
+        fd = f.dropna(how="all").index.intersection(c.index)
+        if len(fd)<50: return {}
+        w = {}
+        for rd in list(fd[::reb]):
+            pos=c.index.get_loc(rd)
+            if pos+1>=len(c.index): continue
+            eff=c.index[pos+1]; fv=f.loc[rd].dropna(); act=c.loc[rd].dropna().index
+            fv=fv.reindex(act).dropna()
+            if len(fv)<n: continue
+            w[eff]=pd.Series(1.0/n,index=fv.nlargest(n).index)
+        return w
+
+    prices = PricePanel(close=close, volume=volume, amount=amount)
+    cfg = BacktestConfig(start="2018-01-01", leverage=1.25)
+
+    # Add existing strategies + new defensive test candidates
+    candidates = {}
+    for name in returns:
+        candidates[name] = returns[name]
+
+    for t_name, t_factor in test_factors.items():
+        t_w = wts(t_factor, close)
+        t_r = BacktestEngine(prices=prices, config=cfg).run(
+            Signal(weights=t_w, timing=None)).returns
+        candidates[t_name] = t_r
+
+    results = []
+    for c_name, c_ret in candidates.items():
+        report = marginal_evaluate(c_ret, c_name, live_pool, mkt_ret)
+        results.append(report)
+
+    results.sort(key=lambda r: (
+        0 if r["grade"] == "LIVE_D" else
+        1 if r["grade"] == "LIVE_P" else
+        2 if r["grade"] == "LIVE_K" else
+        3 if r["grade"] == "LIVE_C" else 4
+    ))
+
+    print(f"\n  {'Candidate':<20} {'Grade':<12} {'ΔSharpe':>8} {'RegimeSc':>8} "
+          f"{'BearImpr':>8} {'Corr':>6} {'ΔMaxDD':>8}")
+    print(f"  {'-'*80}")
+    for r in results:
+        fs = r["full_sample"]
+        df = r["defensive"]
+        impr = df.get("improvement", 0)
+        print(f"  {r['candidate']:<20} {r['grade']:<12} {fs['delta_sharpe']:>+7.2f} "
+              f"{r['regime_weighted_score']:>+7.2f} {impr:>+7.1%} "
+              f"{df['avg_corr_to_live']:>+5.2f} {fs['delta_maxdd']:>+7.1%}")
+
+    # Highlight defensive findings
+    defensive = [r for r in results if r["grade"] == "LIVE_D"]
+    if defensive:
+        print(f"\n  ⭐ DEFENSIVE ASSETS FOUND:")
+        for r in defensive:
+            print(f"    {r['candidate']}: {r['recommendation']}")
+    else:
+        # Show near-misses
+        near = [r for r in results if "NEAR MISS" in r.get("recommendation", "")]
+        if near:
+            print(f"\n  ⚡ NEAR-MISS DEFENSIVE:")
+            for r in near:
+                print(f"    {r['candidate']}: {r['recommendation']}")
+        else:
+            print(f"\n  ℹ️  No defensive candidates with sufficient bear protection yet.")
+            print(f"    Current LIVE all highly correlated (0.8+) — cross-asset data needed.")
+
+    # Regime detail for top candidates
+    print(f"\n  Regime detail (top 3 + any LIVE_D):")
+    shown = set()
+    count = 0
+    for r in results:
+        if r["grade"] == "LIVE_D" or count < 3:
+            if r["candidate"] in shown: continue
+            shown.add(r["candidate"])
+            count += 1
+            rd = r["regime_summary"]
+            print(f"  {r['candidate']:<20} ", end="")
+            parts = [f"{reg}:{rd[reg]['annual']:>+6.1%}" for reg in ["bull","bear","chop","panic","upside_crisis"]]
+            print("  ".join(parts))
+
+
 # ═══════════════════════════════════════════════════
 # Main
 # ═══════════════════════════════════════════════════
@@ -195,9 +333,10 @@ def main():
     ap.add_argument("--compose", choices=["equal_weight", "risk_parity", "regime_adaptive"],
                     help="Run portfolio composition")
     ap.add_argument("--analyze", action="store_true", help="Run full analysis")
+    ap.add_argument("--marginal", action="store_true", help="Regime-aware marginal evaluation")
     args = ap.parse_args()
 
-    if not args.compose and not args.analyze:
+    if not args.compose and not args.analyze and not args.marginal:
         ap.print_help()
         return
 
@@ -208,6 +347,9 @@ def main():
 
     if args.analyze:
         cmd_analyze(returns, regime)
+
+    if args.marginal:
+        cmd_marginal(returns, regime)
 
 
 if __name__ == "__main__":
