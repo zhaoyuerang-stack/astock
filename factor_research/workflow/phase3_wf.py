@@ -232,7 +232,8 @@ class WF3Runner:
             "timestamp": str(pd.Timestamp.now()),
         }
 
-        out_path = OUT_DIR / f"{self.family}_phase3_wf.json"
+        safe_name = self.family.replace("/", "_")
+        out_path = OUT_DIR / f"{safe_name}_phase3_wf.json"
         out_path.write_text(json.dumps(_make_serializable(report),
                                         ensure_ascii=False, indent=2))
         print(f"  Report → {out_path}", flush=True)

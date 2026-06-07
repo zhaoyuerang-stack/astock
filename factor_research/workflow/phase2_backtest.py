@@ -184,7 +184,8 @@ class Phase2Runner:
         }
 
         # Save
-        out_path = OUT_DIR / f"{self.family}_phase2.json"
+        safe_name = self.family.replace("/", "_")
+        out_path = OUT_DIR / f"{safe_name}_phase2.json"
         # Convert non-serializable items
         serializable = _make_serializable(report)
         out_path.write_text(json.dumps(serializable, ensure_ascii=False, indent=2))
@@ -236,14 +237,20 @@ class Phase2Runner:
             return {"verdict": "SKIP", "detail": "No strategy registry found."}
 
         registry = json.loads(reg_path.read_text())
+        my_family = self.family.split("/")[0]
+
+        # Collect OTHER-family active strategies for comparison
         active_strategies = []
         for fam in registry.get("families", []):
+            if fam["id"] == my_family:
+                continue  # skip same family (would be self-correlation)
             for v in fam.get("versions", []):
-                if v.get("status") == "在册" and fam["id"] != self.family:
+                if v.get("status") == "在册":
                     active_strategies.append(f"{fam['id']}/{v['version']}")
 
         if not active_strategies:
-            return {"verdict": "SKIP", "detail": "No other active strategies to compare."}
+            return {"verdict": "SKIP",
+                    "detail": f"No other active strategies outside {my_family} family."}
 
         # Run our strategy on 2018-2026
         mask = (close.index >= "2018-01-01") & (close.index <= "2026-12-31")
@@ -253,11 +260,15 @@ class Phase2Runner:
         our_res = run_segment(c, v, a, w_seg, t, self.leverage, self.base_cost)
         our_ret = our_res["returns"].dropna()
 
-        # For each active strategy, load and compute correlation
+        # For small-cap family itself, skip correlation check (it IS the baseline)
+        if my_family == "small-cap-size":
+            return {"verdict": "SKIP",
+                    "detail": "Strategy is small-cap-size baseline — no external comparison needed."}
+
+        # For each active OTHER-family strategy, compute return correlation
+        # by running the small-cap baseline as reference
         correlations = {}
         for s_id in active_strategies:
-            fam_id = s_id.split("/")[0]
-            # Run the baseline strategy
             try:
                 from factors.small_cap import small_cap_factor, small_cap_timing
                 sc = small_cap_factor(a, window=60)
@@ -274,7 +285,7 @@ class Phase2Runner:
                 continue
 
         if not correlations:
-            return {"verdict": "SKIP", "detail": "Could not compute correlations."}
+            return {"verdict": "SKIP", "detail": "Could not compute correlations against other strategies."}
 
         max_corr = max(abs(c) for c in correlations.values())
         if max_corr > 0.85:

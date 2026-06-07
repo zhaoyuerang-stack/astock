@@ -1,0 +1,15 @@
+{
+  "fingerprint": "66b5f23c",
+  "trigger": "Phase_delisted",
+  "pattern": "退市股覆盖",
+  "detail": "No delisted_codes.parquet — coverage unknown. Synthetic delisted stock present (OK).",
+  "fix": "Ensure data pipeline includes delisted stocks. Check data_lake/price/daily_all.parquet against meta/delisted_codes.parquet.",
+  "hit_count": 4,
+  "first_seen": "2026-06-06",
+  "last_seen": "2026-06-06",
+  "strategies": [
+    "size-earnings-e2e",
+    "leaky-block-test",
+    "small-cap-size"
+  ]
+}
