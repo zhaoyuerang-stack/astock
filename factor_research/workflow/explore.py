@@ -91,6 +91,74 @@ class SizeLowVol:
         r = c.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan)
         return safe_zscore(mad_clip(sz - r.rolling(self.vw).std()))
 
+# ── Round 2: orthogonal niches (low correlation to illiquidity) ──
+
+class MidCapReversal:
+    """Mid-cap short-term reversal: fade recent returns in mid/large stocks."""
+    def __init__(self, w=5): self.w = w
+    def __call__(self, c, v, a, d):
+        # Only consider top 50% by amount (mid-large caps)
+        amt_rank = a.rolling(60).mean().rank(axis=1, pct=True)
+        mid_mask = amt_rank > 0.50
+        ret = c.pct_change(self.w, fill_method=None).replace([np.inf, -np.inf], np.nan)
+        # Fade recent returns (reversal), masked to mid-large
+        signal = -ret * mid_mask
+        return safe_zscore(mad_clip(signal))
+
+class IndustryMomentum:
+    """Momentum ranked within industry — removes size effect."""
+    def __init__(self, w=20): self.w = w
+    def __call__(self, c, v, a, d):
+        from lake.load_lake import load_fundamental_panel
+        ret = c.pct_change(self.w, fill_method=None).replace([np.inf, -np.inf], np.nan)
+        # Get industry labels
+        fund = load_fundamental_panel(d, fields=['industry'])
+        ind = fund.get('industry', pd.DataFrame())
+        if ind.empty:
+            return safe_zscore(mad_clip(ret))
+        ind = ind.reindex(d).ffill()
+        # Rank momentum within each industry
+        ranked = pd.DataFrame(index=ret.index, columns=ret.columns, dtype=float)
+        for dt in ret.index:
+            if dt not in ind.index: continue
+            row_ret = ret.loc[dt].dropna()
+            row_ind = ind.loc[dt].dropna()
+            common = row_ret.index.intersection(row_ind.index)
+            if len(common) < 50: continue
+            for industry, group in row_ind.loc[common].groupby(row_ind.loc[common]):
+                stocks = group.index.intersection(row_ret.index)
+                if len(stocks) < 3: continue
+                vals = row_ret.loc[stocks]
+                ranked.loc[dt, stocks] = (vals - vals.mean()) / (vals.std() + 1e-8)
+        return safe_zscore(mad_clip(ranked))
+
+class LowBeta:
+    """Low market sensitivity — defensive stocks."""
+    def __init__(self, w=60): self.w = w
+    def __call__(self, c, v, a, d):
+        ret = c.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan)
+        mkt = ret.mean(axis=1)
+        # Rolling beta: Cov(stock, mkt) / Var(mkt)
+        cov = ret.rolling(self.w).cov(mkt)
+        var = mkt.rolling(self.w).var() + 1e-8
+        beta = cov.div(var, axis=0)
+        return safe_zscore(mad_clip(-beta))  # buy low-beta
+
+class MidCapQuality:
+    """Quality in mid-large caps: high ROE, filtered by size."""
+    def __init__(self, w=20): self.w = w
+    def __call__(self, c, v, a, d):
+        from lake.load_lake import load_fundamental_panel
+        amt_rank = a.rolling(60).mean().rank(axis=1, pct=True)
+        mid_mask = amt_rank > 0.30  # top 70% by size
+        fund = load_fundamental_panel(d, fields=['roe'])
+        roe = fund.get('roe', pd.DataFrame())
+        if roe.empty:
+            return safe_zscore(mad_clip(mid_mask.astype(float)))
+        roe = roe.reindex(d).ffill()
+        quality = safe_zscore(mad_clip(roe)) * mid_mask
+        return safe_zscore(mad_clip(quality))
+
 
 # ═══════════════════════════════════════════════════════════════════
 # Candidate pool
@@ -132,6 +200,19 @@ def make_candidates() -> list[FactorSpec]:
         C.append(FactorSpec(f"size_low_vol_{vw}d", SizeLowVol(vw), _pt_timing,
                             {**base, "vol_w": vw}, "size-low-vol", "小盘低波"))
 
+    # ── Round 2: orthogonal niches ──
+    for w in [5, 10, 20]:
+        C.append(FactorSpec(f"midcap_reversal_{w}d", MidCapReversal(w), _pt_timing,
+                            {**base, "window": w}, "mid-reversal", "中盘反转: 大中市值短期反转"))
+    for w in [20, 40, 60]:
+        C.append(FactorSpec(f"industry_mom_{w}d", IndustryMomentum(w), _pt_timing,
+                            {**base, "window": w}, "ind-momentum", "行业内动量: 去size效应"))
+    for w in [40, 60]:
+        C.append(FactorSpec(f"low_beta_{w}d", LowBeta(w), _pt_timing,
+                            {**base, "window": w}, "low-beta", "低beta防御: 低市场敏感度"))
+    C.append(FactorSpec("midcap_quality", MidCapQuality(20), _pt_timing,
+                        {**base}, "mid-quality", "中盘质量: 大中市值+高ROE"))
+
     return C
 
 
@@ -143,7 +224,7 @@ def _run_phase1(spec: FactorSpec) -> dict:
     from workflow.phase1_synthetic import Phase1Checker
     checker = Phase1Checker(spec.factor_builder, spec.timing_builder,
                             spec.name, spec.config)
-    results = checker.run_all(use_clean=True)
+    results = checker.run_all(use_clean=True, save_lessons=False)
     fails = [r for r in results if r.is_fail]
     warns = [r for r in results if r.verdict == "WARN"]
     return {"name": spec.name, "niche": spec.niche,

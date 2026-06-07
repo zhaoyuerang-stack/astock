@@ -470,8 +470,8 @@ class Phase1Checker:
 
     # ── main entry ──
 
-    def run_all(self, use_clean: bool = True) -> list[CheckResult]:
-        """Run all checks. Returns list of CheckResult."""
+    def run_all(self, use_clean: bool = True, save_lessons: bool = True) -> list[CheckResult]:
+        """Run all checks. Set save_lessons=False for parallel execution."""
         syn = make_synthetic_clean() if use_clean else make_synthetic_leaky()
 
         # Override timing with user's actual builder
@@ -489,7 +489,8 @@ class Phase1Checker:
             self._check_warmup(syn),
             self._check_delisted_coverage(syn),
         ]
-        self._maybe_save_lessons(checks)
+        if save_lessons:
+            self._maybe_save_lessons(checks)
         return checks
 
     # ── lesson generation ──
@@ -503,7 +504,8 @@ class Phase1Checker:
             ).hexdigest()[:8]
             lf = LESSONS_DIR / f"{c.check_id}_{fp}.json"
             if lf.exists():
-                ex = json.loads(lf.read_text())
+                try: ex = json.loads(lf.read_text())
+                except (json.JSONDecodeError, ValueError): ex = {}
                 ex["hit_count"] = ex.get("hit_count", 1) + 1
                 ex["last_seen"] = str(pd.Timestamp.now())
                 if self.family not in ex.get("strategies", []):

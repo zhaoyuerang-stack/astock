@@ -4,9 +4,9 @@
   "pattern": "退市股覆盖",
   "detail": "No delisted_codes.parquet — coverage unknown. Synthetic delisted stock present (OK).",
   "fix": "Ensure data pipeline includes delisted stocks from meta/delisted_codes.",
-  "hit_count": 39,
+  "hit_count": 66,
   "first_seen": "2026-06-06 20:07:47.083996",
-  "last_seen": "2026-06-06 20:53:23.801955",
+  "last_seen": "2026-06-06 21:50:30.807096",
   "strategies": [
     "v2.0 CLEAN",
     "LEAKY timing",
@@ -39,6 +39,16 @@
     "dual_low_20d",
     "size_low_vol_40d",
     "low_vol",
-    "illiquidity"
+    "illiquidity",
+    "midcap_reversal_5d",
+    "midcap_reversal_20d",
+    "low_beta_40d",
+    "midcap_reversal_10d",
+    "low_beta_60d",
+    "midcap_quality",
+    "industry_mom_60d",
+    "industry_mom_20d",
+    "industry_mom_40d",
+    "size-low-vol"
   ]
 }
