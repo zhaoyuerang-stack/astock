@@ -1,4 +1,4 @@
-"""v2.0 模拟盘(真实盘成交逻辑):T+1 开盘价成交 + pending order + 停牌/涨跌停约束。
+"""illiquidity v1.0 模拟盘(真实盘成交逻辑):T+1 开盘价成交 + pending order + 停牌/涨跌停约束。
 
 真实盘口径(你要求"所有模拟按真实盘"):
   · T 日盘后出信号 → 记 pending → **T+1 开盘按不复权开盘价成交**(收盘后才看到信号,只能次日买)
@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
+import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from app_config.settings import get_settings
@@ -40,7 +41,7 @@ ACCOUNT_FP = PAPER / "account.json"
 TRADES_FP = PAPER / "trades.csv"
 NAV_FP = PAPER / "nav.csv"
 RAW = ROOT / "data_lake/price/daily_raw"
-OBSIDIAN = Path("/Users/kiki/Personal Wiki/30.output/A股v2.0模拟盘")
+OBSIDIAN = Path("/Users/kiki/Personal Wiki/30.output/A股模拟盘")
 
 
 # ── 价格:全部不复权(daily_raw)──
@@ -238,9 +239,9 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocke
     buys = [t for t in trades if t[3] == "BUY"]
     sells = [t for t in trades if t[3] == "SELL"]
     lines = [
-        f"# A股 v2.0 模拟盘 · {date}",
+        f"# A股 模拟盘 · {date}",
         "",
-        f"> 自动生成 {datetime.now():%Y-%m-%d %H:%M} | small-cap-size/v2.0 | 本金 {fmt(acc['init_capital'])} | "
+        f"> 自动生成 {datetime.now():%Y-%m-%d %H:%M} | illiquidity v1.0 | 本金 {fmt(acc['init_capital'])} | "
         f"杠杆 {LEVERAGE}x | 真实盘 T+1 开盘成交",
         "",
         "## 📋 今日开盘成交" + (f"(执行 {exec_from} 信号)" if exec_from else ""),
@@ -327,9 +328,24 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocke
 
 def build_preview(names):
     """假设择时转多:展示「次日开盘建仓清单」(不碰正式账户)。"""
-    from core.backtest import latest_signal, StrategyConfig
-    print("[preview] 加载数据 + 计算当前 top25 名单(约 1-2 分钟)...")
-    sig = latest_signal(StrategyConfig(start="2010-01-01"))
+    from core.backtest import load_price_panels
+    from factors.utils import safe_zscore, mad_clip
+    from factors.small_cap import small_cap_timing
+    print("[preview] 加载数据 + 计算 illiquidity top25 名单(约 1-2 分钟)...")
+    close, volume, amount = load_price_panels("2010-01-01")
+    last = close.index[-1]
+    # illiquidity factor
+    ret_abs = close.pct_change(fill_method=None).abs().replace([float('inf'), float('-inf')], float('nan'))
+    illiq_raw = (ret_abs / (amount + 1)).rolling(20, min_periods=10).mean()
+    factor = safe_zscore(mad_clip(illiq_raw))
+    f = factor.loc[last].dropna()
+    active = close.loc[last].dropna().index
+    holdings = f.reindex(active).dropna().nlargest(25).index.tolist()
+    # Timing dist
+    timing_raw, _, timing_dist = small_cap_timing(close, amount, 16)
+    dist = float(timing_dist.loc[last]) if last in timing_dist.index else 0.0
+    sig = {"date": last, "holdings": holdings, "top_n": 25, "timing_dist": dist,
+           "in_market": bool(timing_raw.loc[last])}
     date = str(sig["date"].date())
     plan = estimate_basket(date, sig["holdings"], INIT_CAPITAL, 25, names)
     tot = sum(r[4] for r in plan)
@@ -393,7 +409,7 @@ def main():
     (OBSIDIAN / "历史").mkdir(exist_ok=True)
     (OBSIDIAN / "历史" / f"{date}.md").write_text(card)
 
-    print(f"=== v2.0 模拟盘(真实盘 T+1){date} ===")
+    print(f"=== illiquidity v1.0 模拟盘(真实盘 T+1){date} ===")
     print(f"  今日开盘成交: 买{len([t for t in trades if t[3]=='BUY'])} 卖{len([t for t in trades if t[3]=='SELL'])} "
           f"受阻{len(blocked)}" + (f"(执行{exec_from}信号)" if exec_from else "(无待执行)"))
     nxt = (acc.get("pending") or {}).get("target") or []
