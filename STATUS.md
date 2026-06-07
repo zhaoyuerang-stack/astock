@@ -17,7 +17,7 @@
 | 有效策略管理 | ✅ | 台账 + decay_monitor + paper_trade(T+1 真实盘) |
 | 生产入口 | ✅ | `run_daily.py` → illiquidity v1.0 |
 | 中央调度层 | ⏳ | launchd 每日增量+周维护 |
-| 组合层 | ✅ | 统一 PureTrend MA16 开关 + 按风险偏好选策略 |
+| 组合层 | ✅ | `portfolio/` 3种组合算法 + 贡献分解 + regime分析 |
 | 展示层 | ○ | 未建 |
 
 ## 策略库 (详见 `strategy_versions.json`)
