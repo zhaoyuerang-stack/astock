@@ -92,10 +92,12 @@ def make_synthetic_clean():
     amount = volume * 100 * raw_close
 
     # ---- Fundamental: avail_date at ev_start ----
+    # Use a MASSIVE value (10.0 = 1000% growth) so the fundamental signal
+    # is unmistakable in the factor output
     fundamental = pd.DataFrame({
         "avail_date": [dates[EV_START]],
         "code": ["000001"],
-        "net_profit_yoy": [0.15],
+        "net_profit_yoy": [10.0],
     })
 
     # ---- Reference timing signals ----
@@ -242,7 +244,16 @@ class Phase1Checker:
     # ── Check 2: 财务对齐 ──
 
     def _check_fundamental_alignment(self, syn: dict) -> CheckResult:
-        """Factor respects avail_date alignment for fundamental data."""
+        """Factor respects avail_date alignment for fundamental data.
+
+        Strategy: the synthetic fundamental gives stock 000001 a MASSIVE
+        earnings bump (net_profit_yoy=10.0, i.e. 1000% growth) at avail_date.
+        If the factor uses fundamentals correctly:
+          - Before avail_date: 000001 looks normal (similar to 000002)
+          - After avail_date:  000001's factor should JUMP relative to peers
+        If the jump happens BEFORE avail_date → look-ahead (FAIL).
+        If no jump at all → fundamental not used (SKIP).
+        """
         fund = syn.get("fundamental")
         if fund is None or fund.empty:
             return CheckResult("fund_alignment", "avail_date 对齐", "SKIP",
@@ -259,26 +270,59 @@ class Phase1Checker:
             return CheckResult("fund_alignment", "avail_date 对齐", "SKIP",
                                "Factor doesn't include 000001 — fundamental not used.")
 
-        # Check if factor changes at avail_date boundary
+        # Compare 000001 vs 000002 factor values around avail_date.
+        # With synthetic net_profit_yoy=10.0 for 000001 at avail_date,
+        # 000001 should jump ahead of 000002 AFTER avail_date.
         ev = syn["event_start"]
-        f_pre = factor["000001"].iloc[max(0, ev-5):ev]
-        f_post = factor["000001"].iloc[ev:ev+5]
+        n_pre = 10  # days to check before/after
 
-        if f_pre.dropna().empty or f_post.dropna().empty:
+        if "000002" not in factor.columns:
             return CheckResult("fund_alignment", "avail_date 对齐", "SKIP",
-                               "Factor has NaN around avail_date — can't verify.")
+                               "Need stock 000002 as control for fundamental check.")
 
-        pre_m, post_m = f_pre.mean(), f_post.mean()
-        if pd.notna(pre_m) and pd.notna(post_m) and pre_m != 0:
-            ratio = abs(post_m / pre_m)
-            if ratio > 1.3 or ratio < 0.77:
-                return CheckResult("fund_alignment", "avail_date 对齐", "PASS",
-                                   f"Factor changes at avail_date (pre={pre_m:.4f} post={post_m:.4f}).",
-                                   {"pre_mean": float(pre_m), "post_mean": float(post_m)})
+        # Spread: factor(000001) - factor(000002)
+        spread = factor["000001"] - factor["000002"]
+        spread_pre = spread.iloc[max(0, ev - n_pre):ev].dropna()
+        spread_post = spread.iloc[ev:ev + n_pre].dropna()
 
-        return CheckResult("fund_alignment", "avail_date 对齐", "SKIP",
-                           "No clear change at avail_date — strategy may not use fundamentals. "
-                           "If it does, load_fundamental_panel() handles alignment.")
+        if len(spread_pre) < 3 or len(spread_post) < 3:
+            return CheckResult("fund_alignment", "avail_date 对齐", "SKIP",
+                               "Not enough valid data around avail_date.")
+
+        pre_mean = float(spread_pre.mean())
+        post_mean = float(spread_post.mean())
+        jump = post_mean - pre_mean
+
+        # Check for look-ahead: does the jump happen BEFORE avail_date?
+        # Look at spread during the 5 days BEFORE avail_date vs 15-10 days before
+        spread_early = spread.iloc[max(0, ev - 20):max(0, ev - 10)].dropna()
+
+        if len(spread_early) >= 3:
+            early_mean = float(spread_early.mean())
+            # If spread 5d before avail_date is already elevated vs 15d before
+            # → fundamental data leaked early
+            pre_5d = spread.iloc[max(0, ev - 5):ev].dropna()
+            if len(pre_5d) >= 3 and len(spread_early) >= 3:
+                pre_5d_mean = float(pre_5d.mean())
+                if pre_5d_mean - early_mean > abs(jump) * 0.5 and jump > 0:
+                    return CheckResult("fund_alignment", "avail_date 对齐", "FAIL",
+                                       f"Fundamental signal appears {ev - max(0, ev-5)}d BEFORE avail_date! "
+                                       f"(early spread={early_mean:.4f}, pre-avail spread={pre_5d_mean:.4f}, "
+                                       f"post-avail spread={post_mean:.4f}). Look-ahead detected.",
+                                       {"early_mean": early_mean, "pre_5d_mean": pre_5d_mean,
+                                        "post_mean": post_mean})
+
+        # Now check if fundamentals are used at all
+        if abs(jump) > 0.1:
+            return CheckResult("fund_alignment", "avail_date 对齐", "PASS",
+                               f"Factor jump at avail_date: spread {pre_mean:+.4f} → {post_mean:+.4f} "
+                               f"(jump={jump:+.4f}). Fundamental data correctly aligned.",
+                               {"pre_spread": pre_mean, "post_spread": post_mean, "jump": jump})
+        else:
+            return CheckResult("fund_alignment", "avail_date 对齐", "SKIP",
+                               f"No significant jump at avail_date (jump={jump:+.4f}). "
+                               f"Strategy may not use fundamental data, or signal too weak. "
+                               f"If using load_fundamental_panel(), alignment is handled there.")
 
     # ── Check 3: amount 公式 ──
 
@@ -323,36 +367,59 @@ class Phase1Checker:
     # ── Check 4: 预热完整 ──
 
     def _check_warmup(self, syn: dict) -> CheckResult:
-        """Factor NaN period should not exceed expected warmup."""
+        """Factor should have enough data for its rolling windows to warm up.
+
+        Checks both:
+          a. Total data length vs max rolling window
+          b. Leading NaN days (all stocks NaN at start)
+        """
         try:
             factor = self.factor_builder(
                 syn["close"], syn["volume"], syn["amount"], syn["trade_dates"])
         except Exception as e:
             return CheckResult("warmup", "预热完整", "WARN", f"factor_builder error: {e}")
 
-        if factor is None or factor.empty:
-            return CheckResult("warmup", "预热完整", "WARN", "No factor output.")
-
-        # Count leading all-NaN days
-        all_nan = factor.isna().all(axis=1)
-        leading = 0
-        for v in all_nan:
-            if v: leading += 1
-            else: break
-
+        n_days = len(syn["trade_dates"])
         max_window = max(
             self.config.get("size_window", 60),
             self.config.get("timing_ma", 16),
             self.config.get("vol_lookback", 60),
         )
 
-        if leading <= max_window:
-            return CheckResult("warmup", "预热完整", "PASS",
-                               f"Leading NaN: {leading}d ≤ max window {max_window}d.",
-                               {"leading_nan": leading, "max_window": max_window})
-        return CheckResult("warmup", "预热完整", "WARN",
-                           f"Leading NaN {leading}d > max window {max_window}d. "
-                           f"Data may not have enough warmup history.")
+        # (a) Data length check
+        if n_days < max_window:
+            return CheckResult("warmup", "预热完整", "FAIL",
+                               f"Data has {n_days} days but max rolling window is {max_window}d. "
+                               f"Need ≥{max_window} days for proper warmup. "
+                               f"Fix: load data from ≥{max_window} trading days before backtest start.",
+                               {"n_days": n_days, "max_window": max_window})
+
+        # (b) Leading NaN check
+        if factor is not None and not factor.empty:
+            all_nan = factor.isna().all(axis=1)
+            leading = 0
+            for v in all_nan:
+                if v: leading += 1
+                else: break
+
+            if leading > max_window:
+                return CheckResult("warmup", "预热完整", "WARN",
+                                   f"Leading NaN: {leading}d > max window {max_window}d. "
+                                   f"Data may have gaps at start.",
+                                   {"leading_nan": leading, "max_window": max_window})
+
+        # Check valid data ratio: at least 30% of days should have valid factor
+        if factor is not None and not factor.empty:
+            valid_ratio = factor.notna().any(axis=1).mean()
+            if valid_ratio < 0.3:
+                return CheckResult("warmup", "预热完整", "WARN",
+                                   f"Only {valid_ratio:.0%} of days have valid factor values. "
+                                   f"Rolling windows may be under-warmed.",
+                                   {"valid_ratio": valid_ratio})
+
+        return CheckResult("warmup", "预热完整", "PASS",
+                           f"Data: {n_days}d ≥ {max_window}d max window. Warmup sufficient.",
+                           {"n_days": n_days, "max_window": max_window})
 
     # ── Check 5: 退市股覆盖 ──
 
