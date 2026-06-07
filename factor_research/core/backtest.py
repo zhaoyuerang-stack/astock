@@ -56,6 +56,13 @@ from strategies.small_cap import (
     load_price_panels,
     run_small_cap_strategy,
 )
+from strategies.size_earnings import (
+    StrategyConfig as SizeEarningsConfig,
+    build_factor,
+    build_vol_target,
+    run_strategy as run_size_earnings_strategy,
+    latest_signal as size_earnings_latest_signal,
+)
 
 # Preserve the engine-based variant that test_engine.py imports
 from strategies.small_cap import run_small_cap_strategy as run_small_cap_strategy_engine
