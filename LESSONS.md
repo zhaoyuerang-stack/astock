@@ -221,6 +221,46 @@ small_nav 5 实验全失败,本质是数学定理:**dist 是 small_nav 对 timin
 - price/hk_daily (111 只 × 8 年) — **HK 港股完全没用,corr 0.25 真低**,需更好 HK 因子工程
 - price/monthly, weekly — 不知用没用
 
+### 多元化的数学下限 — 候选 Sharpe / 组合 Sharpe 比例 (2026-06-07)
+
+HK 因子工程 (6 因子 × 5 config × 多 timing) 实测后发现:
+
+**HK 最佳候选**:
+  · mom252+illiq + notiming: sh 0.53, corr 0.18 to A 股 LIVE
+  · all4_equal (mom+illiq+lowvol+size): sh 0.51, mdd -41% (最低), corr 0.24
+
+**加入组合实测全部拖累**:
+  · A only risk_parity: sh 1.89, cal 2.14
+  · + HK_all4 (sh 0.51, corr 0.24): sh 1.54 (-0.35) ❌
+  · + HK_mom252_illiq (sh 0.53, corr **0.18**): sh 1.55 (-0.33) ❌
+  · **即使 corr 0.18 极低也救不了!**
+
+**根本原因 — 数学约束:**
+  · Sharpe = mean / vol
+  · 加入 HK → portfolio mean 必降 (HK ann 12-19% vs A 股 30%+)
+  · HK vol 高,即使 corr 低,也不显著降 portfolio vol
+  · 分子降幅 > 分母降幅 → Sharpe 净降
+
+**经验法则 (写进 plan):**
+  · **candidate Sharpe / portfolio Sharpe < 50% → 必拖累 (即使 corr=0)**
+  · 当前 portfolio sh 1.89,要不拖累 HK 必须 sh ≥ 0.95
+  · HK long-only 单 sh 上限 ~0.5 (universe 91 只 + 港股流动性 + 机构主导长趋势)
+  · 数学不可能在 long-only 框架下用 HK 改善 A 股组合
+
+**真正可行的 cross-market 路径:**
+  · (a) Long-short HK → 去 beta, vol 降一半,Sharpe 可能翻倍
+  · (b) HK ETF rotation (行业/风格,不选股) → 降 vol
+  · (c) 港股通跨市场统计套利 → 真 market-neutral
+  · 这些都需要新引擎/数据,plan 之前没有
+
+**结论修正 (A 股 long-only 物理上限的精确表述):**
+  · 不只是"corr 0.75-0.80",还有数学约束
+  · 任何 candidate Sharpe < 当前组合 Sharpe × 0.5 → 必拖累
+  · 当前 A 股组合 sh 1.89 → 任何新候选必须 sh ≥ 0.95 才有意义
+  · A 股 long-only 多因子的单 sh 也很难持续 ≥ 0.95 (已知最强 illiq v1.0 sh 1.78)
+
+`scripts/research/hk_factor_grid.py` + `scripts/research/hk_v2_independent_timing.py` 作可复用资产。
+
 ### small_nav 已审计 — 无独立价值 (2026-06-07)
 
 MetaSearch PoC 提示 `small_cap_timing` output[1] `small_nav` 100% 被丢。1-2 小时跑 5 实验:

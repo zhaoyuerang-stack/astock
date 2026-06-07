@@ -25,12 +25,10 @@ from core.backtest import (
     build_rebalance_weights,
 )
 from factors.utils import safe_zscore, mad_clip
-from factors.market_stress import HMMStressConfig, build_market_features, latest_hmm_stress
 from lake.validator import DataValidator
 from app_config.settings import get_settings
 
 _cfg = get_settings().strategy
-_hmm_cfg = get_settings().hmm_stress
 
 SIGNALS = Path("signals"); SIGNALS.mkdir(exist_ok=True)
 LAST_REBAL = SIGNALS / "_last_rebalance.txt"
@@ -136,26 +134,8 @@ def main():
     _raw = max(0.0, min(1.5, 1.0 + _dc * 8.0))
     band_exposure = float(_raw if _dc > 0 else 0.0)
 
-    # HMM stress guard (optional)
-    stress_info = {"prob_stress": 0.0, "stress_state": None, "cache_key": None}
-    stress_block = False
-    if _hmm_cfg.enabled:
-        market_features = build_market_features(close, amount)
-        stress_info = latest_hmm_stress(
-            market_features, target_date=last,
-            cfg=HMMStressConfig(
-                lookback=_hmm_cfg.lookback, retrain_days=_hmm_cfg.retrain_days,
-                threshold=_hmm_cfg.threshold, max_iter=_hmm_cfg.max_iter,
-                filter_days=_hmm_cfg.filter_days,
-            ),
-        )
-        stress_block = stress_info["prob_stress"] > _hmm_cfg.threshold
-
-    in_market = bool(base_in_market and not stress_block)
-    print(f"  小盘指数 vs MA{TIMING_MA}: {dist:+.2%} → {'🟢持仓' if base_in_market else '🔴空仓观望'}")
-    if _hmm_cfg.enabled:
-        print(f"  HMM压力: {stress_info['prob_stress']:.2%} / 阈值{_hmm_cfg.threshold:.0%} → "
-              f"{'🔴风控空仓' if stress_block else '🟢通过'}")
+    in_market = bool(base_in_market)
+    print(f"  小盘指数 vs MA{TIMING_MA}: {dist:+.2%} → {'🟢持仓' if in_market else '🔴空仓观望'}")
 
     # ④ 持仓清单
     print("\n[4/6] 持仓清单...")
@@ -167,10 +147,6 @@ def main():
     print("\n[5/6] 调仓判断...")
     state = load_state()
     is_rebal, reason, action = decide_action(close.index, last, in_market, state)
-    if stress_block:
-        reason = f"HMM压力 {stress_info['prob_stress']:.2%} > {_hmm_cfg.threshold:.0%}，风控空仓"
-        action = "清仓" if state.get("current_position") == "invested" else "空仓观望"
-        is_rebal = state.get("current_position") == "invested"
     print(f"  {'🔄 今日执行' if is_rebal else '⏸ 不执行'} — {reason}")
 
     # ⑥ 保存 signals
@@ -181,10 +157,6 @@ def main():
         "in_market": in_market,
         "base_in_market": base_in_market,
         "small_index_vs_ma16": round(float(dist), 4),
-        "hmm_stress_enabled": bool(_hmm_cfg.enabled),
-        "hmm_stress_prob": round(float(stress_info["prob_stress"]), 6),
-        "hmm_stress_threshold": float(_hmm_cfg.threshold),
-        "hmm_stress_block": bool(stress_block),
         "is_execution_day": is_rebal,
         "is_rebalance_day": bool(is_rebal and in_market),
         "rebalance_reason": reason,
@@ -218,8 +190,6 @@ def main():
     print(f"  策略      : illiquidity v1.0 (Amihud 非流动性)")
     print(f"  日期      : {last.date()}")
     print(f"  择时      : {signal['timing']}  (小盘指数{dist:+.2%} vs MA{TIMING_MA})")
-    if _hmm_cfg.enabled:
-        print(f"  HMM压力   : {stress_info['prob_stress']:.2%} / 阈值{_hmm_cfg.threshold:.0%}")
     print(f"  执行      : {'是' if is_rebal else '否'} — {reason}")
     print(f"  操作      : {signal['action']}")
     if in_market:

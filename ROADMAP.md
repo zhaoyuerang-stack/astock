@@ -40,6 +40,37 @@
 - **展示层**:真实(扣成本)收益看板;受众(投资者/内部)定了再设计。
 - **中央调度层**:✅ 最小定时拉取已落地(`scripts/ops/scheduled_daily_update.py` + launchd);完整事件驱动仍待建:数据事件 → 启停策略/组合。
 
+## 阶段 5 — 盲区修补:6 项结构性建议 ⚡ (2026-06-07 专家审视触发)
+
+> 背景:今日完整跑通工厂 + 信息熵框架 + 跨市场 HK 验证后, 专家审视暴露 6 个盲区。
+> 之前 plan 都在追"+0.05 Sharpe 新母策略", 但真正的钱在执行优化 (+21pp ann 已知漏) + 跨资产架构铺路。
+
+### Phase 1 — Quick Wins (Day 1-3)
+- **1.1 Band timing 切 LIVE 主决策** [#3 伪谨慎修复] — WF 已 14/14 年验证, SHADOW 30 天等待是机会成本; 预期 Calmar 2.14→2.42 (+13%)
+- **1.2 执行优化 PoC** [#2 21pp 年化已知漏的钱] — 跑 5 个 T+1 入场价对照 (open / ohlc_mid / vwap / close / lo_close_mid), 任一 sh +0.10 立即切换 paper_trade 默认; 否则关闭这条分支节省 5min K 线工程
+
+### Phase 2 — 跨资产基础设施 (Day 4-7) [#6 架构盲区]
+- 2.1 `data_lake/cross_asset/` ETF 数据管道 (国债 511010 / 黄金 518880 / 恒生 159920 / 红利 510880)
+- 2.2 单 ETF 趋势策略 + 加入组合层测降回撤; 必须满足 candidate Sharpe ≥ 组合 Sharpe × 50% 才能入主组合 (HK 已实证此约束)
+
+### Phase 3 — 工厂闭环 (Week 2)
+- **3.1 工厂记忆系统** [#5 每轮从零修复] — IC<0.05 family 自动降权; 失败参数区间标 "已饱和 niche" 不再重试
+- **3.2 MI audit → mutate_existing 反馈闭环** [#4 死资产激活] — Information Map "未覆盖象限" → 反向生成 spec → active learning
+
+### Phase 4 — 真新 alpha 发现 (Week 3+)
+- 4.1 **交互项 factor generator** [#1 同因子换篮子修复] — factor_A × factor_B 枚举, MI greedy 选 top
+- 4.2 **Regime-gated factor** — factor × (regime == bear) 等, 直接服务 LIVE_D 防御档
+
+### 核心 KPI
+- Phase 1: Portfolio Calmar 2.42 LIVE; 执行优化 +5pp+ ann
+- Phase 2: 1+ ETF 进组合; 跨资产基础设施落地
+- Phase 3: MI 闭环可用; 工厂重复失败 ↓30%
+- Phase 4: 至少 1 个交互/regime factor 进 LIVE_D
+
+### 整体目标
+当前 Portfolio Sharpe 1.89 / Calmar 2.14 → Phase 1+2 后 2.1+ / 2.5+;
+完整 4 Phase 后, 突破 A 股 long-only 物理上限 (corr 0.75 + candidate sh / portfolio sh < 50% 双约束).
+
 ## 阶段 4 — 远期增强(有触发条件才做)
 - LLM 当进化算子(补「逻辑独立」判定)。
 - 新正交数据源母策略(两融已有 / 北向 / 新闻情绪;先不上 FinBERT/GNN)。
