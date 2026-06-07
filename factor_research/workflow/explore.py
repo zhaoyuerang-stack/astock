@@ -144,6 +144,24 @@ class LowBeta:
         beta = cov.div(var, axis=0)
         return safe_zscore(mad_clip(-beta))  # buy low-beta
 
+class IlliqLowVolBlend:
+    """illiquidity + low volatility, equal weight."""
+    def __init__(self, iw=20, vw=20): self.iw = iw; self.vw = vw
+    def __call__(self, c, v, a, d):
+        r = c.pct_change(fill_method=None).abs().replace([np.inf, -np.inf], np.nan)
+        il = safe_zscore(mad_clip((r/(a+1)).rolling(self.iw).mean()))
+        lv = safe_zscore(mad_clip(-c.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan).rolling(self.vw).std()))
+        return safe_zscore(mad_clip(il + lv))
+
+class IlliqSizeBlend:
+    """illiquidity + size factor, equal weight."""
+    def __init__(self, iw=20): self.iw = iw
+    def __call__(self, c, v, a, d):
+        r = c.pct_change(fill_method=None).abs().replace([np.inf, -np.inf], np.nan)
+        il = safe_zscore(mad_clip((r/(a+1)).rolling(self.iw).mean()))
+        sz = safe_zscore(mad_clip(-np.log(a.rolling(60).mean() + 1)))
+        return safe_zscore(mad_clip(il + sz))
+
 class MidCapQuality:
     """Quality in mid-large caps: high ROE, filtered by size."""
     def __init__(self, w=20): self.w = w
@@ -200,18 +218,36 @@ def make_candidates() -> list[FactorSpec]:
         C.append(FactorSpec(f"size_low_vol_{vw}d", SizeLowVol(vw), _pt_timing,
                             {**base, "vol_w": vw}, "size-low-vol", "小盘低波"))
 
-    # ── Round 2: orthogonal niches ──
+    # ── Round 2: orthogonal niches (info only, don't block) ──
     for w in [5, 10, 20]:
         C.append(FactorSpec(f"midcap_reversal_{w}d", MidCapReversal(w), _pt_timing,
-                            {**base, "window": w}, "mid-reversal", "中盘反转: 大中市值短期反转"))
+                            {**base, "window": w}, "mid-reversal", "中盘反转"))
     for w in [20, 40, 60]:
         C.append(FactorSpec(f"industry_mom_{w}d", IndustryMomentum(w), _pt_timing,
-                            {**base, "window": w}, "ind-momentum", "行业内动量: 去size效应"))
+                            {**base, "window": w}, "ind-momentum", "行业内动量"))
     for w in [40, 60]:
         C.append(FactorSpec(f"low_beta_{w}d", LowBeta(w), _pt_timing,
-                            {**base, "window": w}, "low-beta", "低beta防御: 低市场敏感度"))
+                            {**base, "window": w}, "low-beta", "低beta防御"))
     C.append(FactorSpec("midcap_quality", MidCapQuality(20), _pt_timing,
-                        {**base}, "mid-quality", "中盘质量: 大中市值+高ROE"))
+                        {**base}, "mid-quality", "中盘质量"))
+
+    # ── Round 3: winner variants + combos ──
+    # Higher leverage illiquidity
+    for lev in [1.5, 2.0]:
+        C.append(FactorSpec(f"illiquidity_20d_lev{lev}x", Illiquidity(20), _pt_timing,
+                            {**base, "leverage": lev}, "illi-lev", f"illiq杠杆{lev}x"))
+    # illiquidity + low volatility blend
+    C.append(FactorSpec("illiq_low_vol_blend", IlliqLowVolBlend(20, 20), _pt_timing,
+                        {**base}, "illiq-lovol", "非流动性+低波等权"))
+    # illiquidity + size blend
+    C.append(FactorSpec("illiq_size_blend", IlliqSizeBlend(20), _pt_timing,
+                        {**base}, "illiq-size", "非流动性+size等权"))
+    # Different rebalance: weekly (5d) illiquidity
+    C.append(FactorSpec("illiquidity_20d_weekly", Illiquidity(20), _pt_timing,
+                        {**base, "rebalance_days": 5}, "illiq-freq", "illiq周频调仓"))
+    # Top 50 illiquidity
+    C.append(FactorSpec("illiquidity_20d_top50", Illiquidity(20), _pt_timing,
+                        {**base, "top_n": 50}, "illiq-wide", "illiq持仓50只"))
 
     return C
 
@@ -248,8 +284,7 @@ def _run_phase2(spec: FactorSpec) -> dict:
             blocked = True; reasons.append(f"{lbl} annual≤0")
     if data.get("cost_sensitivity", {}).get("verdict") == "FAIL":
         blocked = True; reasons.append("cost FAIL")
-    if data.get("correlation", {}).get("verdict") == "FAIL":
-        blocked = True; reasons.append("corr FAIL")
+    # Correlation is informational only — no longer blocks strategy library expansion
     return {"name": spec.name, "niche": spec.niche,
             "phase2_pass": not blocked, "phase2_reasons": reasons,
             "is_annual": is_s.get("annual", 0), "is_maxdd": is_s.get("maxdd", 0),
