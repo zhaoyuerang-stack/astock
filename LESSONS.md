@@ -22,6 +22,7 @@
 - **回测必须预热**(2026-06):`small_cap_factor`(rolling60)、`small_cap_timing`(MA16)依赖历史窗口,从目标区间直接起跑会**冷启动虚高**(v2.0 从 2018 跑 24.2%/夏普1.53 vs 从 2010 预热再切 2018 的 **22.2%/1.38**)。正确做法:**从更早(如2010)加载、连续跑、再切目标区间统计**;factory 评估候选同样要预热,否则又是一批冷启动假候选。
 - **v2.0 真身(干净 amount + 预热,2026-06)**:样本内 2018-2026 **22.2%/-20.0%/夏普1.38/卡玛1.11**(达满意线、未达卓越);压力 2010-2026 24.2%/-31.7%/1.27。**剔极端年(2015/2021/2025)常态仅 15%/夏普0.9——满意线达标全靠小盘疯牛年,常态平庸**;容量~2千万、可成交>98%。定位**组合一块、不单吊**。证伪轨迹:v1.0夏普2.06水分→污染21%/1.14→冷启动24%/1.53→真身22%/1.38。
 - **PureTrend MA16 是 A 股策略的生存必需,不是可选开关(2026-06-06)** :测试 8 种策略在无择时下的表现——全部回撤 43-86%。illiquidity 无 PT 时 +31.3%/-73.4%,加 PT 后 +29.7%/-30.5%。PureTrend 用 ~2% 年化代价换 40+pp 回撤保护。没有 PT,任何 A 股日频因子都是不可投资的过山车。**结论:PureTrend MA16 是通用最优开关,在所有策略上验证,无例外。**
+- **Band: PureTrend 的 dist 连续仓位缩放(2026-06-07)**:Binary PT 只用了 MA16 交叉的方向(0/1),丢弃了 dist=偏离度这个连续信号。`exposure = (1+dist×8)×I(dist>0), clamped [0,1.5]`——跌破MA空仓不变,站上MA后按 dist 强度缩放。三段验证(IS/OOS/压力)全部夏普+卡玛改善:Binary +28.4%/-14.9%/1.55 → Band +23.5%/-12.0%/1.60;压力期 DD 从 -31.4% 降到 -25.3%。WF 验证 MA 参数稳定区间 12-20,14/14年 OOS 正,Mode=14。**Band 是 Binary 的完整版——同一套 PureTrend 框架,只是不丢弃 dist 信息。** 当前置于 SHADOW 轨道(不改生产决策,仅记录 exposure 供对比评估)。
 - **v2.2 PureTrend tw=2 偷看 bug(2026-06-06)**:`exposure = (mkt.rolling(2).sum() >= 0).astype(float)` **没有 `shift(1)`**——T 日仓位用到了 T 日 mkt 收益(含当天 close),经典未来函数。修复后 50.5%→**2.2%**,17年仅赢2年,PureTrend tw=2 无真正择时能力。教训:**任何涉及当日行情数据的择时信号必须验证 shift(1) 到位;修复后必须重跑全部数字再注册,不能用旧数字凑**。
 - **成本别乐观**:佣金/融资是可谈硬费率(万0.65 / 5%),但**冲击滑点 0.2% 维持审慎**;往返 ≈0.47%。`evolve` 默认 0.15% 偏乐观、漏过户费。
 - **真实成本杀伤很大**:small-cap-size 去幸存者偏差后 2018-2026 约 31.9%/-11.9%,但接入真实买卖成本+融资后降到约 **21.2%/-16.2%**;年均换手约 32x,成本拖累约 11%/年。阶段 1 必须把换手/成本作为目标,不能只优化收益。
@@ -45,6 +46,40 @@
 - **Overlay 视角必须与策略视角对齐**：小盘策略用等权 mkt_ret（胜率92%）不是成交额加权（胜率67%）。"最准确"的市场收益不是客观存在的，取决于你从谁的视角看。
 - **成本敏感度=验证稳健性，不是验证盈亏**：好策略在成本 3x 时仍有相对优势（PT 优势 +15.8pp）。策略必须在 3~5x 成本假设下仍相对好才算稳健。
 - **回测审计=发现策略边界**：不是安全清单。策略边界"≤1000万规模、成本≤1%、A股全市场"——知道何时失效比知道何时有效更有价值。
+
+## 组合管理 / 边际贡献
+- **"信息→行动"断层是最贵的成本**(2026-06-07):STATUS.md 早写"4 策略组合 Sharpe 1.33 < 单 illiq 1.35"——**已知组合层负贡献,但 LIVE 集合没动一周以上**。这是 plan/工程之外的真问题:**有诊断没行动**。本质是组合管理纪律,不是技术问题。修复 = 把"边际贡献负"作为硬触发,立即 SHADOW(不删除,但停止吸纳)。教训:**只产新工程不剪冗余 = 假装在工作**。
+- **2 ACTIVE > 4 LIVE 等权 (+18% Sharpe)**(2026-06-07 全样本 2018-2026 实测):
+  - 当前 4 LIVE 等权 22.1% / Sharpe 1.60 / mdd -13.9% / calmar 1.60
+  - 剔除 size-low-vol+size-earnings(边际-0.120/-0.277): **29.8% / 1.88 / -15.8% / 1.89**
+  - 同 + risk_parity 加权: **29.3% / 1.89 / -13.7% / 2.14**(calmar 最高)
+  - 边际正只 small-cap v2.0 (+0.104),其余两个全负
+  - 决策:**size-low-vol v1.0/v1.1、size-earnings v1.0 全部转 SHADOW**;组合层用 risk_parity(illiq + small-cap)
+  - 教训:**Portfolio Sharpe 不靠加策略提升,靠剪冗余**。多元化 ≠ 多策略,A 股权益内只是同因子换包装。
+- **plan 自家流水线诚实揭示问题**(2026-06-07,工厂 L3 + marginal 双门验证):工厂 55 hypothesis 跑 L0/L1/L2/L3/marginal,**仅 7 个 small_cap 变体过 L3 + marginal LIVE_C 双门**——全是同因子,corr 0.85+。"防御档"(LIVE_D)候选 ret_zscore_cross/mom_n 被 L3 卡线刷下(avg yearly sharpe 0.49/0.50)。**实证了 STATUS.md 结论 #1 "A 股 alpha 单维度"——工厂自家流水线给出独立证据**。教训:不要拒绝自己流水线说"难"的话——这是质量保护,不是 bug。
+
+## 连续 timing / Band
+- **Band timing — 连续信号是 binary 的科学性升级**(2026-06-07):
+  - 公式: `exposure = clip(1 + dist × 8, 0, 1.5) × I(dist > 0)`,**用 leverage 1.0 + timing[0,1.5]** 代替 Binary 的 leverage 1.25 + timing{0,1}
+  - 本质: 把固定杠杆换成 **dist 驱动的动态杠杆**——趋势确认强时加杠杆,趋势弱时减仓,dist≤0 时空仓
+  - 理论根据: Moskowitz-Ooi-Pedersen 2012 *Time-Series Momentum* 实证一致 (momentum-scaled position sizing)
+  - 三段实测 (illiquidity v1.0 因子,2018-22 IS / 2023-26 OOS / 2010-17 Stress):
+    - IS: Binary 28.4%/-14.9%/1.55 → **Band 23.5%/-12.0%/1.60** (sh +0.05, dd -2.9pp)
+    - OOS: Binary 39.9%/-13.5%/2.23 → **Band 32.7%/-10.8%/2.29** (sh +0.06, dd -2.7pp)
+    - Stress: Binary 30.5%/-31.4%/1.23 → **Band 25.2%/-25.3%/1.27** (sh +0.04, dd -6.1pp)
+  - 价值不在 Sharpe (+0.05 微改) 而在 **Calmar +13% + 极端尾部保护**
+  - 组合层 (illiq+small-cap risk_parity): Binary 29.3%/-13.7%/1.89/cal2.14 → Band 28.5%/-11.8%/1.86/**cal2.42**
+  - 决策: **SHADOW 跟踪 (2026-06-07 起)**,signals/ 含 shadow_band_exposure 字段;30 日后 `scripts/research/band_shadow_review.py --update` 看真实 paper 差异决定是否切 LIVE
+- **engine clip 陷阱**(2026-06-07):BacktestEngine `_run_weight_backtest` 原把 timing 强制 `min(max(x, 0.0), 1.0)`,boost timing > 1.0 全被吞——结果与 binary 完全相同。已加 `Signal.exposure_cap` 字段 (默认 1.0,Band 传 1.5)。教训: 引擎假设是隐藏约束,任何 timing > 1.0 设计**必须先验证 engine 不 clip**。
+- **复现 timing 必须先核对 leverage**(2026-06-07):用户给 Band 公式描述时未明说 leverage 改成了 1.0,我用 1.25 跑出加杠杆型 (sharpe ↓),与用户报告的减仓型 (sharpe ↑) 方向相反——浪费了 2 小时尝试各种 mapping 直到看 `scripts/research/band_timing_test.py` 才发现 `lev=1.0`。教训: **timing + leverage 不可分离讨论**,公式描述必须含 leverage。
+
+## 科学性 / 参数 robustness
+- **MA16 是 plateau 不是 spike**(2026-06-07 grid 测试 2010-2026):
+  - MA10-20 sharpe 1.26-1.45 都 work(plateau)
+  - MA16 sharpe 1.45 是 grid winner,但 MA18 1.42 几乎等效且 calmar +0.92>0.89、mdd -29.1%<-30.5%
+  - 极端 MA5 sh 0.81 / MA60 sh 0.96 → 趋势跟踪概念真实(中间区段都 work)
+  - 但"16"无理论意义,是事后合理化(3 周 ≈ MA15-18 都行)
+  - 教训:**概念有理论根据(time-series momentum) + 参数 plateau ≠ magic number**。MA16 不是 v2.2 tw=2 那样的偷看 bug,只是轻度 in-sample tuning。严肃科学应 walk-forward 选 MA window。
 
 ## 关键决策
 - **文档治理**(2026-06):CLAUDE.md 精简(操作宪法)/ SPEC.md(架构)/ STATUS.md(进度)/ LESSONS.md(本文件)。别再把设计/进度往 CLAUDE.md 堆。

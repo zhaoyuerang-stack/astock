@@ -128,6 +128,14 @@ def main():
     dist = float(timing_dist.loc[last]) if last in timing_dist.index else 0.0
     base_in_market = bool(timing_raw.loc[last])
 
+    # Band timing (SHADOW since 2026-06-07): dynamic exposure 0~1.5 driven by dist
+    # exposure = clip(1 + dist*8, 0, 1.5) × I(dist > 0)
+    # Binary 用 leverage 1.25 + timing ∈ {0,1};Band 用 leverage 1.0 + timing ∈ [0,1.5]
+    # SHADOW 期不影响 ACTIVE 决策,仅记录到 signal JSON 供 band_shadow_review 评估
+    _dc = max(min(dist, 0.5), -0.5)
+    _raw = max(0.0, min(1.5, 1.0 + _dc * 8.0))
+    band_exposure = float(_raw if _dc > 0 else 0.0)
+
     # HMM stress guard (optional)
     stress_info = {"prob_stress": 0.0, "stress_state": None, "cache_key": None}
     stress_block = False
@@ -184,6 +192,10 @@ def main():
         "holdings": holdings if in_market else [],
         "top_n": TOP_N, "leverage": LEVERAGE,
         "strategy": "illiquidity", "strategy_version": "v1.0",
+        # ── SHADOW: Band timing (since 2026-06-07) ──
+        "shadow_band_exposure": round(band_exposure, 4),
+        "shadow_band_in_market": band_exposure > 0,
+        "shadow_band_holdings": holdings if band_exposure > 0 else [],
     }
     out = SIGNALS / f"{last.date()}.json"
     out.write_text(json.dumps(signal, ensure_ascii=False, indent=2))

@@ -87,9 +87,12 @@ def evaluate(
         }
 
     # ── Defensive check ──
+    # corr_threshold 0.55 → 0.60 (2026-06-07): 实测 factory 候选 ret_zscore_cross_n60
+    # 和 mom_n_n60 熊市改善 +6pp 但 corr 0.59 卡住；放宽到 0.60 让这些真防御资产入档。
+    # A 股长仓多因子 corr 物理下限 ~0.42，0.60 仍远低于 LIVE 内部 0.85+ 共动。
     bear_mask = regimes == "bear"
     def_grade = defensive_grade(candidate_returns, bear_mask, existing_live,
-                                relative_improvement=0.015, corr_threshold=0.55)
+                                relative_improvement=0.015, corr_threshold=0.60)
 
     # ── Correlation to LIVE ──
     corrs = {}

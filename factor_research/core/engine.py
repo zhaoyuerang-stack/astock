@@ -92,8 +92,10 @@ class Signal:
     factor_builder: Optional[Callable[[PricePanel, Optional[dict]], pd.DataFrame]] = None
     factor_config: Optional[dict] = None
 
-    # Timing exposure (daily multiplier in [0, 1])
+    # Timing exposure (daily multiplier). Default cap 1.0 (binary).
+    # 2026-06-07: Boost band 需要 > 1.0；调 Signal.exposure_cap 解除。
     timing: Optional[pd.Series] = None
+    exposure_cap: float = 1.0   # boost timing 需要传 1.5 等
 
     # Metadata
     family: str = ""
@@ -324,11 +326,12 @@ class BacktestEngine:
             if dt in scheduled_weights.index:
                 current_selected = scheduled_weights.loc[dt].dropna()
 
-            # Timing exposure multiplier [0, 1]
+            # Timing exposure multiplier [0, exposure_cap]
             exposure = 1.0
             if timing_signal is not None:
                 exposure = float(timing_signal.reindex([dt]).fillna(0.0).iloc[0])
-                exposure = min(max(exposure, 0.0), 1.0)
+                exp_cap = signal_meta.exposure_cap if signal_meta is not None else 1.0
+                exposure = min(max(exposure, 0.0), exp_cap)
 
             target_weight = np.zeros(len(cols))
             if exposure > 0 and len(current_selected):
