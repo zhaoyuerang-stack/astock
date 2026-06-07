@@ -1,6 +1,69 @@
 {
   "families": [
     {
+      "id": "size-earnings",
+      "versions": [
+        {
+          "version": "v1.0",
+          "date": "2026-06-06",
+          "desc": "Size(60d)+NPY λ=0.5 + PureTrend(MA16) + VolTarget(25%/60d) + Lev1.10x",
+          "config": {
+            "factor": "0.5*size60 + 0.5*npy_yoy",
+            "size_window": 60,
+            "npy_source": "yjbb_em.net_profit_yoy",
+            "timing": "PureTrend MA16",
+            "vol_target": {
+              "target_vol": 0.25,
+              "lookback": 60,
+              "min_exp": 0.3,
+              "max_exp": 1.5
+            },
+            "top_n": 25,
+            "rebal_days": 20,
+            "leverage": 1.1,
+            "cost": {
+              "buy": 0.00225,
+              "sell": 0.00275,
+              "financing_rate": 0.065
+            }
+          },
+          "data_scope": {
+            "source": "data_lake",
+            "period": "2018-2026",
+            "survivorship_bias": false,
+            "wf_validated": true,
+            "wf_period": "2022-2025",
+            "wf_annual": 0.19,
+            "wf_maxdd": -0.195,
+            "wf_sharpe": 1.16
+          },
+          "metrics": {
+            "annual": 0.151,
+            "maxdd": -0.183,
+            "sharpe": 1.05,
+            "calmar": 0.82,
+            "hit": true,
+            "annual_2018": 0.151,
+            "maxdd_2018": -0.183,
+            "sharpe_2018": 1.05,
+            "annual_2023": 0.11,
+            "maxdd_2023": -0.111,
+            "sharpe_2023": 0.79,
+            "annual_2010": 0.158,
+            "maxdd_2010": -0.237,
+            "sharpe_2010": 1.08
+          },
+          "status": "在册",
+          "notes": "✅WF存活(+19.0%/-19.5%/夏普1.16,3/4年正)。NPY熊市缓冲(2022 λ=0.7→+23%)，size牛市弹性(2024-25 λ=1.0→+37/+46%)。VolTarget压IS回撤-18.3%。OOS回撤仅-11.1%。压力回撤-23.7%主因2015(+146%后崩)。换手~30x。"
+        }
+      ],
+      "name": "小盘+盈利增长双因子",
+      "hypothesis": "A股散户同时追逐小盘(流动性溢价)和高成长故事(注意力溢价)，两者叠加捕获更纯粹的散户行为alpha。盈利增长(NPY)在熊市提供质量锚，小盘在牛市提供弹性。Vol Target控制回撤。",
+      "regime": "小盘占优市(小盘等权>MA16时持仓)。vol target动态缩放仓位：低波加仓，高波减仓。NPY提供熊市缓冲。",
+      "decay_signal": "size因子IC转负(同small-cap-size)；NPY因子IC转负；vol target长期压仓到min(0.3x)持续>3月",
+      "status": "active"
+    },
+    {
       "id": "small-cap-size",
       "versions": [
         {
@@ -79,7 +142,12 @@
           "metrics": {
             "annual_2018": 0.278,
             "sharpe_2018": 1.64,
-            "maxdd_2018": -0.191
+            "maxdd_2018": -0.191,
+            "annual": 0.278,
+            "maxdd": -0.191,
+            "sharpe": 1.64,
+            "calmar": 1.455497382198953,
+            "hit": true
           },
           "status": "在册",
           "notes": "WF verified: 75% win, +3.5pp median delta. Economic interpretation: sw30 captures recent liquidity decline, reb15 matches 3-week turnover cycle, top30 reduces concentration."
@@ -118,7 +186,12 @@
             "maxdd_2023": -0.062,
             "annual_2010": 0.706,
             "sharpe_2010": 4.23,
-            "maxdd_2010": -0.08
+            "maxdd_2010": -0.08,
+            "annual": 0.516,
+            "maxdd": -0.062,
+            "sharpe": 3.87,
+            "calmar": 8.32258064516129,
+            "hit": true
           },
           "status": "在册",
           "notes": "v2.0 × PureTrend tw=2. WF 12/12年选tw=2. vs v2.0: +28.5pp年化, +13.8pp回撤. 进化自v2.0."
