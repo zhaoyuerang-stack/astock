@@ -39,7 +39,7 @@ def _resolve_factor_fn(fn_name: str):
 
 
 def _dispatch_args(deps, close, volume, amount):
-    s = set(deps)
+    s = {d for d in deps if not d.startswith("fundamental/")}
     if "price/close" in s and "price/volume" in s:
         return [close, volume]
     if "price/close" in s:

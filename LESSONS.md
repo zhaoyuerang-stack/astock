@@ -152,6 +152,75 @@ small_nav 5 实验全失败,本质是数学定理:**dist 是 small_nav 对 timin
 
 **这就是 plan 的 L−1 关 (在 L0 IC scan 之前)**: 工厂前端最便宜的过滤器。`factor_research/metasearch/mi_auditor.py` 已实现,等待集成到 L0 之前。
 
+### Information Map 框架的关键盲点 — IC MI ≠ Returns MI (2026-06-07)
+
+加 4 个 fundamental factor (NPY/revenue_yoy/ROE/gross_margin) 跑端到端,验证 Information Map 的预测:
+
+**Information Map 预测 (IC 时序 MI):**
+  · 4 fundamental 与 LIVE 距离 2.86-2.97 (近上限 ~3.0)
+  · PNG 显示 fundamental 在完全独立的信息维度
+  · 预测: 真正多元化候选
+
+**实测 marginal eval (Returns):**
+  · 4 fundamental returns vs LIVE corr **0.76-0.80** (远超 0.42 物理下限)
+  · 全部 SHELVE,bear_imp 全部负值 (-4.8 ~ -13.8%)
+  · marginal_sharpe -0.09 ~ -0.17
+
+**根本原因 — 两个 MI 层次不同:**
+  · IC MI 测"信号生成时机依赖" → fundamental 真独立 (不同时段不同预测方向)
+  · Returns MI / corr 测"执行结果共动" → fundamental 与 LIVE 都是 long-only,**都吃市场 beta + 选股 overlap (NPY 好的也偏小盘) → returns 必然高度共动**
+
+**plan 修正:**
+  · 现 MetaSearch MI auditor 用 IC 时序作 proxy,与最终决策 (marginal_sharpe on returns) 不同口径
+  · 必须建 **Returns MI auditor** (用 daily returns 而非 IC 时序),与 marginal_sharpe 同口径
+  · 两层独立: IC MI 高 → 信号同源(关闭重复); Returns MI 高 → 组合冗余(真实拖累)
+  · IC MI 低 **不保证** Returns MI 低 (fundamental 案例就是反例)
+
+**A 股 long-only 框架的物理上限再次确认:**
+  · LIVE 2 ACTIVE (illiquidity + small-cap) 已基本耗尽 long-only alpha
+  · 任何 long-only fundamental 加入 → returns 大部分重叠
+  · 真突破必须: (a) long-short 引擎去 beta,或 (b) 跨资产 (港股/债/商品),或 (c) 接受 2 ACTIVE 已是当前框架最优
+  · 印证 STATUS 结论 #3 "真正多元化需跨资产"
+
+**MetaSearch 框架价值:**
+  · 1 天验证 fundamental 在 long-only 框架下无独立组合价值 (节省未来周/月反复尝试)
+  · 暴露 MI 框架盲点 (IC vs Returns 分层) 并即时修正
+  · 关闭分支 ≠ 失败,是 plan 设计本身的迭代
+
+### A 股 long-only 多因子的真实 corr 上限 = 0.75-0.80 (2026-06-07)
+
+之前 LESSONS 写"A 股长仓多因子 corr 物理下限 ~0.42",但 0.42 是个例 (微观结构 vol_breakout/mom_n 类)。完整数据资产盘点 + 大量实测后,**真实分布是 0.75-0.80**:
+
+**实测 corr to A 股 ACTIVE (illiquidity + small-cap):**
+- bp_proxy (经典价值): 0.77 (期望 contrarian 但实际持仓仍偏小盘)
+- ep_proxy: ~0.77
+- roe (质量): 0.77
+- gross_margin: 0.76
+- net_profit_yoy (成长): 0.80
+- vol_breakout/mom_n (微观结构): 0.42-0.58 (个例,corr 真低)
+- **HK 港股 (跨市场): 0.25-0.27** (唯一突破 0.5)
+
+**根本原因 — A 股流动性结构强制 long-only 持仓收敛:**
+- top-N 持仓必然偏小盘 (大盘股 1/top_n 权重太大,等权 long-only 在 A 股 universe 自然偏小)
+- 价值股 (高 BP) 在 A 股不是大盘蓝筹,主要是次新/中小盘
+- 成长股 (高 NPY/ROE) 也多小盘
+- OHLC 派生信号 (close_position/high_low_breakout 等) 选趋势股,也多小盘
+- → 所有 long-only 多因子的实际持仓都收敛到"小盘 + 流动性"维度
+
+**对 plan 的影响:**
+- 现 LIVE 2 ACTIVE (illiq + small-cap) Calmar 2.14 已是 A 股 long-only 框架几乎最优
+- 任何 long-only fundamental / value / quality / OHLC 候选 corr 都 0.75+,组合贡献负
+- 真正突破必须: (a) Long-short 引擎去 beta (corr 物理可到 0.2-0.4), 或 (b) 跨资产 (HK 已验证 corr 0.26 但单 Sharpe 弱需更好因子), 或 (c) 接受现状
+- 现 MI Auditor 用 IC 时序 → 与最终 Returns 共动差异巨大,**信号空间独立 ≠ 持仓空间独立**,必须建 Returns MI 第二层
+
+**完整数据资产清单 (已盘点 2026-06-07):**
+- price/daily (close, volume 已用) + daily_raw OHLC (raw_open/high/low 之前没用,新增 close_position/high_low_breakout/amplitude_mean factor)
+- fundamental_batch 16 字段 (今天已用 NPY/ROE/revenue_yoy/gross_margin/BP/EP/cfo,9/16 字段)
+- capital/margin_all (2010-2026 全) — LESSONS 标弱,Returns 视角可重测
+- capital/northbound_all (2017-2024-08 截止) — 浅尝
+- price/hk_daily (111 只 × 8 年) — **HK 港股完全没用,corr 0.25 真低**,需更好 HK 因子工程
+- price/monthly, weekly — 不知用没用
+
 ### small_nav 已审计 — 无独立价值 (2026-06-07)
 
 MetaSearch PoC 提示 `small_cap_timing` output[1] `small_nav` 100% 被丢。1-2 小时跑 5 实验:

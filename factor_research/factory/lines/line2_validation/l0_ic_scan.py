@@ -42,8 +42,9 @@ def _resolve_factor_fn(fn_name: str):
 
 
 def _dispatch_args(deps: tuple[str, ...], close, volume, amount) -> list[pd.DataFrame]:
-    """根据 data_dependencies 选择喂给 factor_fn 的位置参数。"""
-    deps_set = set(deps)
+    """根据 data_dependencies 选择喂给 factor_fn 的位置参数。
+    fundamental/* 由 factor 内部 lru_cache 加载,只需喂 close 拿日历。"""
+    deps_set = {d for d in deps if not d.startswith("fundamental/")}
     if "price/close" in deps_set and "price/volume" in deps_set:
         return [close, volume]
     if "price/close" in deps_set:

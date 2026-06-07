@@ -134,6 +134,115 @@ FACTOR_MUTATION_SPECS: dict[str, dict] = {
         "data_dependencies": ("price/close",),
     },
 
+    # ── 基本面 alpha 源 (Information Map 驱动,2026-06-07) ─────────────────
+    # 这些应该与 LIVE (价量类) 在 MI 空间距离 >> 2,验证信息地图预测力
+    # 单参数(没有 window),每个 factor 只一个 hypothesis
+
+    "factors.fundamental.net_profit_yoy": {
+        "thesis": EconomicThesis(
+            mechanism="盈利增长 = 基本面动量,散户对成长性溢价。size_earnings v1.0 已 LIVE 实证",
+            citation="Fama-French 1992 + size_earnings v1.0 OOS Sharpe 1.16",
+            falsifiability="NPY IC 持续 < 0 一年 → 价值/反转 regime",
+        ),
+        "param_grid": {"_": [0]},   # 占位,本因子无参数
+        "data_dependencies": ("price/close", "fundamental/net_profit_yoy"),
+    },
+    "factors.fundamental.revenue_yoy": {
+        "thesis": EconomicThesis(
+            mechanism="营收同比 = 顶层成长信号,绕过净利润操纵",
+            citation="Lakonishok-Shleifer-Vishny 1994",
+            falsifiability="IC 持续 < 0",
+        ),
+        "param_grid": {"_": [0]},
+        "data_dependencies": ("price/close", "fundamental/revenue_yoy"),
+    },
+    "factors.fundamental.roe": {
+        "thesis": EconomicThesis(
+            mechanism="ROE 经典质量因子,高 ROE 长期跑赢",
+            citation="Asness-Frazzini-Pedersen 2019 'Quality minus Junk'",
+            falsifiability="IC 持续 < 0 / Junk 因子主导",
+        ),
+        "param_grid": {"_": [0]},
+        "data_dependencies": ("price/close", "fundamental/roe"),
+    },
+    "factors.fundamental.gross_margin": {
+        "thesis": EconomicThesis(
+            mechanism="毛利率 = 经营护城河,高毛利持续",
+            citation="Novy-Marx 2013 'Other Side of Value'",
+            falsifiability="IC 持续 < 0",
+        ),
+        "param_grid": {"_": [0]},
+        "data_dependencies": ("price/close", "fundamental/gross_margin"),
+    },
+
+    # ── 价值因子 BP/EP (与 LIVE long-only 选股池 overlap 最小,2026-06-07) ─────
+    # 价值股 (高 BP/EP) 多大盘金融/周期/蓝筹,与小盘 fundamental-growth 反向
+    "factors.fundamental.bp_proxy": {
+        "thesis": EconomicThesis(
+            mechanism="高 BP (净资产/价 高) = 被低估,经典 Graham 价值。选股多大盘金融/周期 → 与小盘 overlap 小",
+            citation="Fama-French 1992 + Lakonishok 1994",
+            falsifiability="价值 IC 持续 < 0 一年,或选股仍偏小盘",
+        ),
+        "param_grid": {"_": [0]},
+        "data_dependencies": ("price/close", "fundamental/bps"),
+    },
+    "factors.fundamental.ep_proxy": {
+        "thesis": EconomicThesis(
+            mechanism="高 EP (EPS/价 高) = 低 PE = 经典价值因子",
+            citation="Fama-French 1992; Basu 1977",
+            falsifiability="价值 IC 持续 < 0",
+        ),
+        "param_grid": {"_": [0]},
+        "data_dependencies": ("price/close", "fundamental/eps_ttm"),
+    },
+    "factors.fundamental.cfo_quality": {
+        "thesis": EconomicThesis(
+            mechanism="经营现金流/股 = 真实盈利质量,绕过应收账款操纵",
+            citation="Sloan 1996 'accrual anomaly'",
+            falsifiability="cfo_ps IC 持续 < 0",
+        ),
+        "param_grid": {"_": [0]},
+        "data_dependencies": ("price/close", "fundamental/cfo_ps"),
+    },
+
+    # ── OHLC 微观结构 (raw_high/low/open 之前完全没用,2026-06-07) ─────────
+    "factors.ohlc.amplitude_mean": {
+        "thesis": EconomicThesis(
+            mechanism="日内振幅 = 不确定性溢价 + lottery preference。日内 ≠ 收盘 vol",
+            citation="Bali-Cakici-Whitelaw 2011 lottery preference",
+            falsifiability="低波 dominate → 反方向更优",
+        ),
+        "param_grid": {"n": [10, 20, 60]},
+        "data_dependencies": ("price/close",),    # OHLC 内部 lru_cache
+    },
+    "factors.ohlc.overnight_gap": {
+        "thesis": EconomicThesis(
+            mechanism="隔夜跳空 = 海外信息冲击 + 散户隔夜情绪,A 股 T+1 制度下隔夜 alpha 独特",
+            citation="Lou-Polk-Skouras 2019 'overnight return'",
+            falsifiability="隔夜 mean ≈ 0 in OOS",
+        ),
+        "param_grid": {"n": [5, 10, 20]},
+        "data_dependencies": ("price/close",),
+    },
+    "factors.ohlc.close_position": {
+        "thesis": EconomicThesis(
+            mechanism="收盘相对日内位置 = 买盘/抛压强弱,收高位 → 多头持续",
+            citation="技术分析经典 + 散户尾盘行为",
+            falsifiability="OOS Sharpe < 0",
+        ),
+        "param_grid": {"n": [5, 10, 20]},
+        "data_dependencies": ("price/close",),
+    },
+    "factors.ohlc.high_low_breakout": {
+        "thesis": EconomicThesis(
+            mechanism="突破 N 日新高 = 趋势确认,Donchian-style. A 股散户追涨杀跌增强",
+            citation="Donchian Channel; Faber 2007",
+            falsifiability="OOS Sharpe < 0",
+        ),
+        "param_grid": {"n": [10, 20, 60, 120]},
+        "data_dependencies": ("price/close",),
+    },
+
     # 截面动量 z-score
     "factors.microstructure.ret_zscore_cross": {
         "thesis": EconomicThesis(
