@@ -13,8 +13,10 @@
 import warnings; warnings.filterwarnings("ignore")
 import os, json, argparse
 from pathlib import Path
-from datetime import date
+from datetime import datetime
+from zoneinfo import ZoneInfo
 os.chdir(Path(__file__).parent)
+CHINA_TZ = ZoneInfo("Asia/Shanghai")
 import numpy as np
 import pandas as pd
 
@@ -89,7 +91,7 @@ def main():
     args = ap.parse_args()
 
     print("=" * 60)
-    print(f"  每日运行  {date.today()}  —  illiquidity v1.0")
+    print(f"  每日运行  {datetime.now(CHINA_TZ).strftime('%Y-%m-%d %H:%M')} CST  —  illiquidity v1.0")
     print("=" * 60)
 
     # ① 增量更新数据
