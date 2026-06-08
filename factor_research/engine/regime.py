@@ -68,10 +68,12 @@ class RegimeEngine:
         labels = pd.DataFrame(index=idx)
 
         # ── 趋势 ──
+        # ⚠️ dist[T] 包含 T 日 close, 必须 shift(1) 防未来函数
+        # 否则 T 日的 regime 标签和 T 日的收益来自同一信息 → 虚假相关
         _, small_nav, dist = small_cap_timing(close, amount, ma_window=self.cfg.trend_ma)
-        # dist > 0 = 站上 MA = trend up
-        labels["trend"] = np.where(dist > 0, "up", "down")
-        labels["trend_dist"] = dist.round(6)
+        dist_lagged = dist.shift(1)
+        labels["trend"] = np.where(dist_lagged > 0, "up", "down")
+        labels["trend_dist"] = dist_lagged.round(6)
 
         # ── 波动率 ──
         ret = close.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan)
