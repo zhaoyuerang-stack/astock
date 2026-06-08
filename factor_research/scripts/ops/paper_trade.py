@@ -48,7 +48,7 @@ ACCOUNT_FP = PAPER / "account.json"
 TRADES_FP = PAPER / "trades.csv"
 NAV_FP = PAPER / "nav.csv"
 RAW = ROOT / "data_lake/price/daily_raw"
-OBSIDIAN = Path("/Users/kiki/Personal Wiki/30.output/A股模拟盘")
+OBSIDIAN = Path("/Users/kiki/Personal Wiki/30.output/A股v2.0模拟盘")
 
 
 # ── 价格:全部不复权(daily_raw)──
@@ -475,7 +475,8 @@ def main():
 
     card = render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocked, names, exec_from)
     OBSIDIAN.mkdir(parents=True, exist_ok=True)
-    (OBSIDIAN / "今日操作.md").write_text(card)
+    daily_file = OBSIDIAN / f"今日操作_{date}.md"
+    daily_file.write_text(card)
     (OBSIDIAN / "历史").mkdir(exist_ok=True)
     (OBSIDIAN / "历史" / f"{date}.md").write_text(card)
 
@@ -485,7 +486,7 @@ def main():
     nxt = (acc.get("pending") or {}).get("target") or []
     print(f"  明日开盘计划: {'建仓/持有 '+str(len(nxt))+' 只' if (signal['in_market'] and nxt) else '空仓观望'}")
     print(f"  总资产 {fmt(nav)} | 现金 {fmt(acc['cash'])} | 持仓 {len(detail)}只 {fmt(pos_value)} | 累计 {ret:+.2%}")
-    print(f"  → Obsidian: {OBSIDIAN / '今日操作.md'}")
+    print(f"  → Obsidian: {daily_file}")
     return 0
 
 
