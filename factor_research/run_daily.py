@@ -138,10 +138,23 @@ def main():
     # LIVE 决策 = Band timing (主), Binary 保留作 SHADOW 对比
     binary_in_market = bool(base_in_market)   # SHADOW (旧 LIVE)
     in_market = bool(band_in_market)          # 新 LIVE 主决策 = Band
+
+    # Regime 检测: dist.shift(1) > 0 → bull, ≤ 0 → bear
+    # (T日只用T-1日dist, 防未来函数)
+    regime_dist = float(timing_dist.shift(1).loc[last]) if last in timing_dist.index else 0.0
+    regime = "bull" if regime_dist > 0 else "bear"
+
     print(f"  小盘指数 vs MA{TIMING_MA}: {dist:+.2%}")
+    print(f"  Regime (shifted):         {'🟢 BULL' if regime == 'bull' else '🔴 BEAR'}")
     print(f"  Binary timing (SHADOW):    {'🟢持仓' if binary_in_market else '🔴空仓'}")
     print(f"  Band timing   (LIVE 主决策): exposure={band_exposure:.2f}x → "
           f"{'🟢持仓' if in_market else '🔴空仓观望'}")
+
+    # 轮动信号
+    if regime == "bear":
+        print(f"  ⚠️ BEAR regime → 建议: 空仓资金配置 511010 国债ETF")
+    else:
+        print(f"  ℹ️ BULL regime → 全仓 illiq 股票")
 
     # ④ 持仓清单
     print("\n[4/6] 持仓清单...")
@@ -168,6 +181,18 @@ def main():
         "band_in_market": band_in_market,
         "timing_mode_live": "band",                        # 标识主决策来源
         "leverage": effective_leverage,                    # effective leverage = band_exposure
+        # ── Regime + 轮动 (2026-06-08) ──
+        "regime": regime,                                  # "bull" | "bear"
+        "regime_dist": round(float(regime_dist), 4),       # shifted dist (防未来函数)
+        "rotation": {
+            "current_regime": regime,
+            "recommend_stocks": regime == "bull",           # bull→全仓 illiq
+            "recommend_bond": regime == "bear",             # bear→换债券(511010)
+            "bond_code": "511010",
+            "bond_name": "国债ETF",
+            "bond_allocation": "全部闲置资金",               # bear=100%现金→债券
+            "note": "BEAR时全部现金买511010; BULL时卖光511010买回股票",
+        },
         # ── SHADOW: Binary timing (2026-06-07 Band 接替后保留对比) ──
         "binary_in_market_shadow": binary_in_market,
         "base_in_market": base_in_market,                  # binary 原始
@@ -180,7 +205,7 @@ def main():
         "holdings": holdings if in_market else [],
         "top_n": TOP_N,
         "strategy": "illiquidity", "strategy_version": "v1.0",
-        # ── 向后兼容: 旧 shadow_band_* 字段保留 (band_shadow_review.py 读取) ──
+        # ── 向后兼容: 旧 shadow_band_* 字段保留 ──
         "shadow_band_exposure": round(band_exposure, 4),
         "shadow_band_in_market": band_in_market,
         "shadow_band_holdings": holdings if band_in_market else [],
@@ -205,11 +230,14 @@ def main():
     print("\n" + "=" * 60)
     print(f"  策略      : illiquidity v1.0 (Amihud 非流动性)")
     print(f"  日期      : {last.date()}")
+    print(f"  Regime    : {'🟢 BULL' if regime == 'bull' else '🔴 BEAR'} (shifted)")
     print(f"  择时      : {signal['timing']}  (小盘指数{dist:+.2%} vs MA{TIMING_MA})")
     print(f"  执行      : {'是' if is_rebal else '否'} — {reason}")
     print(f"  操作      : {signal['action']}")
     if in_market:
         print(f"  持仓({len(holdings)}只): {', '.join(holdings[:12])}{' ...' if len(holdings)>12 else ''}")
+    if regime == "bear":
+        print(f"  💡 建议   : 空仓资金配置 511010 国债ETF")
     print(f"  已保存    : {out}")
     print("=" * 60)
 

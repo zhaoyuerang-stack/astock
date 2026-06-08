@@ -357,8 +357,27 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocke
     else:
         lines += ["- 失效: (decay_status.json 缺失,跑 decay_monitor 刷新)"]
 
+    # ── 轮动建议 ──
+    rotation = signal.get("rotation", {})
+    regime = rotation.get("current_regime", signal.get("regime", ""))
+    if regime:
+        regime_icon = "🟢 BULL" if regime == "bull" else "🔴 BEAR"
+        lines += [
+            "", "## 🔄 Regime 轮动", "",
+            f"- 当前 Regime: **{regime_icon}** (shifted dist: {signal.get('regime_dist', 0):+.2%})",
+        ]
+        if regime == "bear":
+            lines += [
+                f"- 💡 **建议**: 空仓资金配置 **{rotation.get('bond_code', '511010')} {rotation.get('bond_name', '国债ETF')}**",
+                f"- 买入方式: 和买股票一样, 代码 {rotation.get('bond_code', '511010')}, 股票账户直接交易",
+                "- 切换回 BULL 时卖出债券, 买回 illiq 股票",
+            ]
+        else:
+            lines += ["- 全仓 illiquidity 股票 (当前策略)", ""]
+        lines += [""]
+
     lines += [
-        "", "## 📖 卖出规则(系统自动执行)", "",
+        "## 📖 卖出规则(系统自动执行)", "",
         "- 择时转空(小盘指数跌破 MA16)→ 次日开盘**全部清仓**",
         "- 调仓日(每 20 交易日)→ 次日开盘卖掉**掉出 top25** 的、买入新进的",
         "- 无单只止盈止损(截面策略,靠分散+调仓控制风险)",
