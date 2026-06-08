@@ -266,6 +266,36 @@ small_nav 5 实验全失败,本质是数学定理:**dist 是 small_nav 对 timin
 - price/hk_daily (111 只 × 8 年) — **HK 港股完全没用,corr 0.25 真低**,需更好 HK 因子工程
 - price/monthly, weekly — 不知用没用
 
+### 验证纪律 — 任何"建议使用"前必须 OOS 三关 (2026-06-08 永久记忆)
+
+**触发条件:** 任何策略/配置/参数被推荐入 LIVE/SHADOW/生产前 (含"切换默认", "推荐配置", "新组合").
+
+**必须三关 (in-sample 漂亮 ≠ 可投资):**
+1. **Walk-Forward 参数稳健性** — 在搜索网格上做 WF, 看选出的参数 OOS 是否仍是最优, 或邻近参数 OOS 表现是否一致 (plateau ≠ spike).
+2. **分段稳定性** — 按年/regime 切分独立测, 看哪些时段亏哪些时段赚, 是否依赖单一极端年.
+3. **极端事件检查** — 在已知 stress 期 (2008/2015/2018/2022 等 A 股大跌) 看策略真实表现, 不能只看全样本平滑曲线.
+
+**反例 (今天踩的坑):**
+- 2026-06-07 推荐 ETF 配置 35/35/15/15, grid search 在全样本上选的最优
+- 国债 MA60 是先验选的, 没在 ETF universe 做 WF
+- 未分段验证 → 不知道是否依赖某些特殊年份
+- 用户即时拦住要求验证 → 才发现可能 in-sample 调优
+
+**反例 (历史):**
+- v1.0 夏普 2.06 (含幸存者偏差水分)
+- v2.2 PureTrend tw=2 IS Sharpe 4.25-4.96, shift(1) 修复后 2.2%
+- MA16 grid 测试 plateau 不是 spike (这是正面例子 — 做了所以稳健)
+
+**强制流程 (任何 SHADOW/LIVE 推荐前):**
+```
+1. 报告 in-sample 结果
+2. 主动声明: "未经 OOS 三关验证, 直接切 LIVE 是冒险"
+3. 给出三关验证 plan
+4. 三关全过才能 SHADOW; SHADOW 30 日不出问题才 LIVE
+```
+
+**例外:** 仅当用户明确说"先 SHADOW 跟踪, 不切 LIVE", 且 SHADOW 期内会持续累计真实数据 — 才可跳过 walk-forward (因为 SHADOW 期本身就是 OOS 验证).
+
 ### 执行优化 — fill_mode 切换 close 实证 Sharpe +0.18 / ann +5.3pp (2026-06-07 Task 1.2)
 
 LESSONS 早已写过 "T+1 开盘执行让 2024-2025 年化 45.1%→23.7%, 差 21.4pp"。Task 1.2 audit 实证:

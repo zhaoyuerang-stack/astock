@@ -12,6 +12,7 @@
 唯一变化点是 factor 公式。
 """
 from functools import lru_cache
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -84,6 +85,28 @@ def _run_with_factor(
     return result.returns.dropna()
 
 
+# ────────────────────────── Cross-asset ETF runners ──────────────────────────
+
+_ETF_DIR = (Path(__file__).resolve().parent.parent
+            / "data_lake" / "cross_asset" / "etf")
+
+
+@lru_cache(maxsize=8)
+def _load_etf_close(code: str) -> pd.Series:
+    fp = _ETF_DIR / f"{code}.parquet"
+    df = pd.read_parquet(fp)
+    df["date"] = pd.to_datetime(df["date"])
+    return df.set_index("date").sort_index()["close"]
+
+
+def _run_etf_trend(code: str, ma: int = 60, start: str = "2018-01-01") -> pd.Series:
+    """ETF MA-N 趋势策略: close > MA → 持仓, 否则空仓. leverage 1.0x."""
+    close = _load_etf_close(code).loc[start:]
+    ma_line = close.rolling(ma).mean()
+    in_mkt = (close > ma_line).shift(1, fill_value=False).astype(float)
+    return (close.pct_change(fill_method=None).fillna(0) * in_mkt).dropna()
+
+
 # ────────────────────────── Public LIVE runners ──────────────────────────
 
 # 2026-06-07 引入 status 字段：
@@ -128,6 +151,20 @@ LIVE_STRATEGIES = {
             _f_size_low_vol, start=start,
             family="size-low-vol", version="v1.0",
         ),
+    },
+    "gov_bond_etf_511010.MA60": {
+        "desc": "国债 ETF 511010 + MA60 趋势 + 1.0x (跨资产, 三关全过 2026-06-08 入 SHADOW)",
+        "status": "SHADOW",
+        "shadow_since": "2026-06-08",
+        "shadow_reason": "三关验证全过 (WF MA10-60 plateau, 9/9 年 sh 改善, 5 个极端期防御)。SHADOW 30 日观察实盘后决定 weight",
+        "marginal_sharpe": +0.65,    # 实测加入 baseline 组合 Δsh +0.65 (Phase 2.2 audit)
+        "validation": {
+            "wf_oos_positive_years": "6/6",
+            "wf_avg_sh": 2.19,
+            "stress_period_defense": "5/5",
+            "corr_to_a_stocks": -0.09,
+        },
+        "fn": lambda start: _run_etf_trend("511010", ma=60, start=start),
     },
     "size-earnings.v1.0": {
         "desc": "size60 + NPY blend λ=0.5 + PT-MA16 × VolTarget(25%) + Lev1.10x (2026-06-07 转 SHADOW)",
