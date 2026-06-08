@@ -597,6 +597,30 @@ HIGH PRIORITY — 默认被忽略的输出
 
 `scripts/research/asymmetry_retrospective.py` + `scripts/research/experiment_ts_weighting.py` + `scripts/research/experiment_factor_timing_pairing.py` 作可复用资产。
 
+### factor_research vs Personal Alpha — 两套系统对比 (2026-06-08)
+
+Personal Alpha 是同一数据湖的"干净版本"——策略层剥离，只保留数据基础设施+通用回测内核。
+但意外发现它的 `factors/` 框架设计远优于我们的:
+
+**Personal Alpha 的因子表达层 (我们缺少的)**:
+- `Factor` 抽象基类: 延迟计算图, `factor.compute(data)` 统一接口
+- `TransformedFactor`: `.rolling(n).zscore().shift(1)` 链式变换
+- `FactorBlend`: `factor1 + factor2 = FactorBlend`, 静态/IC动态加权
+- `FactorSpace`: axis-based 网格搜索 (比我们工厂的 mutation spec 更通用)
+- `FactorData`: 统一输入容器 (close/volume/amount/raw_close/industry)
+
+**我们有但 Personal Alpha 没有的**:
+- 完整生产链路 (run_daily → paper_trade → Obsidian + launchd)
+- WF 验证 + Regime 引擎 + Composer
+- 不对称性审计 + regime-conditional 评估
+- L0-L3 工厂流水线 + marginal eval
+
+**结论**: Personal Alpha 的因子表达层设计更优雅（延迟计算图 > 散落函数），
+但缺乏验证和生产能力。理想下一步: 把它的 `factors/` 框架搬过来当表达层，
+上面接我们的 Regime 引擎 + Composer + 生产链路。
+
+Personal Alpha 路径: `/Users/kiki/Personal Alpha`
+
 ## 关键决策
 - **文档治理**(2026-06):CLAUDE.md 精简(操作宪法)/ SPEC.md(架构)/ STATUS.md(进度)/ LESSONS.md(本文件)。别再把设计/进度往 CLAUDE.md 堆。
 - **母策略两层台账**(2026-06):口径降为版本属性;组合 vs 轮换待定(先只立分类)。
