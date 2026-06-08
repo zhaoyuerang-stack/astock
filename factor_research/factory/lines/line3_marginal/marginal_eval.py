@@ -35,6 +35,9 @@ from factors.small_cap import small_cap_timing
 # 合并核心：复用 portfolio.marginal.evaluate
 from portfolio.marginal import evaluate as portfolio_marginal_evaluate
 
+# 不对称性审计
+from factory.analysis.asymmetry_audit import asymmetry_report
+
 from factory.ontology import (
     Decision,
     Experiment,
@@ -281,6 +284,9 @@ def evaluate_candidate(
             else Decision.SHELVE
         )
 
+        # 不对称性审计
+        asym = asymmetry_report(best_ret, market_returns, hyp.name)
+
         result = ExperimentResult(
             metrics={
                 "delta_sharpe": report.delta_sharpe,
@@ -292,6 +298,12 @@ def evaluate_candidate(
                 "bear_improvement": report.bear_improvement,
                 "bear_annual": report.bear_annual,
                 "avg_corr_to_live": report.avg_corr_to_live,
+                # 不对称性指标
+                "asymmetry_score": asym.asymmetry_score,
+                "gain_pain_ratio": asym.gain_pain,
+                "up_down_capture": asym.up_down_capture,
+                "sortino_ratio": asym.sortino,
+                "omega_ratio": asym.omega,
             },
             details={
                 "grade": report.grade,
