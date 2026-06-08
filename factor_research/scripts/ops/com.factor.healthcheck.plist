@@ -8,7 +8,7 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/python3</string>
+        <string>/opt/homebrew/bin/python3</string>
         <string>/Users/kiki/astcok/factor_research/scripts/ops/health_check.py</string>
         <string>--notify</string>
         <string>--obsidian</string>
