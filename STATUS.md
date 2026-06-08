@@ -4,6 +4,12 @@
 
 ## 一句话
 
+**2026-06-07 晚**: 专家审视 6 大盲区 → Phase 1 Quick Wins 双交付:
+  · Task 1.1 **Band 切 LIVE 主决策** (run_daily/paper_trade band_exposure 动态杠杆, Calmar 2.14→2.42 +13%)
+  · Task 1.2 **执行优化 PoC**: paper_trade 默认 fill_mode = 'close', audit 实证 Sharpe +0.18 / ann +5.3pp (5 mode 对照)
+  · Task 1.3 ROADMAP 阶段 5 写入 6 盲区完整路线 (Phase 1-4)
+今日总产出: 6 commits / ~8000 行代码 / 12 个新 LESSONS / 当前组合 Calmar 2.42 LIVE + 执行优化生效。
+
 **2026-06-07**: 建 Strategy Factory 流水线(L0/L1/L2/L3 + regime-aware marginal eval),工厂自家流水线给出独立证据印证"A 股 alpha 单维度";**清理 LIVE 集合:size-low-vol/size-earnings 转 SHADOW**(边际负贡献-0.120/-0.277),组合 Sharpe 实测 1.60→1.89(+18%);MA16 grid 测试确认 plateau 不是 magic number;**Band timing 发现 — 连续 dist 信号代替 binary,Calmar 1.89→2.42 (+28%) Band SHADOW 跟踪中**。
 
 **2026-06-06**: v2.2 偷看退役, 建 workflow 自动化流水线, 三轮探索 45 候选, illiquidity v1.0 成为生产基线, PureTrend MA16 证实为通用最优开关, A 股日频 alpha = 小盘/非流动单维度。

@@ -30,10 +30,17 @@ from app_config.settings import get_settings
 _cost_cfg = get_settings().cost
 
 INIT_CAPITAL = 1_000_000.0
-LEVERAGE = 1.0  # 模拟盘固定 1.0x
+LEVERAGE = 1.0  # 模拟盘固定 1.0x (动态杠杆从 signal.band_exposure 传入)
 BUY_COST = _cost_cfg.buy_cost
 SELL_COST = _cost_cfg.sell_cost
 LOT = 100
+
+# ── 执行成交价模式 (2026-06-07 Task 1.2 audit 实证) ──
+# audit (2024-2025, simplified no-cost): open sh 2.29 → close sh 2.47 (+0.18)
+# 隔夜跳空 9% 显著高开 (>+1%) 是 open 模式损失主因
+# close 模式 = T+1 14:55 收盘价成交 (盘中冲击消化后), 避开高开摩擦
+# 选项: "open" (旧默认) | "close" (新默认) | "ohlc_mid" (10:30 近似) | "vwap_4"
+FILL_PRICE_MODE = os.environ.get("PAPER_FILL_MODE", "close")
 
 SIGNALS = ROOT / "signals"
 PAPER = ROOT / "paper"
@@ -71,6 +78,38 @@ def get_open(code, date):
     return float(o) if pd.notna(o) and o > 0 else None
 
 
+def get_fill_price(code, date, mode=None):
+    """按 FILL_PRICE_MODE 决定 T+1 成交价 (audit 2026-06-07 推荐 'close').
+    mode = "open" | "close" | "ohlc_mid" | "vwap_4"
+    停牌 (当天无数据) 返回 None。
+    """
+    mode = mode or FILL_PRICE_MODE
+    df = _raw(code)
+    if df is None:
+        return None
+    row = df[pd.to_datetime(df["date"]) == pd.Timestamp(date)]
+    if not len(row):
+        return None
+    if mode == "open":
+        v = row.get("raw_open", row.get("raw_close")).iloc[0]
+    elif mode == "close":
+        v = row["raw_close"].iloc[0]
+    elif mode == "ohlc_mid":
+        o, c = row["raw_open"].iloc[0], row["raw_close"].iloc[0]
+        if pd.isna(o) or pd.isna(c):
+            return None
+        v = (o + c) / 2
+    elif mode == "vwap_4":
+        o, h, l, c = (row["raw_open"].iloc[0], row["raw_high"].iloc[0],
+                      row["raw_low"].iloc[0], row["raw_close"].iloc[0])
+        if any(pd.isna(x) for x in [o, h, l, c]):
+            return None
+        v = (o + h + l + c) / 4
+    else:
+        raise ValueError(f"unknown FILL_PRICE_MODE: {mode}")
+    return float(v) if pd.notna(v) and v > 0 else None
+
+
 def get_prev_close(code, date):
     """date 前一交易日不复权收盘——算涨跌停基准。"""
     df = _raw(code)
@@ -90,25 +129,29 @@ def limit_pct(code, name):
 
 
 def buyable_open(code, date, name):
-    """T+1 可买入开盘价:未停牌且非开盘涨停;否则 None(买不进)。"""
-    o = get_open(code, date)
+    """T+1 可买入价 (按 FILL_PRICE_MODE):未停牌且非开盘涨停;否则 None。
+    涨停约束仍按 T+1 开盘价判 (即使 fill_mode = close, 开盘涨停依然买不进)。"""
+    o = get_open(code, date)   # 涨跌停约束用开盘价
     if o is None:
         return None
     pc = get_prev_close(code, date)
     if pc and o >= round(pc * (1 + limit_pct(code, name)), 2) - 1e-6:   # 开盘即涨停(涨停价按分四舍五入)
         return None
+    # 实际成交价按 FILL_PRICE_MODE
+    return get_fill_price(code, date)
     return o
 
 
 def sellable_open(code, date, name):
-    """T+1 可卖出开盘价:未停牌且非开盘跌停;否则 None(卖不出)。"""
-    o = get_open(code, date)
+    """T+1 可卖出价 (按 FILL_PRICE_MODE):未停牌且非开盘跌停;否则 None。"""
+    o = get_open(code, date)   # 涨跌停约束用开盘价
     if o is None:
         return None
     pc = get_prev_close(code, date)
     if pc and o <= round(pc * (1 - limit_pct(code, name)), 2) + 1e-6:   # 开盘即跌停(跌停价按分四舍五入)
         return None
-    return o
+    # 实际成交价按 FILL_PRICE_MODE
+    return get_fill_price(code, date)
 
 
 # ── account / 流水 IO ──
@@ -159,7 +202,10 @@ def upsert_nav(date, nav, cash, pos_value, ret):
 
 
 # ── T+1 开盘成交:把持仓调到 target ──
-def execute_to_target(acc, date, target, top_n, names, trades, blocked):
+def execute_to_target(acc, date, target, top_n, names, trades, blocked, leverage=None):
+    """leverage: 动态杠杆 (从 signal 的 band_exposure 传入). 默认 LEVERAGE 常量 (1.0)."""
+    if leverage is None:
+        leverage = LEVERAGE
     target = set(target)
     # 1. 卖出:持仓中不在 target 的(掉出名单),用 date 开盘价
     for code in list(acc["positions"]):
@@ -177,7 +223,7 @@ def execute_to_target(acc, date, target, top_n, names, trades, blocked):
                        round(price, 3), round(notional, 2), round(cost, 2), round(acc["cash"], 2)])
     # 2. 买入:target 中未持有的(新进名单),等权 total_equity/top_n,用 date 开盘价
     pos_value = sum(p["shares"] * (get_close(c, date) or p["avg_cost"]) for c, p in acc["positions"].items())
-    budget_each = (acc["cash"] + pos_value) * LEVERAGE / top_n
+    budget_each = (acc["cash"] + pos_value) * leverage / top_n
     for code in target:
         if code in acc["positions"]:
             continue
@@ -390,12 +436,17 @@ def main():
         pend = acc.get("pending")
         if pend:
             exec_from = pend["signal_date"]
-            execute_to_target(acc, date, pend["target"], signal["top_n"], names, trades, blocked)
+            # 用 pending 记录的 leverage (band_exposure 动态杠杆) 执行;fallback 1.0
+            execute_to_target(acc, date, pend["target"], signal["top_n"], names,
+                              trades, blocked, leverage=pend.get("leverage", LEVERAGE))
             if trades:
                 append_trades(trades)
         # 2. 记录新 pending:本信号 → 下个交易日开盘执行
+        # leverage = band_exposure (动态),空仓时 0;fallback 旧字段或常量
         target = signal["holdings"] if signal["in_market"] else []
-        acc["pending"] = {"signal_date": date, "target": target}
+        pend_leverage = float(signal.get("band_exposure",
+                                          signal.get("leverage", LEVERAGE))) if target else 0.0
+        acc["pending"] = {"signal_date": date, "target": target, "leverage": pend_leverage}
         acc["last_date"] = date
 
     nav, pos_value, detail = valuation(acc, date)

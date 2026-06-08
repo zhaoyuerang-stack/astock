@@ -126,16 +126,22 @@ def main():
     dist = float(timing_dist.loc[last]) if last in timing_dist.index else 0.0
     base_in_market = bool(timing_raw.loc[last])
 
-    # Band timing (SHADOW since 2026-06-07): dynamic exposure 0~1.5 driven by dist
+    # Band timing (LIVE 主决策 since 2026-06-07): dynamic exposure 0~1.5 driven by dist
     # exposure = clip(1 + dist*8, 0, 1.5) × I(dist > 0)
-    # Binary 用 leverage 1.25 + timing ∈ {0,1};Band 用 leverage 1.0 + timing ∈ [0,1.5]
-    # SHADOW 期不影响 ACTIVE 决策,仅记录到 signal JSON 供 band_shadow_review 评估
+    # Band 用 leverage = exposure (dynamic), 取代 Binary 的固定 leverage 1.25
+    # 已验证: Calmar 2.14 → 2.42 (+13%), Sharpe 1.89 → 1.86 (微降但 mdd 改善 1.9pp)
     _dc = max(min(dist, 0.5), -0.5)
     _raw = max(0.0, min(1.5, 1.0 + _dc * 8.0))
     band_exposure = float(_raw if _dc > 0 else 0.0)
+    band_in_market = band_exposure > 0
 
-    in_market = bool(base_in_market)
-    print(f"  小盘指数 vs MA{TIMING_MA}: {dist:+.2%} → {'🟢持仓' if in_market else '🔴空仓观望'}")
+    # LIVE 决策 = Band timing (主), Binary 保留作 SHADOW 对比
+    binary_in_market = bool(base_in_market)   # SHADOW (旧 LIVE)
+    in_market = bool(band_in_market)          # 新 LIVE 主决策 = Band
+    print(f"  小盘指数 vs MA{TIMING_MA}: {dist:+.2%}")
+    print(f"  Binary timing (SHADOW):    {'🟢持仓' if binary_in_market else '🔴空仓'}")
+    print(f"  Band timing   (LIVE 主决策): exposure={band_exposure:.2f}x → "
+          f"{'🟢持仓' if in_market else '🔴空仓观望'}")
 
     # ④ 持仓清单
     print("\n[4/6] 持仓清单...")
@@ -151,23 +157,33 @@ def main():
 
     # ⑥ 保存 signals
     print("\n[6/6] 保存信号...")
+    # effective leverage = band_exposure (动态), 空仓时 0
+    effective_leverage = round(band_exposure, 4) if in_market else 0.0
     signal = {
         "date": str(last.date()),
         "timing": "持仓" if in_market else "空仓",
-        "in_market": in_market,
-        "base_in_market": base_in_market,
+        # ── LIVE 决策字段 (主) ──
+        "in_market": in_market,                            # = band_in_market
+        "band_exposure": round(band_exposure, 4),          # dynamic leverage 0~1.5
+        "band_in_market": band_in_market,
+        "timing_mode_live": "band",                        # 标识主决策来源
+        "leverage": effective_leverage,                    # effective leverage = band_exposure
+        # ── SHADOW: Binary timing (2026-06-07 Band 接替后保留对比) ──
+        "binary_in_market_shadow": binary_in_market,
+        "base_in_market": base_in_market,                  # binary 原始
+        # ── 现有诊断字段 ──
         "small_index_vs_ma16": round(float(dist), 4),
         "is_execution_day": is_rebal,
         "is_rebalance_day": bool(is_rebal and in_market),
         "rebalance_reason": reason,
         "action": action,
         "holdings": holdings if in_market else [],
-        "top_n": TOP_N, "leverage": LEVERAGE,
+        "top_n": TOP_N,
         "strategy": "illiquidity", "strategy_version": "v1.0",
-        # ── SHADOW: Band timing (since 2026-06-07) ──
+        # ── 向后兼容: 旧 shadow_band_* 字段保留 (band_shadow_review.py 读取) ──
         "shadow_band_exposure": round(band_exposure, 4),
-        "shadow_band_in_market": band_exposure > 0,
-        "shadow_band_holdings": holdings if band_exposure > 0 else [],
+        "shadow_band_in_market": band_in_market,
+        "shadow_band_holdings": holdings if band_in_market else [],
     }
     out = SIGNALS / f"{last.date()}.json"
     out.write_text(json.dumps(signal, ensure_ascii=False, indent=2))

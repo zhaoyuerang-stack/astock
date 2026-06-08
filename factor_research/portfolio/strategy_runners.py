@@ -99,8 +99,9 @@ def _run_with_factor(
 # 组合实测改善：2 ACTIVE risk_parity Sharpe 1.89 vs 4 LIVE 等权 1.60 (+18%)
 LIVE_STRATEGIES = {
     "small-cap-size.v2.0": {
-        "desc": "size60 + PT-MA16 + Lev1.25x",
+        "desc": "size60 + PT-MA16 Band 1.0x (timing_mode=band 2026-06-07)",
         "status": "ACTIVE",
+        "timing_mode": "band",      # 主决策: Band timing (dynamic 0~1.5x)
         "marginal_sharpe": +0.104,
         "fn": lambda start: _run_with_factor(
             _f_small_cap, start=start,
@@ -108,8 +109,9 @@ LIVE_STRATEGIES = {
         ),
     },
     "illiquidity.v1.0": {
-        "desc": "Amihud illiq20 + PT-MA16 + Lev1.25x (生产基线)",
+        "desc": "Amihud illiq20 + PT-MA16 Band 1.0x (生产基线, timing_mode=band 2026-06-07)",
         "status": "ACTIVE",
+        "timing_mode": "band",      # 主决策: Band timing (dynamic 0~1.5x)
         "marginal_sharpe": None,    # baseline reference
         "fn": lambda start: _run_with_factor(
             _f_illiquidity, start=start,
