@@ -284,12 +284,16 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocke
     ret = nav / acc["init_capital"] - 1
     buys = [t for t in trades if t[3] == "BUY"]
     sells = [t for t in trades if t[3] == "SELL"]
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    is_fresh = (date == today_str)
+    title = f"# A股 模拟盘 · {date}" + ("" if is_fresh else f" (生成于 {today_str})")
+    stale_note = "" if is_fresh else f"\n> ⚠️ 信号日期 {date} 非今日({today_str})——最新可用数据为 {date} 收盘, 等待下次数据更新.\n"
     lines = [
-        f"# A股 模拟盘 · {date}",
+        title,
         "",
         f"> 自动生成 {datetime.now():%Y-%m-%d %H:%M} | illiquidity v1.0 | 本金 {fmt(acc['init_capital'])} | "
         f"杠杆 {LEVERAGE}x | 真实盘 T+1 开盘成交",
-        "",
+        stale_note,
         "## 📋 今日开盘成交" + (f"(执行 {exec_from} 信号)" if exec_from else ""),
         "",
     ]
