@@ -26,8 +26,10 @@ from core.backtest import (
     small_cap_timing,
     build_rebalance_weights,
 )
-from factors.utils import safe_zscore, mad_clip
 from lake.validator import DataValidator
+from factors.alpha import transforms  # register zscore/mad_clip/shift
+from factors.alpha.base import FactorData
+from factors.alpha.builtins.illiq import SizeProxy
 from app_config.settings import get_settings
 
 _cfg = get_settings().strategy
@@ -41,7 +43,6 @@ TOP_N = _cfg.top_n
 TIMING_MA = _cfg.timing_ma
 REBAL_DAYS = _cfg.rebalance_days
 LEVERAGE = _cfg.leverage
-ILLIQ_WINDOW = 20
 START = get_settings().data.warmup_start
 
 
@@ -118,10 +119,10 @@ def main():
 
     # ③ 择时信号 + illiquidity 因子
     print("\n[3/6] 生成择时信号 (illiquidity + PureTrend MA16)...")
-    # illiquidity factor: Amihud |ret|/amount, rolling 20d
-    ret_abs = close.pct_change(fill_method=None).abs().replace([float('inf'), float('-inf')], float('nan'))
-    illiq_raw = (ret_abs / (amount + 1)).rolling(ILLIQ_WINDOW, min_periods=10).mean()
-    factor = safe_zscore(mad_clip(illiq_raw))
+    # SizeProxy: -ln(avg_amount_60d), zscore, MAD clip, shift(1) 防未来函数
+    data = FactorData(close=close, volume=volume, amount=amount)
+    factor_expr = SizeProxy(window=60).mad_clip(5).zscore().shift(1)
+    factor = factor_expr.compute(data)
 
     # PureTrend MA16 timing (shared with v2.0, proven)
     timing_raw, small_nav, timing_dist = small_cap_timing(close, amount, TIMING_MA)
