@@ -26,7 +26,7 @@ sys.path.insert(0, str(ROOT))
 LOG_DIR = ROOT / "logs/daily_update"
 REPORT_DIR = ROOT / "reports/ops/daily_update"
 LOCK_PATH = LOG_DIR / ".scheduled_daily_update.lock"
-PYTHON = "/usr/bin/python3"
+PYTHON = "/opt/homebrew/bin/python3"
 SAMPLE_CODES = ["600519", "000001", "300750", "600036", "601398"]
 CALENDAR_ANCHORS = ["600519", "601398", "000001", "600036", "600000", "601988"]
 CHINA_TZ = ZoneInfo("Asia/Shanghai")
