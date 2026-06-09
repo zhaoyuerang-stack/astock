@@ -106,7 +106,21 @@ class Fetcher:
         skip_existing=True 时跳过已存在文件（断点续传）。
         返回统计字典 + 失败清单。
         """
-        todo = [k for k in keys if not (skip_existing and self.out_path(k).exists())]
+        todo = []
+        for k in keys:
+            out = self.out_path(k)
+            if skip_existing and out.exists():
+                # 检查文件是否包含最新数据(文件日期 < 2天前 → 可能过期)
+                try:
+                    import pandas as pd
+                    df = pd.read_parquet(out)
+                    if 'date' in df.columns and len(df) > 0:
+                        last = pd.Timestamp(df['date'].max())
+                        if (pd.Timestamp.now() - last).days <= 2:
+                            continue  # 数据新鲜, 跳过
+                except Exception:
+                    pass
+            todo.append(k)
         cached = len(keys) - len(todo)
         stats = {"ok": 0, "empty": 0, "error": 0, "cached": cached}
         failures = []
