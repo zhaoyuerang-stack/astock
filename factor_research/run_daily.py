@@ -4,8 +4,8 @@
 流程：①增量更新数据 → ②质量校验 → ③生成择时信号 → ④持仓清单
       → ⑤调仓判断(距上次≥20交易日) → ⑥保存 signals/YYYY-MM-DD.json
 
-策略: illiquidity v1.0 (Amihud 非流动性因子 + PureTrend MA16 择时)
-      18候选并行探索唯一全流程通过者, WF +35.6%, 真实盘 +20.0%
+策略: illiquidity v3.0 (AmihudIlliq |ret|/amount + PureTrend MA16 Band 择时 + 511010 国债ETF 轮动)
+      已全区间压力测试(2010-2026): +37.8%/-16.6%/1.99
 
 用法：python3 run_daily.py            # 完整流程(含联网更新数据)
       python3 run_daily.py --no-update # 跳过数据更新，仅用现有数据出信号
@@ -29,7 +29,7 @@ from core.backtest import (
 from lake.validator import DataValidator
 from factors.alpha import transforms  # register zscore/mad_clip/shift
 from factors.alpha.base import FactorData
-from factors.alpha.builtins.illiq import SizeProxy
+from factors.alpha.builtins.illiq import AmihudIlliq
 from app_config.settings import get_settings
 
 _cfg = get_settings().strategy
@@ -92,7 +92,7 @@ def main():
     args = ap.parse_args()
 
     print("=" * 60)
-    print(f"  每日运行  {datetime.now(CHINA_TZ).strftime('%Y-%m-%d %H:%M')} CST  —  illiquidity v1.0")
+    print(f"  每日运行  {datetime.now(CHINA_TZ).strftime('%Y-%m-%d %H:%M')} CST  —  illiquidity v3.0")
     print("=" * 60)
 
     # ① 增量更新数据
@@ -119,9 +119,9 @@ def main():
 
     # ③ 择时信号 + illiquidity 因子
     print("\n[3/6] 生成择时信号 (illiquidity + PureTrend MA16)...")
-    # SizeProxy: -ln(avg_amount_60d), zscore, MAD clip, shift(1) 防未来函数
+    # AmihudIlliq: |ret|/amount 20d, zscore, MAD clip, shift(1) 防未来函数
     data = FactorData(close=close, volume=volume, amount=amount)
-    factor_expr = SizeProxy(window=60).mad_clip(5).zscore().shift(1)
+    factor_expr = AmihudIlliq(window=20).mad_clip(5).zscore().shift(1)
     factor = factor_expr.compute(data)
 
     # PureTrend MA16 timing (shared with v2.0, proven)
@@ -207,7 +207,7 @@ def main():
         "action": action,
         "holdings": holdings if in_market else [],
         "top_n": TOP_N,
-        "strategy": "illiquidity", "strategy_version": "v1.0",
+        "strategy": "illiquidity", "strategy_version": "v3.0",
         # ── 向后兼容: 旧 shadow_band_* 字段保留 ──
         "shadow_band_exposure": round(band_exposure, 4),
         "shadow_band_in_market": band_in_market,
