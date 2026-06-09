@@ -373,18 +373,25 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocke
     regime = rotation.get("current_regime", signal.get("regime", ""))
     if regime:
         regime_icon = "🟢 BULL" if regime == "bull" else "🔴 BEAR"
+        dist_val = signal.get('regime_dist', 0)
         lines += [
             "", "## 🔄 Regime 轮动", "",
-            f"- 当前 Regime: **{regime_icon}** (shifted dist: {signal.get('regime_dist', 0):+.2%})",
+            f"- 当前 Regime: **{regime_icon}** (偏离度: {dist_val:+.2%})",
+            f"  > 偏离度=小盘指数相对MA16的距离. >0=BULL(趋势向上), ≤0=BEAR(趋势向下).",
+            f"  > 数据来源: 最新交易日 {signal['date']} 收盘价, T日只用T-1日数据(shifted,防未来函数).",
         ]
         if regime == "bear":
             lines += [
                 f"- 💡 **建议**: 空仓资金配置 **{rotation.get('bond_code', '511010')} {rotation.get('bond_name', '国债ETF')}**",
+                f"  > 回测验证: BEAR期间债券年化+2.7% vs 现金0%, 10年累计多赚592万(AmihudIlliq).",
                 f"- 买入方式: 和买股票一样, 代码 {rotation.get('bond_code', '511010')}, 股票账户直接交易",
                 "- 切换回 BULL 时卖出债券, 买回 illiq 股票",
             ]
         else:
-            lines += ["- 全仓 illiquidity 股票 (当前策略)", ""]
+            lines += [
+                "- 全仓 illiquidity 股票 (当前策略)",
+                "  > BULL期间全仓小盘非流动性股票, Band动态杠杆0~1.5x.",
+            ]
         lines += [""]
 
     lines += [
