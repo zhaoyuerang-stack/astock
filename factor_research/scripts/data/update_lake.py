@@ -73,7 +73,7 @@ def update_prices():
     for i, fp in enumerate(files):
         df = pd.read_parquet(fp)
         last = df["date"].max()
-        if last >= today - pd.Timedelta(days=1):
+        if last >= today:
             skipped += 1
             continue
         f.start = (last + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
