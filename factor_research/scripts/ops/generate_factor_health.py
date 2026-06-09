@@ -7,7 +7,8 @@
   /opt/homebrew/bin/python3 scripts/ops/generate_factor_health.py
 """
 import warnings; warnings.filterwarnings('ignore')
-import os, json; os.chdir(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+import os, json, sys; os.chdir(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(0, os.getcwd())
 from pathlib import Path
 import numpy as np; import pandas as pd
 from core.backtest import load_price_panels
