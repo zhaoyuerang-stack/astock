@@ -288,12 +288,13 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocke
     sells = [t for t in trades if t[3] == "SELL"]
     today_str = datetime.now(CHINA_TZ).strftime("%Y-%m-%d")
     is_fresh = (date == today_str)
+    strategy_ver = signal.get("strategy_version", "v1.0")
     title = f"# A股 模拟盘 · {date}" + ("" if is_fresh else f" (生成于 {today_str})")
     stale_note = "" if is_fresh else f"\n> ⚠️ 信号日期 {date} 非今日({today_str})——最新可用数据为 {date} 收盘, 等待下次数据更新.\n"
     lines = [
         title,
         "",
-        f"> 自动生成 {datetime.now(CHINA_TZ):%Y-%m-%d %H:%M} CST | illiquidity v1.0 | 本金 {fmt(acc['init_capital'])} | "
+        f"> 自动生成 {datetime.now(CHINA_TZ):%Y-%m-%d %H:%M} CST | illiquidity {strategy_ver} | 本金 {fmt(acc['init_capital'])} | "
         f"杠杆 {LEVERAGE}x | 真实盘 T+1 开盘成交",
         stale_note,
         "## 📋 今日开盘成交" + (f"(执行 {exec_from} 信号)" if exec_from else ""),
@@ -354,10 +355,14 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocke
 
     dist = signal.get("small_index_vs_ma16", 0)
     lines += ["## 📈 择时 & 失效监控", "",
-              f"- 择时: {'🟢 持仓' if signal['in_market'] else '🔴 空仓'}  (小盘指数 vs MA16: {dist:+.2%})"]
+              f"- 择时: {'🟢 持仓' if signal['in_market'] else '🔴 空仓'}  (小盘指数 vs MA16: {dist:+.2%})",
+              f"  > 小盘指数=成交额后50%股票的等权平均净值. MA16=其16日均线.",
+              f"  > 站上MA16=小盘趋势向好→持仓; 跌破=小盘走弱→空仓."]
     if decay:
-        lines += [f"- 失效: {decay['status']}  (IC {decay['ic']} vs 历史 {decay['ic_hist']} | "
-                  f"小盘动量 {decay['rel_mom']:+.1%} | 滚动夏普 {decay['roll_sharpe']})  更新 {decay.get('updated')}"]
+        lines += [f"- 失效: {decay['status']}  更新 {decay.get('updated')}",
+                  f"  > Rank IC={decay['ic']}(历史均值{decay['ic_hist']}): 因子选股排名和次日收益的相关性,>0=有效,<0=失效.",
+                  f"  > 小盘动量={decay['rel_mom']:+.1%}: 小盘相对于全市场的超额走势,正值=小盘跑赢.",
+                  f"  > 滚动夏普={decay['roll_sharpe']}: 近12个月策略风险调整收益,>1=良好,<0.5=预警."]
         if decay.get("msgs"):
             lines += [f"  - 触发: {', '.join(decay['msgs'])}"]
     else:
@@ -391,7 +396,7 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocke
         "- **真实盘成交**:T 日盘后出信号 → **T+1 开盘价**成交(你收盘后才看到信号,只能次日买)",
         "- **停牌/涨跌停**:停牌不可买卖;一字涨停买不进、一字跌停卖不出(见上「未成交」)",
         f"- 成交/估值用**不复权价**(daily_raw);成本 买 {BUY_COST:.3%} / 卖 {SELL_COST:.3%}",
-        f"- 杠杆 {LEVERAGE}x;容量:本金 {fmt(acc['init_capital'])} ≪ 策略容量 ~2000万",
+        f"- 杠杆 {LEVERAGE}x;容量:本金 {fmt(acc['init_capital'])} ≪ 策略容量 ~2700万 (AmihudIlliq v3.0)",
         "- 回测口径(收盘撮合)另算——回测归回测,本卡是真实买卖逻辑",
     ]
     return "\n".join(lines) + "\n"
