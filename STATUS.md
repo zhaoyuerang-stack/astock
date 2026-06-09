@@ -1,17 +1,19 @@
 # STATUS — 当前进度
 
-> 更新:2026-06-08。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
+> 更新:2026-06-09。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
 
-**2026-06-08**: 两日密集探索→架构重构(P1-P4)。
-  · **Band LIVE + HMM 移除**: 回撤方差-19%, 极端回撤-44%, 年化+5.5pp
-  · **国债 ETF 轮动发现**: 熊市不躺现金→换债券, 100万→1279万 vs 基线 806万(+59%)
-  · **Composer 编排自动化**: 自动搜索最优 regime 组合, 输出 JSON 策略定义
-  · **完整研究报告**: `reports/research/illiquidity_strategy_report.md` (公式+WF+IC+复现清单)
-  · **策略哲学确立**: 不对称收益框架, 正收益端厚度 > 负收益端厚度
+**2026-06-09**: 因子升级 v3.0 (SizeProxy→AmihudIlliq) + 生产链路修复。
+  · **AmihudIlliq v3.0 LIVE**: |ret|/amount 公式, 全区间 +37.8%/-16.6%/1.99
+  · **Alpha 框架融合**: Personal Alpha 因子框架搬入(factors/alpha/)
+  · **DSR+PBO 接入工厂**: 统计验证层, 52候选最优SR=1.93显著(p≈0)
+  · **生产环境修复**: launchd Python路径/时区/数据freshness三修
+  · **v3.0 完整报告**: `reports/research/amihud_rotation_strategy_report.md`
 
-**2026-06-07 晚**: 专家审视 6 大盲区 → Phase 1 Quick Wins 双交付: Band 切 LIVE / 执行优化 PoC.
+**2026-06-08**: Band LIVE + HMM移除 + 债券轮动 + Composer + 不对称性审计。
+**2026-06-07**: 专家审视 6 大盲区, Band 切 LIVE。
+**2026-06-06**: v2.2 偷看退役, illiquidity v1.0 基线。
 
 **2026-06-06**: v2.2 偷看退役, illiquidity v1.0 基线, A 股 alpha = 小盘/非流动单维度。
 
@@ -24,9 +26,11 @@
 | **Regime 引擎** | ✅ | engine/regime.py 多维分类(trend/vol/liquidity/breadth) |
 | **不对称性审计** | ✅ | factory/analysis/asymmetry_audit.py (gain/pain+up/down+sortino) |
 | **Composer** | ✅ | engine/strategy_composer.py regime编排自动化搜索 |
-| 策略发现 | ✅ | workflow/ Phase1-4 + Leg Factory MVP |
-| 策略库 | ✅ | illiquidity v1.0 生产基线 + 债券轮动(v2.0候选) |
-| 生产入口 | ✅ | run_daily.py → Band LIVE (动态0~1.5x), HMM已移除 |
+| **Alpha 因子框架** | ✅ | factors/alpha/ (Base+Blend+Search+Transforms) |
+| **DSR+PBO 验证** | ✅ | factory/analysis/wf_validator.py |
+| 策略发现 | ✅ | workflow/ Phase1-4 + FactorSpace 搜索 |
+| 策略库 | ✅ | illiquidity v3.0 (AmihudIlliq) LIVE + 债券轮动候选 |
+| 生产入口 | ✅ | run_daily.py → AmihudIlliq + Band LIVE + regime轮动信号 |
 | 模拟盘 | ✅ | paper_trade.py → illiquidity v1.0 + band_exposure |
 | 失效监控 | ✅ | decay_monitor.py → illiquidity |
 | 健康检查 | ✅ | health_check.py + 桌面通知 + Obsidian |
@@ -77,23 +81,26 @@
 
 ### LIVE — 生产运行
 ```
-■ illiquidity v1.0 (Band LIVE)    +25.0%  -17.7%  1.50  当前生产
+■ illiquidity v3.0 (AmihudIlliq + Band LIVE)     +37.8%  -16.6%  1.99  当前生产 (全区间2010-2026)
+  因子: AmihudIlliq |ret|/amount (window=20)
   择时: Band exposure 0~1.5x (PureTrend MA16)
   权重: top-25 等权, 20日调仓
+  轮动: BEAR→511010国债ETF (Obsidian信号含建议)
+  容量: ~2700万 (中等估计)
 ```
 
-### CANDIDATE — 待验证上线
+### CANDIDATE — 待 P5 自动化
 ```
-■ illiquidity + 国债轮动 v2.0     +25.7%  -12.5%  1.90  Composer最优
-  bull→illiq_w60全仓, bear→511010国债ETF
-  WF 7/8胜, 100万→1279万(2016-2025)
-  待: P5生产集成 / 真实债券交易测试
+■ AmihudIlliq + 国债轮动         +29.0%  -11.4%  1.73  2016-2025
+  bull→AmihudIlliq全仓, bear→511010国债ETF
+  待: 债券自动交易/paper_trade ETF支持
 ```
 
 ### RETIRED
 ```
-■ illiquidity + HMM             已移除  年化-5.5pp, 回撤无改善
-■ size-low-vol/size-earnings    SHADOW  边际负贡献
+■ SizeProxy v2.1                因子公式已升级, 终值低74%
+■ illiquidity + HMM             年化-5.5pp, 回撤无改善
+■ size-low-vol/size-earnings    边际负贡献
 ```
 
 ## workflow/ 发现流水线
@@ -125,15 +132,26 @@ python3 apps/portfolio_cli.py --analyze # 组合分析
 - **信息→行动断层**(2026-06-07): 知道组合负贡献一周以上没动 LIVE。组合管理纪律=边际负→立即 SHADOW，不删除但停止吸纳。
 - **MA16 = plateau 不是 spike**(2026-06-07): MA10-20 都 work，MA16 不是 magic number。轻度 in-sample tuning，不是 v2.2 那样的 bug。
 
-## 关键产出 (2026-06-08)
+## 关键产出
 
-### 架构重构
-- `engine/regime.py` — Regime引擎 (多维分类: trend/vol/liquidity/breadth)
-- `engine/strategy_composer.py` — 策略编排器 (regime组合自动化搜索)
-- `factory/analysis/asymmetry_audit.py` — 不对称性审计 (gain/pain+up/down+sortino)
+### 架构重构 (P1-P4)
+- `engine/regime.py` — Regime引擎
+- `engine/strategy_composer.py` — Composer编排自动化
+- `factory/analysis/asymmetry_audit.py` — 不对称性审计
+- `factory/analysis/wf_validator.py` — DSR+PBO验证层
+- `factors/alpha/` — Personal Alpha因子框架(base/blend/search/transforms/builtins)
+- `core/analysis/walk_forward.py` — Purged WF + DSR + PBO
 
 ### 研究报告
-- `reports/research/illiquidity_strategy_report.md` — 完整策略报告 (公式+WF+IC+复现清单)
+- `reports/research/amihud_rotation_strategy_report.md` — **v3.0 完整策略报告**
+- `reports/research/illiquidity_strategy_report.md` — v2.1 策略报告
+
+### 生产链路
+- `run_daily.py` — v3.0 LIVE (AmihudIlliq + Band + regime轮动信号)
+- `scripts/ops/paper_trade.py` — Obsidian操作卡片(含regime轮动建议)
+- `scripts/ops/prod_health_check.py` — 生产环境全链路健康检查
+- `scripts/ops/scheduled_daily_update.py` — launchd定时入口
+- `lake/base.py` — 数据freshness检查修复
 
 ### 实验脚本
 - `scripts/research/mvp_leg_factory.py` — Leg Factory MVP (28腿)
@@ -146,7 +164,3 @@ python3 apps/portfolio_cli.py --analyze # 组合分析
 - `scripts/research/factor_eval_framework.py` — 因子评价框架
 - `scripts/research/experiment_factor_timing_pairing.py` — 因子×择时配对
 - `scripts/research/asymmetry_retrospective.py` — 不对称性回顾审计
-
-### 生产改动
-- `run_daily.py` — Band LIVE + HMM移除
-- `app_config/settings.py` — HMM配置清理
