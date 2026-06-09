@@ -1,10 +1,10 @@
-"""illiquidity v1.0 失效监控: 3 个定量信号 + 状态判定。
-① illiquidity 因子滚动 RankIC (转负 = 非流动性溢价失效)
+"""illiquidity v3.0 失效监控: 3 个定量信号 + 状态判定。
+① AmihudIlliq 因子滚动 RankIC (转负 = 非流动性溢价失效)
 ② 小盘相对全市场动量 (PureTrend 择时的命门)
-③ illiquidity 策略滚动 12 月夏普
+③ 策略滚动 12 月夏普 (v3.0: AmihudIlliq + Band, 动态杠杆)
 两项同时触发 → 预警/复审退役。
 
-用法(cwd=factor_research): /usr/bin/python3 scripts/research/decay_monitor.py
+用法(cwd=factor_research): /opt/homebrew/bin/python3 scripts/research/decay_monitor.py
 """
 import json, os, sys
 from pathlib import Path
@@ -18,22 +18,21 @@ import pandas as pd
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel
+from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
 from strategies.small_cap import load_price_panels
-from factors.utils import safe_zscore, mad_clip
 from factors.small_cap import small_cap_timing
-
-# ── illiquidity factor ──
-class Illiq:
-    def __init__(self, w=20): self.w = w
-    def __call__(self, c, v, a, d):
-        r = c.pct_change(fill_method=None).abs().replace([np.inf, -np.inf], np.nan)
-        return safe_zscore(mad_clip((r/(a+1)).rolling(self.w).mean()))
+from factors.alpha import transforms
+from factors.alpha.base import FactorData
+from factors.alpha.builtins.illiq import AmihudIlliq
+from strategies.small_cap import build_rebalance_weights
 
 # ── Load data ──
 close, volume, amount = load_price_panels("2010-01-01")
-td = close.index
-factor = Illiq(20)(close, volume, amount, td)
+data = FactorData(close=close, volume=volume, amount=amount)
+
+# ── AmihudIlliq v3.0 factor ──
+factor_expr = AmihudIlliq(window=20).mad_clip(5).zscore().shift(1)
+factor = factor_expr.compute(data)
 
 # ① illiquidity 因子滚动 RankIC (vs 未来 20 日收益; 转负 = 非流动性溢价失效)
 fwd = close.pct_change(20, fill_method=None).shift(-20)
@@ -72,11 +71,17 @@ def build_weights(factor, close, n=25, reb=20):
         w[eff] = pd.Series(1.0/n, index=f.nlargest(n).index)
     return w
 
-pt, _, _ = small_cap_timing(close, amount, 16)
+# ── Band timing (v3.0 LIVE) ──
+_, _, dist = small_cap_timing(close, amount, 16)
+band = ((1 + dist.shift(1) * 8).clip(0, 1.5) * (dist.shift(1) > 0)).fillna(0.0)
+
+# ── v3.0 回测 (AmihudIlliq + Band, 动态杠杆) ──
 w = build_weights(factor, close)
 prices = PricePanel(close=close, volume=volume, amount=amount)
-r = BacktestEngine(prices=prices, config=BacktestConfig(start="2010-01-01", leverage=1.25)).run(
-    Signal(weights=w, timing=pt.astype(float)))
+r = BacktestEngine(
+    prices=prices,
+    config=BacktestConfig(start="2010-01-01", cost=CostModel(), leverage=1.0),
+).run(Signal(weights=w, timing=band, exposure_cap=1.5))
 ret = r.returns
 roll_sharpe = ret.rolling(252).mean() / ret.rolling(252).std() * np.sqrt(252)
 
