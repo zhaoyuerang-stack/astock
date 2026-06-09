@@ -336,6 +336,7 @@ def run_daily_update(args):
 
                 if fresh:
                     run_signal(report, dry_run=args.dry_run)
+                    run_factor_health(report, dry_run=args.dry_run)
                     if args.dry_run or report.get("signal", {}).get("generated"):
                         run_paper_trade(report, dry_run=args.dry_run)
                 else:

@@ -394,6 +394,20 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocke
             ]
         lines += [""]
 
+    # ── 因子健康 (来自 factor_health.json) ──
+    health_fp = ROOT / "reports/factor_health.json"
+    if health_fp.exists():
+        health = json.loads(health_fp.read_text())
+        lines += ["## 🩺 因子健康", "",
+                  f"  > 更新: {health.get('updated', '?')}, 滚动12月Sharpe动量. 📈加速=好, 📉减速=关注."]
+        for hname, hdata in health.items():
+            if hname == "updated": continue
+            sh = hdata["sharpe"]; mom = hdata["momentum_6m"]; trend = hdata["trend"]
+            icon = "📈" if trend == "加速" else "📉"
+            current_mark = " ⬅ 当前" if "当前" in hname else ""
+            lines.append(f"- {icon} {hname}: Sharpe={sh:.2f}, 6月变化={mom:+.0f}%, {trend}{current_mark}")
+        lines.append("")
+
     lines += [
         "## 📖 卖出规则(系统自动执行)", "",
         "- 择时转空(小盘指数跌破 MA16)→ 次日开盘**全部清仓**",
