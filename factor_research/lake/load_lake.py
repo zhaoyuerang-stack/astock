@@ -8,6 +8,8 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
+from lake.cleaning import apply_quarantine, repair_ohlc
+
 LAKE = Path(__file__).parent.parent / "data_lake"
 
 
@@ -25,6 +27,7 @@ def load_prices(codes=None, start="2010-01-01", fields=("close", "volume", "amou
         df = df[df["date"] >= pd.Timestamp(start)]
         if codes:
             df = df[df["code"].isin(codes)]
+        df = repair_ohlc(apply_quarantine(df))   # 确定性清洗(隔离坏数据 + OHLC 自洽)
         return {f: df.pivot(index="date", columns="code", values=f) for f in fields}
 
     # fallback: 逐只 parquet
@@ -40,6 +43,7 @@ def load_prices(codes=None, start="2010-01-01", fields=("close", "volume", "amou
         frames.append(df)
     long = pd.concat(frames, ignore_index=True)
     long = long[long["date"] >= pd.Timestamp(start)]
+    long = repair_ohlc(apply_quarantine(long))   # 确定性清洗
     return {f: long.pivot(index="date", columns="code", values=f) for f in fields}
 
 
@@ -94,6 +98,7 @@ def load_raw_close(codes=None, start="2010-01-01"):
         df = df[df["date"] >= pd.Timestamp(start)]
         if codes:
             df = df[df["code"].isin(codes)]
+        df = apply_quarantine(df)   # 与复权价一致地排除隔离区间
         return df.pivot(index="date", columns="code", values="raw_close")
 
     # fallback: 逐只 parquet
@@ -111,6 +116,7 @@ def load_raw_close(codes=None, start="2010-01-01"):
         return pd.DataFrame()
     long = pd.concat(frames, ignore_index=True)
     long = long[long["date"] >= pd.Timestamp(start)]
+    long = apply_quarantine(long)
     return long.pivot(index="date", columns="code", values="raw_close")
 
 
