@@ -1,0 +1,14 @@
+# Quant research engine + product API (Phase 0)
+# 注:Homebrew python3 为 externally-managed,安装用:
+#   python3 -m pip install --break-system-packages -r requirements.txt
+
+# --- 引擎(已在用)---
+pandas
+numpy
+pyarrow
+scipy
+
+# --- 产品 API 层(Phase 0 新增)---
+fastapi
+uvicorn[standard]
+pydantic>=2

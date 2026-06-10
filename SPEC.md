@@ -9,7 +9,7 @@
 
 ## 架构(自下而上;✅已建 / ⏳进行中 / ○未建)
 1. **数据基础设施** `data_lake` ✅ — 全市场+全历史+含退市股的最全口径。
-2. **统一回测内核** `core/` ✅ — `data_lake` 加载 + 因子/择时 + 真实买卖成本 + 融资成本 + 指标,作为生产与研究单一事实源。
+2. **统一回测内核** `core/` ✅ — `core.engine.BacktestEngine` 是**唯一**回测权威(`data_lake` 加载 + 因子/择时 + 真实买卖成本 + 融资成本 + 指标),生产与研究单一事实源。旧 `core.backtest` 兼容层已退场(`core/_deprecated_backtest.py.bak`),全仓迁移到 canonical 路径。
 3. **策略工厂** ⏳ — 已建确定性网格、最小 NSGA-II、生态位搜索、review audit、孵化池、岛屿编排、扩展非小盘价量因子池、fundamental 正交因子池、fundamental 因子工程升级、两融资金面因子池和孵化池自进化;下一步围绕弱候选做本地规则化持续进化 + 自动证伪(过拟合/幸存者偏差/特定行情);**按母策略隔离进化(岛屿模型,见下「防同质化」)**。当前小规模搜索尚未产出 ≥2 个通过预审的非 small-cap 低相关候选。
 4. **有效策略管理** ✅台账 / ○监控 — 母策略两层台账,跟踪 有效/衰减/退役。
 5. **中央调度层** ⏳ — 最小 launchd 定时拉取已建;event-driven 编排待建:数据就绪 / 市场状态切换 / 失效信号触发 → 启动或停用 对应母策略/组合。
@@ -18,6 +18,16 @@
 
 - 核心循环:工厂产出 → 管理层汰换 → **只有「有效」策略才进组合与展示**。
 - ⚠ 依赖顺序:组合/展示的收益必须建在 `core/` 真实成本口径上;旧 `data_full/data` 已清理,不得恢复为主线。
+
+### 模块解耦与单向依赖(2026-06-10 解耦收尾)
+单向依赖链(`scripts/ci/check_layer_deps.py` 静态守卫,接入 `test_all.sh`):
+```
+data(lake) → factors → core.engine → {strategies(生产), factory/workflow(探索)} → registry → production
+```
+- 生产层(`run_daily`/`scripts/data`/`strategies`)**禁止**依赖 `factory.*`/`scripts.research.*`/`workflow.*`;探索层只消费 data/factors/core.engine 的稳定接口。
+- **策略漏斗(候选→登记唯一通道)**:`factory/lines` 负责广度(变异生成 + L0 IC/L1 BT/L2 regime/L3 WF 廉价筛选,候选以 `factory.ontology.Hypothesis` 存于 `factory.pool`);L3_PASSED 经 `workflow/from_factory.py` 适配 → `workflow` phase1 合成防未来审计 → phase2/3 → `phase4_register` 登记 → `line3_marginal` 边际评级定 ACTIVE/SHADOW。驱动:`workflow/promote.py` 或 `python3 apps/factory_cli.py promote`。
+- **台账唯一写入口** = `strategy_registry.register_family/register`(经 `phase4_register`);禁止任何代码直写 `strategy_versions.json`。
+- `phase1_synthetic` 是**全系统唯一**机械执行「防未来函数」铁律的闸门。
 
 ## 数据层设计
 - **口径**:全市场+全历史+含退市股(`data_lake`);估值用不复权价、财务按公告日对齐(防未来函数)。

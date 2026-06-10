@@ -49,3 +49,12 @@ python3 scripts/research/cost_sensitivity.py  # 成本敏感性
 - 实盘折扣:费率见上表;另评估 小盘容量、停牌/涨跌停、组合换手。
 - 已 git 化:重要阶段改动用提交固定;数据湖和大体量运行产物不入库。
 - 改了架构/进度,顺手更新 SPEC.md / STATUS.md;踩了坑记 LESSONS.md。
+
+## 架构铁律(模块解耦,违反 = CI 报错)
+单向依赖链:`data(lake) → factors → core.engine → {strategies, factory/workflow} → registry → production`。
+- **回测唯一权威 = `core.engine.BacktestEngine`**。`core.backtest` 已退场(`core/_deprecated_backtest.py.bak`),禁止再 import;用 `strategies.small_cap` / `factors.small_cap` / `engine.metrics` / `factors.utils` 的 canonical 路径。
+- **配置走 `app_config/settings.yaml`**(`get_settings()`),勿散落硬编码。
+- **台账唯一写入口 = `strategy_registry.register_family/register`**(即 `workflow/phase4_register`);任何代码不得直写 `strategy_versions.json`。
+- **候选→登记唯一通道 = `workflow` phase1~4**。factory(`factory/lines`)负责生成+L0~L3 廉价筛选;L3_PASSED 经 `workflow/promote.py`(或 `python3 apps/factory_cli.py promote`)走 phase1 合成防未来审计 → phase2/3 → phase4 登记。`phase1_synthetic` 是防未来铁律的唯一机械执行点。
+- **生产层(run_daily 等)禁止 import `factory.*`/`scripts.research.*`/`workflow.*`**。
+- 守卫:`python3 scripts/ci/check_layer_deps.py`(已接入 `scripts/test_all.sh`)。

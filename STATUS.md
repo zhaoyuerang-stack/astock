@@ -1,8 +1,16 @@
 # STATUS — 当前进度
 
-> 更新:2026-06-09。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
+> 更新:2026-06-10。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
+
+**2026-06-10**: 全系统模块解耦收尾(architecture)。
+  · **回测唯一权威**: `core.backtest` 兼容层退场(→`core/_deprecated_backtest.py.bak`),全仓 90+ 文件迁移到 `core.engine`/`strategies.small_cap`/`factors.small_cap`/`engine.metrics`/`factors.utils`,0 导入方残留。指标逐位不变(strategy_lake/test_engine/run_daily 全验证)。
+  · **配置源**: `app_config/settings.yaml` 落地;`StrategyConfig` 默认值修正为 illiquidity v3.0(原 small-cap-size/v2.0 已脱节)。
+  · **探索→登记唯一通道**: 新增 `workflow/from_factory.py`(factory Hypothesis→workflow builder 适配器)+ `workflow/promote.py`(L3_PASSED→phase1合成审计→phase2/3→phase4 唯一登记) + `factory_cli promote` 子命令。打通后 factory pool 有 **7 个 L3_PASSED 候选**待 promote 入册。
+  · **死代码清理**: 删 `factory/evaluator.py`(v1孤儿)+ `scripts/research/portfolio_combo.py`。
+  · **research 归档**: 29 个死变体族(hmm_*/state_transition_*/mkt_diffusion_*/breadth_dd20_*/abcd_*)→ `scripts/research/archive/`。
+  · **依赖守卫**: `scripts/ci/check_layer_deps.py`(AST 分层依赖 + 台账唯一写入口 + 禁 import 退场模块),接入 `scripts/test_all.sh`。
 
 **2026-06-09**: 因子升级 v3.0 (SizeProxy→AmihudIlliq) + 生产链路修复。
   · **AmihudIlliq v3.0 LIVE**: |ret|/amount 公式, 全区间 +37.8%/-16.6%/1.99
