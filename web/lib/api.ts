@@ -1,5 +1,12 @@
 // FastAPI 客户端(Phase 0 services 接缝)。前端不做任何量化计算,只调 API。
-import type { BacktestResult, FactorView, StrategyView } from "./types";
+import type {
+  BacktestResult,
+  DataQualityView,
+  FactorHealthView,
+  FactorView,
+  MarketStateView,
+  StrategyView,
+} from "./types";
 
 const BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "http://127.0.0.1:8011";
@@ -15,6 +22,9 @@ export const api = {
   health: () => get<{ status: string; phase: number }>("/health"),
   strategies: () => get<StrategyView[]>("/strategies"),
   factors: () => get<FactorView[]>("/factors"),
+  dataQuality: () => get<DataQualityView>("/data/quality"),
+  strategyHealth: () => get<FactorHealthView[]>("/state/health"),
+  marketState: () => get<MarketStateView>("/state/market"),
   runBacktest: (params: {
     start?: string;
     top_n?: number;

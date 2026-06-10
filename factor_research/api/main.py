@@ -10,7 +10,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import backtest, factors, strategies
+from api.routers import backtest, data, factors, state, strategies
 
 app = FastAPI(title="Quant Research Platform API", version="0.0-phase0")
 
@@ -25,6 +25,8 @@ app.add_middleware(
 app.include_router(strategies.router)
 app.include_router(factors.router)
 app.include_router(backtest.router)
+app.include_router(data.router)
+app.include_router(state.router)
 
 
 @app.get("/health")

@@ -12,3 +12,6 @@ scipy
 fastapi
 uvicorn[standard]
 pydantic>=2
+
+# --- 即席查询 / 数据 QA(Phase 2;可选,services 内优雅降级)---
+duckdb

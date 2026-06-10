@@ -57,3 +57,39 @@ class FactorView(BaseModel):
     regime: str = ""
     n_versions: int = 0
     status: str = ""
+
+
+# ── Phase 2 状态层 ─────────────────────────────────────────────────────────────
+class DataQualityView(BaseModel):
+    """数据质量状态(读 data_lake/quality_report.json)。
+
+    区分真问题与 A股正常现象(铁律#7):severe = 负价/OHLC错;
+    跳变>50% 多为除权/涨跌停,单列不计入 severe。
+    """
+    total: int
+    clean: int
+    clean_ratio: float
+    issue_breakdown: dict = Field(default_factory=dict)
+    n_flagged: int = 0
+    flagged_sample: list[dict] = Field(default_factory=list)
+    severe_count: int = 0           # 真问题股票数(负价/OHLC错)
+    jump_count: int = 0             # 跳变标记数(含正常现象)
+    verdict: str = ""               # 可用 / 关注 / 不建议回测
+    duckdb: dict | None = None      # 可选:DuckDB 即席复核
+
+
+class FactorHealthView(BaseModel):
+    """策略/因子健康(读 reports/factor_health.json)。"""
+    name: str
+    sharpe: float = 0.0
+    momentum_6m: float = 0.0
+    trend: str = ""
+
+
+class MarketStateView(BaseModel):
+    """当前持仓/动作状态(读 signals/state.json)。"""
+    current_position: str = ""
+    last_action: str = ""
+    last_signal_date: str | None = None
+    last_rebalance_date: str | None = None
+    n_holdings: int = 0

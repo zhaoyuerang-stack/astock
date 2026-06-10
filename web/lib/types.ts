@@ -43,3 +43,40 @@ export interface FactorView {
   n_versions: number;
   status: string;
 }
+
+// Phase 2 状态层
+export interface DataQualityView {
+  total: number;
+  clean: number;
+  clean_ratio: number;
+  issue_breakdown: Record<string, number>;
+  n_flagged: number;
+  flagged_sample: { code: string; issues: string[] }[];
+  severe_count: number;
+  jump_count: number;
+  verdict: string;
+  duckdb: {
+    available: boolean;
+    note?: string;
+    rows?: number;
+    codes?: number;
+    date_range?: string;
+    nonpositive_close?: number;
+    quarantined_ranges?: number;
+  } | null;
+}
+
+export interface FactorHealthView {
+  name: string;
+  sharpe: number;
+  momentum_6m: number;
+  trend: string;
+}
+
+export interface MarketStateView {
+  current_position: string;
+  last_action: string;
+  last_signal_date: string | null;
+  last_rebalance_date: string | null;
+  n_holdings: number;
+}
