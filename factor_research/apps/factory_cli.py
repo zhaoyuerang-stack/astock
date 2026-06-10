@@ -181,6 +181,22 @@ def cmd_run_l0(args):
         print("no queued hypotheses; run 'queue' first")
         return 0
 
+    # 知识图谱 intake gate:已证伪候选(SKIP)直接弃,不花数据加载/IC 算力
+    from knowledge.graph import load_graph
+    kg = load_graph()
+    runnable = []
+    for h in queued:
+        skip, reason = kg.should_skip(h)
+        if skip:
+            print(f"  ⏭ KG SKIP {h.name}: {reason}")
+            pool.update_status(h.id, HypothesisStatus.DISCARDED)
+        else:
+            runnable.append(h)
+    queued = runnable
+    if not queued:
+        print("all queued hypotheses gated by knowledge graph; nothing to run")
+        return 0
+
     print(f"loading data lake (start={args.start})...")
     t0 = time.time()
     close, volume, amount = _load_data_panel(args.start)
@@ -205,10 +221,15 @@ def cmd_run_l0(args):
                 n_err += 1
             pool.update_status(h.id, HypothesisStatus.DISCARDED)
             n_fail += 1
+            # L0 弱 IC = regime/区间依赖 → DEPRIORITIZE + 保质期(非永久 SKIP)
+            kg.record_from_validation(h, passed=False,
+                                      metrics=dict(exp.result.metrics or {}),
+                                      stage="L0", action="DEPRIORITIZE")
 
     dt = time.time() - t1
     print(f"L0 done: {n_pass} PASSED, {n_fail} DISCARDED ({n_err} errored), "
           f"{dt:.1f}s total ({dt/len(queued):.2f}s/hyp)")
+    print(f"  [knowledge] {kg.summary()}")
     return 0
 
 
@@ -654,6 +675,34 @@ def cmd_run_l1(args):
     return 0
 
 
+def cmd_knowledge(args):
+    """巡检知识图谱:summary + findings + 待重测(过期)。"""
+    from knowledge.graph import load_graph
+    kg = load_graph()
+    print(kg.summary())
+    findings = sorted(kg._findings.values(), key=lambda f: f.created, reverse=True)
+    if args.limit:
+        findings = findings[: args.limit]
+    for f in findings:
+        gates = " ".join(f"[{g.action}]" for g in f.gates) or "[no-gate]"
+        flag = "⏰过期" if f.is_expired else ""
+        print(f"  {f.created} {gates} {f.statement}  exp={f.expires} {flag}")
+    expired = kg.check_expiry()
+    if expired:
+        print(f"\n待重测({len(expired)}):{[f.id for f in expired]}")
+    return 0
+
+
+def cmd_promote(args):
+    """L3_PASSED 候选 → workflow phase1~4 验证+登记(唯一登记闸门)。"""
+    from workflow.promote import promote_pool_l3
+    reports = promote_pool_l3(version=args.version, run_marginal=args.marginal,
+                              force=args.force)
+    n_reg = sum(1 for r in reports if r and r.registered)
+    print(f"\npromote done: {n_reg}/{len(reports)} 登记入册")
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(prog="factory_cli", description="Strategy Factory CLI")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -731,6 +780,18 @@ def main():
                        help="show marginal-eval results sorted by grade & delta")
     p.add_argument("--limit", type=int)
     p.set_defaults(func=cmd_graded)
+
+    p = sub.add_parser("knowledge",
+                       help="巡检知识图谱(findings / 待重测)")
+    p.add_argument("--limit", type=int)
+    p.set_defaults(func=cmd_knowledge)
+
+    p = sub.add_parser("promote",
+                       help="L3_PASSED → workflow phase1~4 验证+登记(唯一登记闸门)")
+    p.add_argument("--version", default="v1.0")
+    p.add_argument("--marginal", action="store_true", help="登记后算边际贡献")
+    p.add_argument("--force", action="store_true", help="phase1/2 不过也强制登记(标候选)")
+    p.set_defaults(func=cmd_promote)
 
     args = parser.parse_args()
     return args.func(args)
