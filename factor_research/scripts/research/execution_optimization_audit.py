@@ -26,7 +26,7 @@ import numpy as np
 import pandas as pd
 
 import scripts.ops.paper_trade as pt
-from core.backtest import run_small_cap_strategy, StrategyConfig
+from strategies.small_cap import run_small_cap_strategy, StrategyConfig
 from lake.load_lake import load_raw_close
 
 

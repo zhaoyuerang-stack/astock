@@ -1,3 +1,4 @@
+# [STATUS: archived] 已退役探索变体族,不再维护;仅供追溯。见 scripts/research/archive/__init__.py
 """HMM stress guard strategy — strict look-ahead-free implementation.
 
 Based on the HMM core algorithm doc. Key fix: P(stress) is computed from
@@ -18,10 +19,8 @@ ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from core.backtest import (
-    StrategyConfig, load_price_panels, backtest_weights,
-    small_cap_factor, small_cap_timing, build_rebalance_weights,
-)
+from strategies.small_cap import StrategyConfig, load_price_panels, backtest_weights, build_rebalance_weights
+from factors.small_cap import small_cap_factor, small_cap_timing
 
 OUT = ROOT / "reports" / "research"
 OUT.mkdir(parents=True, exist_ok=True)

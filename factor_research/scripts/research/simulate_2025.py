@@ -14,7 +14,7 @@ os.chdir(ROOT)
 import sys
 sys.path.insert(0, str(ROOT))
 import numpy as np, pandas as pd
-from core.backtest import StrategyConfig, run_small_cap_strategy
+from strategies.small_cap import StrategyConfig, run_small_cap_strategy
 
 INIT, LEV = 1_000_000, 1.25
 TOP_N, SIZE_WIN, TIMING_MA, REBAL = 25, 60, 16, 20

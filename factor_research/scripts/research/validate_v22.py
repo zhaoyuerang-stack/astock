@@ -18,11 +18,8 @@ sys.path.insert(0, ROOT)
 
 import numpy as np
 import pandas as pd
-from core.backtest import (
-    StrategyConfig, load_price_panels,
-    small_cap_factor, small_cap_timing,
-    build_rebalance_weights, backtest_weights,
-)
+from strategies.small_cap import StrategyConfig, load_price_panels, build_rebalance_weights, backtest_weights
+from factors.small_cap import small_cap_factor, small_cap_timing
 from app_config.settings import get_settings
 
 # ── 参数 ──────────────────────────────────────────────────────────────

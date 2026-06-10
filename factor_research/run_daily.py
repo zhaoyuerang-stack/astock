@@ -21,11 +21,8 @@ import numpy as np
 import pandas as pd
 
 from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from core.backtest import (
-    load_price_panels,
-    small_cap_timing,
-    build_rebalance_weights,
-)
+from strategies.small_cap import load_price_panels, build_rebalance_weights
+from factors.small_cap import small_cap_timing
 from lake.validator import DataValidator
 from factors.alpha import transforms  # register zscore/mad_clip/shift
 from factors.alpha.base import FactorData

@@ -51,7 +51,7 @@ def main():
     # ═══ 数据 ═══
     print("\n── 数据 ──")
     try:
-        from core.backtest import load_price_panels
+        from strategies.small_cap import load_price_panels
         close, volume, amount = load_price_panels("2010-01-01")
         last_data_date = close.index[-1].date()
         data_age = (now_cn.date() - last_data_date).days

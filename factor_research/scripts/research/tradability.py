@@ -15,9 +15,8 @@ sys.path.insert(0, str(ROOT))
 import numpy as np                                          # noqa: E402
 import pandas as pd                                         # noqa: E402
 
-from core.backtest import (                                 # noqa: E402
-    load_price_panels, small_cap_factor, build_rebalance_weights,
-)
+from strategies.small_cap import load_price_panels, build_rebalance_weights
+from factors.small_cap import small_cap_factor
 from lake.load_lake import load_raw_close                   # noqa: E402
 
 close, volume, amount = load_price_panels("2018-01-01")

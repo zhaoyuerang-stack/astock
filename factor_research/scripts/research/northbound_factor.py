@@ -19,7 +19,7 @@ ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from core.backtest import backtest_weights, StrategyConfig, run_small_cap_strategy, build_rebalance_weights
+from strategies.small_cap import backtest_weights, StrategyConfig, run_small_cap_strategy, build_rebalance_weights
 
 OUT = ROOT / "reports" / "research"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -101,7 +101,8 @@ def main():
     ret_nb_pt2 = None
 
     # ── v2.0 small-cap baseline ──
-    from core.backtest import small_cap_factor, small_cap_timing, load_price_panels
+    from strategies.small_cap import load_price_panels
+    from factors.small_cap import small_cap_factor, small_cap_timing
     close_all, vol_all, amount_all = load_price_panels("2017-01-01")
     factor_sc = small_cap_factor(amount_all, 60)
     timing_sc, _, _ = small_cap_timing(close_all, amount_all, 16)

@@ -425,7 +425,7 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocke
 
 def build_preview(names):
     """假设择时转多:展示「次日开盘建仓清单」(不碰正式账户)。"""
-    from core.backtest import load_price_panels
+    from strategies.small_cap import load_price_panels
     from factors.utils import safe_zscore, mad_clip
     from factors.small_cap import small_cap_timing
     print("[preview] 加载数据 + 计算 illiquidity top25 名单(约 1-2 分钟)...")

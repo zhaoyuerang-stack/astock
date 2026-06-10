@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path.cwd()))
 import numpy as np
 import pandas as pd
 from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from core.backtest import load_price_panels
+from strategies.small_cap import load_price_panels
 from factors.small_cap import small_cap_factor, small_cap_timing
 from strategies.small_cap import build_rebalance_weights
 

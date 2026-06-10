@@ -1,3 +1,4 @@
+# [STATUS: archived] 已退役探索变体族,不再维护;仅供追溯。见 scripts/research/archive/__init__.py
 """HMM exit overlay for the small-cap strategy.
 
 Independent research script; it only reads data_lake/core backtest helpers and
@@ -5,7 +6,7 @@ writes result artifacts under reports/research. It does not touch production
 signals, registry, scheduled jobs, or the core strategy implementation.
 
 Usage:
-  /usr/bin/python3 -m scripts.research.hmm_exit_smallcap
+  /usr/bin/python3 -m scripts.research.archive.hmm_exit_smallcap
 """
 import json
 import os
@@ -17,18 +18,12 @@ import numpy as np
 import pandas as pd
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from core.backtest import (  # noqa: E402
-    StrategyConfig,
-    backtest_weights,
-    load_price_panels,
-    metrics,
-    run_small_cap_strategy,
-    yearly_returns,
-)
+from strategies.small_cap import StrategyConfig, backtest_weights, load_price_panels, run_small_cap_strategy
+from engine.metrics import metrics, yearly_returns
 
 
 OUT_DIR = ROOT / "reports" / "research"

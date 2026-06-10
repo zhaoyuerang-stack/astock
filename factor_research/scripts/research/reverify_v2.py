@@ -10,9 +10,8 @@ ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from core.backtest import (                                 # noqa: E402
-    run_small_cap_strategy, StrategyConfig, metrics, yearly_returns,
-)
+from strategies.small_cap import run_small_cap_strategy, StrategyConfig
+from engine.metrics import metrics, yearly_returns
 
 print("=== v2.0 干净 amount 口径重验(不复权成交额)===")
 for label, start in [("样本内 2018-2026", "2018-01-01"), ("压力 2010-2026", "2010-01-01")]:

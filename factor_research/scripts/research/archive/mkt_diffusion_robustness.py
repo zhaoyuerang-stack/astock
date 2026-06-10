@@ -1,3 +1,4 @@
+# [STATUS: archived] 已退役探索变体族,不再维护;仅供追溯。见 scripts/research/archive/__init__.py
 """Robustness checks for the refined market-diffusion transition rule.
 
 Fixed rule under test:
@@ -15,7 +16,7 @@ Checks:
 Research-only: writes reports/research artifacts only.
 
 Usage:
-  /usr/bin/python3 -m scripts.research.mkt_diffusion_robustness
+  /usr/bin/python3 -m scripts.research.archive.mkt_diffusion_robustness
 """
 import json
 import os
@@ -27,17 +28,19 @@ import numpy as np
 import pandas as pd
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from core.backtest import CostModel, StrategyConfig, metrics, run_small_cap_strategy, yearly_returns  # noqa: E402
-from scripts.research.mkt_diffusion_transition_refine import ConfirmRule, apply_confirm, build_channels  # noqa: E402
-from scripts.research.state_transition_execution_explore import (  # noqa: E402
+from strategies.small_cap import StrategyConfig, run_small_cap_strategy
+from core.engine import CostModel
+from engine.metrics import metrics, yearly_returns
+from scripts.research.archive.mkt_diffusion_transition_refine import ConfirmRule, apply_confirm, build_channels  # noqa: E402
+from scripts.research.archive.state_transition_execution_explore import (  # noqa: E402
     ExecutionRule,
     backtest_execution_overlay,
 )
-from scripts.research.state_transition_lead_experiment import (  # noqa: E402
+from scripts.research.archive.state_transition_lead_experiment import (  # noqa: E402
     TriggerRule,
     evaluate_lead,
     make_trigger_mask,

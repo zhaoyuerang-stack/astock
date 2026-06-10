@@ -1,3 +1,4 @@
+# [STATUS: archived] 已退役探索变体族,不再维护;仅供追溯。见 scripts/research/archive/__init__.py
 """Search broader state-transition early-warning signals.
 
 This expands beyond a single HMM risk probability. Candidate transition scores
@@ -15,7 +16,7 @@ Execution is intentionally fixed to the previously promising responses
 Research-only: no production signal, registry, or scheduler files are changed.
 
 Usage:
-  /usr/bin/python3 -m scripts.research.state_transition_signal_search
+  /usr/bin/python3 -m scripts.research.archive.state_transition_signal_search
 """
 import json
 import os
@@ -27,20 +28,21 @@ import numpy as np
 import pandas as pd
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from core.backtest import CostModel, StrategyConfig, run_small_cap_strategy  # noqa: E402
-from scripts.research.hmm_exit_smallcap import make_features  # noqa: E402
-from scripts.research.hmm_stress_guard_smallcap import build_market_features  # noqa: E402
-from scripts.research.state_transition_execution_explore import (  # noqa: E402
+from strategies.small_cap import StrategyConfig, run_small_cap_strategy
+from core.engine import CostModel
+from scripts.research.archive.hmm_exit_smallcap import make_features  # noqa: E402
+from scripts.research.archive.hmm_stress_guard_smallcap import build_market_features  # noqa: E402
+from scripts.research.archive.state_transition_execution_explore import (  # noqa: E402
     ExecutionRule,
     backtest_execution_overlay,
     objective,
     summarize,
 )
-from scripts.research.state_transition_lead_experiment import (  # noqa: E402
+from scripts.research.archive.state_transition_lead_experiment import (  # noqa: E402
     TriggerRule,
     evaluate_lead,
     make_trigger_mask,

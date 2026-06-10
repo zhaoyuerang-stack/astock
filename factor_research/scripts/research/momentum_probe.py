@@ -10,11 +10,9 @@ ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from core.backtest import (                                 # noqa: E402
-    load_price_panels, build_rebalance_weights, backtest_weights,
-    run_small_cap_strategy, StrategyConfig, metrics, yearly_returns,
-    safe_zscore, mad_clip,
-)
+from strategies.small_cap import load_price_panels, build_rebalance_weights, backtest_weights, run_small_cap_strategy, StrategyConfig
+from engine.metrics import metrics, yearly_returns
+from factors.utils import safe_zscore, mad_clip
 
 close, volume, amount = load_price_panels("2010-01-01")
 dret = close.pct_change(fill_method=None)

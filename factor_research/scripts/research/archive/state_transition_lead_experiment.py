@@ -1,3 +1,4 @@
+# [STATUS: archived] 已退役探索变体族,不再维护;仅供追溯。见 scripts/research/archive/__init__.py
 """State-transition lead-time experiment for the v2.0 small-cap strategy.
 
 The earlier overlay experiments used HMM risk probabilities as an exposure
@@ -12,7 +13,7 @@ into a temporary exposure cut.
 Research-only: no production signal, registry, or scheduler files are changed.
 
 Usage:
-  /usr/bin/python3 -m scripts.research.state_transition_lead_experiment
+  /usr/bin/python3 -m scripts.research.archive.state_transition_lead_experiment
 """
 import json
 import os
@@ -24,11 +25,12 @@ import numpy as np
 import pandas as pd
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from core.backtest import StrategyConfig, backtest_weights, metrics, run_small_cap_strategy  # noqa: E402
+from strategies.small_cap import StrategyConfig, backtest_weights, run_small_cap_strategy
+from engine.metrics import metrics
 
 
 OUT_DIR = ROOT / "reports" / "research"

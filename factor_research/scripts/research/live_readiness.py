@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from core.backtest import StrategyConfig, latest_signal, load_price_panels  # noqa: E402
+from strategies.small_cap import StrategyConfig, latest_signal, load_price_panels
 from lake.load_lake import load_raw_close                                   # noqa: E402
 
 sig = latest_signal(StrategyConfig(start="2010-01-01"))

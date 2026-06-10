@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path.cwd()))
 import numpy as np
 import pandas as pd
 
-from core.backtest import load_price_panels
+from strategies.small_cap import load_price_panels
 from engine.factor_analysis import calc_ic, ic_summary
 from factors.small_cap import small_cap_factor
 from factors.momentum import (

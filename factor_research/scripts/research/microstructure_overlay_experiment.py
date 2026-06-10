@@ -20,7 +20,8 @@ ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from core.backtest import StrategyConfig, backtest_weights, metrics, run_small_cap_strategy  # noqa: E402
+from strategies.small_cap import StrategyConfig, backtest_weights, run_small_cap_strategy
+from engine.metrics import metrics
 
 
 OUT_DIR = ROOT / "reports" / "research"

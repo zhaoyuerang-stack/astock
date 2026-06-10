@@ -12,14 +12,9 @@ os.chdir(Path(__file__).parent)
 
 # Phase-2 migration: use unified BacktestEngine instead of legacy run_small_cap_strategy()
 from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from core.backtest import (
-    load_price_panels,
-    small_cap_factor,
-    small_cap_timing,
-    build_rebalance_weights,
-    metrics,
-    yearly_returns,
-)
+from strategies.small_cap import load_price_panels, build_rebalance_weights
+from factors.small_cap import small_cap_factor, small_cap_timing
+from engine.metrics import metrics, yearly_returns
 
 
 def run_backtest(label, start):

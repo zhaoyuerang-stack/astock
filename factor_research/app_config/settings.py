@@ -25,13 +25,13 @@ class CostModelConfig:
 
 
 # ---------------------------------------------------------------------------
-# Strategy defaults (small-cap-size v2.0)
+# Strategy defaults (illiquidity v3.0, current LIVE production config)
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class StrategyConfig:
-    family: str = "small-cap-size"
-    version: str = "v2.0"
+    family: str = "illiquidity"
+    version: str = "v3.0"
     start: str = "2018-01-01"
     size_window: int = 60
     timing_ma: int = 16
@@ -98,7 +98,13 @@ class Settings:
 
 def _env_config_path() -> Optional[str]:
     import os
-    return os.environ.get("ASTOCK_CONFIG")
+    env_path = os.environ.get("ASTOCK_CONFIG")
+    if env_path:
+        return env_path
+    default_path = Path(__file__).parent / "settings.yaml"
+    if default_path.exists():
+        return str(default_path)
+    return None
 
 
 # ---------------------------------------------------------------------------

@@ -11,7 +11,7 @@ import os, json, sys; os.chdir(os.path.dirname(os.path.dirname(os.path.dirname(o
 sys.path.insert(0, os.getcwd())
 from pathlib import Path
 import numpy as np; import pandas as pd
-from core.backtest import load_price_panels
+from strategies.small_cap import load_price_panels
 from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
 from factors.small_cap import small_cap_timing
 from factors.alpha import transforms

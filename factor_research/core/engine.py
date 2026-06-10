@@ -55,8 +55,8 @@ class BacktestConfig:
 class PricePanel:
     """Unified price / volume panel.
 
-    Replaces the ad-hoc ``(close, volume, amount, raw_close)`` tuples that are
-    currently passed around in ``core/backtest.py`` and ``factory/evaluator.py``.
+    Replaces the ad-hoc ``(close, volume, amount, raw_close)`` tuples that
+    used to be passed around between modules.
     """
     close: pd.DataFrame          # adjusted close (for return calculation)
     volume: pd.DataFrame         # in 手 (×100 for shares)

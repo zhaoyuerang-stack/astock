@@ -25,9 +25,7 @@ ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from core.backtest import (
-    StrategyConfig, backtest_weights, run_small_cap_strategy,
-)
+from strategies.small_cap import StrategyConfig, backtest_weights, run_small_cap_strategy
 
 OUT = ROOT / "reports" / "research"
 OUT.mkdir(parents=True, exist_ok=True)

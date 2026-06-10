@@ -1,3 +1,4 @@
+# [STATUS: archived] 已退役探索变体族,不再维护;仅供追溯。见 scripts/research/archive/__init__.py
 """Broader optimizer for the HMM small-cap exit overlay.
 
 Research-only script. It caches HMM risk probabilities per model grid, then
@@ -5,7 +6,7 @@ evaluates many exposure transforms without retraining. No production code,
 registry, daily signal, or scheduler is changed.
 
 Usage:
-  /usr/bin/python3 -m scripts.research.hmm_exit_smallcap_optimize
+  /usr/bin/python3 -m scripts.research.archive.hmm_exit_smallcap_optimize
 """
 import json
 import os
@@ -17,12 +18,13 @@ import numpy as np
 import pandas as pd
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from core.backtest import StrategyConfig, backtest_weights, metrics, run_small_cap_strategy  # noqa: E402
-from scripts.research.hmm_exit_smallcap import HMMGrid, hmm_exit_signal, make_features, row_for  # noqa: E402
+from strategies.small_cap import StrategyConfig, backtest_weights, run_small_cap_strategy
+from engine.metrics import metrics
+from scripts.research.archive.hmm_exit_smallcap import HMMGrid, hmm_exit_signal, make_features, row_for  # noqa: E402
 
 
 OUT_DIR = ROOT / "reports" / "research"

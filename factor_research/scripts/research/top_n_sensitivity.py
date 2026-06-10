@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 
 from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from core.backtest import load_price_panels
+from strategies.small_cap import load_price_panels
 from factors.small_cap import small_cap_factor, small_cap_timing
 from factors.utils import safe_zscore, mad_clip
 from strategies.small_cap import build_rebalance_weights

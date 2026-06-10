@@ -16,7 +16,7 @@ import numpy as np                                       # noqa: E402
 import pandas as pd                                      # noqa: E402
 
 import scripts.ops.paper_trade as pt                     # noqa: E402
-from core.backtest import run_small_cap_strategy, StrategyConfig
+from strategies.small_cap import run_small_cap_strategy, StrategyConfig
 from lake.load_lake import load_raw_close
 
 REPLAY_START = sys.argv[1] if len(sys.argv) > 1 else "2024-01-01"

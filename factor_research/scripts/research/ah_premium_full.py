@@ -15,7 +15,7 @@ from scipy.stats import spearmanr
 ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT); sys.path.insert(0, str(ROOT))
 
-from core.backtest import load_price_panels, backtest_weights, StrategyConfig
+from strategies.small_cap import load_price_panels, backtest_weights, StrategyConfig
 from factors.small_cap import small_cap_factor
 
 OUT = ROOT / "reports" / "research"; OUT.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,27 @@
+# 全局配置 — 与 app_config/settings.py 中的 dataclass 默认值保持一致。
+# 这里的值是当前生产实际生效的值(illiquidity v3.0 LIVE)。
+# 修改后无需改动代码,Settings.from_yaml() 会读取此文件。
+
+cost:
+  buy_cost: 0.00225
+  sell_cost: 0.00275
+  financing_rate: 0.065
+
+strategy:
+  family: illiquidity
+  version: v3.0
+  start: "2018-01-01"
+  size_window: 60
+  timing_ma: 16
+  top_n: 25
+  rebalance_days: 20
+  leverage: 1.25
+
+data:
+  warmup_start: "2010-01-01"
+  default_start: "2018-01-01"
+
+factory:
+  top_n_choices: [15, 20, 25, 40, 60, 80, 120]
+  leverage_choices: [1.0, 1.25]
+  review_corr_threshold: 0.50

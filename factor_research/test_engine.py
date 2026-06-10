@@ -15,16 +15,15 @@ os.chdir(Path(__file__).parent)
 import numpy as np
 import pandas as pd
 
-from core.backtest import (
+from strategies.small_cap import (
     StrategyConfig,
     backtest_weights,
     build_rebalance_weights,
     load_price_panels,
-    metrics,
     run_small_cap_strategy,
-    small_cap_factor,
-    small_cap_timing,
 )
+from factors.small_cap import small_cap_factor, small_cap_timing
+from engine.metrics import metrics
 from core.engine import (
     BacktestConfig,
     BacktestEngine,
@@ -141,7 +140,7 @@ def test_backtest_result_properties():
 
 def test_small_cap_strategy_engine():
     """The engine-based small-cap wrapper must match the legacy implementation."""
-    from core.backtest import run_small_cap_strategy_engine
+    from strategies.small_cap import run_small_cap_strategy as run_small_cap_strategy_engine
 
     legacy = run_small_cap_strategy()
     modern = run_small_cap_strategy_engine()

@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from lake.load_lake import load_prices, load_raw_close
 from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from core.backtest import build_rebalance_weights
+from strategies.small_cap import build_rebalance_weights
 from factors.small_cap import small_cap_timing
 from factors.utils import safe_zscore, mad_clip
 

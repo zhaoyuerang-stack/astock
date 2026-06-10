@@ -22,7 +22,7 @@ results.append({"risk": "过拟合", "verdict": "✅ PASS",
 
 # === Risk 2: Survivorship ===
 print("[2/17] 幸存者偏差...")
-from core.backtest import StrategyConfig, run_small_cap_strategy
+from strategies.small_cap import StrategyConfig, run_small_cap_strategy
 cfg = StrategyConfig(start="2010-01-01")
 base = run_small_cap_strategy(cfg)
 close = base["close"]
@@ -119,7 +119,7 @@ results.append({"risk": "极端事件", "verdict": "⚠️ WARN",
 
 # === Risk 14: Benchmark ===
 print("[14/17] 基准选择...")
-from core.backtest import run_small_cap_strategy
+from strategies.small_cap import run_small_cap_strategy
 v20base = run_small_cap_strategy(StrategyConfig(start="2010-01-01"))
 v20_ret = v20base["returns"]
 # Load v30
@@ -141,7 +141,7 @@ def build_scheduled_w(factor, close, top_n, rebal_days):
         sched[eff] = pd.Series(1.0/top_n, index=f.nlargest(top_n).index)
     return sched
 
-from core.backtest import backtest_weights
+from strategies.small_cap import backtest_weights
 sch = build_scheduled_w(factor_500, close, 30, 63)
 mkt = close.pct_change(fill_method=None).mean(axis=1).fillna(0.0)
 trend = mkt.rolling(2).sum()

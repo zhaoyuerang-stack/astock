@@ -275,7 +275,7 @@ def main():
 
     # Orthogonality
     print("\n[Bonus] Orthogonality check...")
-    from core.backtest import StrategyConfig, run_small_cap_strategy
+    from strategies.small_cap import StrategyConfig, run_small_cap_strategy
     cfg = StrategyConfig(start="2010-01-01")
     base = run_small_cap_strategy(cfg)
     v20_ret = base["returns"]

@@ -15,9 +15,8 @@ import matplotlib                                           # noqa: E402
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt                             # noqa: E402
 
-from core.backtest import (                                 # noqa: E402
-    metrics, yearly_returns, run_small_cap_strategy, StrategyConfig,
-)
+from strategies.small_cap import run_small_cap_strategy, StrategyConfig
+from engine.metrics import metrics, yearly_returns
 
 ret = run_small_cap_strategy(StrategyConfig(start="2010-01-01"))["returns"]
 
