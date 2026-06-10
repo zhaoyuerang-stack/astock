@@ -8,10 +8,20 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from api.routers import backtest, factors, strategies
 
 app = FastAPI(title="Quant Research Platform API", version="0.0-phase0")
+
+# Phase 1:允许本地 Next.js 开发服务器(3000)跨域调用。
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(strategies.router)
 app.include_router(factors.router)
 app.include_router(backtest.router)

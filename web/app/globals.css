@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: -apple-system, "PingFang SC", "Noto Sans SC", Inter, system-ui, sans-serif;
+}
+
+/* 可读的高密度:统一卡片骨架 */
+.card {
+  @apply bg-white border border-cardline rounded-card p-4;
+}
