@@ -4,8 +4,11 @@ import type {
   DataQualityView,
   FactorHealthView,
   FactorView,
+  FunnelView,
+  HypothesisView,
   MarketStateView,
   PortfolioView,
+  RegisteredExperimentView,
   RiskReport,
   StrategyView,
 } from "./types";
@@ -29,6 +32,10 @@ export const api = {
   marketState: () => get<MarketStateView>("/state/market"),
   portfolio: () => get<PortfolioView>("/portfolio"),
   risk: () => get<RiskReport>("/risk"),
+  funnel: () => get<FunnelView>("/experiments/funnel"),
+  hypotheses: (status?: string, limit = 60) =>
+    get<HypothesisView[]>(`/experiments/hypotheses?${new URLSearchParams({ ...(status ? { status } : {}), limit: String(limit) })}`),
+  registeredExperiments: () => get<RegisteredExperimentView[]>("/experiments/registered"),
   runBacktest: (params: {
     start?: string;
     top_n?: number;

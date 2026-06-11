@@ -128,3 +128,39 @@ class RiskReport(BaseModel):
     checks: list[RiskRuleCheck] = Field(default_factory=list)
     control_actions: list[dict] = Field(default_factory=list)  # ControlAction dicts
     verdict: str = "正常"          # 正常 | 预警 | 超限
+
+
+# ── Phase 4 研究实验 ────────────────────────────────────────────────────────────
+class FunnelView(BaseModel):
+    """假设池漏斗:DRAFTED→QUEUED→L0~L3→PROMOTED;DISCARDED/SHELVED 旁路。"""
+    total: int = 0
+    stages: list[dict] = Field(default_factory=list)  # [{stage, count}]
+    side: list[dict] = Field(default_factory=list)
+    discard_ratio: float = 0.0
+    registered: int = 0
+
+
+class HypothesisView(BaseModel):
+    id: str
+    name: str = ""
+    factor_fn_name: str = ""
+    factor_params: dict = Field(default_factory=dict)
+    timing_fn_name: str | None = None
+    status: str = ""
+    source: str = ""               # mutation | llm_paper | anomaly | manual
+    mechanism: str = ""
+    citation: str = ""
+    created_at: str = ""
+
+
+class RegisteredExperimentView(BaseModel):
+    """已晋级登记的实验(台账版本)+ 可复现键(config_hash)。"""
+    strategy_id: str
+    family_name: str = ""
+    version: str = ""
+    status: str = ""
+    date: str = ""
+    config_hash: str = ""
+    config: dict = Field(default_factory=dict)
+    metrics: dict = Field(default_factory=dict)
+    data_scope: dict = Field(default_factory=dict)

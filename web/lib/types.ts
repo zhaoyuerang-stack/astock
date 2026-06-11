@@ -126,3 +126,37 @@ export interface RiskReport {
   control_actions: ControlAction[];
   verdict: "正常" | "预警" | "超限";
 }
+
+// Phase 4 研究实验
+export interface FunnelView {
+  total: number;
+  stages: { stage: string; count: number }[];
+  side: { stage: string; count: number }[];
+  discard_ratio: number;
+  registered: number;
+}
+
+export interface HypothesisView {
+  id: string;
+  name: string;
+  factor_fn_name: string;
+  factor_params: Record<string, unknown>;
+  timing_fn_name: string | null;
+  status: string;
+  source: string;
+  mechanism: string;
+  citation: string;
+  created_at: string;
+}
+
+export interface RegisteredExperimentView {
+  strategy_id: string;
+  family_name: string;
+  version: string;
+  status: string;
+  date: string;
+  config_hash: string;
+  config: Record<string, unknown>;
+  metrics: Record<string, number>;
+  data_scope: Record<string, unknown>;
+}
