@@ -24,6 +24,10 @@ echo "=== test_knowledge.py ==="
 python3 tests/test_knowledge.py
 
 echo ""
+echo "=== test_autoresearch_engine.py (Auto Factor Research Lite) ==="
+python3 tests/test_autoresearch_engine.py
+
+echo ""
 echo "=== test_services_phase0.py (产品 services 接缝;全量比对设 PHASE0_FULL=1) ==="
 python3 tests/test_services_phase0.py
 
@@ -42,6 +46,10 @@ python3 tests/test_llm_providers.py
 echo ""
 echo "=== test_settings_phase6.py (系统设置 · 成本铁律只读 + 审计) ==="
 python3 tests/test_settings_phase6.py
+
+echo ""
+echo "=== test_paper_etf.py (模拟盘债券 ETF 轮动 P5) ==="
+python3 tests/test_paper_etf.py
 
 echo ""
 echo "🎉 All tests passed!"

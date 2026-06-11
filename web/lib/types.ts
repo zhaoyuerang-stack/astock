@@ -161,6 +161,85 @@ export interface RegisteredExperimentView {
   data_scope: Record<string, unknown>;
 }
 
+export interface AutoResearchCandidateView {
+  fingerprint: string;
+  status: string;
+  source: string;
+  ast: Record<string, unknown>;
+  complexity_score: number;
+  max_auto_stage: string;
+  notes: string;
+  created_at: string;
+}
+
+export interface AutoResearchReviewItemView {
+  fingerprint: string;
+  status: string;
+  decision: string;
+  reason: string;
+  candidate: Record<string, unknown>;
+  metrics: Record<string, unknown>;
+  review_action: string; // "" = 待复核;approve / reject = 已人工决策
+  reviewer_notes: string;
+  reviewed_at: string;
+}
+
+export interface AutoResearchFunnelView {
+  total: number;
+  stages: { stage: string; count: number }[];
+  review_queue: number;
+}
+
+export interface AutoResearchRunResultView {
+  fingerprint: string;
+  status: string;
+  decision: string;
+  reason: string;
+  protocols: string[];
+}
+
+export interface AutoResearchRunResponse {
+  vintage_id: string;
+  max_stage: string;
+  results: AutoResearchRunResultView[];
+}
+
+export interface AutoResearchPromoteResponse {
+  fingerprint: string;
+  hypothesis_name: string;
+  version: string;
+  registered: boolean;
+  detail: string;
+}
+
+export interface AutoResearchLLMGenResponse {
+  model: string;
+  requested: number;
+  accepted: number;
+  rejected: string[];
+  run: AutoResearchRunResponse;
+}
+
+export interface AutoResearchChampionView {
+  fingerprint: string;
+  island: number;
+  generation: number;
+  icir: number;
+  expr: string;
+  status: string;
+  decision: string;
+  reason: string;
+}
+
+export interface AutoResearchIslandSearchResponse {
+  vintage_id: string;
+  islands: number;
+  generations: number;
+  evaluated: number;
+  seeded_by: string;
+  champions: AutoResearchChampionView[];
+}
+
 // Phase 5 Agent
 export interface AgentOutput {
   summary: string;
@@ -216,4 +295,100 @@ export interface LLMConfigView {
 export interface LLMTestResult {
   ok: boolean;
   message: string;
+}
+
+// ── 模拟盘跟单(P5 债券轮动 · 操作卡/流水/净值)──────────────────────────────
+export interface PaperTradeRow {
+  date: string;
+  code: string;
+  name: string;
+  side: "BUY" | "SELL" | string;
+  shares: number;
+  price: number;
+  notional: number;
+  cost: number;
+  cash_after: number;
+}
+
+export interface PaperBlockedRow {
+  side: string;
+  code: string;
+  name: string;
+  reason: string;
+}
+
+export interface PaperPositionRow {
+  code: string;
+  name: string;
+  shares: number;
+  cost: number;
+  price: number | null;
+  mv: number;
+  pnl: number;
+  asset: "stock" | "etf" | string;
+}
+
+export interface PaperPlanItem {
+  action: "BUY" | "SELL" | string;
+  code: string;
+  name: string;
+  ref_price: number;
+  est_shares: number;
+  est_notional: number;
+}
+
+export interface BondInstructionView {
+  active: boolean;
+  side: "BUY" | "SELL" | "HOLD" | string;
+  code: string;
+  name: string;
+  ref_price: number;
+  est_shares: number;
+  est_notional: number;
+  shares_held: number;
+  note: string;
+}
+
+export interface TradePlanView {
+  signal_date: string;
+  generated_at: string;
+  stale: boolean;
+  stale_reason: string;
+  regime: string;
+  regime_dist: number;
+  in_market: boolean;
+  band_exposure: number;
+  action: string;
+  executed: PaperTradeRow[];
+  blocked: PaperBlockedRow[];
+  plan: PaperPlanItem[];
+  bond: BondInstructionView | null;
+  positions: PaperPositionRow[];
+  nav: number;
+  cash: number;
+  position_value: number;
+  total_return: number;
+  disclaimer: string;
+}
+
+export interface NavPoint {
+  date: string;
+  nav: number;
+  cash: number;
+  position_value: number;
+  total_return: number;
+}
+
+export interface NavCurveView {
+  points: NavPoint[];
+  inception: string;
+  init_capital: number;
+  latest_nav: number;
+  total_return: number;
+  max_drawdown: number;
+}
+
+export interface PaperTradesView {
+  trades: PaperTradeRow[];
+  total: number;
 }

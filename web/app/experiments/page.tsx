@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import MetricCard from "@/components/ui/MetricCard";
 import { api, pct, num } from "@/lib/api";
 import type { FunnelView, HypothesisView, RegisteredExperimentView } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
+import { useAutoRefresh } from "@/lib/useAutoRefresh";
+import AutoResearchLab from "./AutoResearchLab";
 
 const STAGE_LABEL: Record<string, string> = {
   drafted: "草拟", queued: "入队", l0_passed: "L0", l1_passed: "L1",
@@ -15,6 +17,7 @@ const STAGE_LABEL: Record<string, string> = {
 const FILTERS = ["l3_passed", "l2_passed", "l1_passed", "discarded", "shelved"];
 
 export default function ExperimentsPage() {
+  const [tab, setTab] = useState<"pool" | "autoresearch">("pool");
   const [funnel, setFunnel] = useState<FunnelView | null>(null);
   const [reg, setReg] = useState<RegisteredExperimentView[]>([]);
   const [hyps, setHyps] = useState<HypothesisView[]>([]);
@@ -22,7 +25,9 @@ export default function ExperimentsPage() {
   const [err, setErr] = useState<string | null>(null);
   const setContext = useAgent((s) => s.setContext);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    if (tab !== "pool") return;
+    api.hypotheses(filter, 40).then(setHyps).catch(() => setHyps([]));
     Promise.all([api.funnel(), api.registeredExperiments()])
       .then(([f, r]) => {
         setFunnel(f);
@@ -37,20 +42,29 @@ export default function ExperimentsPage() {
         });
       })
       .catch((e) => setErr(String(e)));
-  }, [setContext]);
-
-  useEffect(() => {
-    api.hypotheses(filter, 40).then(setHyps).catch(() => setHyps([]));
-  }, [filter]);
+  }, [setContext, tab, filter]);
+  useAutoRefresh(load);
 
   const maxCount = funnel ? Math.max(1, ...funnel.stages.map((s) => s.count)) : 1;
 
   return (
     <div>
-      <PageHeader title="研究实验" desc="假设池漏斗 + 已登记实验 · 实时 factory/pool + registry" />
-      {err && <div className="card text-sm text-danger mb-4">API 错误:{err}<br />请确认后端已启动(uvicorn :8011)。</div>}
+      <PageHeader title="研究实验" desc="假设池漏斗 + 已登记实验 + AutoResearch 实验室 · 实时 factory/pool + registry" />
 
-      {funnel && (
+      <div className="flex gap-1 mb-4">
+        {([["pool", "假设池漏斗"], ["autoresearch", "AutoResearch 实验室"]] as const).map(([key, label]) => (
+          <button key={key} onClick={() => setTab(key)}
+            className={`text-[13px] px-3 py-1.5 rounded ${tab === key ? "bg-brand text-white" : "bg-bg text-subink border border-cardline"}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "autoresearch" && <AutoResearchLab />}
+
+      {tab === "pool" && err && <div className="card text-sm text-danger mb-4">API 错误:{err}<br />请确认后端已启动(uvicorn :8011)。</div>}
+
+      {tab === "pool" && funnel && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
             <MetricCard label="假设池候选" value={String(funnel.total)} sub="去重唯一身份(内容哈希)" />

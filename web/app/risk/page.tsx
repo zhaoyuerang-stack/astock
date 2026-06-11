@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import MetricCard from "@/components/ui/MetricCard";
 import { api } from "@/lib/api";
 import type { RiskReport } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
+import { useAutoRefresh } from "@/lib/useAutoRefresh";
 
 const STATUS_TONE: Record<string, string> = {
   ok: "text-ok", warn: "text-warn", breach: "text-danger", na: "text-subink",
@@ -25,7 +26,7 @@ export default function RiskPage() {
   const [confirmed, setConfirmed] = useState<Record<string, boolean>>({});
   const setContext = useAgent((s) => s.setContext);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     api
       .risk()
       .then((d) => {
@@ -42,6 +43,7 @@ export default function RiskPage() {
       })
       .catch((e) => setErr(String(e)));
   }, [setContext]);
+  useAutoRefresh(load);
 
   const tone = r ? (r.verdict === "正常" ? "ok" : r.verdict === "预警" ? "warn" : "danger") : "default";
 

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import { api } from "@/lib/api";
 import type { FactorView } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
+import { useAutoRefresh } from "@/lib/useAutoRefresh";
 
 export default function FactorsPage() {
   const [factors, setFactors] = useState<FactorView[]>([]);
@@ -12,7 +13,7 @@ export default function FactorsPage() {
   const [loading, setLoading] = useState(true);
   const setContext = useAgent((s) => s.setContext);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     api
       .factors()
       .then((f) => {
@@ -29,6 +30,7 @@ export default function FactorsPage() {
       .catch((e) => setErr(String(e)))
       .finally(() => setLoading(false));
   }, [setContext]);
+  useAutoRefresh(load);
 
   return (
     <div>

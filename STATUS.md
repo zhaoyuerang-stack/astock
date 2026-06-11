@@ -1,8 +1,27 @@
 # STATUS — 当前进度
 
-> 更新:2026-06-10。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
+> 更新:2026-06-12。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
+
+**2026-06-12**: P5 债券轮动落地模拟盘 + web 端完整跟单闭环。
+  · **paper_trade 支持 511010 国债ETF**(P5,已 WF 验证 7/8 窗口:年化+25.7%/-12.5%/夏普1.90):四段执行顺序 卖股→卖债→买股→闲钱买债;BEAR 全部闲置资金买债,BULL 卖光换股;ETF 费率 0.05%(settings `etf_buy/sell_cost`);估值含债券。执行引擎抽到 `portfolio/paper_engine.py`(无 chdir,可被 API import),`scripts/ops/paper_trade.py` 只留 CLI+Obsidian。单测 `tests/test_paper_etf.py`(已挂 test_all.sh)。
+  · **ETF 数据修复**: `fetch_cross_asset_etf.py` 重写——增量 `update_etfs()` + 不复权 raw_* 列(旧文件只有后复权 145.x,盘口实价 141.x;成交/估值/跟单展示全用 raw),已接入 `scheduled_daily_update`(此前 ETF 无任何日更,停在 06-08)。`lake/cross_asset.py::load_etf_daily` 统一读取。510880/513100 当日代理被拦未补 raw,日更会自动重试。
+  · **web 模拟盘展示**: 新路由 `/paper`(plan/trades/nav 只读,`api/routers/paper.py` + `services/read/paper.py`);组合页改 4 tab(组合概览|今日操作卡|交易记录|净值曲线,`web/components/paper/`)。操作卡=今日成交+受阻明细+明日计划(参考价=信号日收盘)+债券轮动指令卡(醒目);净值曲线手写 SVG 零依赖。模拟盘全自动按真实盘 T+1 口径执行,**无人工确认环节**(人工确认按钮做了又删:系统定位是全自动模拟,不是人工跟单打卡)。
+  · **验证**: 真实数据沙盒买债 7000份@141.138 费494;重放 06-10 信号 pending 带 bond 指令,API/Obsidian 双端一致;test_all.sh + check_layer_deps + tsc/lint/build 全绿。account.json 改造前备份 `paper.bak.1781203988/`。
+  · 待观察: regime 无滞回(单日翻转即换仓)——已 WF 验证口径不私改,先记录切换频次,损耗超预期再立新假设走研究流程。
+
+**2026-06-11**: AutoResearch Lite 接通真实 L0/L1/L2/L3 流水线。
+  · **F-2 铁律 bug 修复**: `ast_to_hypothesis` DRAFTED→QUEUED(假 runner 测试掩盖,真跑必炸,见 LESSONS)。
+  · **neutralize 诚实化**: 运行时未实现就拒绝声明(validator)+ 种子 AST 不再带 neutralize。
+  · **真实 runner 契约测试**: 确定性合成面板逐级调真实 run_l0..l3 + 端到端 L0,零 mock。
+  · **真实 data_lake 验证**: 15 个种子候选全链路(75.6s)——14 个死 L1 成本闸门、1 个死 L0;纯 illiquidity 候选走完四级(L0 ICIR 0.34 → L1 年化 10.1% → L2 3/4 regime 正 → L3 9年7正 avg_sharpe 0.37 **SHELVE**)。复核队列零写入(无 PROMOTE),台账零写入。
+  · 入口: `services/actions/autoresearch.py::run_autoresearch_seeds` / `POST /experiments/autoresearch/run-seeds`。
+  · **前端实验室页**: `/experiments` 加 tab(假设池漏斗 | AutoResearch 实验室),新组件 `web/app/experiments/AutoResearchLab.tsx`——KPI/候选漏斗/运行种子(可选 L0~L3)/复核队列/候选台账,tsc+lint+build 全绿,端到端连真实 API 验证。
+  · **人工复核工作台**: `POST /experiments/autoresearch/review/{fingerprint}` approve/reject(`services/actions/autoresearch.py::review_autoresearch_candidate`)。approve→APPROVED **仍不写 LIVE 台账**(入册唯一通道仍是 workflow/promote);reject→REJECTED_BY_HUMAN。决策 append-only 进 review_queue.jsonl(latest-wins)+ 纳入 `/settings/audit` 审计流(kind=review);漏斗 review_queue 改为只数待复核。前端工作台:待复核行内 批准/拒绝 + 复核意见 + 已决策历史。
+  · **最后一公里**: `promote_approved_candidate` —— APPROVED 候选 → ast_to_hypothesis → `workflow.promote.promote_hypothesis`(phase1 合成防未来审计→phase2/3→phase4 唯一登记)。`POST /autoresearch/promote/{fp}`;前端已批准行「正式入册」按钮。本动作自身零台账写入。
+  · **LLM 候选生成**: `services/actions/autoresearch_llm.py` —— llm_adapter 加通用 complete();白名单 DSL spec + 近期候选结局注入 prompt,LLM 只产 JSON AST → validate+泄露守卫+fingerprint 去重 → 真实验证线。未配置 LLM 明确 400,不静默降级。`POST /autoresearch/run-llm`。
+  · **多岛屿搜索**: `factory/autoresearch/islands.py` —— AST 变异/杂交(白名单约束)+ N 岛独立进化 + 环形精英迁移,适应度=真实 run_l0 |ICIR|,冠军走 final_stage;确定性 rng(同 seed 同轨迹)。services 编排 LLM 按主题播种(不可用退种子,seeded_by 如实标注)。`POST /autoresearch/island-search`;真实 data_lake 验证 2岛×1代 12 评估 35s。注:rank-IC 对单调变换不变 → 语义等价 AST 可能不同 fingerprint(语义去重为后续优化)。
 
 **2026-06-10**: 全系统模块解耦收尾(architecture)。
   · **回测唯一权威**: `core.backtest` 兼容层退场(→`core/_deprecated_backtest.py.bak`),全仓 90+ 文件迁移到 `core.engine`/`strategies.small_cap`/`factors.small_cap`/`engine.metrics`/`factors.utils`,0 导入方残留。指标逐位不变(strategy_lake/test_engine/run_daily 全验证)。
@@ -42,8 +61,8 @@
 | 模拟盘 | ✅ | paper_trade.py → illiquidity v1.0 + band_exposure |
 | 失效监控 | ✅ | decay_monitor.py → illiquidity |
 | 健康检查 | ✅ | health_check.py + 桌面通知 + Obsidian |
-| 调度层 | ⏳ | launchd 待配置 |
-| 跨资产轮动 | ⏳ | P5 生产集成待做, 目前手动执行 |
+| 调度层 | ✅ | launchd 四件套:daily-update / weekly-maintenance / **api(:8011 常驻)** / **web(:3000 常驻)**,KeepAlive 自动拉起,`install_launchd_jobs.sh` 一键装 |
+| 跨资产轮动 | ✅ | P5 已入模拟盘自动执行(paper_engine 债券腿)+ web 操作卡跟单;实盘仍人工跟单 |
 
 ## 核心结论 (2026-06-08 更新)
 

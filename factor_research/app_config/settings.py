@@ -22,6 +22,9 @@ class CostModelConfig:
     buy_cost: float = 0.00225      # 0.225%
     sell_cost: float = 0.00275     # 0.275%
     financing_rate: float = 0.065  # 6.5% annual
+    # 场内 ETF(债券轮动腿):免印花税/过户费,佣金+点差保守上限 0.05%
+    etf_buy_cost: float = 0.0005
+    etf_sell_cost: float = 0.0005
 
 
 # ---------------------------------------------------------------------------

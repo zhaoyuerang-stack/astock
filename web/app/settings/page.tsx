@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import { api, pct } from "@/lib/api";
 import type { SystemConfigView, AuditView, LLMConfigView, LLMTestResult } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
+import { useAutoRefresh } from "@/lib/useAutoRefresh";
 
 function Row({ k, v, locked }: { k: string; v: React.ReactNode; locked?: boolean }) {
   return (
@@ -50,12 +51,17 @@ export default function SettingsPage() {
     try { setTest(await api.testLlm()); } catch (e) { setTest({ ok: false, message: String(e) }); }
   }
 
+  // LLM 配置只在挂载时拉一次:轮询会重置表单,覆盖正在编辑的输入
   useEffect(() => {
+    loadLlm();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const load = useCallback(() => {
     Promise.all([api.systemConfig(), api.audit(30)])
       .then(([cfg, a]) => {
         setC(cfg);
         setAudit(a);
-        loadLlm();
         setContext({
           page: "settings",
           title: "配置助手",
@@ -66,6 +72,7 @@ export default function SettingsPage() {
       })
       .catch((e) => setErr(String(e)));
   }, [setContext]);
+  useAutoRefresh(load);
 
   return (
     <div>

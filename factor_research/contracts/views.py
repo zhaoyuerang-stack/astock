@@ -168,6 +168,96 @@ class RegisteredExperimentView(BaseModel):
     data_scope: dict = Field(default_factory=dict)
 
 
+class AutoResearchCandidateView(BaseModel):
+    """Auto Factor Research candidate submitted as controlled JSON AST."""
+    fingerprint: str
+    status: str = ""
+    source: str = ""
+    ast: dict = Field(default_factory=dict)
+    complexity_score: float = 0.0
+    max_auto_stage: str = ""
+    notes: str = ""
+    created_at: str = ""
+
+
+class AutoResearchReviewItemView(BaseModel):
+    """Candidate promoted to human review. This is not LIVE registration."""
+    fingerprint: str
+    status: str = ""
+    decision: str = ""
+    reason: str = ""
+    candidate: dict = Field(default_factory=dict)
+    metrics: dict = Field(default_factory=dict)
+    review_action: str = ""    # "" = 待复核;approve / reject = 已人工决策
+    reviewer_notes: str = ""
+    reviewed_at: str = ""
+
+
+class AutoResearchReviewRequest(BaseModel):
+    action: str        # approve | reject
+    notes: str = ""
+
+
+class AutoResearchFunnelView(BaseModel):
+    """AutoResearch Lite funnel counts."""
+    total: int = 0
+    stages: list[dict] = Field(default_factory=list)
+    review_queue: int = 0
+
+
+class AutoResearchRunResultView(BaseModel):
+    fingerprint: str
+    status: str = ""
+    decision: str = ""
+    reason: str = ""
+    protocols: list[str] = Field(default_factory=list)
+
+
+class AutoResearchRunResponse(BaseModel):
+    vintage_id: str = ""
+    max_stage: str = "l0"
+    results: list[AutoResearchRunResultView] = Field(default_factory=list)
+
+
+class AutoResearchPromoteResponse(BaseModel):
+    """APPROVED 候选 → workflow phase1~4 正式入册的结果。"""
+    fingerprint: str
+    hypothesis_name: str = ""
+    version: str = ""
+    registered: bool = False
+    detail: str = ""
+
+
+class AutoResearchLLMGenResponse(BaseModel):
+    """LLM 生成候选并走真实验证线的结果。"""
+    model: str = ""
+    requested: int = 0
+    accepted: int = 0
+    rejected: list[str] = Field(default_factory=list)   # 每条 = 拒绝原因
+    run: AutoResearchRunResponse = Field(default_factory=AutoResearchRunResponse)
+
+
+class AutoResearchChampionView(BaseModel):
+    fingerprint: str
+    island: int = 0
+    generation: int = 0
+    icir: float = 0.0
+    expr: str = ""
+    status: str = ""
+    decision: str = ""
+    reason: str = ""
+
+
+class AutoResearchIslandSearchResponse(BaseModel):
+    """多岛屿进化搜索结果。"""
+    vintage_id: str = ""
+    islands: int = 0
+    generations: int = 0
+    evaluated: int = 0
+    seeded_by: str = "seeds"        # seeds | llm
+    champions: list[AutoResearchChampionView] = Field(default_factory=list)
+
+
 # ── Phase 5 Agent ──────────────────────────────────────────────────────────────
 class AgentAskRequest(BaseModel):
     request: str
@@ -194,7 +284,7 @@ class SystemConfigView(BaseModel):
 
 
 class AuditEntry(BaseModel):
-    kind: str = ""        # agent | control | backtest | config
+    kind: str = ""        # agent | control | backtest | config | review
     summary: str = ""
     detail: str = ""
     status: str = ""
@@ -228,3 +318,104 @@ class LLMConfigSet(BaseModel):
 class LLMTestResult(BaseModel):
     ok: bool = False
     message: str = ""
+
+
+# ── 模拟盘跟单(P5 债券轮动 · web 操作卡/流水/净值)────────────────────────────
+class PaperTradeRow(BaseModel):
+    """trades.csv 单行 —— 已成交记录。"""
+    date: str = ""
+    code: str = ""
+    name: str = ""
+    side: str = ""              # BUY | SELL
+    shares: int = 0
+    price: float = 0.0
+    notional: float = 0.0
+    cost: float = 0.0
+    cash_after: float = 0.0
+
+
+class PaperBlockedRow(BaseModel):
+    """真实盘约束未成交(停牌/一字板/ETF 无数据)。"""
+    side: str = ""
+    code: str = ""
+    name: str = ""
+    reason: str = ""
+
+
+class PaperPositionRow(BaseModel):
+    code: str = ""
+    name: str = ""
+    shares: int = 0
+    cost: float = 0.0
+    price: float | None = None  # None = 停牌
+    mv: float = 0.0
+    pnl: float = 0.0
+    asset: str = "stock"        # stock | etf
+
+
+class PaperPlanItem(BaseModel):
+    """明日计划单腿(参考价=信号日收盘,实际按 T+1 成交价模式)。"""
+    action: str = ""            # BUY | SELL
+    code: str = ""
+    name: str = ""
+    ref_price: float = 0.0
+    est_shares: int = 0
+    est_notional: float = 0.0
+
+
+class BondInstructionView(BaseModel):
+    """债券 ETF 轮动指令卡(P5)。"""
+    active: bool = False
+    side: str = ""              # BUY | SELL | HOLD | ""
+    code: str = "511010"
+    name: str = "国债ETF"
+    ref_price: float = 0.0
+    est_shares: int = 0
+    est_notional: float = 0.0
+    shares_held: int = 0
+    note: str = ""
+
+
+class TradePlanView(BaseModel):
+    """今日操作卡:今日成交 + 明日计划 + 轮动指令 + 账户 + 确认状态。"""
+    signal_date: str = ""
+    generated_at: str = ""
+    stale: bool = False
+    stale_reason: str = ""
+    regime: str = ""
+    regime_dist: float = 0.0
+    in_market: bool = False
+    band_exposure: float = 0.0
+    action: str = ""
+    executed: list[PaperTradeRow] = Field(default_factory=list)
+    blocked: list[PaperBlockedRow] = Field(default_factory=list)
+    plan: list[PaperPlanItem] = Field(default_factory=list)
+    bond: BondInstructionView | None = None
+    positions: list[PaperPositionRow] = Field(default_factory=list)
+    nav: float = 0.0
+    cash: float = 0.0
+    position_value: float = 0.0
+    total_return: float = 0.0
+    disclaimer: str = ""
+
+
+class NavPoint(BaseModel):
+    date: str = ""
+    nav: float = 0.0
+    cash: float = 0.0
+    position_value: float = 0.0
+    total_return: float = 0.0
+
+
+class NavCurveView(BaseModel):
+    points: list[NavPoint] = Field(default_factory=list)
+    inception: str = ""
+    init_capital: float = 0.0
+    latest_nav: float = 0.0
+    total_return: float = 0.0
+    max_drawdown: float = 0.0
+
+
+class PaperTradesView(BaseModel):
+    trades: list[PaperTradeRow] = Field(default_factory=list)
+    total: int = 0

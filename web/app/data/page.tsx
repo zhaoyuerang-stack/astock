@@ -1,18 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import MetricCard from "@/components/ui/MetricCard";
 import { api, pct } from "@/lib/api";
 import type { DataQualityView } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
+import { useAutoRefresh } from "@/lib/useAutoRefresh";
 
 export default function DataPage() {
   const [dq, setDq] = useState<DataQualityView | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const setContext = useAgent((s) => s.setContext);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     api
       .dataQuality()
       .then((d) => {
@@ -32,6 +33,7 @@ export default function DataPage() {
       })
       .catch((e) => setErr(String(e)));
   }, [setContext]);
+  useAutoRefresh(load);
 
   const tone = dq ? (dq.verdict === "可用" ? "ok" : dq.verdict === "关注" ? "warn" : "danger") : "default";
 

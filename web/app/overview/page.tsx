@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import MetricCard from "@/components/ui/MetricCard";
 import { api, pct, num } from "@/lib/api";
 import type { StrategyView, MarketStateView, FactorHealthView, DataQualityView } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
+import { useAutoRefresh } from "@/lib/useAutoRefresh";
 
 const FLOW = ["假设发现", "因子构建", "状态识别", "策略构建", "回测验证", "执行监控", "复盘迭代"];
 
@@ -17,7 +18,7 @@ export default function OverviewPage() {
   const [err, setErr] = useState<string | null>(null);
   const setContext = useAgent((s) => s.setContext);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     Promise.all([api.strategies(), api.marketState(), api.strategyHealth(), api.dataQuality()])
       .then(([s, m, h, d]) => {
         setStrategies(s);
@@ -37,6 +38,7 @@ export default function OverviewPage() {
       })
       .catch((e) => setErr(String(e)));
   }, [setContext]);
+  useAutoRefresh(load);
 
   const families = new Set(strategies.map((s) => s.family));
   const live = strategies.filter((s) => s.status === "在册").length;

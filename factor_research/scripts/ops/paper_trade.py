@@ -6,12 +6,12 @@
   · 等权 1/top_n,A股 100 股整数倍;成交/估值全用不复权价(daily_raw 的 raw_open/raw_close)
   · 本金 100 万,1.0x;成本 买 0.225% / 卖 0.275%
   · 回测口径(core 的 run_small_cap_strategy 收盘撮合)不动——回测归回测,成交归真实买卖
+执行引擎: portfolio/paper_engine.py(与 web 操作卡 services/read/paper.py 共享,本文件只管 CLI + Obsidian)
 状态: paper/account.json(含 pending) + trades.csv + nav.csv
 输出: <OBSIDIAN>/今日操作.md(覆盖) + 历史/YYYY-MM-DD.md(归档)
 用法(cwd=factor_research): /usr/bin/python3 -m scripts.ops.paper_trade [--preview]
 """
 import argparse
-import csv
 import json
 import os
 import sys
@@ -24,253 +24,13 @@ ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
+from portfolio.paper_engine import (  # noqa: E402
+    INIT_CAPITAL, LEVERAGE, BUY_COST, SELL_COST, ETF_BUY_COST, ETF_SELL_COST, SIGNALS,
+    load_names, load_account, save_account, append_trades, upsert_nav,
+    execute_to_target, valuation, estimate_basket, estimate_bond_order, get_close,
+)
 
-from app_config.settings import get_settings
-
-_cost_cfg = get_settings().cost
-
-INIT_CAPITAL = 1_000_000.0
-LEVERAGE = 1.0  # 模拟盘固定 1.0x (动态杠杆从 signal.band_exposure 传入)
-BUY_COST = _cost_cfg.buy_cost
-SELL_COST = _cost_cfg.sell_cost
-LOT = 100
-
-# ── 执行成交价模式 (2026-06-07 Task 1.2 audit 实证) ──
-# audit (2024-2025, simplified no-cost): open sh 2.29 → close sh 2.47 (+0.18)
-# 隔夜跳空 9% 显著高开 (>+1%) 是 open 模式损失主因
-# close 模式 = T+1 14:55 收盘价成交 (盘中冲击消化后), 避开高开摩擦
-# 选项: "open" (旧默认) | "close" (新默认) | "ohlc_mid" (10:30 近似) | "vwap_4"
-FILL_PRICE_MODE = os.environ.get("PAPER_FILL_MODE", "close")
-
-SIGNALS = ROOT / "signals"
-PAPER = ROOT / "paper"
-ACCOUNT_FP = PAPER / "account.json"
-TRADES_FP = PAPER / "trades.csv"
-NAV_FP = PAPER / "nav.csv"
-RAW = ROOT / "data_lake/price/daily_raw"
 OBSIDIAN = Path("/Users/kiki/Personal Wiki/30.output/A股v2.0模拟盘")
-
-
-# ── 价格:全部不复权(daily_raw)──
-def _raw(code):
-    fp = RAW / f"{code}.parquet"
-    return pd.read_parquet(fp) if fp.exists() else None
-
-
-def get_close(code, date):
-    """date(含)前最近不复权收盘——估值用。"""
-    df = _raw(code)
-    if df is None:
-        return None
-    df = df[pd.to_datetime(df["date"]) <= pd.Timestamp(date)]
-    return float(df["raw_close"].iloc[-1]) if len(df) else None
-
-
-def get_open(code, date):
-    """date 当天不复权开盘——T+1 成交价;停牌(当天无数据/无 open)返回 None。"""
-    df = _raw(code)
-    if df is None or "raw_open" not in df.columns:
-        return None
-    row = df[pd.to_datetime(df["date"]) == pd.Timestamp(date)]
-    if not len(row):
-        return None
-    o = row["raw_open"].iloc[0]
-    return float(o) if pd.notna(o) and o > 0 else None
-
-
-def get_fill_price(code, date, mode=None):
-    """按 FILL_PRICE_MODE 决定 T+1 成交价 (audit 2026-06-07 推荐 'close').
-    mode = "open" | "close" | "ohlc_mid" | "vwap_4"
-    停牌 (当天无数据) 返回 None。
-    """
-    mode = mode or FILL_PRICE_MODE
-    df = _raw(code)
-    if df is None:
-        return None
-    row = df[pd.to_datetime(df["date"]) == pd.Timestamp(date)]
-    if not len(row):
-        return None
-    if mode == "open":
-        v = row.get("raw_open", row.get("raw_close")).iloc[0]
-    elif mode == "close":
-        v = row["raw_close"].iloc[0]
-    elif mode == "ohlc_mid":
-        o, c = row["raw_open"].iloc[0], row["raw_close"].iloc[0]
-        if pd.isna(o) or pd.isna(c):
-            return None
-        v = (o + c) / 2
-    elif mode == "vwap_4":
-        o, h, l, c = (row["raw_open"].iloc[0], row["raw_high"].iloc[0],
-                      row["raw_low"].iloc[0], row["raw_close"].iloc[0])
-        if any(pd.isna(x) for x in [o, h, l, c]):
-            return None
-        v = (o + h + l + c) / 4
-    else:
-        raise ValueError(f"unknown FILL_PRICE_MODE: {mode}")
-    return float(v) if pd.notna(v) and v > 0 else None
-
-
-def get_prev_close(code, date):
-    """date 前一交易日不复权收盘——算涨跌停基准。"""
-    df = _raw(code)
-    if df is None:
-        return None
-    df = df[pd.to_datetime(df["date"]) < pd.Timestamp(date)]
-    return float(df["raw_close"].iloc[-1]) if len(df) else None
-
-
-# ── 涨跌停(按板块)──
-def limit_pct(code, name):
-    if name and "ST" in str(name).upper():
-        return 0.05
-    if code[:3] in ("300", "301", "688"):   # 创业板/科创
-        return 0.20
-    return 0.10                              # 主板(北交所已不在universe)
-
-
-def buyable_open(code, date, name):
-    """T+1 可买入价 (按 FILL_PRICE_MODE):未停牌且非开盘涨停;否则 None。
-    涨停约束仍按 T+1 开盘价判 (即使 fill_mode = close, 开盘涨停依然买不进)。"""
-    o = get_open(code, date)   # 涨跌停约束用开盘价
-    if o is None:
-        return None
-    pc = get_prev_close(code, date)
-    if pc and o >= round(pc * (1 + limit_pct(code, name)), 2) - 1e-6:   # 开盘即涨停(涨停价按分四舍五入)
-        return None
-    # 实际成交价按 FILL_PRICE_MODE
-    return get_fill_price(code, date)
-    return o
-
-
-def sellable_open(code, date, name):
-    """T+1 可卖出价 (按 FILL_PRICE_MODE):未停牌且非开盘跌停;否则 None。"""
-    o = get_open(code, date)   # 涨跌停约束用开盘价
-    if o is None:
-        return None
-    pc = get_prev_close(code, date)
-    if pc and o <= round(pc * (1 - limit_pct(code, name)), 2) + 1e-6:   # 开盘即跌停(跌停价按分四舍五入)
-        return None
-    # 实际成交价按 FILL_PRICE_MODE
-    return get_fill_price(code, date)
-
-
-# ── account / 流水 IO ──
-def load_names():
-    fp = ROOT / "data_lake/meta/codes.parquet"
-    if fp.exists():
-        df = pd.read_parquet(fp)
-        return dict(zip(df["code"].astype(str), df["name"]))
-    return {}
-
-
-def load_account():
-    if ACCOUNT_FP.exists():
-        return json.loads(ACCOUNT_FP.read_text())
-    return {"init_capital": INIT_CAPITAL, "inception": None, "cash": INIT_CAPITAL,
-            "positions": {}, "pending": None, "last_date": None}
-
-
-def save_account(acc):
-    PAPER.mkdir(exist_ok=True)
-    ACCOUNT_FP.write_text(json.dumps(acc, ensure_ascii=False, indent=2))
-
-
-def append_trades(rows):
-    PAPER.mkdir(exist_ok=True)
-    new = not TRADES_FP.exists()
-    with TRADES_FP.open("a", newline="") as f:
-        w = csv.writer(f)
-        if new:
-            w.writerow(["date", "code", "name", "side", "shares", "price", "notional", "cost", "cash_after"])
-        w.writerows(rows)
-
-
-def upsert_nav(date, nav, cash, pos_value, ret):
-    PAPER.mkdir(exist_ok=True)
-    rows = {}
-    if NAV_FP.exists():
-        with NAV_FP.open() as f:
-            for r in csv.DictReader(f):
-                rows[r["date"]] = r
-    rows[date] = {"date": date, "nav": f"{nav:.2f}", "cash": f"{cash:.2f}",
-                  "position_value": f"{pos_value:.2f}", "total_return": f"{ret:.6f}"}
-    with NAV_FP.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=["date", "nav", "cash", "position_value", "total_return"])
-        w.writeheader()
-        for d in sorted(rows):
-            w.writerow(rows[d])
-
-
-# ── T+1 开盘成交:把持仓调到 target ──
-def execute_to_target(acc, date, target, top_n, names, trades, blocked, leverage=None):
-    """leverage: 动态杠杆 (从 signal 的 band_exposure 传入). 默认 LEVERAGE 常量 (1.0)."""
-    if leverage is None:
-        leverage = LEVERAGE
-    target = set(target)
-    # 1. 卖出:持仓中不在 target 的(掉出名单),用 date 开盘价
-    for code in list(acc["positions"]):
-        if code in target:
-            continue
-        price = sellable_open(code, date, names.get(code))
-        if price is None:
-            blocked.append(("卖出", code, names.get(code, code), "停牌/一字跌停,卖不出"))
-            continue
-        pos = acc["positions"].pop(code)
-        notional = pos["shares"] * price
-        cost = notional * SELL_COST
-        acc["cash"] += notional - cost
-        trades.append([date, code, names.get(code, code), "SELL", pos["shares"],
-                       round(price, 3), round(notional, 2), round(cost, 2), round(acc["cash"], 2)])
-    # 2. 买入:target 中未持有的(新进名单),等权 total_equity/top_n,用 date 开盘价
-    pos_value = sum(p["shares"] * (get_close(c, date) or p["avg_cost"]) for c, p in acc["positions"].items())
-    budget_each = (acc["cash"] + pos_value) * leverage / top_n
-    for code in target:
-        if code in acc["positions"]:
-            continue
-        price = buyable_open(code, date, names.get(code))
-        if price is None:
-            blocked.append(("买入", code, names.get(code, code), "停牌/一字涨停,买不进"))
-            continue
-        shares = int(budget_each / price // LOT) * LOT
-        if shares <= 0:
-            continue
-        notional = shares * price
-        cost = notional * BUY_COST
-        if notional + cost > acc["cash"]:
-            continue
-        acc["cash"] -= notional + cost
-        acc["positions"][code] = {"shares": shares, "avg_cost": round(price, 3)}
-        trades.append([date, code, names.get(code, code), "BUY", shares,
-                       round(price, 3), round(notional, 2), round(cost, 2), round(acc["cash"], 2)])
-
-
-def valuation(acc, date):
-    pos_value = 0.0
-    detail = []
-    for code, pos in acc["positions"].items():
-        price = get_close(code, date)
-        mv = pos["shares"] * price if price else 0.0
-        pos_value += mv
-        pnl = (price - pos["avg_cost"]) * pos["shares"] if price else 0.0
-        detail.append({"code": code, "shares": pos["shares"], "cost": pos["avg_cost"],
-                       "price": price, "mv": mv, "pnl": pnl})
-    return acc["cash"] + pos_value, pos_value, detail
-
-
-def estimate_basket(date, codes, equity, top_n, names):
-    """按参考价(date 收盘)估算等权建仓清单——给"明日计划"/预览展示,实际按 T+1 开盘成交。"""
-    budget_each = equity * LEVERAGE / top_n
-    rows = []
-    for code in codes:
-        ref = get_close(code, date)
-        if not ref:
-            continue
-        shares = int(budget_each / ref // LOT) * LOT
-        if shares > 0:
-            rows.append((code, names.get(code, code), shares, ref, shares * ref))
-    return rows
 
 
 def fmt(x):
@@ -332,6 +92,17 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocke
         lines += [""]
     else:
         lines += ["**空仓观望**,明日开盘不建仓(若有持仓则次日开盘清仓)。", ""]
+    pend_bond = pend.get("bond") or {}
+    if pend_bond.get("enabled"):
+        est = estimate_bond_order(date, acc["cash"], pend_bond.get("code", "511010"))
+        if est:
+            sh, ref, est_amt = est
+            lines += [f"**🔄 债券轮动(BEAR)**:次日闲置资金买入 {pend_bond.get('code','511010')} "
+                      f"{pend_bond.get('name','国债ETF')} ≈ {sh} 份 × {ref:.3f} = {fmt(est_amt)}"
+                      f"(参考价=今收,费率 {ETF_BUY_COST:.2%})", ""]
+    elif acc.get("bond") and (acc["bond"] or {}).get("shares"):
+        lines += [f"**🔄 债券轮动(BULL)**:次日开盘卖出全部 {acc['bond']['code']} "
+                  f"{acc['bond'].get('name','国债ETF')} {acc['bond']['shares']} 份,资金买回股票", ""]
 
     lines += [
         "## 💰 账户", "", "| 指标 | 值 |", "|--|--|",
@@ -347,7 +118,8 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocke
         lines += ["## 📦 当前持仓", "", "| 代码 | 名称 | 股数 | 成本 | 现价 | 市值 | 浮盈 |", "|--|--|--|--|--|--|--|"]
         for d in sorted(detail, key=lambda x: -x["mv"]):
             pr = f"{d['price']:.2f}" if d["price"] else "停牌"
-            lines += [f"| {d['code']} | {names.get(d['code'], d['code'])} | {d['shares']} | "
+            dname = d.get("name") or names.get(d["code"], d["code"])
+            lines += [f"| {d['code']} | {dname} | {d['shares']} | "
                       f"{d['cost']:.2f} | {pr} | {fmt(d['mv'])} | {d['pnl']:+,.0f} |"]
         lines += [""]
     else:
@@ -489,15 +261,25 @@ def main():
             exec_from = pend["signal_date"]
             # 用 pending 记录的 leverage (band_exposure 动态杠杆) 执行;fallback 1.0
             execute_to_target(acc, date, pend["target"], signal["top_n"], names,
-                              trades, blocked, leverage=pend.get("leverage", LEVERAGE))
+                              trades, blocked, leverage=pend.get("leverage", LEVERAGE),
+                              bond=pend.get("bond"))
             if trades:
                 append_trades(trades)
+        # 记录本次执行摘要(web 操作卡展示受阻明细用;blocked 不进 trades.csv)
+        acc["last_exec"] = {"exec_date": date, "from_signal": exec_from,
+                            "blocked": [list(b) for b in blocked]}
         # 2. 记录新 pending:本信号 → 下个交易日开盘执行
         # leverage = band_exposure (动态),空仓时 0;fallback 旧字段或常量
         target = signal["holdings"] if signal["in_market"] else []
         pend_leverage = float(signal.get("band_exposure",
                                           signal.get("leverage", LEVERAGE))) if target else 0.0
-        acc["pending"] = {"signal_date": date, "target": target, "leverage": pend_leverage}
+        # 债券轮动指令(P5):BEAR → 次日闲置资金买国债ETF;BULL → 次日先卖光ETF再买股
+        rot = signal.get("rotation", {}) or {}
+        pend_bond = {"enabled": bool(rot.get("recommend_bond")),
+                     "code": rot.get("bond_code", "511010"),
+                     "name": rot.get("bond_name", "国债ETF")}
+        acc["pending"] = {"signal_date": date, "target": target, "leverage": pend_leverage,
+                          "bond": pend_bond}
         acc["last_date"] = date
 
     nav, pos_value, detail = valuation(acc, date)

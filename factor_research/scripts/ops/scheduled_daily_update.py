@@ -195,6 +195,17 @@ def run_updates(report, dry_run=False):
         traceback.print_exc()
 
     try:
+        print("[update] cross-asset ETF (不复权 raw 列,模拟盘债券轮动成交/估值用)")
+        from scripts.data.fetch_cross_asset_etf import update_etfs
+        etf_stats = update_etfs()
+        etf_ok = all(v.get("ok") for v in etf_stats.values())
+        report["etf_update"] = {"ok": etf_ok, "detail": etf_stats}
+    except Exception as exc:
+        report["etf_update"] = {"ok": False, "error": str(exc)}
+        print(f"[update] etf failed: {exc}")
+        traceback.print_exc()
+
+    try:
         print("[update] fundamental")
         result = update_lake.update_fundamental()
         manifest.update(result)

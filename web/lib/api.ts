@@ -2,6 +2,13 @@
 import type {
   AgentAskResponse,
   AuditView,
+  AutoResearchCandidateView,
+  AutoResearchFunnelView,
+  AutoResearchIslandSearchResponse,
+  AutoResearchLLMGenResponse,
+  AutoResearchPromoteResponse,
+  AutoResearchReviewItemView,
+  AutoResearchRunResponse,
   BacktestResult,
   DataQualityView,
   LLMConfigView,
@@ -11,8 +18,11 @@ import type {
   FunnelView,
   HypothesisView,
   MarketStateView,
+  NavCurveView,
+  PaperTradesView,
   PortfolioView,
   RegisteredExperimentView,
+  TradePlanView,
   RiskReport,
   StrategyView,
   SystemConfigView,
@@ -47,11 +57,47 @@ export const api = {
   strategyHealth: () => get<FactorHealthView[]>("/state/health"),
   marketState: () => get<MarketStateView>("/state/market"),
   portfolio: () => get<PortfolioView>("/portfolio"),
+  paperPlan: () => get<TradePlanView>("/paper/plan"),
+  paperTrades: (limit = 200) => get<PaperTradesView>(`/paper/trades?limit=${limit}`),
+  paperNav: () => get<NavCurveView>("/paper/nav"),
   risk: () => get<RiskReport>("/risk"),
   funnel: () => get<FunnelView>("/experiments/funnel"),
   hypotheses: (status?: string, limit = 60) =>
     get<HypothesisView[]>(`/experiments/hypotheses?${new URLSearchParams({ ...(status ? { status } : {}), limit: String(limit) })}`),
   registeredExperiments: () => get<RegisteredExperimentView[]>("/experiments/registered"),
+  autoresearchFunnel: () => get<AutoResearchFunnelView>("/experiments/autoresearch/funnel"),
+  autoresearchCandidates: (limit = 40) =>
+    get<AutoResearchCandidateView[]>(`/experiments/autoresearch/candidates?limit=${limit}`),
+  autoresearchReviewQueue: (limit = 20) =>
+    get<AutoResearchReviewItemView[]>(`/experiments/autoresearch/review-queue?limit=${limit}`),
+  reviewAutoresearch: (fingerprint: string, action: "approve" | "reject", notes = "") =>
+    post<AutoResearchReviewItemView>(`/experiments/autoresearch/review/${fingerprint}`, { action, notes }),
+  promoteAutoresearch: (fingerprint: string, version = "v1.0") =>
+    post<AutoResearchPromoteResponse>(`/experiments/autoresearch/promote/${fingerprint}?version=${encodeURIComponent(version)}`, {}),
+  runAutoresearchLLM: (params: { n?: number; theme?: string; max_stage?: string }) => {
+    const q = new URLSearchParams(
+      Object.entries(params)
+        .filter(([, v]) => v !== undefined && v !== null && v !== "")
+        .map(([k, v]) => [k, String(v)])
+    );
+    return post<AutoResearchLLMGenResponse>(`/experiments/autoresearch/run-llm?${q.toString()}`, {});
+  },
+  runIslandSearch: (params: { islands?: number; generations?: number; population?: number; final_stage?: string }) => {
+    const q = new URLSearchParams(
+      Object.entries(params)
+        .filter(([, v]) => v !== undefined && v !== null && v !== "")
+        .map(([k, v]) => [k, String(v)])
+    );
+    return post<AutoResearchIslandSearchResponse>(`/experiments/autoresearch/island-search?${q.toString()}`, {});
+  },
+  runAutoresearchSeeds: (params: { limit?: number; max_stage?: string; start?: string; sample_dates?: number | null }) => {
+    const q = new URLSearchParams(
+      Object.entries(params)
+        .filter(([, v]) => v !== undefined && v !== null && v !== "")
+        .map(([k, v]) => [k, String(v)])
+    );
+    return post<AutoResearchRunResponse>(`/experiments/autoresearch/run-seeds?${q.toString()}`, {});
+  },
   agentAsk: (request: string, context: Record<string, unknown> = {}) =>
     post<AgentAskResponse>("/agent/ask", { request, context }),
   systemConfig: () => get<SystemConfigView>("/settings/config"),

@@ -8,11 +8,21 @@ from __future__ import annotations
 
 import functools
 import json
+import threading
 from pathlib import Path
 
 from contracts.views import Holding, PortfolioView
 
 ROOT = Path(__file__).resolve().parents[2]
+
+_TARGET_LOCK = threading.Lock()
+_LAKE_FILES = ("data_lake/price/daily_all.parquet", "data_lake/price/daily_raw_all.parquet")
+
+
+def _data_version() -> tuple:
+    """数据版本指纹(湖文件 mtime)——日更后缓存自动失效,无需重启后端。"""
+    return tuple(int((ROOT / rel).stat().st_mtime_ns) if (ROOT / rel).exists() else 0
+                 for rel in _LAKE_FILES)
 
 
 def _read_json(rel: str):
@@ -27,10 +37,12 @@ def _latest_signal_json() -> dict:
 
 
 @functools.lru_cache(maxsize=8)
-def _target_cached(start: str, top_n: int, rebalance_days: int, factor_window: int) -> tuple:
+def _target_cached(start: str, top_n: int, rebalance_days: int, factor_window: int,
+                   data_version: tuple) -> tuple:
     """现算最新 top-N 选股权重并缓存(目标组合一天才变一次,无需每请求重算)。
 
-    缓存随进程生命周期;后端重启(或 --reload)即刷新。返回 hashable 元组。
+    缓存键含 data_version(湖文件 mtime):数据日更后自动重算,无需重启后端。
+    返回 hashable 元组。
     """
     from strategies.small_cap import load_price_panels, build_rebalance_weights
     from factors.small_cap import small_cap_factor
@@ -46,8 +58,13 @@ def _target_cached(start: str, top_n: int, rebalance_days: int, factor_window: i
 
 def target_portfolio(start: str = "2023-01-01", top_n: int = 25,
                      rebalance_days: int = 20, factor_window: int = 60) -> list[Holding]:
-    """最新 top-N 选股权重(canonical 路径,受控接缝;结果缓存,秒回)。"""
-    return [Holding(code=c, weight=w) for c, w in _target_cached(start, top_n, rebalance_days, factor_window)]
+    """最新 top-N 选股权重(canonical 路径,受控接缝;结果缓存,秒回)。
+
+    锁串行化:数据更新后首个请求重算(分钟级),并发请求等待同一份结果而非各自重算。
+    """
+    with _TARGET_LOCK:
+        rows = _target_cached(start, top_n, rebalance_days, factor_window, _data_version())
+    return [Holding(code=c, weight=w) for c, w in rows]
 
 
 def current_portfolio(with_target: bool = True) -> PortfolioView:
