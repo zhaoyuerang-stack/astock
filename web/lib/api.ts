@@ -1,6 +1,7 @@
 // FastAPI 客户端(Phase 0 services 接缝)。前端不做任何量化计算,只调 API。
 import type {
   AgentAskResponse,
+  AuditView,
   BacktestResult,
   DataQualityView,
   FactorHealthView,
@@ -12,6 +13,7 @@ import type {
   RegisteredExperimentView,
   RiskReport,
   StrategyView,
+  SystemConfigView,
 } from "./types";
 
 const BASE =
@@ -50,6 +52,8 @@ export const api = {
   registeredExperiments: () => get<RegisteredExperimentView[]>("/experiments/registered"),
   agentAsk: (request: string, context: Record<string, unknown> = {}) =>
     post<AgentAskResponse>("/agent/ask", { request, context }),
+  systemConfig: () => get<SystemConfigView>("/settings/config"),
+  audit: (limit = 40) => get<AuditView>(`/settings/audit?limit=${limit}`),
   runBacktest: (params: {
     start?: string;
     top_n?: number;

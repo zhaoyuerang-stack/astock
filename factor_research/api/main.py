@@ -10,7 +10,8 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import agent, backtest, data, experiments, factors, portfolio, risk, state, strategies
+from api.routers import (agent, backtest, data, experiments, factors, portfolio,
+                         risk, settings, state, strategies)
 
 app = FastAPI(title="Quant Research Platform API", version="0.0-phase0")
 
@@ -31,6 +32,7 @@ app.include_router(portfolio.router)
 app.include_router(risk.router)
 app.include_router(experiments.router)
 app.include_router(agent.router)
+app.include_router(settings.router)
 
 
 @app.get("/health")

@@ -179,3 +179,27 @@ export interface AgentAskResponse {
   risk: string | null;
   llm_ready: boolean;
 }
+
+// Phase 6 系统设置 / 审计
+export interface SystemConfigView {
+  cost: Record<string, number | boolean>;
+  strategy: Record<string, unknown>;
+  risk_policy: Record<string, number>;
+  data: Record<string, unknown>;
+  ai_model: { llm_ready: boolean; provider: string; mode: string };
+  services: { name: string; status: string }[];
+  quarantine_ranges: number;
+}
+
+export interface AuditEntry {
+  kind: string;
+  summary: string;
+  detail: string;
+  status: string;
+  actor: string;
+}
+
+export interface AuditView {
+  entries: AuditEntry[];
+  total: number;
+}

@@ -180,3 +180,27 @@ class AgentAskResponse(BaseModel):
     tool: str | None = None
     risk: str | None = None        # 命中工具的风险级
     llm_ready: bool = False        # 是否已接真 LLM(当前规则式 = False)
+
+
+# ── Phase 6 系统设置 / 审计 ─────────────────────────────────────────────────────
+class SystemConfigView(BaseModel):
+    cost: dict = Field(default_factory=dict)        # 含 locked=True(成本铁律只读)
+    strategy: dict = Field(default_factory=dict)
+    risk_policy: dict = Field(default_factory=dict)
+    data: dict = Field(default_factory=dict)
+    ai_model: dict = Field(default_factory=dict)
+    services: list[dict] = Field(default_factory=list)
+    quarantine_ranges: int = 0
+
+
+class AuditEntry(BaseModel):
+    kind: str = ""        # agent | control | backtest | config
+    summary: str = ""
+    detail: str = ""
+    status: str = ""
+    actor: str = ""       # human | system | agent
+
+
+class AuditView(BaseModel):
+    entries: list[AuditEntry] = Field(default_factory=list)
+    total: int = 0

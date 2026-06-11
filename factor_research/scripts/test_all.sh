@@ -36,4 +36,8 @@ echo "=== test_agent_phase5.py (Agent planner + 不越权分级) ==="
 python3 tests/test_agent_phase5.py
 
 echo ""
+echo "=== test_settings_phase6.py (系统设置 · 成本铁律只读 + 审计) ==="
+python3 tests/test_settings_phase6.py
+
+echo ""
 echo "🎉 All tests passed!"
