@@ -71,6 +71,10 @@ class LLMAdapter:
         """把工具结果写成中文解读,或 None(planner 用确定性 _summarize)。"""
         return None
 
+    def complete(self, system: str, user: str, max_tokens: int = 2000) -> str | None:
+        """通用补全(如 AutoResearch 候选生成)。不可用 / 失败 → None。"""
+        return None
+
     def ping(self) -> bool:
         """最小连通测试。子类做一次 1-token 调用,失败抛异常。"""
         return False
@@ -127,6 +131,12 @@ class OpenAICompatAdapter(LLMAdapter):
         except Exception:  # noqa: BLE001
             return None
 
+    def complete(self, system, user, max_tokens=2000):
+        try:
+            return self._chat(system, user, max_tokens=max_tokens)
+        except Exception:  # noqa: BLE001
+            return None
+
     def ping(self) -> bool:
         self._chat("你是助手", "回复:通", max_tokens=64)
         return True
@@ -172,6 +182,12 @@ class AnthropicAdapter(LLMAdapter):
         try:
             return self._msg("你是量化研究副驾驶,根据 JSON 写简洁中文解读,不得编造数字。",
                              f"问题:{request}\n工具:{tool_name}\n数据:{json.dumps(data, ensure_ascii=False)[:3000]}")
+        except Exception:  # noqa: BLE001
+            return None
+
+    def complete(self, system, user, max_tokens=2000):
+        try:
+            return self._msg(system, user, max_tokens=max_tokens)
         except Exception:  # noqa: BLE001
             return None
 

@@ -681,6 +681,12 @@ Personal Alpha 是同一数据湖的"干净版本"——策略层剥离，只保
 
 Personal Alpha 路径: `/Users/kiki/Personal Alpha`
 
+## 工程: 假 runner 测试掩盖铁律错配 (2026-06-11)
+
+AutoResearch → L0-L3 的桥接代码(`factory/autoresearch/pipeline.py`)写完后,所有 pipeline 测试都注入 fake runner,结果掩盖了一个真跑必炸的 bug:`ast_to_hypothesis` 产出 `DRAFTED` 状态,而 `run_l0` 的 F-2 铁律(cheap-first)在 try 块**外**断言进 L0 必须是 `QUEUED` → 第一次接真实 runner 直接 `InvariantViolation`。
+
+**教训**:跨模块桥接必须配**真实被调方的契约测试**——用确定性合成面板(不碰 data_lake,420 天×25 股带漂移)逐级调用真实 `run_l0..run_l3`,断言 `Experiment.result.error is None`。fake runner 只能测桥接自身的控制流,测不了契约;decision 交给真实 gate,不在断言范围。同类坑:声明了 `neutralize` 但运行时不执行 = 口径不透明,validator 现在直接拒绝未实现的声明。
+
 ## 关键决策
 - **文档治理**(2026-06):CLAUDE.md 精简(操作宪法)/ SPEC.md(架构)/ STATUS.md(进度)/ LESSONS.md(本文件)。别再把设计/进度往 CLAUDE.md 堆。
 - **母策略两层台账**(2026-06):口径降为版本属性;组合 vs 轮换待定(先只立分类)。

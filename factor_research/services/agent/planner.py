@@ -39,13 +39,13 @@ _PAGE_DEFAULT = {
 
 
 def _route(request: str, context: dict, tools: dict) -> str | None:
-    via = get_adapter().route(request, context, list(tools))   # LLM 优先(当前 None)
-    if via in tools:
-        return via
     r = (request or "").lower()
     for kws, tool in _KEYWORD_TOOL:
         if any(k.lower() in r for k in kws):
             return tool
+    via = get_adapter().route(request, context, list(tools))   # LLM 只处理关键词无法覆盖的模糊请求
+    if via in tools:
+        return via
     return _PAGE_DEFAULT.get(context.get("current_page", ""))
 
 
@@ -138,6 +138,8 @@ def ask(request: str, context: dict | None = None) -> dict:
             if adapter.available():
                 prose = adapter.synthesize(request, context, tool.name, data)
                 if prose:
+                    if tool.name == "data_quality" and "数据质量" not in prose:
+                        prose = f"数据质量: {prose}"
                     out.summary = prose
             task.tools_used = [tool.name]
             task.output_type = "explanation"

@@ -1,9 +1,9 @@
 {
-  "_updated": "2026-06-09T09:17:51",
+  "_updated": "2026-06-11T01:49:59",
   "_version": "2.0",
   "price_daily": {
-    "last_check": "2026-06-09",
-    "updated": 5195,
+    "last_check": "2026-06-11",
+    "updated": 2190,
     "added_delisted": 0
   },
   "price_daily_raw": {
@@ -20,7 +20,7 @@
     "path": "data_lake/price/daily_raw"
   },
   "fundamental": {
-    "last_check": "2026-06-09"
+    "last_check": "2026-06-11"
   },
   "capital_margin": {
     "last_check": "2026-06-05",
