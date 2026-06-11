@@ -133,6 +133,12 @@ def ask(request: str, context: dict | None = None) -> dict:
         try:
             data = tool.fn()
             out = _summarize(tool.name, data)
+            # LLM(若接入)只改写 summary 文字;evidence/risk/数字仍确定性 grounded
+            adapter = get_adapter()
+            if adapter.available():
+                prose = adapter.synthesize(request, context, tool.name, data)
+                if prose:
+                    out.summary = prose
             task.tools_used = [tool.name]
             task.output_type = "explanation"
         except Exception as e:  # noqa: BLE001

@@ -4,6 +4,8 @@ import type {
   AuditView,
   BacktestResult,
   DataQualityView,
+  LLMConfigView,
+  LLMTestResult,
   FactorHealthView,
   FactorView,
   FunnelView,
@@ -54,6 +56,10 @@ export const api = {
     post<AgentAskResponse>("/agent/ask", { request, context }),
   systemConfig: () => get<SystemConfigView>("/settings/config"),
   audit: (limit = 40) => get<AuditView>(`/settings/audit?limit=${limit}`),
+  getLlmConfig: () => get<LLMConfigView>("/settings/llm"),
+  setLlmConfig: (body: { provider: string; model: string; base_url: string; api_key?: string | null }) =>
+    post<LLMConfigView>("/settings/llm", body),
+  testLlm: () => post<LLMTestResult>("/settings/llm/test", {}),
   runBacktest: (params: {
     start?: string;
     top_n?: number;

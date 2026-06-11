@@ -12,10 +12,21 @@ from contracts.views import AuditEntry, AuditView
 
 ROOT = Path(__file__).resolve().parents[2]
 _TASK_LOG = ROOT / "data_lake" / "agent" / "agent_tasks.jsonl"
+_CONFIG_AUDIT = ROOT / "data_lake" / "agent" / "config_audit.jsonl"
 
 
 def recent_audit(limit: int = 40) -> AuditView:
     entries: list[AuditEntry] = []
+
+    # 配置变更(倒序)
+    if _CONFIG_AUDIT.exists():
+        for l in reversed([x for x in _CONFIG_AUDIT.read_text(encoding="utf-8").splitlines() if x.strip()][-limit:]):
+            try:
+                c = json.loads(l)
+            except ValueError:
+                continue
+            entries.append(AuditEntry(kind="config", summary=c.get("summary", ""),
+                                      detail=c.get("detail", ""), status=c.get("date", ""), actor="human"))
 
     # Agent 任务(倒序)
     if _TASK_LOG.exists():

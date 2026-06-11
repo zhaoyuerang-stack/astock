@@ -204,3 +204,27 @@ class AuditEntry(BaseModel):
 class AuditView(BaseModel):
     entries: list[AuditEntry] = Field(default_factory=list)
     total: int = 0
+
+
+# ── LLM 配置(UI 可写)──────────────────────────────────────────────────────────
+class LLMConfigView(BaseModel):
+    """给前端的当前 LLM 配置 —— key 永不回传明文。"""
+    provider: str = "none"
+    model: str = ""
+    base_url: str = ""
+    has_key: bool = False
+    key_hint: str = ""          # 形如 "sk-…ab",仅提示
+    llm_ready: bool = False
+
+
+class LLMConfigSet(BaseModel):
+    """前端提交的配置。api_key 留空 = 保留原 key(不覆盖)。"""
+    provider: str = "none"
+    model: str = ""
+    base_url: str = ""
+    api_key: str | None = None
+
+
+class LLMTestResult(BaseModel):
+    ok: bool = False
+    message: str = ""

@@ -35,14 +35,14 @@ def _services_status() -> list[dict]:
 
 def system_config() -> SystemConfigView:
     s = _settings()
-    from services.agent.llm_adapter import llm_ready
+    from services.agent.llm_adapter import ai_model_info
     from lake.cleaning import load_quarantine
     return SystemConfigView(
         cost={**(s.get("cost") or {}), "locked": True},   # 成本铁律,只读
         strategy=s.get("strategy") or {},
         risk_policy=s.get("risk_policy") or {},
         data=s.get("data") or {},
-        ai_model={"llm_ready": llm_ready(), "provider": "anthropic", "mode": "规则式" if not llm_ready() else "LLM"},
+        ai_model=ai_model_info(),   # {provider, model, base_url, llm_ready, mode}
         services=_services_status(),
         quarantine_ranges=len(load_quarantine()),
     )

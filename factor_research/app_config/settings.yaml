@@ -35,3 +35,19 @@ risk_policy:
   max_drawdown_warning: -0.15        # 回撤预警线
   max_drawdown_stop: -0.20           # 回撤降仓线
   max_turnover_annual: 25.0          # 年化换手上限(x)
+
+# Agent LLM —— 切模型只改这里(无 key/无配置 → 规则式 NullAdapter)。
+# LLM 只做"路由+解读",永不执行工具/下单(不越权门在 planner)。
+ai_model:
+  provider: none            # none | anthropic | openai_compatible
+  model: ""                 # deepseek-chat / qwen-max / claude-opus-4-8 / gpt-4o / glm-4 / kimi-k2 …
+  base_url: ""              # openai_compatible 必填
+  api_key_env: ANTHROPIC_API_KEY   # 从哪个环境变量读 key
+  # 示例:
+  #  DeepSeek : provider=openai_compatible model=deepseek-chat base_url=https://api.deepseek.com/v1 api_key_env=DEEPSEEK_API_KEY
+  #  通义Qwen : provider=openai_compatible model=qwen-max  base_url=https://dashscope.aliyun.com/compatible-mode/v1 api_key_env=DASHSCOPE_API_KEY
+  #  Kimi     : provider=openai_compatible model=moonshot-v1-8k base_url=https://api.moonshot.cn/v1 api_key_env=MOONSHOT_API_KEY
+  #  智谱GLM  : provider=openai_compatible model=glm-4 base_url=https://open.bigmodel.cn/api/paas/v4 api_key_env=ZHIPU_API_KEY
+  #  Ollama本地: provider=openai_compatible model=qwen2.5 base_url=http://localhost:11434/v1 api_key_env=OLLAMA_KEY(任填)
+  #  OpenAI   : provider=openai_compatible model=gpt-4o base_url=https://api.openai.com/v1 api_key_env=OPENAI_API_KEY
+  #  Anthropic: provider=anthropic model=claude-opus-4-8 api_key_env=ANTHROPIC_API_KEY

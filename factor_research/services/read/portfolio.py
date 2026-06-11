@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import functools
 import json
 from pathlib import Path
 
@@ -25,9 +26,12 @@ def _latest_signal_json() -> dict:
     return json.loads(files[-1].read_text(encoding="utf-8")) if files else {}
 
 
-def target_portfolio(start: str = "2023-01-01", top_n: int = 25,
-                     rebalance_days: int = 20, factor_window: int = 60) -> list[Holding]:
-    """最新 top-N 选股权重(canonical 路径,受控接缝)。"""
+@functools.lru_cache(maxsize=8)
+def _target_cached(start: str, top_n: int, rebalance_days: int, factor_window: int) -> tuple:
+    """现算最新 top-N 选股权重并缓存(目标组合一天才变一次,无需每请求重算)。
+
+    缓存随进程生命周期;后端重启(或 --reload)即刷新。返回 hashable 元组。
+    """
     from strategies.small_cap import load_price_panels, build_rebalance_weights
     from factors.small_cap import small_cap_factor
 
@@ -35,9 +39,15 @@ def target_portfolio(start: str = "2023-01-01", top_n: int = 25,
     factor = small_cap_factor(amount, window=factor_window)
     weights = build_rebalance_weights(factor, close, top_n=top_n, rebalance_days=rebalance_days)
     if not weights:                       # dict {effective_date: Series(等权 top_n)}
-        return []
+        return ()
     latest = weights[max(weights.keys())].sort_values(ascending=False)
-    return [Holding(code=str(c), weight=float(w)) for c, w in latest.items()]
+    return tuple((str(c), float(w)) for c, w in latest.items())
+
+
+def target_portfolio(start: str = "2023-01-01", top_n: int = 25,
+                     rebalance_days: int = 20, factor_window: int = 60) -> list[Holding]:
+    """最新 top-N 选股权重(canonical 路径,受控接缝;结果缓存,秒回)。"""
+    return [Holding(code=c, weight=w) for c, w in _target_cached(start, top_n, rebalance_days, factor_window)]
 
 
 def current_portfolio(with_target: bool = True) -> PortfolioView:

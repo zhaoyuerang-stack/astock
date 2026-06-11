@@ -186,7 +186,7 @@ export interface SystemConfigView {
   strategy: Record<string, unknown>;
   risk_policy: Record<string, number>;
   data: Record<string, unknown>;
-  ai_model: { llm_ready: boolean; provider: string; mode: string };
+  ai_model: { llm_ready: boolean; provider: string; mode: string; model?: string; base_url?: string };
   services: { name: string; status: string }[];
   quarantine_ranges: number;
 }
@@ -202,4 +202,18 @@ export interface AuditEntry {
 export interface AuditView {
   entries: AuditEntry[];
   total: number;
+}
+
+export interface LLMConfigView {
+  provider: string;
+  model: string;
+  base_url: string;
+  has_key: boolean;
+  key_hint: string;
+  llm_ready: boolean;
+}
+
+export interface LLMTestResult {
+  ok: boolean;
+  message: string;
 }
