@@ -80,3 +80,49 @@ export interface MarketStateView {
   last_rebalance_date: string | null;
   n_holdings: number;
 }
+
+// Phase 3 组合 / 风控
+export interface Holding {
+  code: string;
+  weight: number;
+}
+
+export interface PortfolioView {
+  nav: number;
+  cash: number;
+  current_positions: Holding[];
+  stance: string;
+  regime: string;
+  note: string;
+  target_holdings: Holding[];
+  target_as_of: string | null;
+  target_note: string;
+}
+
+export interface RiskRuleCheck {
+  rule: string;
+  threshold: number;
+  current: number | null;
+  status: "ok" | "warn" | "breach" | "na";
+  note: string;
+}
+
+export interface ControlAction {
+  action_id: string;
+  object_type: string;
+  object_id: string;
+  trigger_state: string;
+  action: string;
+  reason: string;
+  recommendation: string;
+  requires_confirmation: boolean;
+  executed: boolean;
+  executed_by: string;
+}
+
+export interface RiskReport {
+  evaluated_on: string;
+  checks: RiskRuleCheck[];
+  control_actions: ControlAction[];
+  verdict: "正常" | "预警" | "超限";
+}

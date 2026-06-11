@@ -5,6 +5,8 @@ import type {
   FactorHealthView,
   FactorView,
   MarketStateView,
+  PortfolioView,
+  RiskReport,
   StrategyView,
 } from "./types";
 
@@ -25,6 +27,8 @@ export const api = {
   dataQuality: () => get<DataQualityView>("/data/quality"),
   strategyHealth: () => get<FactorHealthView[]>("/state/health"),
   marketState: () => get<MarketStateView>("/state/market"),
+  portfolio: () => get<PortfolioView>("/portfolio"),
+  risk: () => get<RiskReport>("/risk"),
   runBacktest: (params: {
     start?: string;
     top_n?: number;

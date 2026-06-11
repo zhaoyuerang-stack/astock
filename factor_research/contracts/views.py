@@ -93,3 +93,38 @@ class MarketStateView(BaseModel):
     last_signal_date: str | None = None
     last_rebalance_date: str | None = None
     n_holdings: int = 0
+
+
+# ── Phase 3 组合 / 风控 ─────────────────────────────────────────────────────────
+class Holding(BaseModel):
+    code: str
+    weight: float
+
+
+class PortfolioView(BaseModel):
+    """当前组合(实盘/纸面)+ 目标组合(选股层 top-N)。"""
+    nav: float = 0.0
+    cash: float = 0.0
+    current_positions: list[Holding] = Field(default_factory=list)
+    stance: str = ""              # 当前动作(如 空仓观望)
+    regime: str = ""              # bull/bear/...
+    note: str = ""                # 如 BEAR→国债ETF
+    target_holdings: list[Holding] = Field(default_factory=list)
+    target_as_of: str | None = None
+    target_note: str = ""
+
+
+class RiskRuleCheck(BaseModel):
+    rule: str
+    threshold: float
+    current: float | None = None   # None = 无法计算(如空仓/缺数据)
+    status: str = "ok"             # ok | warn | breach | na
+    note: str = ""
+
+
+class RiskReport(BaseModel):
+    """风控评估:逐条规则 + 超限生成的控制动作。"""
+    evaluated_on: str = ""         # target / current
+    checks: list[RiskRuleCheck] = Field(default_factory=list)
+    control_actions: list[dict] = Field(default_factory=list)  # ControlAction dicts
+    verdict: str = "正常"          # 正常 | 预警 | 超限

@@ -25,3 +25,13 @@ factory:
   top_n_choices: [15, 20, 25, 40, 60, 80, 120]
   leverage_choices: [1.0, 1.25]
   review_corr_threshold: 0.50
+
+# 声明式风控规则(Phase 3)。services/read/risk 据此评估组合 → 超限生成 ControlAction。
+# 注:行业/市值集中度规则待 data_lake 补 industry_map/market_cap 后再加(当前无数据,不臆造)。
+risk_policy:
+  max_single_position_weight: 0.10   # 单票最大权重
+  max_position_count: 30             # 最大持仓数
+  max_leverage: 1.30                 # 杠杆上限(生产 1.25)
+  max_drawdown_warning: -0.15        # 回撤预警线
+  max_drawdown_stop: -0.20           # 回撤降仓线
+  max_turnover_annual: 25.0          # 年化换手上限(x)

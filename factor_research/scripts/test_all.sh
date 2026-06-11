@@ -28,4 +28,8 @@ echo "=== test_services_phase0.py (产品 services 接缝;全量比对设 PHASE0
 python3 tests/test_services_phase0.py
 
 echo ""
+echo "=== test_risk_phase3.py (风控控制回路;集成设 PHASE3_FULL=1) ==="
+python3 tests/test_risk_phase3.py
+
+echo ""
 echo "🎉 All tests passed!"
