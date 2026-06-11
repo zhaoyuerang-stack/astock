@@ -1,0 +1,67 @@
+"""Phase 5 验证:Agent planner 工具路由 + 不越权分级。
+
+Run: cd factor_research && python3 tests/test_agent_phase5.py
+"""
+import os
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+os.chdir(ROOT)
+
+from services.agent.planner import ask
+from services.agent.tools import tool_registry, requires_confirmation
+
+
+def test_tool_whitelist_risk():
+    reg = tool_registry()
+    assert reg["data_quality"].risk == "readonly"
+    assert reg["run_backtest"].risk == "mid"
+    assert reg["rebalance"].risk == "high" and reg["rebalance"].fn is None
+    print(f"✅ 工具白名单 {len(reg)} 个,风险分级正确")
+
+
+def test_high_risk_never_auto_executes():
+    """不越权铁律:调仓(high)→ requires_human_confirmation,绝不执行。"""
+    r = ask("帮我降仓调仓", {"current_page": "portfolio"})
+    assert r["tool"] == "rebalance" and r["risk"] == "high"
+    assert r["output"]["requires_human_confirmation"] is True
+    print("✅ 高风险(调仓)→ 仅提案待确认,系统不自动执行")
+
+
+def test_mid_risk_requires_confirmation():
+    r = ask("跑一下回测", {"current_page": "backtest"})
+    assert r["tool"] == "run_backtest" and r["output"]["requires_human_confirmation"] is True
+    print("✅ 中风险(回测)→ 需二次确认")
+
+
+def test_readonly_executes_and_grounds():
+    r = ask("当前数据质量怎么样", {"current_page": "data"})
+    assert r["tool"] == "data_quality"
+    assert r["output"]["requires_human_confirmation"] is False
+    assert "数据质量" in r["output"]["summary"]
+    print(f"✅ 只读(数据质量)→ 自动执行并解读:{r['output']['summary'][:40]}…")
+
+
+def test_page_context_routing():
+    r = ask("看看", {"current_page": "risk"})   # 无明确关键词 → 按页面默认
+    assert r["tool"] == "risk"
+    print("✅ 页面上下文路由:risk 页 → risk 工具")
+
+
+def test_llm_not_ready_but_works():
+    r = ask("帮助", {})
+    assert r["llm_ready"] is False   # 无 key,规则式
+    print("✅ 无 LLM key 时规则式可用(llm_ready=False)")
+
+
+if __name__ == "__main__":
+    print("Running Phase 5 agent tests...\n")
+    test_tool_whitelist_risk()
+    test_high_risk_never_auto_executes()
+    test_mid_risk_requires_confirmation()
+    test_readonly_executes_and_grounds()
+    test_page_context_routing()
+    test_llm_not_ready_but_works()
+    print("\n🎉 Phase 5 agent tests passed!")

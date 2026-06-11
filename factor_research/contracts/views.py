@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from contracts.models import AgentOutput
+
 
 class BacktestResult(BaseModel):
     """``services.actions.run_backtest`` 的返回。
@@ -164,3 +166,17 @@ class RegisteredExperimentView(BaseModel):
     config: dict = Field(default_factory=dict)
     metrics: dict = Field(default_factory=dict)
     data_scope: dict = Field(default_factory=dict)
+
+
+# ── Phase 5 Agent ──────────────────────────────────────────────────────────────
+class AgentAskRequest(BaseModel):
+    request: str
+    context: dict = Field(default_factory=dict)   # {current_page, selected_object_id, ...}
+
+
+class AgentAskResponse(BaseModel):
+    output: AgentOutput
+    task_id: str
+    tool: str | None = None
+    risk: str | None = None        # 命中工具的风险级
+    llm_ready: bool = False        # 是否已接真 LLM(当前规则式 = False)

@@ -160,3 +160,22 @@ export interface RegisteredExperimentView {
   metrics: Record<string, number>;
   data_scope: Record<string, unknown>;
 }
+
+// Phase 5 Agent
+export interface AgentOutput {
+  summary: string;
+  evidence: string[];
+  risk: string[];
+  recommendation: string[];
+  next_actions: string[];
+  confidence: number;
+  requires_human_confirmation: boolean;
+}
+
+export interface AgentAskResponse {
+  output: AgentOutput;
+  task_id: string;
+  tool: string | null;
+  risk: string | null;
+  llm_ready: boolean;
+}

@@ -13,9 +13,43 @@ RISK_HIGH = "high"              # 调仓/下单/改风控规则 → 必须确认
 
 REQUIRES_CONFIRMATION = {RISK_MID, RISK_HIGH}
 
-# Phase 0:空。Phase 5 形如 {"run_backtest": (callable, RISK_MID), ...}
-TOOL_WHITELIST: dict[str, tuple] = {}
-
-
 def requires_confirmation(risk_level: str) -> bool:
     return risk_level in REQUIRES_CONFIRMATION
+
+
+# ── Phase 5:工具注册表(services 函数 = 工具)──────────────────────────────────
+from dataclasses import dataclass
+from typing import Callable, Optional
+
+
+@dataclass(frozen=True)
+class Tool:
+    name: str
+    risk: str
+    desc: str
+    fn: Optional[Callable]   # None = 仅提案不执行(高风险动作)
+
+
+def tool_registry() -> dict[str, Tool]:
+    """白名单工具。读类 = readonly(自动);run_backtest = mid;调仓 = high(仅提案)。
+
+    懒导入避免模块级循环;Agent 只能调本表内工具。
+    """
+    from services.read import factors as fac, registry as reg
+    from services.read import experiments as ex, portfolio as pf, risk as rk, state as st
+
+    def _backtest(**kw):
+        from services.actions.run_backtest import run_backtest
+        return run_backtest(**kw).model_dump()
+
+    return {
+        "data_quality":  Tool("data_quality", RISK_READONLY, "数据质量状态", lambda: st.data_quality().model_dump()),
+        "market_state":  Tool("market_state", RISK_READONLY, "当前持仓/动作状态", lambda: st.market_state().model_dump()),
+        "factors":       Tool("factors", RISK_READONLY, "alpha 因子家族", lambda: [f.model_dump() for f in fac.list_factors()]),
+        "strategies":    Tool("strategies", RISK_READONLY, "母策略台账", lambda: [s.model_dump() for s in reg.list_strategies()]),
+        "portfolio":     Tool("portfolio", RISK_READONLY, "当前/目标组合", lambda: pf.current_portfolio().model_dump()),
+        "risk":          Tool("risk", RISK_READONLY, "风控评估", lambda: rk.risk_report().model_dump()),
+        "experiments":   Tool("experiments", RISK_READONLY, "假设池漏斗", lambda: ex.funnel().model_dump()),
+        "run_backtest":  Tool("run_backtest", RISK_MID, "跑生产口径回测(算力开销)", _backtest),
+        "rebalance":     Tool("rebalance", RISK_HIGH, "调仓执行", None),  # 仅提案,系统永不自动执行
+    }

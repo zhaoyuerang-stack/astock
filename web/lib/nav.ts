@@ -7,6 +7,6 @@ export const NAV = [
   { href: "/portfolio", label: "组合管理", ready: true },
   { href: "/risk", label: "风险控制", ready: true },
   { href: "/experiments", label: "研究实验", ready: true },
-  { href: "/agent", label: "AI研究助手", ready: false },
+  { href: "/agent", label: "AI研究助手", ready: true },
   { href: "/settings", label: "系统设置", ready: false },
 ] as const;

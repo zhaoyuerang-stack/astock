@@ -1,5 +1,6 @@
 // FastAPI 客户端(Phase 0 services 接缝)。前端不做任何量化计算,只调 API。
 import type {
+  AgentAskResponse,
   BacktestResult,
   DataQualityView,
   FactorHealthView,
@@ -22,6 +23,17 @@ async function get<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`API ${path} → ${res.status} ${res.statusText}`);
+  return res.json() as Promise<T>;
+}
+
 export const api = {
   base: BASE,
   health: () => get<{ status: string; phase: number }>("/health"),
@@ -36,6 +48,8 @@ export const api = {
   hypotheses: (status?: string, limit = 60) =>
     get<HypothesisView[]>(`/experiments/hypotheses?${new URLSearchParams({ ...(status ? { status } : {}), limit: String(limit) })}`),
   registeredExperiments: () => get<RegisteredExperimentView[]>("/experiments/registered"),
+  agentAsk: (request: string, context: Record<string, unknown> = {}) =>
+    post<AgentAskResponse>("/agent/ask", { request, context }),
   runBacktest: (params: {
     start?: string;
     top_n?: number;

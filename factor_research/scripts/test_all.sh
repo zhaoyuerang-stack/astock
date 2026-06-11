@@ -32,4 +32,8 @@ echo "=== test_risk_phase3.py (风控控制回路;集成设 PHASE3_FULL=1) ==="
 python3 tests/test_risk_phase3.py
 
 echo ""
+echo "=== test_agent_phase5.py (Agent planner + 不越权分级) ==="
+python3 tests/test_agent_phase5.py
+
+echo ""
 echo "🎉 All tests passed!"
