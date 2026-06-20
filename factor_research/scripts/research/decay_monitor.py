@@ -137,6 +137,31 @@ Path("reports/decay_status.json").write_text(json.dumps({
 }, ensure_ascii=False, indent=2))
 print("  → 状态已写 reports/decay_status.json")
 
+# ── §5.4 缝④: governance.decay 通用复测 — 扫所有在册版本收益,decayed 写退役复核清单 ──
+# 让 governance.decay 真正被自动路径消费(此前建好没接);退役执行仍人确认(§6),不自动下架。
+from governance.decay import decay_check
+_vr = ROOT / "data_lake" / "version_returns"
+_retire = []
+if _vr.exists():
+    for _csv in sorted(_vr.glob("*.csv")):
+        try:
+            _s = pd.read_csv(_csv, index_col=0, parse_dates=True).iloc[:, 0].dropna()
+        except Exception:
+            continue
+        _dc = decay_check(_s)
+        if _dc.get("decayed"):
+            _retire.append({"version": _csv.stem, "reasons": _dc["reasons"],
+                            "rolling_3y_sharpe": _dc.get("rolling_3y_sharpe_latest"),
+                            "action": _dc["action"]})
+Path("reports/research").mkdir(parents=True, exist_ok=True)
+Path("reports/research/retirement_review.json").write_text(json.dumps({
+    "updated": str(close.index[-1].date()),
+    "decayed_count": len(_retire),
+    "candidates": _retire,
+    "note": "decayed = 滚动3年夏普<0.5 或 RankIC连续4季<0;退役执行仍人确认(§6),非自动下架。",
+}, ensure_ascii=False, indent=2))
+print(f"  → §5.4 通用复测: {len(_retire)} 个在册版本触发退役复核 → reports/research/retirement_review.json")
+
 # ── Plot ──
 fig, ax = plt.subplots(3, 1, figsize=(12, 9), sharex=True)
 ax[0].plot(roll_ic.index, roll_ic.values)

@@ -35,6 +35,11 @@ def cmd_generate(args):
         hyps = hyps[: args.count]
 
     added, dup = pool.add_many(iter(hyps))
+    # 持久化诚实搜索数(§5.1):本次新增(去重后)候选计入 autoresearch 血缘累计 → DSR 惩罚来源。
+    if added > 0:
+        from governance.trial_ledger import record_trials
+        cum = record_trials("autoresearch", added, context=f"factory_cli mutate ({args.source})")
+        print(f"  [trial_ledger] autoresearch 累计搜索 = {cum}")
     print(f"generated={len(hyps)}  added={added}  dup={dup}  pool_total={len(pool)}")
     return 0
 

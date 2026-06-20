@@ -23,6 +23,8 @@ from core.analysis.nine_gates import NineGatesEvaluator, NineGatesReport
 from services.actions.autoresearch_search import run_island_search, run_autoresearch_island_search
 from factory.autoresearch.repositories import CandidateRepository, ReviewQueue, ExperimentLog
 from strategies.small_cap import load_price_panels
+from governance.trial_ledger import honest_n_trials  # LOOP_ENGINEERING §5.1(record 下沉到 orchestrator)
+from governance.holdout import boundary, assert_search_clean, validate_on_holdout  # §5.2
 
 
 def main():
@@ -38,6 +40,14 @@ def main():
     # 2. Run Island Search to evolve factors
     print("\n[Step 1] Running Multi-Island Evolutionary Search...", flush=True)
     try:
+        # Holdout 合规(§5.2):演化只见 <boundary,绝不触金库。载面板截断后传入。
+        HOLDOUT = boundary()
+        _c, _v, _a = load_price_panels("2018-01-01")
+        _mask = _c.index < HOLDOUT
+        _c, _v, _a = _c[_mask], _v[_mask], _a[_mask]
+        assert_search_clean(_c.index, label="周度岛屿搜索")  # 自查门:数据越界即 fail-fast
+        _fwd = _c.shift(-20) / _c - 1.0  # 前向收益(搜索窗内,边界前 fwd 天 NaN,不越金库)
+        print(f"  [holdout] 搜索窗截到 <{HOLDOUT.date()}({_c.shape[0]}日),金库段不参与演化", flush=True)
         # We run 3 islands, 3 generations, population of 6
         # Set use_llm=True so it uses AI if keys are present, otherwise falls back
         search_res = run_autoresearch_island_search(
@@ -50,9 +60,12 @@ def main():
             sample_dates=120,
             repository=repository,
             experiment_log=experiment_log,
-            review_queue=review_queue
+            review_queue=review_queue,
+            close=_c, volume=_v, amount=_a, forward_ret=_fwd,  # 截断面板 → holdout 合规
         )
         print(f"  Evolved factors complete. Evaluated: {search_res.evaluated}.")
+        # trial 记账已下沉到 run_autoresearch_island_search(§5.1 chokepoint),此处不再重复,
+        # 避免双计。honest_n_trials("autoresearch") 仍由 9-Gate 在下方读取。
         
         # Copy newly evolved candidate experiments to the immutable ResearchLedger
         try:
@@ -99,9 +112,22 @@ def main():
 
     print(f"\n[Step 2] Found {len(promoted)} candidates promoted to review. Running 9-Gate audits...", flush=True)
 
-    # Load data for evaluation
-    close, volume, amount = load_price_panels("2018-01-01")
+    # Load data for evaluation. 保留全样本面板(close_full)仅供晋级前唯一一次 holdout 校验;
+    # 9-Gate 是选择层,只看 < boundary 的切片(§5.2:补上"评估半边"的洞,loop 不得触碰金库)。
+    close_full, volume_full, amount_full = load_price_panels("2018-01-01")
+    close = close_full[close_full.index < HOLDOUT]
+    volume = volume_full[volume_full.index < HOLDOUT]
+    amount = amount_full[amount_full.index < HOLDOUT]
+    assert_search_clean(close.index, label="9-Gate 评估")
     prices = PricePanel(close=close, volume=volume, amount=amount)
+
+    # §5.3 缝④:预算一次在册 ACTIVE 组合(<boundary)收益,供逐候选边际真 alpha 判冗余。
+    try:
+        from portfolio.strategy_runners import run_active
+        book_search = {k: v[v.index < HOLDOUT] for k, v in run_active(start="2018-01-01").items()}
+    except Exception as _bk_err:
+        book_search = None
+        print(f"  [marginal] 在册组合加载失败,跳过边际判定: {_bk_err}", flush=True)
 
     for item in promoted:
         from factory.autoresearch.models import Candidate, CandidateStatus
@@ -164,12 +190,67 @@ def main():
                 factor_df=factor_df,
                 factor_builder=wrapped_builder,
                 thesis=thesis,
-                n_trials=10,
+                n_trials=honest_n_trials("autoresearch"),  # 读账本累计,替代手填 10(§5.1)
                 forward_days=20
             )
 
             reports = evaluator.evaluate_all(signal, start="2018-01-01")
             passed_all = all(r.passed for r in reports)
+
+            # §5.2 晋级前唯一一次 holdout 校验:可部署形态(因子+veto 权重)的全样本收益,
+            # validate_on_holdout 只读 ≥boundary 段。best-effort——失败不吞 9-Gate 报告;
+            # 崩(夏普<0.6)→holdout_failed,仅作 review 证据,本脚本不自动晋级(文档 §6)。
+            from core.engine import BacktestEngine, BacktestConfig, CostModel
+            ret_full = None  # §5.3 缝④:供 holdout 与 marginal 复用;holdout try 内赋值
+            try:
+                veto_full = salience_covariance_veto(close_full).shift(1)
+                factor_full = spec.factor_builder(close_full, volume_full, amount_full, close_full.index)
+                weights_full = build_rebalance_weights(
+                    factor_full, close_full, top_n=25, rebalance_days=20,
+                    veto_factor=veto_full, veto_q=0.30,
+                )
+                ho_cost = CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065)
+                ret_full = BacktestEngine(
+                    prices=PricePanel(close=close_full, volume=volume_full, amount=amount_full),
+                    config=BacktestConfig(start="2018-01-01", cost=ho_cost, leverage=1.0),
+                ).run(Signal(weights=weights_full)).returns
+                ho = validate_on_holdout(f"autoresearch_{fp[:8]}", ret_full)
+                ho_sharpe_ok = isinstance(ho.get("sharpe"), (int, float)) and ho["sharpe"] >= 0.6
+                # §5.2 缝②:金库 DSR 算得动则必须显著(跨候选多重检验);短段算不动退回夏普门兜底
+                ho_ok = ho_sharpe_ok and ho.get("holdout_dsr_sig") is not False
+                print(f"  [holdout] 段夏普 {ho.get('sharpe', 0):.2f} (n={ho.get('n')}, "
+                      f"金库试过{ho.get('holdout_trials')}候选/DSR_p={ho.get('holdout_dsr_p')}, "
+                      f"偷看{ho.get('peek_count')}次) → {'通过' if ho_ok else 'holdout_failed'}", flush=True)
+                try:
+                    review_queue.record_fields(
+                        fp, holdout_sharpe=round(float(ho.get("sharpe", 0) or 0), 3),
+                        holdout_ok=bool(ho_ok), holdout_peek=int(ho.get("peek_count", 1)),
+                        holdout_dsr_p=ho.get("holdout_dsr_p"), holdout_trials=ho.get("holdout_trials"),
+                    )
+                except Exception:
+                    pass
+            except Exception as ho_err:
+                ho, ho_ok = {"note": f"{type(ho_err).__name__}: {str(ho_err)[:80]}"}, False
+                print(f"  [holdout] 校验异常(跳过,不影响 9-Gate 报告): {ho_err}", flush=True)
+
+            # §5.3 缝④:边际真 alpha — 候选去掉对在册组合暴露后是否还赚钱(高相关+残差弱=冗余同质变体)
+            mg = {"marginal_verdict": "未计算"}
+            if ret_full is not None and book_search is not None:
+                try:
+                    from governance.marginal import marginal_alpha
+                    mg = marginal_alpha(ret_full[ret_full.index < HOLDOUT], book_search)
+                    print(f"  [marginal] {mg.get('marginal_verdict')} "
+                          f"(corr={mg.get('corr_to_book')}, 残差夏普={mg.get('residual_sharpe')})", flush=True)
+                    try:
+                        review_queue.record_fields(
+                            fp, marginal_verdict=mg.get("marginal_verdict"),
+                            marginal_resid_sharpe=mg.get("residual_sharpe"),
+                            marginal_corr=mg.get("corr_to_book"),
+                        )
+                    except Exception:
+                        pass
+                except Exception as mg_err:
+                    mg = {"marginal_verdict": f"未能计算: {type(mg_err).__name__}"}
 
             # Build markdown report
             report = NineGatesReport(
@@ -183,7 +264,28 @@ def main():
             report_dir.mkdir(parents=True, exist_ok=True)
             report_path = report_dir / f"autoresearch_{fp[:8]}_9_gates_report.md"
             
-            report_path.write_text(report.to_markdown(), encoding="utf-8")
+            ho_md = (
+                f"\n\n## Holdout 金库校验(LOOP_ENGINEERING §5.2)\n"
+                f"- 金库边界 **{HOLDOUT.date()}**(≥此为 holdout,搜索/9-Gate 从未使用)\n"
+            )
+            if ho.get("note"):
+                ho_md += f"- {ho['note']}\n- 判定: ⚠️ 未能校验,需人工复核\n"
+            else:
+                _dsr_tag = (' ✅显著' if ho.get('holdout_dsr_sig') else
+                            (' ❌不显著' if ho.get('holdout_dsr_sig') is False else ' (短段未算)'))
+                ho_md += (
+                    f"- holdout 段: 年化 {ho.get('annual', 0):+.1%} / 夏普 {ho.get('sharpe', 0):.2f} / "
+                    f"回撤 {ho.get('maxdd', 0):+.1%}(n={ho.get('n')})\n"
+                    f"- 多重检验(§5.2 缝②): 金库已试 {ho.get('holdout_trials')} 候选, DSR_p={ho.get('holdout_dsr_p')}{_dsr_tag}, "
+                    f"偷看 {ho.get('peek_count')} 次\n"
+                    f"- 判定: {'✅ 通过(夏普≥0.6 且金库多重检验过关)' if ho_ok else '❌ **holdout_failed** — 不予晋级'}\n"
+                )
+            ho_md += (
+                f"\n## 边际真 alpha(§5.3 缝④)\n"
+                f"- 判定: {mg.get('marginal_verdict')}(对在册组合 corr={mg.get('corr_to_book')}, "
+                f"去暴露后残差夏普={mg.get('residual_sharpe')})\n"
+            )
+            report_path.write_text(report.to_markdown() + ho_md, encoding="utf-8")
             print(f"  ✅ 9-Gate audit report saved to:\n  {report_path}")
 
         except Exception as e:

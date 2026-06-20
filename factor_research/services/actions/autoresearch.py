@@ -216,6 +216,8 @@ def promote_approved_candidate(
     promote_kwargs = {"run_marginal": run_marginal}
     if target_status:
         promote_kwargs["target_status"] = target_status
+    # §5.2:把候选的 holdout 校验 id 透传给 phase4 金库闸(scheduled_factor_search 已写记录)
+    promote_kwargs["holdout_id"] = f"autoresearch_{fingerprint[:8]}"
     report = promote_fn(hyp, version=version, **promote_kwargs)
 
     registered = bool(report is not None and getattr(report, "registered", False))

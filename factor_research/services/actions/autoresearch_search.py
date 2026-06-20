@@ -16,6 +16,7 @@ from contracts.views import (
 from factory.autoresearch import CandidateRepository
 from factory.autoresearch.islands import run_island_search
 from factory.autoresearch.walkforward import run_walk_forward_search
+from governance.trial_ledger import record_trials  # §5.1 chokepoint:搜索即记账
 
 from .autoresearch import _load_validation_data
 from .autoresearch_llm import generate_llm_candidates
@@ -133,6 +134,10 @@ def run_autoresearch_island_search(
         experiment_log=experiment_log,
         review_queue=review_queue,
     )
+    # §5.1 chokepoint:每次真实搜索都记账,honest_n_trials 据此惩罚 DSR。所有 orchestrator
+    # 调用者(scheduled_factor_search / research 脚本)经此自动累计,不靠各 caller 自觉——
+    # 杜绝「搜了不记 = DSR 虚松」(LOOP_ENGINEERING §5.1 半接失守的根治)。
+    record_trials("autoresearch", max(1, int(result.evaluated)), context="island search")
     return AutoResearchIslandSearchResponse(
         vintage_id=vintage,
         islands=islands,
@@ -214,6 +219,8 @@ def run_autoresearch_walk_forward(
         experiment_log=experiment_log,
         review_queue=review_queue,
     )
+    # §5.1 chokepoint:walk-forward 搜索同样记账(此前完全漏计 = DSR 虚松)。
+    record_trials("autoresearch", max(1, int(result.evaluated)), context="walk-forward search")
     return AutoResearchWalkForwardResponse(
         vintage_id=vintage,
         cutoff=result.cutoff,

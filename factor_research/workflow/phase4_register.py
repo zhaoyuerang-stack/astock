@@ -30,6 +30,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent.parent
 LESSONS_DIR = ROOT / "workflow" / "pending_lessons"
 LESSONS_DIR.mkdir(parents=True, exist_ok=True)
+_HOLDOUT_VALIDATIONS = ROOT / "data_lake" / "governance" / "holdout_validations.jsonl"
 
 
 def _extract_nine_gate_summary(phase2_data, phase3_data) -> dict:
@@ -48,6 +49,42 @@ def _extract_nine_gate_summary(phase2_data, phase3_data) -> dict:
         "wf_verdict": agg.get("verdict"),
     }
     return {k: v for k, v in out.items() if v is not None}
+
+
+def _holdout_gate(holdout_id: str, *, min_sharpe: float = 0.6) -> tuple[Optional[str], dict]:
+    """§5.2 登记前金库闸:holdout_id 提供时,要求存在一条**通过**的 holdout 校验记录。
+
+    读 data_lake/governance/holdout_validations.jsonl(由 governance.holdout.validate_on_holdout
+    写入),按 candidate_id 取最新一条。返回 (block_reason 或 None, holdout_summary)。
+    无记录 / 夏普 < min_sharpe → 返回 block_reason(触碰金库或金库段崩,§5.2 拒绝登记)。
+    holdout_id 为空 → (None, {}),由调用方决定软告警(向后兼容历史/手动登记)。
+    """
+    if not holdout_id:
+        return None, {}
+    rec = None
+    if _HOLDOUT_VALIDATIONS.exists():
+        for line in _HOLDOUT_VALIDATIONS.read_text().splitlines():
+            if not line.strip():
+                continue
+            try:
+                d = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if d.get("candidate_id") == holdout_id:
+                rec = d  # 取最后一条 = 最新
+    if rec is None:
+        return (f"无 holdout 校验记录(candidate_id={holdout_id});§5.2 要求晋级前唯一一次金库校验", {})
+    m = rec.get("holdout_metrics", {})
+    sh = m.get("sharpe")
+    dsr_sig = rec.get("holdout_dsr_sig")
+    summary = {"holdout_sharpe": sh, "holdout_n": m.get("n"),
+               "holdout_trials": rec.get("holdout_trials"), "holdout_dsr_p": rec.get("holdout_dsr_p"),
+               "peek_count": rec.get("peek_count"), "boundary": rec.get("boundary")}
+    if not isinstance(sh, (int, float)) or sh < min_sharpe:
+        return (f"holdout 校验未通过(夏普={sh} < {min_sharpe});§5.2 金库段崩→拒绝登记", summary)
+    if dsr_sig is False:
+        return (f"holdout DSR 不显著(已 {rec.get('holdout_trials')} 候选试过同段金库,多重检验后不成立);§5.2 缝②", summary)
+    return None, summary
 
 
 # ---------------------------------------------------------------------------
@@ -288,6 +325,7 @@ class Phase4Register:
         hypothesis_id: str = "",
         evidence_experiment_ids: Optional[list] = None,
         target_status: str = "",
+        holdout_id: str = "",
     ) -> RegistrationReport:
         """Register strategy. Saves lessons regardless; registers only if all clear or forced."""
 
@@ -310,6 +348,19 @@ class Phase4Register:
                 registered=False, repro_meta=repro, lessons_saved=n_lessons,
                 detail=f"Blocked: {blocked}", status="blocked",
             )
+
+        # §5.2 holdout 金库闸:holdout_id 提供时强制要求通过记录;缺省软告警(向后兼容)。
+        ho_block, ho_summary = _holdout_gate(holdout_id)
+        if holdout_id and ho_block and not force:
+            print(f"  Registration BLOCKED (holdout §5.2): {ho_block}", flush=True)
+            print(f"  Use force=True to override.", flush=True)
+            return RegistrationReport(
+                family=self.family, version=self.version,
+                registered=False, repro_meta=repro, lessons_saved=n_lessons,
+                detail=f"Blocked: {ho_block}", status="blocked",
+            )
+        if not holdout_id:
+            print("  ⚠️ 无 holdout_id:跳过 §5.2 金库校验(手动/历史登记路径,不阻断)", flush=True)
 
         # Build metrics from Phase 2+3
         metrics = self._build_metrics(phase2_data, phase3_data)
@@ -349,6 +400,7 @@ class Phase4Register:
                         for r in (phase1_results or [])
                     ),
                     "reproducibility": repro,
+                    "holdout": ho_summary,
                 },
                 metrics=metrics,
                 status=reg_status,

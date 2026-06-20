@@ -44,10 +44,13 @@ def search_cross_asset_legs(
     """
     from portfolio.composer import compose, metrics as pm
     from portfolio.strategy_runners import _load_etf_close, _run_etf_trend, run_active
+    from governance.holdout import boundary, assert_search_clean  # §5.2 缝③:择优不得碰金库
 
-    a_ret = run_active(start=start)
+    HOLDOUT = boundary()
+    a_ret = {k: v[v.index < HOLDOUT] for k, v in run_active(start=start).items()}
     book_returns = list(a_ret.values())
     book_eq = pd.DataFrame(a_ret).dropna().mean(axis=1)
+    assert_search_clean(book_eq.index, label="跨资产防御腿搜索")  # 自查门:择优数据越界即报错
     worst = book_eq <= book_eq.quantile(0.20)
     base_rp, _ = compose(a_ret, method="risk_parity")
     mb = pm(base_rp)
@@ -60,6 +63,7 @@ def search_cross_asset_legs(
                 r = _run_etf_trend(code, ma=ma, start=start).dropna()
             except Exception:
                 continue
+            r = r[r.index < HOLDOUT]  # §5.2 缝③:腿收益也截到搜索窗,Δsharpe 不含金库
             if len(r) < 200:
                 continue
             ann = float(r.mean() * 252)
