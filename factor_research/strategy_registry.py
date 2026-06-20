@@ -73,7 +73,8 @@ def register_family(id, name, hypothesis="", regime="", decay_signal="", status=
 
 
 def register(family, version, desc, config, data_scope, metrics, status="候选", notes="",
-             evidence=None, admission=None, nine_gate=None, date_str=None):
+             evidence=None, admission=None, nine_gate=None, date_str=None,
+             spec=None, spec_hash=None):
     """登记/更新某母策略下的一个版本（同 family+version 覆盖）
 
     hit：一律由 ``engine.metrics.compute_hit`` 按 metrics 里的 annual/maxdd 重算并覆盖，
@@ -89,6 +90,21 @@ def register(family, version, desc, config, data_scope, metrics, status="候选"
     fam = next((f for f in data["families"] if f["id"] == family), None)
     if fam is None:
         raise ValueError(f"母策略 '{family}' 未登记，请先 register_family('{family}', ...)")
+
+    # 0) ExecutableStrategySpec 校验(Task 5)：提供 spec 则身份必须自洽——
+    #    spec_hash 与重算一致、family/version 与登记参数一致。不提供则向后兼容(历史/手动登记)。
+    spec_record = None
+    if spec is not None:
+        from core.strategy_spec import ExecutableStrategySpec
+        parsed = ExecutableStrategySpec.from_dict(spec)
+        parsed.validate()
+        if spec_hash is not None and parsed.spec_hash != spec_hash:
+            raise ValueError(
+                f"{family}/{version} spec_hash 不匹配：重算={parsed.spec_hash[:12]} 传入={str(spec_hash)[:12]}")
+        if parsed.family != family or parsed.version != version:
+            raise ValueError(
+                f"策略身份不匹配：spec={parsed.family}/{parsed.version} 登记={family}/{version}")
+        spec_record = {"spec": parsed.to_dict(), "spec_hash": parsed.spec_hash}
 
     # 1) hit 由公式重算覆盖——杜绝手填记分牌
     metrics = dict(metrics or {})
@@ -128,6 +144,7 @@ def register(family, version, desc, config, data_scope, metrics, status="候选"
         "evidence": evidence or {},
         "admission": adm,
         "nine_gate": nine_gate or {},
+        **({"executable_spec": spec_record} if spec_record else {}),
     })
     fam["versions"].sort(key=lambda v: v["version"])
     _save(data)
