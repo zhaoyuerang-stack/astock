@@ -17,6 +17,22 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+try:
+    import pytest
+
+    @pytest.fixture(autouse=True)
+    def _restore_registry_path():
+        """hermetic:每个测试结束后恢复 R.REGISTRY,避免临时台账污染后续测试文件
+        (全量 pytest 发现下,本文件多处把 R.REGISTRY 指向 tmp;不恢复会污染 risk_phase3 等)。"""
+        import strategy_registry as R
+        saved = R.REGISTRY
+        try:
+            yield
+        finally:
+            R.REGISTRY = saved
+except ImportError:
+    pass  # 作为 __main__ 脚本直跑时无 pytest;独立进程不会污染他人
+
 
 # ── A1: compute_hit 唯一权威（严格不等号）+ 机构级指标 ──────────────────────────
 def test_compute_hit_strict_boundaries():

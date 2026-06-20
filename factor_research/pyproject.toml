@@ -60,7 +60,8 @@ exclude = ["data*", "data_lake*", "docs*", "logs*", "paper*", "results*", "repor
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-testpaths = ["tests"]
+# tests/ 全量 + 根目录唯一的 pytest 风格模块 test_engine.py(其余根 test_*.py 是脚本,由 test_all.sh 单跑)
+testpaths = ["tests", "test_engine.py"]
 addopts = "-q"
 
 [tool.ruff]
