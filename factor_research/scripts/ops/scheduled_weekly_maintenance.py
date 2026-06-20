@@ -123,6 +123,13 @@ def run_weekly(args):
                 [PYTHON, "scripts/ops/scheduled_factor_search.py"],
                 dry_run=args.dry_run,
             )
+            # 跨资产防御腿边际搜索:equity 搜索已证 ≈0 边际,本步把发现算力对准
+            # 唯一无条件正边际的分散源(国债/黄金腿),按对在册 Δsharpe 排序标 SHADOW。
+            report["cross_asset_leg_search"] = run_subprocess(
+                "cross-asset defensive-leg search (边际透镜,标 SHADOW 推荐)",
+                [PYTHON, "scripts/ops/scheduled_cross_asset_leg_search.py"],
+                dry_run=args.dry_run,
+            )
             # 自动补审:对任何「在册」但缺 DSR 审计的版本(配置已知者)自动跑 9-Gate 并落台账,
             # 保持台账多重检验覆盖不留空(行业级因子等不适配者会被记 SKIP)。
             report["audit_stale"] = run_subprocess(

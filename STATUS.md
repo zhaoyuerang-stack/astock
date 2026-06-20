@@ -4,6 +4,11 @@
 
 ## 一句话
 
+**2026-06-19(发现引擎对准跨资产防御腿)**: 把已验证**唯一无条件正边际**的分散源——跨资产防御腿边际搜索——接进周度调度,堵上「自动发现算力全烧在 ≈0 边际的 equity 红海」的缺口。
+  · **新增** `scripts/ops/scheduled_cross_asset_leg_search.py`:复用 reusable 契约 `portfolio.cross_asset.search_cross_asset_legs`(与 `portfolio_cli --discover-legs`/research 脚本同一函数,杜绝算法漂移),在边际透镜下搜 {5 ETF × MA{20,40,60,120,240}},按对在册 ACTIVE 组合 Δsharpe 排序、标 SHADOW 推荐,落 `reports/research/cross_asset_leg_search.json`(latest + 按日期归档)。本地 data_lake ETF close,**不联网**。
+  · **挂载** `scheduled_weekly_maintenance.py`:排在 `factor_search` 之后、`audit_stale` 之前;与 factor_search 同为研究旁路(不进 weekly status 必须项,失败不标 failed)。dry-run 验证挂载、分层守卫过。
+  · **首跑诚实信号**:`SHADOW 推荐(0)`——因基线 `run_active()` 已含 06-14 转 ACTIVE 的国债 MA60+黄金 MA60,候选池里**已无超过现有 ACTIVE 的新腿**(国债/黄金已在册自相关 +1.00、其余恒生/红利/纳指是伪 beta 负边际)。这是「防御腿已饱和」的正确监控信号,非失败;将来 ETF 数据漂移/新增 ETF/某腿失效移出 ACTIVE 时会自动重新推荐。**遗留可选优化**:候选池仍含已 ACTIVE 的精确 (code,ma) 腿,以自相关噪音行出现,可后续从池中排除使输出更干净(不影响"是否有新腿"结论)。
+
 **2026-06-19(因子页升级为机构级研究审计面板)**: 把 `/factors` 策略表从「收益排行榜」改成「哪些因子还没被杀死」的审计面板,并把 9-Gate 已算但被丢弃的证据全量落库可视化。
   · **后端透传**: `StrategyView` 增 `style_betas/failure_boundaries/decay_signal`(家族级只读,`services/read/registry`)。
   · **Phase 2A 加宽留存**: `NineGatesReport.summarize()` 此前只留 DSR/PSR/WF/CV/tail——把 gate2(`nw_icir`/`monotonicity_corr`/`ic_decay`)、gate3(`neut_nw_icir`/`icir_retention` 中性化后残差)、gate6(`cost_decay_rate`/`capacity_limit_aum`/`annual_1x/2x/3x`)、gate7(`bull/bear_sharpe` regime 拆分)一并落台账(全是已算丢弃,非新计算)。重跑 11 在册回填。实测 illiquidity/v3.1:neut retention 169%(中性化后反升=真特质 alpha)、cost decay 64%、**bull 5.2 / bear -4.9(强 regime 依赖)**。
