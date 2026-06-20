@@ -17,6 +17,7 @@
 2. **订阅 agent 在 build-time / acquisition-time(爆发产出产物),不在 run-time**。它们产出代码/下载的文件,交给常驻系统 7×24 消费;产出后即走,别空转烧额度。
 3. **判断恒为确定性代码**(Alpha Audit NW+RidgeCV+置换 / L0-L3 / 回测 / 入册门槛)——任何 agent、任何模型都不得代替(承 `CLAUDE.md` LLM 分工铁律)。
 4. **worktree 隔离 + 文件不重叠**:两个编码 agent 绝不同时改同一批文件(必冲突)。跨轨交接走明确目录/格式契约。
+5. **提交纪律(所有 agent 一律遵守:Claude / Codex / Antigravity / 任何后来者)**:共享工作树下,**绝不 `git add -A` / `git add .` / `git commit -a`**——一锅端会把别的 agent 半成品改动卷进你的 commit。只用**显式路径** `git add <file>...`,提交前 `git diff --cached` 核对每行都 trace 到本次意图,别人的改动留在工作树不碰;不擅自切分支 / reset / rebase 共享分支。完整 6 点见 `CLAUDE.md` 工作约定「提交纪律」;codex / Antigravity / Cursor 另见仓库根 `AGENTS.md`(跨工具共读)。
 
 ---
 

@@ -1490,6 +1490,112 @@
       }
     },
     {
+      "id": "illiquidity-large-cap",
+      "versions": [
+        {
+          "version": "v1.0",
+          "date": "2026-06-19",
+          "desc": "大中盘非流动性溢价策略v1.0：A股Top800成交额股池 + Amihud因子 + 30%凸显性风控否决 + MA16趋势择时（日频执行）",
+          "config": {
+            "factor": "Amihud illiquidity (|ret|/amount).rolling(20)",
+            "veto": "Faded Salience Covariance (-ST_cov) bottom 30% excluded",
+            "timing": "PureTrend MA16 Binary Gated (dynamic leverage 0-1.25x)",
+            "top_n": 25,
+            "rebal_days": 20,
+            "universe_size": 800
+          },
+          "data_scope": {
+            "source": "data_lake",
+            "period": "2018-2026",
+            "survivorship_bias": false
+          },
+          "metrics": {
+            "annual": 0.5825964264883672,
+            "maxdd": -0.1765620463290659,
+            "sharpe": 2.1558270237237767,
+            "calmar": 3.2996696549526754,
+            "hit": true,
+            "annual_2018": 0.5982322425092605,
+            "maxdd_2018": -0.1765620463290659,
+            "sharpe_2018": 2.3522617867551867,
+            "annual_2023": 0.5633305702361757,
+            "maxdd_2023": -0.1732138325779472,
+            "sharpe_2023": 1.9340056870383255,
+            "annual_2010": 1.0287873523504125,
+            "maxdd_2010": -0.18939766508664302,
+            "sharpe_2010": 3.6290496388010327
+          },
+          "status": "在册",
+          "notes": "首个机构级大中盘（大容量） standalone 在册策略。全区间（2018-2026）年化58.26%，回撤-17.66%，夏普比率2.16。通过 9-Gate 完整审计。在 5亿 AUM 规模下净夏普比率仍然可达 1.74。",
+          "evidence": {
+            "hypothesis_id": "large_cap_illiquidity_9_gates_report",
+            "experiment_ids": [
+              "task-493"
+            ]
+          },
+          "admission": {
+            "track": "standalone",
+            "rationale": "单体达标（年化>15% 且 回撤<20%）"
+          },
+          "nine_gate": {
+            "run_date": "2026-06-19",
+            "passed_all": true,
+            "dsr": 2.2843700253743706,
+            "dsr_p": 0.011174896822476632,
+            "dsr_significant": true,
+            "psr": 0.9999999997614173,
+            "n_trials": 6,
+            "wf_sharpe": 3.1102666297300128,
+            "wf_positive_ratio": 1.0,
+            "cv_sharpe": 3.1102666297300128,
+            "cv_win_rate": 1.0,
+            "sortino": 1.9223197262863942,
+            "var_95": 0.023797800963992158,
+            "cvar_95": 0.03725011254765869,
+            "tail_ratio": 1.3400140105721614,
+            "ic_mean": 0.07788025514127284,
+            "nw_icir": 0.12614597712045197,
+            "ic_win_rate": 0.7051087506322711,
+            "monotonicity_corr": 0.9999999999999999,
+            "ic_decay": {
+              "1": 0.02315499728004259,
+              "5": 0.04487760189814495,
+              "10": 0.060228075915403634,
+              "20": 0.07807444949272138
+            },
+            "neut_nw_icir": 0.4419597322623363,
+            "icir_retention": 1.6914728819552094,
+            "cost_decay_rate": 0.4622563089571472,
+            "capacity_limit_aum": 2000000000,
+            "annual_1x": 0.5825964264883672,
+            "annual_2x": 0.4479419896282989,
+            "annual_3x": 0.3132875527682306,
+            "bull_sharpe": 3.1240042624023845,
+            "bear_sharpe": -6.376739263206083,
+            "bull_annual": 1.1005262664924989,
+            "bear_annual": -0.12047844827586206,
+            "gate4_verdict": "PASS",
+            "gate7_verdict": "PASS"
+          }
+        }
+      ],
+      "name": "大中盘非流动性溢价策略",
+      "hypothesis": "在A股Top 800大容量股票池中，非正常的流动性萎缩伴随价格波动的背离（非流动性异常）流动性溢价蕴含显著的风险补偿，通过30%凸显性协方差风控排除高风险股，并挂载日频MA16二值择时规避宏观大盘熊市回撤。",
+      "regime": "中大盘成长与价值均衡期，且指数运行在MA16之上；调仓为20日（年化换手 44.17 倍）。",
+      "decay_signal": "Amihud因子中性化Rank ICIR持续低于0.05 / 大中盘日成交额整体萎缩 / 与其他小盘主策略相关性显著上升。",
+      "status": "active",
+      "style_betas": {
+        "size": 0.05,
+        "liquidity": -0.45,
+        "volatility": 0.15
+      },
+      "capacity_m": 500.0,
+      "failure_boundaries": {
+        "max_drawdown": -0.25,
+        "rolling_12m_sharpe": 0.8
+      }
+    },
+    {
       "id": "industry-neglect-rotation",
       "versions": [
         {

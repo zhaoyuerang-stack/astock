@@ -1,8 +1,13 @@
 # STATUS — 当前进度
 
-> 更新:2026-06-19。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
+> 更新:2026-06-20。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
+
+**2026-06-20 (首个大中盘策略正式晋级与登记在册)**: 针对 A 股大中盘流动性风险补偿，正式登记并晋级首个大容量在册单体策略 `illiquidity-large-cap v1.0`。
+  · **审计合格**: 顺利通过 9-Gate R2P 完整审计，DSR p-val = 0.0112，显著性与风控指标全部达标。
+  · **多阶段绩效落盘**: 计算并补全了 `IS 2018-2022` (年化 59.82%, 回撤 -17.66%, 夏普 2.35)、`OOS 2023-2026` (年化 56.33%, 回撤 -17.32%, 夏普 1.93)、`Stress 2010-2017` (年化 102.88%, 回撤 -18.94%, 夏普 3.63) 细分样本段的年化、最大回撤与夏普指标，解决了前端看板的指标空白问题。
+  · **双轨准入在册**: 凭借 2018-2026 全区间 58.26% 年化 / -17.66% 最大回撤的强劲表现，成功通过 `"standalone"` 轨准入要求登记入册。
 
 **2026-06-19(发现引擎对准跨资产防御腿)**: 把已验证**唯一无条件正边际**的分散源——跨资产防御腿边际搜索——接进周度调度,堵上「自动发现算力全烧在 ≈0 边际的 equity 红海」的缺口。
   · **新增** `scripts/ops/scheduled_cross_asset_leg_search.py`:复用 reusable 契约 `portfolio.cross_asset.search_cross_asset_legs`(与 `portfolio_cli --discover-legs`/research 脚本同一函数,杜绝算法漂移),在边际透镜下搜 {5 ETF × MA{20,40,60,120,240}},按对在册 ACTIVE 组合 Δsharpe 排序、标 SHADOW 推荐,落 `reports/research/cross_asset_leg_search.json`(latest + 按日期归档)。本地 data_lake ETF close,**不联网**。

@@ -60,6 +60,13 @@ npm run build                      # 仅在 dev 已关闭时跑;CI/部署用
 - 回测交付三段：样本内(2018-2026)/ 样本外(2023-2026)/ 压力测试(2010-2026)。
 - 实盘折扣:费率见上表;另评估 小盘容量、停牌/涨跌停、组合换手。
 - 已 git 化:重要阶段改动用提交固定;数据湖和大体量运行产物不入库。
+- **提交纪律(多 agent 共享工作树,违反 = 卷走别人改动/无法 revert)**:
+  1. **一个 commit = 一个完整、可独立 revert 的意图**。宁可拆成几个小而自洽的 commit,不要一个"什么都做了"的大杂烩。
+  2. **绝不 `git add -A` / `git add .`** —— 本仓库多 agent 并发,一锅端会把别人半成品改动卷进你的 commit。**只用显式路径** `git add <file>...`,且只 stage 你 trace 得清、属于本次意图的文件。
+  3. **提交前必 `git diff --cached --stat` + `git diff --cached` 核对范围**:每个文件、每一行都要 trace 到本次目的;别人的改动留在工作树,不碰。
+  4. **不擅自切分支 / reset / rebase 共享分支**;动 git 历史前先看 `git status` 有无他人正在改的文件。
+  5. **message 讲"为什么"**:`type(scope): 标题` + 正文写根因(diff 看不出的)和验证证据(守卫绿/测试 N/N);提交前先跑守卫+测试,绿了再提。
+  6. 尾注固定加 `Co-Authored-By:` 与 `Claude-Session:`(claude)。
 - **搜索/回测默认思维**: 先问能否 `预计算 / 复用 / 并行 / 拆分`，再问能否改变实现顺序；只能加速计算，不能改样本、公式、成本、`shift(1)`、T+1 或任何真实口径。
 - **前端开发纪律**: 严禁在开发服务运行（`npm run dev`）时跑生产打包（`npm run build`），防止 Webpack 缓存污染导致全站 404/500 崩溃。`build` 不可作为 dev 运行时的常规验证步骤；先看 `npx tsc --noEmit` 和 `npm run lint`。若出现缓存损坏（ENOENT/Cannot find module 等），须强制关闭 dev 任务、用 `lsof -ti :3000 | xargs kill -9` 释放端口、运行 `rm -rf web/.next web/node_modules/.cache` 清空双重缓存、再重启并指引浏览器硬刷新（⌘+Shift+R）。
 - 改了架构/进度,顺手更新 SPEC.md / STATUS.md;踩了坑记 LESSONS.md。
