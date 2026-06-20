@@ -1034,7 +1034,7 @@ class NineGatesReport:
         verdict_by_id = {r.gate_id: r.verdict for r in self.reports}
         g2, g3 = by_id.get(2, {}), by_id.get(3, {})
         g4, g5, g6 = by_id.get(4, {}), by_id.get(5, {}), by_id.get(6, {})
-        g7, g7a = by_id.get(7, {}), by_id.get("7A", by_id.get("7a", {}))
+        g7, g7a, g8 = by_id.get(7, {}), by_id.get("7A", by_id.get("7a", {})), by_id.get(8, {})
         out = {
             "run_date": self.run_date,
             "passed_all": self.passed_all,
@@ -1075,6 +1075,10 @@ class NineGatesReport:
             "bear_sharpe": g7.get("bear_sharpe"),
             "bull_annual": g7.get("bull_annual"),
             "bear_annual": g7.get("bear_annual"),
+            # 实盘监控风控硬边界(Gate 8)
+            "daily_mean_expected": g8.get("daily_mean_expected"),
+            "daily_vol_expected": g8.get("daily_vol_expected"),
+            "max_live_drawdown_limit": g8.get("max_live_drawdown_limit"),
             "gate4_verdict": verdict_by_id.get(4),
             "gate7_verdict": verdict_by_id.get(7),
         }

@@ -1575,7 +1575,10 @@
             "bull_annual": 1.1005262664924989,
             "bear_annual": -0.12047844827586206,
             "gate4_verdict": "PASS",
-            "gate7_verdict": "PASS"
+            "gate7_verdict": "PASS",
+            "daily_mean_expected": 0.002312,
+            "daily_vol_expected": 0.017024,
+            "max_live_drawdown_limit": -0.265
           }
         }
       ],
