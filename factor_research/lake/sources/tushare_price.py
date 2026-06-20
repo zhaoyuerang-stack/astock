@@ -31,6 +31,7 @@ def fetch_new_day(
       columns: date, open, close, high, low, volume, amount
       index: 整数（调用方合并到 per-stock parquet）
 
+    数据湖 canonical 单位：volume=股、amount=元；所有板块使用相同口径。
     prev_hfq_closes: 上一交易日的 hfq 收盘价（从 daily_all.parquet 读）。
     没有上一日记录的股票（新上市等）会被跳过，调用方应用 Tencent 补全。
     """
@@ -80,8 +81,8 @@ def fetch_new_day(
         hfq_close   = round(float(hfq_prev) * price_ratio * adj_ratio, 4)
         hfq_factor  = hfq_close / raw_close   # 用于缩放 open/high/low
 
-        volume = float(r.get("vol") or 0) * 100      # tushare: 手 → 股
-        amount = float(r.get("amount") or 0) * 1000  # tushare: 千元 → 元
+        volume = float(r.get("vol") or 0) * 100      # Tushare 手 → canonical 股
+        amount = float(r.get("amount") or 0) * 1000  # Tushare 千元 → canonical 元
 
         rows.append({
             "code":   code,

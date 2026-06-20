@@ -14,25 +14,11 @@ LAKE = Path(__file__).parent.parent / "data_lake"
 
 
 # ── 价量面板 ──
-def _normalize_star_volume(panels: dict) -> dict:
-    """科创板(688)volume 原始单位是**股**,主板/创业板是**手**——除以 100 归一到手,
-    使 `amount = volume×100×raw` 对全市场一致(LESSONS 2026-06-14:688 amount 曾被放大 100x,
-    寒武纪 688256 显示 17734亿/日 物理不可能;÷100 后 177亿 与真实一致)。
-    创业板 300 不受影响(volume 已是手)。
-    """
-    if "volume" in panels and not panels["volume"].empty:
-        v = panels["volume"]
-        star = [c for c in v.columns if str(c).startswith("688")]
-        if star:
-            v.loc[:, star] = v.loc[:, star] / 100.0
-    return panels
-
-
 def load_prices(codes=None, start="2010-01-01", fields=("close", "volume", "amount")):
     """加载日线 → {field: date×code 宽表}。
 
     优先读取 daily_all.parquet（大表），不存在则 fallback 到逐只文件。
-    科创板(688)volume 单位修正:见 _normalize_star_volume。
+    canonical 单位对所有板块一致：volume=股、amount=元。
     """
     all_fp = LAKE / "price/daily_all.parquet"
     if all_fp.exists():
@@ -43,7 +29,7 @@ def load_prices(codes=None, start="2010-01-01", fields=("close", "volume", "amou
         if codes:
             df = df[df["code"].isin(codes)]
         df = repair_ohlc(apply_quarantine(df))   # 确定性清洗(隔离坏数据 + OHLC 自洽)
-        return _normalize_star_volume({f: df.pivot(index="date", columns="code", values=f) for f in fields})
+        return {f: df.pivot(index="date", columns="code", values=f) for f in fields}
 
     # fallback: 逐只 parquet
     daily = LAKE / "price/daily"
@@ -59,7 +45,7 @@ def load_prices(codes=None, start="2010-01-01", fields=("close", "volume", "amou
     long = pd.concat(frames, ignore_index=True)
     long = long[long["date"] >= pd.Timestamp(start)]
     long = repair_ohlc(apply_quarantine(long))   # 确定性清洗
-    return _normalize_star_volume({f: long.pivot(index="date", columns="code", values=f) for f in fields})
+    return {f: long.pivot(index="date", columns="code", values=f) for f in fields}
 
 
 from lake.schema import FUNDAMENTAL_FIELDS

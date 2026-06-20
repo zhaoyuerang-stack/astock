@@ -13,6 +13,7 @@ from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, Cost
 from factors.small_cap import small_cap_factor, small_cap_timing
 from factors.utils import safe_zscore, mad_clip
 from lake.load_lake import load_prices, load_raw_close
+from lake.units import implied_amount
 from research_toolkit import apply_veto_filter
 
 
@@ -52,12 +53,18 @@ def _drop_star(*panels):
 # ---------------------------------------------------------------------------
 
 def load_price_panels(start="2010-01-01"):
-    """Load close/volume/amount panels.  Amount is recomputed with unadjusted price."""
-    px = load_prices(start=start, fields=("close", "volume"))
+    """Load canonical close/volume/amount panels.
+
+    The lake amount field is authoritative. Missing cells are repaired from
+    canonical volume(shares) × raw_close(CNY/share), without board-specific
+    unit branches.
+    """
+    px = load_prices(start=start, fields=("close", "volume", "amount"))
     raw = load_raw_close(start=start)
-    # amount = volume(手) * 100 * raw_close(元)  — 用不复权价避免复权因子污染截面排序
-    amount = px["volume"] * 100 * raw.reindex(index=px["volume"].index, columns=px["volume"].columns)
     close, volume = px["close"], px["volume"]
+    amount = px["amount"].copy()
+    if not raw.empty:
+        amount = amount.combine_first(implied_amount(volume, raw))
     # Truncate tail where raw prices may lag (causing NaN amount on latest days)
     valid = amount.notna().sum(axis=1)
     if len(valid) > 5:
