@@ -120,6 +120,14 @@ echo "=== test_lake_invariants.py (数据湖写路径不变量) ==="
 python3 tests/test_lake_invariants.py
 
 echo ""
+echo "=== test_price_unit_contract.py (价量 canonical 单位) ==="
+python3 -m pytest tests/test_price_unit_contract.py -q
+
+echo ""
+echo "=== test_price_amount_invariant.py (成交额物理量纲写入闸门) ==="
+python3 -m pytest tests/test_price_amount_invariant.py -q
+
+echo ""
 echo "=== test_star_exclude.py (科创板 volume 修正 + 小盘显式排除) ==="
 python3 tests/test_star_exclude.py
 
