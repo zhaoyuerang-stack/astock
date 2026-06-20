@@ -13,7 +13,7 @@ import type { NavCurveView, PaperTradesView, PortfolioView, TradePlanView } from
 import { useAgent } from "@/lib/agentStore";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 
-const TABS = ["组合概览", "今日操作卡", "交易记录", "净值曲线", "时空穿梭机"] as const;
+const TABS = ["组合概览", "今日操作卡", "交易记录", "净值曲线", "策略模拟沙盒"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function PortfolioPage() {
@@ -161,7 +161,7 @@ export default function PortfolioPage() {
         </>
       )}
 
-      {tab === "时空穿梭机" && (
+      {tab === "策略模拟沙盒" && (
         <TimeTravelSimulator nav={nav} trades={trades} />
       )}
 

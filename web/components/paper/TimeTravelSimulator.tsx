@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import type { NavCurveView, PaperTradesView } from "@/lib/types";
 import { pct, num } from "@/lib/api";
+import SimulationModeBanner from "@/components/paper/SimulationModeBanner";
 
 // 演示回测模拟盘的高密度 30 日样本数据(对应 innovative_design_proposal.md 演示模式)
 interface DemoPoint {
@@ -176,7 +177,8 @@ export default function TimeTravelSimulator({
   nav: NavCurveView | null;
   trades: PaperTradesView | null;
 }) {
-  const [mode, setMode] = useState<"real" | "demo">("demo");
+  // Task 18: 默认 real(真实模拟盘)。demo 是显式选择的教学沙盒,绝不默认渲染美股合成数据。
+  const [mode, setMode] = useState<"real" | "demo">("real");
   const [index, setIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState<1 | 2 | 4>(2);
@@ -324,6 +326,7 @@ export default function TimeTravelSimulator({
 
   return (
     <div className="space-y-4">
+      {mode === "demo" && <SimulationModeBanner />}
       {/* 头部控制栏 */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#0E172B]/60 p-4 border border-[#3C4654]/25 rounded-card">
         <div>
