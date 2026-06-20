@@ -62,7 +62,12 @@ def _run_candidates(
     if close is None or volume is None or amount is None or forward_ret is None:
         close, volume, amount, forward_ret = _load_validation_data(start)
 
-    vintage = vintage_id or f"data_lake:{start}:{date.today().isoformat()}"
+    if vintage_id is None:
+        from lake.fingerprint import stamp_vintage
+
+        # vintage 带数据内容指纹:数据湖日内漂移时,不同面板绝不共享同一凭证
+        vintage_id = stamp_vintage(f"data_lake:{start}:{date.today().isoformat()}", close)
+    vintage = vintage_id
     results: list[AutoResearchRunResultView] = []
     for candidate in candidates:
         result = run_validation_pipeline(
@@ -107,6 +112,10 @@ def review_autoresearch_candidate(
     notes: str = "",
     repository: CandidateRepository | None = None,
     review_queue: ReviewQueue | None = None,
+    auto_promote_after_approve: bool | None = None,
+    promote_version: str = "v1.0",
+    promote_fn: Callable | None = None,
+    job_submitter: Callable | None = None,
 ) -> AutoResearchReviewItemView:
     """Human approve/reject for a promoted candidate.
 
@@ -135,6 +144,37 @@ def review_autoresearch_candidate(
         notes=notes,
         reviewed_at=date.today().isoformat(),
     )
+    if action == "approve" and _auto_promote_enabled(auto_promote_after_approve):
+        if candidate is not None:
+            repository.record(candidate.with_status(
+                CandidateStatus.PROMOTING,
+                notes or "approved; auto shadow promote queued",
+            ))
+        rec = review_queue.record_status(
+            fingerprint,
+            CandidateStatus.PROMOTING,
+            target_status="SHADOW",
+            promote_error="",
+        )
+        submitter = job_submitter
+        if submitter is None:
+            from services.actions.jobs import submit_action_job
+            submitter = submit_action_job
+        job = submitter(
+            "autoresearch.promote_after_approve",
+            promote_approved_candidate_job,
+            fingerprint=fingerprint,
+            version=promote_version,
+            repository=repository,
+            review_queue=review_queue,
+            promote_fn=promote_fn,
+            target_status="SHADOW",
+        )
+        rec = review_queue.record_fields(
+            fingerprint,
+            promote_job_id=getattr(job, "job_id", ""),
+            target_status="SHADOW",
+        )
     return AutoResearchReviewItemView(**rec)
 
 
@@ -146,6 +186,8 @@ def promote_approved_candidate(
     repository: CandidateRepository | None = None,
     review_queue: ReviewQueue | None = None,
     promote_fn: Callable | None = None,
+    target_status: str = "",
+    auto_job: bool = False,
 ) -> AutoResearchPromoteResponse:
     """APPROVED 候选 → workflow phase1~4 正式入册的"最后一公里"。
 
@@ -171,16 +213,93 @@ def promote_approved_candidate(
         promote_fn = promote_hypothesis
 
     hyp = ast_to_hypothesis(candidate)
-    report = promote_fn(hyp, version=version, run_marginal=run_marginal)
+    promote_kwargs = {"run_marginal": run_marginal}
+    if target_status:
+        promote_kwargs["target_status"] = target_status
+    report = promote_fn(hyp, version=version, **promote_kwargs)
 
     registered = bool(report is not None and getattr(report, "registered", False))
     detail = getattr(report, "detail", "") if report is not None else "知识图谱 gate 跳过"
+    registry_status = getattr(report, "status", "") if report is not None else ""
+    phase_summary = getattr(report, "phase_summary", {}) if report is not None else {}
+    if str(target_status or "").upper() == "SHADOW" and registry_status in {"在册", "ACTIVE", "active"}:
+        raise RuntimeError(f"SHADOW auto-promote attempted ACTIVE registry status: {registry_status}")
     note = f"registered {hyp.name}/{version}" if registered else f"promotion not registered: {detail or 'gates not met'}"
-    repository.record(candidate.with_status(candidate.status, note))
+    if auto_job and str(target_status or "").upper() == "SHADOW":
+        shadow_note = f"shadow promoted {hyp.name}/{version}: {detail}"
+        repository.record(candidate.with_status(CandidateStatus.PROMOTED_SHADOW, shadow_note))
+        review_queue.record_status(
+            fingerprint,
+            CandidateStatus.PROMOTED_SHADOW,
+            target_status="SHADOW",
+            registry_status=registry_status,
+            promote_detail=detail,
+            promote_error="",
+        )
+    else:
+        repository.record(candidate.with_status(candidate.status, note))
     return AutoResearchPromoteResponse(
         fingerprint=fingerprint,
         hypothesis_name=hyp.name,
         version=version,
         registered=registered,
         detail=detail,
+        target_status=target_status,
+        registry_status=registry_status,
+        phase_summary=phase_summary,
     )
+
+
+def promote_approved_candidate_job(
+    *,
+    fingerprint: str,
+    version: str = "v1.0",
+    repository: CandidateRepository | None = None,
+    review_queue: ReviewQueue | None = None,
+    promote_fn: Callable | None = None,
+    target_status: str = "SHADOW",
+) -> AutoResearchPromoteResponse:
+    """Async job wrapper: auto approve path may only promote into SHADOW/候选."""
+    repository = repository or CandidateRepository()
+    review_queue = review_queue or ReviewQueue()
+    candidate = repository.get(fingerprint)
+    if candidate is not None:
+        repository.record(candidate.with_status(CandidateStatus.PROMOTING, "auto shadow promote running"))
+    review_queue.record_status(
+        fingerprint,
+        CandidateStatus.PROMOTING,
+        target_status=target_status,
+        promote_error="",
+    )
+    try:
+        return promote_approved_candidate(
+            fingerprint=fingerprint,
+            version=version,
+            repository=repository,
+            review_queue=review_queue,
+            promote_fn=promote_fn,
+            target_status=target_status,
+            auto_job=True,
+        )
+    except Exception as e:
+        msg = f"{type(e).__name__}: {str(e)[:500]}"
+        candidate = repository.get(fingerprint)
+        if candidate is not None:
+            repository.record(candidate.with_status(CandidateStatus.PROMOTE_FAILED, msg))
+        review_queue.record_status(
+            fingerprint,
+            CandidateStatus.PROMOTE_FAILED,
+            target_status=target_status,
+            promote_error=msg,
+        )
+        raise
+
+
+def _auto_promote_enabled(value: bool | None) -> bool:
+    if value is not None:
+        return bool(value)
+    try:
+        from app_config.settings import get_settings
+        return bool(get_settings().factory.auto_promote_after_approve)
+    except Exception:
+        return False

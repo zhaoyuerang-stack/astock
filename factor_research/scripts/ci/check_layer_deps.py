@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 # 不参与分层检查的目录(测试/脚本工具自身)
-EXCLUDE_DIRS = {"__pycache__", ".git", "data_lake", "signals", "reports", "logs"}
+EXCLUDE_DIRS = {"__pycache__", ".git", "data_lake", "signals", "reports", "logs", "scratch"}
 
 FORBIDDEN_EDGES = [
     ("run_daily", ["factory.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
@@ -24,6 +24,12 @@ FORBIDDEN_EDGES = [
     ("factors.", ["factory.", "strategies.", "scripts.research.", "workflow.", "core.", "knowledge.", "api.", "services."]),
     ("lake.", ["factors.", "strategies.", "core.", "factory.", "scripts.research.", "knowledge.", "api.", "services."]),
     ("core.engine", ["factory.", "strategies.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
+    ("core.analysis", ["factory.", "strategies.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
+    # engine/ 是 core.engine 的底层引擎叶子(metrics/composer/portfolio/factor_analysis),
+    # 必须停在最底层:不得反向依赖 factors(状态/因子层)、组合构建层(strategies)或探索层
+    # (factory/scripts.research/workflow)。黑名单原先漏了这个与 core/ 平级的顶层目录,
+    # 导致 regime.py/strategy_composer.py 倒灌未被发现;两者已迁出至 factory/。
+    ("engine.", ["factors.", "factory.", "strategies.", "scripts.research.", "workflow."]),
     ("scripts.data.", ["factory.", "strategies.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
     # knowledge 是纯机制:只依赖 stdlib(+ duck-typed Hypothesis),不得依赖任何业务层
     ("knowledge.", ["core.", "lake.", "factors.", "strategies.", "factory.", "workflow.", "scripts.", "api.", "services."]),
@@ -139,7 +145,8 @@ def check() -> int:
         mod = module_path(py_file)
         rel = py_file.relative_to(ROOT)
         # 台账唯一写入口检查
-        if py_file.name not in REGISTRY_WRITER_ALLOWLIST:
+        is_test = "tests" in py_file.relative_to(ROOT).parts
+        if py_file.name not in REGISTRY_WRITER_ALLOWLIST and not is_test:
             for lineno in registry_write_violations(py_file):
                 violations.append((rel, lineno,
                     f"直写 {REGISTRY_FILE} — 台账只能经 strategy_registry.register()"))

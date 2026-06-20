@@ -25,6 +25,7 @@ sys.path.insert(0, str(ROOT))
 
 LOG_DIR = ROOT / "logs/daily_update"
 REPORT_DIR = ROOT / "reports/ops/daily_update"
+DATA_TRIAGE_PATH = ROOT / "reports/data/data_issue_triage.json"
 LOCK_PATH = LOG_DIR / ".scheduled_daily_update.lock"
 PYTHON = "/opt/homebrew/bin/python3"
 SAMPLE_CODES = ["600519", "000001", "300750", "600036", "601398"]
@@ -97,7 +98,8 @@ def prior_success(report_path):
         report = json.loads(report_path.read_text())
     except Exception:
         return False
-    return report.get("status") == "ok"
+    # partial_ok: 信号已生成，只是辅助数据(ETF/raw)有失败，无需重跑
+    return report.get("status") in ("ok", "partial_ok")
 
 
 def write_json(path, data):
@@ -105,26 +107,91 @@ def write_json(path, data):
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2))
 
 
-def rebuild_trade_calendar_from_prices():
-    from collections import Counter
+def model_dump(obj):
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    return obj.dict()
 
-    counter = Counter()
-    for code in CALENDAR_ANCHORS:
-        fp = ROOT / f"data_lake/price/daily/{code}.parquet"
-        if fp.exists():
-            counter.update(pd.read_parquet(fp, columns=["date"])["date"].tolist())
-    if not counter:
-        return None
-    cal = pd.DatetimeIndex(sorted(date for date, count in counter.items() if count >= 5))
-    if len(cal):
-        out = ROOT / "data_lake/meta/trade_calendar.parquet"
-        pd.DataFrame({"date": cal}).to_parquet(out, index=False)
-        return cal.max()
-    return None
+
+def _alert_body(report: dict) -> str:
+    """从日更 report 提取告警正文(失败步骤 + 信号状态 + error 摘要)。"""
+    parts = [f"status={report.get('status')}"]
+    failed_steps = [
+        k for k in (
+            "calendar_update", "price_update", "raw_update", "etf_update",
+            "fundamental_update", "tushare_incremental",
+        )
+        if isinstance(report.get(k), dict) and report[k].get("ok") is False
+    ]
+    if failed_steps:
+        parts.append("失败步骤:" + ",".join(failed_steps))
+    sig = report.get("signal")
+    if isinstance(sig, dict) and not sig.get("generated"):
+        reason = sig.get("reason") or (sig.get("error") or "")[:80]
+        parts.append(f"信号未生成:{reason}")
+    if report.get("error"):
+        parts.append(f"error:{str(report['error'])[:120]}")
+    return " | ".join(parts)
+
+
+def maybe_alert(report: dict, report_path: Path) -> None:
+    """日更结束后按 status 推送告警:去重(launchd 一天重试多次)+ 失败恢复报平安。
+
+    告警是旁路:任何异常都吞掉,绝不影响日更返回码 / 主流程。
+    """
+    try:
+        from app_config.settings import get_settings
+        from scripts.ops import notify
+
+        cfg = get_settings().notify
+        status = report.get("status", "unknown")
+        date = report_path.stem  # YYYY-MM-DD
+        sentinel = report_path.parent / f".alert_{date}.json"
+
+        if status in cfg.alert_on:
+            # 去重:同一天同一 status 只推一次(launchd 盘后会重试 4 次)
+            if sentinel.exists():
+                try:
+                    if json.loads(sentinel.read_text()).get("status") == status:
+                        return
+                except Exception:
+                    pass
+            label = "失败" if status == "failed" else "部分失败"
+            notify.send_alert(
+                f"🔴 A股日更{label} {date}",
+                _alert_body(report),
+                desktop=cfg.desktop,
+                obsidian=cfg.obsidian,
+            )
+            write_json(sentinel, {"status": status, "alerted_at": now_iso()})
+        elif status == "ok" and cfg.recovery and sentinel.exists():
+            # 今天先前推过失败,现已恢复 → 报平安并清哨兵(避免持续焦虑)
+            notify.send_alert(
+                f"✅ A股日更已恢复 {date}",
+                "日更恢复正常(status=ok)。",
+                desktop=cfg.desktop,
+                obsidian=cfg.obsidian,
+            )
+            sentinel.unlink(missing_ok=True)
+    except Exception as exc:
+        print(f"[alert] 告警旁路异常(不影响日更): {exc}")
+
+
+def rebuild_trade_calendar_from_prices():
+    from lake.meta import rebuild_trade_calendar_from_prices as rebuild_calendar
+
+    return rebuild_calendar(root=ROOT, anchors=CALENDAR_ANCHORS, min_anchor_count=5)
 
 
 def expected_trade_date(today=None):
-    today = pd.Timestamp(today or datetime.now().date())
+    if today is not None:
+        today = pd.Timestamp(today)
+    else:
+        # Before ~09:00 China time the trading day hasn't started yet, so the
+        # most recent *closed* trading day is still "yesterday". Shift the
+        # clock back so early-morning runs (e.g. 00:30/01:30 launchd jobs)
+        # target the prior day's close instead of the not-yet-traded today.
+        today = pd.Timestamp((china_now() - pd.Timedelta(hours=9)).date())
     cal = pd.read_parquet(ROOT / "data_lake/meta/trade_calendar.parquet")["date"]
     cal = pd.to_datetime(cal)
     eligible = cal[cal <= today]
@@ -166,12 +233,42 @@ def sample_quality_check():
     return {"checked": checked, "bad": bad, "ok": not bad}
 
 
+def attach_production_readiness(report):
+    from runtime.production_readiness import get_production_readiness
+
+    readiness = get_production_readiness(
+        data_date=report.get("latest_after_update") or None,
+        expected_trade_date=report.get("expected_trade_date") or None,
+    )
+    report["production_readiness"] = model_dump(readiness)
+    return readiness
+
+
+def attach_data_issue_triage(report):
+    from lake.data_issue_triage import build_scheduled_update_triage
+
+    triage = build_scheduled_update_triage(report, save_path=DATA_TRIAGE_PATH)
+    report["data_issue_triage"] = triage.get("summary", {})
+    return triage
+
+
 def run_updates(report, dry_run=False):
     if dry_run:
         print("[dry-run] skip update_prices/update_fundamental")
         return
 
     from scripts.data import update_lake
+    from lake.meta import update_trade_calendar
+
+    # ── 0. 交易日历（必须先于价量更新，否则 update_prices 不知道新交易日）──
+    try:
+        print("[update] trade_calendar")
+        cal_result = update_trade_calendar(root=ROOT)
+        report["calendar_update"] = cal_result
+    except Exception as exc:
+        report["calendar_update"] = {"ok": False, "error": str(exc)}
+        print(f"[update] calendar failed: {exc}")
+        traceback.print_exc()
 
     manifest = update_lake.load_manifest()
     try:
@@ -216,10 +313,90 @@ def run_updates(report, dry_run=False):
         traceback.print_exc()
 
     try:
+        print("[update] tushare 日频维度增量 (daily_basic/moneyflow/stk_limit/suspend_d/index_daily/adj_factor)")
+        from scripts.data.update_tushare import incremental_update
+        ts_stats = incremental_update()
+        ts_ok = all(v.get("ok") for v in ts_stats.values())
+        ts_new = sum(v.get("new", 0) for v in ts_stats.values() if v.get("ok"))
+        report["tushare_incremental"] = {"ok": ts_ok, "new_rows": ts_new, "detail": ts_stats}
+        for dim, s in ts_stats.items():
+            if s.get("ok"):
+                print(f"  [tushare_inc] {dim}: latest={s.get('latest','')} new={s.get('new',0)}")
+            else:
+                print(f"  [tushare_inc] {dim}: ⚠ {s.get('error','')}")
+    except Exception as exc:
+        report["tushare_incremental"] = {"ok": False, "error": str(exc)}
+        print(f"[update] tushare incremental failed: {exc}")
+        traceback.print_exc()
+
+    try:
         update_lake.save_manifest(manifest)
     except Exception as exc:
         report["manifest_error"] = str(exc)
         print(f"[update] manifest save failed: {exc}")
+
+
+def run_report_nlp(report, dry_run=False):
+    if dry_run:
+        print("[nlp] skip report nlp pipeline")
+        report["report_nlp"] = {"ran": False, "dry_run": True}
+        return
+
+    print("[nlp] running auto_download_reports.py")
+    try:
+        # 1. 自动下载高价值方向研报
+        proc_dl = subprocess.run(
+            [PYTHON, "scripts/ops/auto_download_reports.py", "--days", "15"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        print(proc_dl.stdout)
+        if proc_dl.stderr:
+            print(proc_dl.stderr, file=sys.stderr)
+        report["report_download"] = {
+            "ran": proc_dl.returncode == 0,
+            "returncode": proc_dl.returncode,
+        }
+    except Exception as exc:
+        report["report_download"] = {"ok": False, "error": str(exc)}
+        print(f"[nlp] auto_download_reports.py 运行异常: {exc}")
+
+    print("[nlp] running report_nlp_pipeline.py")
+    try:
+        # 2. 运行 NLP 解析与图谱合并管线
+        proc = subprocess.run(
+            [PYTHON, "scripts/research/report_nlp_pipeline.py", "--delete"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        print(proc.stdout)
+        if proc.stderr:
+            print(proc.stderr, file=sys.stderr)
+        report["report_nlp"] = {
+            "ran": proc.returncode == 0,
+            "returncode": proc.returncode,
+        }
+        if proc.returncode != 0:
+            print(f"[nlp] 警告: 研报 NLP 管线退出码非零: {proc.returncode}")
+        else:
+            print("[nlp] running run_ontology_shadow_pipeline.py")
+            proc_ont = subprocess.run(
+                [PYTHON, "scripts/research/run_ontology_shadow_pipeline.py"],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            print(proc_ont.stdout)
+            if proc_ont.stderr:
+                print(proc_ont.stderr, file=sys.stderr)
+    except Exception as exc:
+        report["report_nlp"] = {"ran": False, "error": str(exc)}
+        print(f"[nlp] 错误: 执行研报 NLP 管线出现异常: {exc}")
 
 
 def run_signal(report, dry_run=False):
@@ -242,9 +419,47 @@ def run_signal(report, dry_run=False):
     report["signal"] = {
         "generated": proc.returncode == 0,
         "returncode": proc.returncode,
+        "blocked_readiness": proc.returncode == 2,
     }
     if proc.returncode != 0:
         report["signal"]["error"] = proc.stderr[-1000:]
+    else:
+        print("[signal] running validate_amount_timing.py")
+        proc_val = subprocess.run(
+            [PYTHON, "scripts/research/validate_amount_timing.py"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        print(proc_val.stdout)
+        if proc_val.stderr:
+            print(proc_val.stderr, file=sys.stderr)
+
+
+def run_factor_health(report, dry_run=False):
+    if dry_run:
+        print("[health] skip factor health")
+        report["factor_health"] = {"generated": False, "dry_run": True}
+        return
+
+    print("[health] generate_factor_health.py")
+    proc = subprocess.run(
+        [PYTHON, "scripts/ops/generate_factor_health.py"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    print(proc.stdout)
+    if proc.stderr:
+        print(proc.stderr, file=sys.stderr)
+    report["factor_health"] = {
+        "generated": proc.returncode == 0,
+        "returncode": proc.returncode,
+    }
+    if proc.returncode != 0:
+        report["factor_health"]["error"] = proc.stderr[-1000:]
 
 
 def run_paper_trade(report, dry_run=False):
@@ -273,7 +488,8 @@ def run_paper_trade(report, dry_run=False):
 
 
 def run_daily_update(args):
-    run_date = china_now().date().isoformat()
+    expected, expected_source = expected_trade_date(args.today)
+    run_date = expected.strftime("%Y-%m-%d") if expected is not None else china_now().date().isoformat()
     log_path = LOG_DIR / f"{run_date}.log"
     report_path = REPORT_DIR / f"{run_date}.json"
     report = {
@@ -332,23 +548,46 @@ def run_daily_update(args):
                 report["expected_trade_date_source"] = expected_source
                 after_latest = actual_latest_price_date()
                 report["latest_after_update"] = str(after_latest.date()) if after_latest is not None else None
+                # freshness 仅基于核心价量数据(price/daily)，ETF/raw 是辅助数据，失败不阻断信号
                 fresh = expected is not None and after_latest is not None and after_latest >= expected
                 report["data_fresh"] = bool(fresh)
-                report["update_failed_but_data_fresh"] = bool(
-                    fresh and (
-                        not report.get("price_update", {}).get("ok", True)
-                        or not report.get("fundamental_update", {}).get("ok", True)
-                    )
-                )
-                print(f"[freshness] after={report['latest_after_update']} fresh={fresh}")
+
+                # 区分核心更新失败 vs 辅助更新失败
+                price_ok = report.get("price_update", {}).get("ok", True)
+                fundamental_ok = report.get("fundamental_update", {}).get("ok", True)
+                etf_ok = report.get("etf_update", {}).get("ok", True)
+                raw_ok = report.get("raw_update", {}).get("ok", True)
+                tushare_inc_ok = report.get("tushare_incremental", {}).get("ok", True)
+                core_update_ok = price_ok and fundamental_ok
+                aux_update_ok = etf_ok and raw_ok and tushare_inc_ok
+
+                report["update_failed_but_data_fresh"] = bool(fresh and not core_update_ok)
+                report["aux_update_partial"] = bool(not aux_update_ok)
+                if not etf_ok:
+                    etf_detail = report.get("etf_update", {}).get("detail", {})
+                    failed_etfs = [c for c, v in etf_detail.items() if not v.get("ok")]
+                    print(f"[freshness] ETF 更新部分失败({failed_etfs}),不影响价量 freshness")
+                if not tushare_inc_ok:
+                    ts_detail = report.get("tushare_incremental", {}).get("detail", {})
+                    failed_dims = [d for d, v in ts_detail.items() if not v.get("ok")]
+                    print(f"[freshness] tushare 日频维度部分失败({failed_dims}),不影响价量 freshness")
+                print(f"[freshness] after={report['latest_after_update']} fresh={fresh} "
+                      f"price_ok={price_ok} etf_ok={etf_ok} raw_ok={raw_ok} tushare_inc_ok={tushare_inc_ok}")
 
                 report["sample_quality"] = sample_quality_check()
                 print(f"[quality] sample_ok={report['sample_quality']['ok']} bad={report['sample_quality']['bad']}")
+                triage = attach_data_issue_triage(report)
+                print(f"[triage] production_blocked={triage['summary']['production_blocked']} "
+                      f"categories={triage['summary']['counts_by_category']}")
+                readiness = attach_production_readiness(report)
+                print(f"[readiness] allowed={readiness.allowed} "
+                      f"blocking={readiness.blocking_reasons} warnings={readiness.warnings}")
 
-                if fresh:
+                if fresh or args.force:
+                    run_report_nlp(report, dry_run=args.dry_run)
                     run_signal(report, dry_run=args.dry_run)
                     run_factor_health(report, dry_run=args.dry_run)
-                    if args.dry_run or report.get("signal", {}).get("generated"):
+                    if args.dry_run or report.get("signal", {}).get("generated") or args.force:
                         run_paper_trade(report, dry_run=args.dry_run)
                 else:
                     report["signal"] = {
@@ -358,8 +597,13 @@ def run_daily_update(args):
                     print("[signal] skip because data is stale")
 
                 signal_ok = bool(report.get("signal", {}).get("generated") or args.dry_run)
-                report["status"] = "ok" if fresh and signal_ok else "failed"
-                return 0 if report["status"] == "ok" else 1
+                # ok = 核心数据新鲜 + 信号生成；partial_ok = 信号生成但辅助更新有失败
+                if (fresh or args.force) and signal_ok:
+                    report["status"] = "ok" if aux_update_ok else "partial_ok"
+                else:
+                    report["status"] = "failed"
+                # partial_ok 仍返回 0(不触发 launchd 报警),failed 返回 1
+                return 0 if report["status"] in ("ok", "partial_ok") else 1
             except Exception as exc:
                 report["status"] = "failed"
                 report["error"] = str(exc)
@@ -371,6 +615,7 @@ def run_daily_update(args):
                 write_json(report_path, report)
                 print(f"[report] {report_path}")
                 print(f"scheduled_daily_update finished status={report['status']}")
+                maybe_alert(report, report_path)
 
 
 def main():

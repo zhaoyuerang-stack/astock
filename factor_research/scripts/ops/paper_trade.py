@@ -189,7 +189,7 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocke
         "- **真实盘成交**:T 日盘后出信号 → **T+1 开盘价**成交(你收盘后才看到信号,只能次日买)",
         "- **停牌/涨跌停**:停牌不可买卖;一字涨停买不进、一字跌停卖不出(见上「未成交」)",
         f"- 成交/估值用**不复权价**(daily_raw);成本 买 {BUY_COST:.3%} / 卖 {SELL_COST:.3%}",
-        f"- 杠杆 {LEVERAGE}x;容量:本金 {fmt(acc['init_capital'])} ≪ 策略容量 ~2700万 (AmihudIlliq v3.0)",
+        f"- 杠杆 {LEVERAGE}x;容量:本金 {fmt(acc['init_capital'])} ≪ 策略容量 ~2700万 (AmihudIlliq v3.1)",
         "- 回测口径(收盘撮合)另算——回测归回测,本卡是真实买卖逻辑",
     ]
     return "\n".join(lines) + "\n"
@@ -288,19 +288,27 @@ def main():
     save_account(acc)
 
     card = render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocked, names, exec_from)
-    OBSIDIAN.mkdir(parents=True, exist_ok=True)
-    daily_file = OBSIDIAN / f"今日操作_{date}.md"
-    daily_file.write_text(card)
-    (OBSIDIAN / "历史").mkdir(exist_ok=True)
-    (OBSIDIAN / "历史" / f"{date}.md").write_text(card)
+    daily_file = None
+    try:
+        OBSIDIAN.mkdir(parents=True, exist_ok=True)
+        daily_file = OBSIDIAN / f"今日操作_{date}.md"
+        daily_file.write_text(card)
+        (OBSIDIAN / "历史").mkdir(exist_ok=True)
+        (OBSIDIAN / "历史" / f"{date}.md").write_text(card)
+        print(f"  → Obsidian: {daily_file}")
+    except Exception as e:
+        print(f"  ⚠️ Warning: Failed to write to Obsidian path ({OBSIDIAN}): {e}")
 
     print(f"=== illiquidity v1.0 模拟盘(真实盘 T+1){date} ===")
     print(f"  今日开盘成交: 买{len([t for t in trades if t[3]=='BUY'])} 卖{len([t for t in trades if t[3]=='SELL'])} "
-          f"受阻{len(blocked)}" + (f"(执行{exec_from}信号)" if exec_from else "(无待执行)"))
+      f"受阻{len(blocked)}" + (f"(执行{exec_from}信号)" if exec_from else "(无待执行)"))
     nxt = (acc.get("pending") or {}).get("target") or []
     print(f"  明日开盘计划: {'建仓/持有 '+str(len(nxt))+' 只' if (signal['in_market'] and nxt) else '空仓观望'}")
     print(f"  总资产 {fmt(nav)} | 现金 {fmt(acc['cash'])} | 持仓 {len(detail)}只 {fmt(pos_value)} | 累计 {ret:+.2%}")
-    print(f"  → Obsidian: {daily_file}")
+    if daily_file:
+        print(f"  → Obsidian: {daily_file}")
+    else:
+        print(f"  → Obsidian: (Not written due to permission error)")
     return 0
 
 

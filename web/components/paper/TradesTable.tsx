@@ -14,7 +14,7 @@ export default function TradesTable({ data }: { data: PaperTradesView }) {
       <div className="max-h-[480px] overflow-y-auto">
         <table className="w-full text-[13px]">
           <thead>
-            <tr className="text-subink text-left border-b border-cardline sticky top-0 bg-white">
+            <tr className="text-subink text-left border-b border-cardline sticky top-0 bg-[#24354D]">
               <th className="py-1 font-medium">日期</th>
               <th className="py-1 font-medium">方向</th>
               <th className="py-1 font-medium">代码</th>

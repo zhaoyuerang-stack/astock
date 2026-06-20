@@ -24,3 +24,6 @@ factor_research/paper/
 
 # 研报/参考资料(二进制,不纳入,留磁盘)
 *.pdf
+
+# MCP 配置含 token,禁止提交
+.mcp.json

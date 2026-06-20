@@ -3,15 +3,17 @@
 import { useCallback, useEffect, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import MetricCard from "@/components/ui/MetricCard";
+import Card from "@/components/ui/Card";
 import PlanCard from "@/components/paper/PlanCard";
 import TradesTable from "@/components/paper/TradesTable";
 import NavChart from "@/components/paper/NavChart";
+import TimeTravelSimulator from "@/components/paper/TimeTravelSimulator";
 import { api, pct } from "@/lib/api";
 import type { NavCurveView, PaperTradesView, PortfolioView, TradePlanView } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 
-const TABS = ["组合概览", "今日操作卡", "交易记录", "净值曲线"] as const;
+const TABS = ["组合概览", "今日操作卡", "交易记录", "净值曲线", "时空穿梭机"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function PortfolioPage() {
@@ -42,7 +44,7 @@ export default function PortfolioPage() {
       page: "portfolio",
       title: "组合优化助手",
       summary: plan
-        ? `模拟盘跟单:${plan.signal_date} ${plan.action}(${regime});净值 ${(plan.nav / 10000).toFixed(1)}万,今日成交 ${plan.executed.length} 笔,明日计划 ${plan.plan.length} 腿${plan.bond?.active ? ` + 债券轮动 ${plan.bond.side}` : ""}。`
+        ? `模拟盘跟单:${plan.signal_date} ${plan.action}(${regime});净值 ${(plan.nav / 10000).toFixed(2)}万,今日成交 ${plan.executed.length} 笔,明日计划 ${plan.plan.length} 腿${plan.bond?.active ? ` + 债券轮动 ${plan.bond.side}` : ""}。`
         : `当前 ${p?.stance || "—"}(${regime});现金 ${((p?.cash ?? 0) / 10000).toFixed(0)}万。`,
       evidence: [
         plan?.bond?.note || p?.note || "—",
@@ -81,7 +83,7 @@ export default function PortfolioPage() {
           {p && (
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
-                <MetricCard label="组合净值" value={`${(p.nav / 10000).toFixed(1)}万`} sub="纸面账户" />
+                <MetricCard label="组合净值" value={`${(p.nav / 10000).toFixed(2)}万`} sub="纸面账户" />
                 <MetricCard label="现金占比" value={p.nav > 0 ? pct(p.cash / p.nav, 0) : "—"} tone="ok" sub={p.stance} />
                 <MetricCard label="当前持仓" value={String(p.current_positions.length)} sub={`市场状态 ${p.regime}`} />
                 <MetricCard label="目标持仓" value={String(p.target_holdings.length)} sub="选股层 top-N(等权)" />
@@ -94,21 +96,19 @@ export default function PortfolioPage() {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="card">
-                  <div className="text-sm font-medium mb-2">当前组合 vs 目标组合</div>
+                <Card title="当前组合 vs 目标组合">
                   <div className="text-[13px] space-y-1.5">
                     <div className="flex justify-between"><span className="text-subink">当前</span><span className="text-ink">{p.current_positions.length ? `${p.current_positions.length} 只持仓` : "空仓 / 全现金"}</span></div>
                     <div className="flex justify-between"><span className="text-subink">目标</span><span className="text-ink">{p.target_holdings.length} 只 · 单票 {pct(p.target_holdings[0]?.weight ?? 0, 1)}</span></div>
                     <div className="text-[11px] text-subink pt-1">{p.target_note}</div>
                   </div>
-                </div>
+                </Card>
 
-                <div className="card">
-                  <div className="text-sm font-medium mb-2">目标持仓({p.target_as_of || "—"})</div>
+                <Card title={`目标持仓(${p.target_as_of || "—"})`}>
                   <div className="max-h-64 overflow-y-auto">
                     <table className="w-full text-[13px]">
                       <thead>
-                        <tr className="text-subink text-left border-b border-cardline sticky top-0 bg-white">
+                        <tr className="text-subink text-left border-b border-cardline sticky top-0 bg-[#24354D]">
                           <th className="py-1 font-medium">代码</th>
                           <th className="py-1 font-medium text-right">目标权重</th>
                         </tr>
@@ -123,7 +123,7 @@ export default function PortfolioPage() {
                       </tbody>
                     </table>
                   </div>
-                </div>
+                </Card>
               </div>
             </>
           )}
@@ -136,10 +136,10 @@ export default function PortfolioPage() {
           {plan && (
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                <MetricCard label="总资产" value={`${(plan.nav / 10000).toFixed(1)}万`} sub={`信号日 ${plan.signal_date}`} />
-                <MetricCard label="现金" value={`${(plan.cash / 10000).toFixed(1)}万`} sub={plan.action || "—"} />
+                <MetricCard label="总资产" value={`${(plan.nav / 10000).toFixed(2)}万`} sub={`结算日 ${plan.account_date || plan.signal_date}`} />
+                <MetricCard label="现金" value={`${(plan.cash / 10000).toFixed(2)}万`} sub={plan.action || "—"} />
                 <MetricCard label="累计收益" value={`${plan.total_return >= 0 ? "+" : ""}${(plan.total_return * 100).toFixed(2)}%`} tone={plan.total_return >= 0 ? "ok" : "danger"} sub="vs 本金 100万" />
-                <MetricCard label="Regime" value={plan.regime === "bear" ? "BEAR" : plan.regime === "bull" ? "BULL" : "—"} tone={plan.regime === "bear" ? "danger" : "ok"} sub={`Band ${plan.band_exposure.toFixed(2)}x`} />
+                <MetricCard label="Regime" value={plan.regime === "bear" ? "BEAR" : plan.regime === "bull" ? "BULL" : "—"} tone={plan.regime === "bear" ? "danger" : "ok"} sub={`信号日 ${plan.signal_date}`} />
               </div>
               <PlanCard plan={plan} />
             </>
@@ -159,6 +159,10 @@ export default function PortfolioPage() {
           {!nav && !err && <div className="card text-sm text-subink">加载中…</div>}
           {nav && <NavChart data={nav} />}
         </>
+      )}
+
+      {tab === "时空穿梭机" && (
+        <TimeTravelSimulator nav={nav} trades={trades} />
       )}
 
       <div className="text-[11px] text-subink mt-6">

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
+import Card from "@/components/ui/Card";
 import { api } from "@/lib/api";
 import type { AgentAskResponse } from "@/lib/types";
 
@@ -38,13 +39,15 @@ export default function AgentWorkbench() {
     <div>
       <PageHeader title="AI 研究助手" desc="Agent 主工作台 · 工具调用 + 不越权分级 + 结构化产出" />
 
-      <div className="card mb-4">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium">研究对话</span>
-          <span className="text-[11px] px-1.5 py-0.5 rounded border border-cardline text-subink">
+      <Card
+        title="研究对话"
+        className="mb-4"
+        right={
+          <span className="px-1.5 py-0.5 rounded border border-cardline">
             {llmReady ? "LLM 已接入" : "规则式(给 ANTHROPIC_API_KEY 即接真 LLM)"}
           </span>
-        </div>
+        }
+      >
         <div className="flex gap-1.5">
           <input
             value={q}
@@ -64,19 +67,17 @@ export default function AgentWorkbench() {
             </button>
           ))}
         </div>
-      </div>
+      </Card>
 
       <div className="space-y-3">
         {turns.map((t, i) => {
           const o = t.r.output;
           return (
-            <div key={i} className="card">
-              <div className="flex items-center justify-between">
-                <span className="text-[13px] text-ink font-medium">{t.q}</span>
-                <span className="text-[11px] text-subink">
-                  工具:{t.r.tool ?? "—"} · {t.r.risk ?? "readonly"} · 置信 {(o.confidence * 100).toFixed(0)}%
-                </span>
-              </div>
+            <Card
+              key={i}
+              title={t.q}
+              right={`工具:${t.r.tool ?? "—"} · ${t.r.risk ?? "readonly"} · 置信 ${(o.confidence * 100).toFixed(0)}%`}
+            >
               <div className="text-[13px] text-ink mt-2 leading-relaxed">{o.summary}</div>
               {o.requires_human_confirmation && (
                 <div className="mt-2 text-[12px] text-warn border border-cardline rounded p-2">
@@ -92,7 +93,7 @@ export default function AgentWorkbench() {
               {o.recommendation.length > 0 && (
                 <div className="mt-1 text-[12px] text-ink">建议:{o.recommendation.join(" · ")}</div>
               )}
-            </div>
+            </Card>
           );
         })}
         {turns.length === 0 && <div className="card text-sm text-subink">点上方快捷指令试试。注意:回测/调仓会被标为需人工确认,不自动执行。</div>}

@@ -22,6 +22,9 @@ _FUNNEL_ORDER = [
     CandidateStatus.DISCARDED.value,
     CandidateStatus.PROMOTED_TO_REVIEW.value,
     CandidateStatus.APPROVED.value,
+    CandidateStatus.PROMOTING.value,
+    CandidateStatus.PROMOTED_SHADOW.value,
+    CandidateStatus.PROMOTE_FAILED.value,
     CandidateStatus.REJECTED_BY_HUMAN.value,
     CandidateStatus.RETIRED.value,
 ]

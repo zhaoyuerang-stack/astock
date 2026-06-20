@@ -1,8 +1,15 @@
 """多岛屿进化搜索:在受控 DSL 空间内变异/交叉/迁移。
 
 每个岛屿独立进化(各自 rng),周期性把最优个体迁移到邻岛——岛屿模型
-保多样性、防全局早熟。适应度 = 真实 run_l0 的 |ICIR|(同一套 canonical
-验证线,绝无第二套口径);冠军可再走更深的 L1~L3。
+保多样性、防全局早熟。适应度四项(同一套 canonical 验证线,绝无第二套口径):
+  |ICIR|                          真实 run_l0 的独立 edge
+  + novelty_weight × 行为新颖性    vs 已评估候选+参考池的最近邻行为距离(因子形态)
+  − corr_weight × 对在册组合相关    候选 top-N 收益与在册腿同涨同跌→罚,反相关(防御腿)→奖
+  − turnover_weight × 换手代理      top-N 成员相邻期流失率→罚,把 L1 的成本压力前置
+  [硬闸] 对在册相关 ≥ rediscovery_corr → |ICIR| 归零(边际为零,不让高 IC 重发现霸榜)
+只奖绩效必然同质坍缩;新颖性填未占领的行为生态位;边际项填组合相关空洞
+(伪多样性审计:在册 5 股票腿 0.76 相关);换手项防"高 IC 高换手在 L1 被成本杀"
+(成本约 12pp/年),并抵消去相关项对反转(高换手)的偏好。冠军可再走更深的 L1~L3。
 
 全程确定性:同 rng_seed + 同数据 → 同搜索轨迹(实验可复现)。
 """
@@ -14,6 +21,14 @@ from dataclasses import dataclass, field
 
 from .generator import generate_seed_candidates
 from .models import Candidate
+from .novelty import (
+    candidate_factor_panel,
+    max_return_correlation,
+    novelty_score,
+    sample_behavior_dates,
+    topn_long_return,
+    topn_turnover,
+)
 from .pipeline import run_validation_pipeline
 from .registry import ALLOWED_FACTORS, ALLOWED_TRANSFORMS
 from .validator import DSLValidationError, validate_candidate_ast
@@ -128,6 +143,10 @@ class ChampionRecord:
     status: str = ""
     decision: str = ""
     reason: str = ""
+    novelty: float = 0.0
+    fitness: float = 0.0
+    corr_to_book: float = 0.0
+    turnover: float = 0.0
 
 
 @dataclass
@@ -152,12 +171,30 @@ def run_island_search(
     seeds: list[Candidate] | None = None,
     rng_seed: int = 7,
     sample_dates: int | None = 120,
+    novelty_weight: float = 0.25,
+    corr_weight: float = 0.0,
+    turnover_weight: float = 0.0,
+    rediscovery_corr: float = 0.5,
+    reference_panels: list | None = None,
+    behavior_dates: int = 60,
+    top_n: int = 25,
     repository=None,
     experiment_log=None,
     review_queue=None,
     runners: dict | None = None,
 ) -> IslandSearchResult:
-    """N 岛屿 × G 代进化;适应度 = 真实 L0 |ICIR|;top_k 冠军走 final_stage。"""
+    """N 岛屿 × G 代进化;适应度 = |ICIR| + novelty_weight×新颖性 − corr_weight×对在册组合相关。
+
+    reference_panels:在册母策略的因子面板。两种用法:
+      - 新颖性(行为距离):候选因子形态与之雷同 → 压分;
+      - 边际贡献(corr_weight>0):候选 top-N 收益与在册腿同涨同跌 → 罚,反相关(防御腿)→ 奖。
+    传入面板必须与 close 同口径(walk-forward 下即已截断的训练面板)。
+    novelty_weight=0 退回纯绩效;corr_weight=0 不计边际(向后兼容)。
+    """
+    # 因子面板 memo 搜索内有效:清空以隔离上一次 run / 不同数据口径(防陈旧命中)
+    from factors.autoresearch_dsl import clear_factor_cache
+    clear_factor_cache()
+
     seeds = list(seeds) if seeds else list(generate_seed_candidates(limit=max(n_islands * 2, 4)))
     pipe_kw = dict(
         close=close, volume=volume, amount=amount, forward_ret=forward_ret,
@@ -168,20 +205,66 @@ def run_island_search(
     memo: dict[str, tuple[float, object]] = {}  # fingerprint -> (fitness, result)
     evaluated = 0
 
+    # 行为档案:已评估候选的因子面板,新颖性 = 与(档案 + 外部参考池)的最近邻距离。
+    # 面板即传入的(walk-forward 下已截断的)训练面板,行为距离只用历史。
+    behavior_idx = sample_behavior_dates(close.index, behavior_dates)
+    refs: list = [p.loc[p.index.intersection(behavior_idx)] for p in (reference_panels or [])]
+    archive: dict[str, object] = {}
+    # 在册腿的 top-N 收益代理(一次性预算;corr_weight>0 才需要)
+    ref_returns: list = []
+    if corr_weight > 0 and forward_ret is not None:
+        ref_returns = [topn_long_return(r, forward_ret, top_n) for r in refs]
+
+    pre_evaluated_results: dict[str, object] = {}
+
     def fitness(candidate: Candidate, island: int, generation: int) -> float:
         nonlocal evaluated
         if candidate.fingerprint in memo:
             return memo[candidate.fingerprint][0]
-        result = run_validation_pipeline(candidate, max_stage="l0", **pipe_kw)
+        if candidate.fingerprint in pre_evaluated_results:
+            result = pre_evaluated_results[candidate.fingerprint]
+        else:
+            result = run_validation_pipeline(candidate, max_stage="l0", **pipe_kw)
         evaluated += 1
         exps = result.metrics.get("experiments", [])
         icir = (exps[0].get("metrics", {}) or {}).get("ICIR") if exps else None
-        fit = abs(float(icir)) if icir is not None else 0.0
+
+        # 因子面板算一次,供新颖性(行为距离)与边际(收益相关)共用
+        panel = None
+        if novelty_weight > 0 or corr_weight > 0 or turnover_weight > 0:
+            try:
+                panel = candidate_factor_panel(candidate.ast, close, volume, behavior_idx)
+            except Exception:
+                panel = None  # 算不出因子 → 不奖不罚(L0 同样会废掉它)
+
+        nov = 0.0
+        if novelty_weight > 0 and panel is not None:
+            nov = novelty_score(panel, refs + list(archive.values()))
+            archive[candidate.fingerprint] = panel
+
+        corr = 0.0
+        if corr_weight > 0 and panel is not None and ref_returns:
+            corr = max_return_correlation(topn_long_return(panel, forward_ret, top_n), ref_returns)
+
+        turn = 0.0
+        if turnover_weight > 0 and panel is not None:
+            turn = topn_turnover(panel, top_n)
+
+        # 重发现硬闸:与在册腿相关 ≥ 阈值 = 该 edge 在册已捕获,**边际为零** →
+        # 把 |ICIR| 归零(无论毛 IC 多高都不该霸占冠军席)。corr/turnover 罚仍计入,
+        # 使重发现沉到所有真候选之下。WF OOS 发现:0.3 软罚压不住 0.76 IC 的 illiquidity 重发现。
+        edge = abs(float(icir)) if icir is not None else 0.0
+        if rediscovery_corr and corr_weight > 0 and ref_returns and corr >= rediscovery_corr:
+            edge = 0.0
+        priority_adjustment = float(
+            (result.metrics.get("knowledge_gate", {}) or {}).get("priority_adjustment", 1.0)
+        )
+        fit = (edge + novelty_weight * nov - corr_weight * corr - turnover_weight * turn) * priority_adjustment
         memo[candidate.fingerprint] = (fit, result)
-        meta[candidate.fingerprint] = (island, generation, float(icir) if icir is not None else 0.0, candidate)
+        meta[candidate.fingerprint] = (island, generation, float(icir) if icir is not None else 0.0, candidate, nov, corr, turn)
         return fit
 
-    meta: dict[str, tuple[int, int, float, Candidate]] = {}
+    meta: dict[str, tuple[int, int, float, Candidate, float, float, float]] = {}
 
     # 初始化:种子轮转分配 + 变异补满
     islands: list[list[Candidate]] = []
@@ -204,10 +287,28 @@ def run_island_search(
     migrants: list[Candidate | None] = [None] * n_islands
 
     for gen in range(generations):
-        for i, pop in enumerate(islands):
+        # 1. Apply migrants first
+        for i in range(n_islands):
             if migrants[i] is not None:
-                pop.append(migrants[i])
+                islands[i].append(migrants[i])
                 migrants[i] = None
+
+        # 2. Batch pre-evaluate all new candidates in parallel
+        candidates_to_eval = [c for pop in islands for c in pop if c.fingerprint not in memo and c.fingerprint not in pre_evaluated_results]
+        if candidates_to_eval:
+            from concurrent.futures import ThreadPoolExecutor
+            num_workers = min(len(candidates_to_eval), 8)
+            with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                jobs = {executor.submit(run_validation_pipeline, c, max_stage="l0", **pipe_kw): c for c in candidates_to_eval}
+                for fut in jobs:
+                    c = jobs[fut]
+                    try:
+                        pre_evaluated_results[c.fingerprint] = fut.result()
+                    except Exception as e:
+                        print(f"[!] Error pre-evaluating candidate {c.fingerprint[:8]}: {e}")
+
+        # 3. Evaluate and breed next generation
+        for i, pop in enumerate(islands):
             ranked = sorted(pop, key=lambda c: fitness(c, i, gen), reverse=True)
             elites = ranked[: max(1, elite)]
             # 下一代 = 精英 + 精英变异/杂交后代
@@ -226,6 +327,20 @@ def run_island_search(
             best = max(pop, key=lambda c: memo.get(c.fingerprint, (0.0, None))[0])
             migrants[(i + 1) % n_islands] = best
 
+    # Batch pre-evaluate final remaining candidates
+    candidates_to_eval = [c for pop in islands for c in pop if c.fingerprint not in memo and c.fingerprint not in pre_evaluated_results]
+    if candidates_to_eval:
+        from concurrent.futures import ThreadPoolExecutor
+        num_workers = min(len(candidates_to_eval), 8)
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+            jobs = {executor.submit(run_validation_pipeline, c, max_stage="l0", **pipe_kw): c for c in candidates_to_eval}
+            for fut in jobs:
+                c = jobs[fut]
+                try:
+                    pre_evaluated_results[c.fingerprint] = fut.result()
+                except Exception as e:
+                    print(f"[!] Error pre-evaluating candidate {c.fingerprint[:8]}: {e}")
+
     # 收最后一代的遗漏评估
     for i, pop in enumerate(islands):
         for c in pop:
@@ -234,7 +349,7 @@ def run_island_search(
     ranked_all = sorted(memo.items(), key=lambda kv: kv[1][0], reverse=True)[:top_k]
     champions: list[ChampionRecord] = []
     for fp, (fit, l0_result) in ranked_all:
-        island, gen, icir, candidate = meta[fp]
+        island, gen, icir, candidate, nov, corr, turn = meta[fp]
         result = l0_result
         if final_stage != "l0":
             result = run_validation_pipeline(candidate, max_stage=final_stage, **pipe_kw)
@@ -242,5 +357,6 @@ def run_island_search(
             fingerprint=fp, island=island, generation=gen, icir=icir,
             expr=ast_expr(candidate.ast),
             status=result.status.value, decision=result.decision.value, reason=result.reason,
+            novelty=nov, fitness=fit, corr_to_book=corr, turnover=turn,
         ))
     return IslandSearchResult(evaluated=evaluated, champions=champions)

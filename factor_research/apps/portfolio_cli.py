@@ -132,7 +132,11 @@ def load_all_strategies():
 
 def cmd_compose(returns, regime, method):
     """Compose portfolio and print results."""
-    port_ret, weights = compose(returns, method=method, regime_signal=regime)
+    kw = {}
+    if method == "capped":
+        from portfolio.strategy_runners import defensive_strategies
+        kw = {"defensive": defensive_strategies(), "cap": 0.30}  # LIVE 配比:防御腿合计封顶 30%
+    port_ret, weights = compose(returns, method=method, regime_signal=regime, **kw)
     m = port_metrics(port_ret)
 
     print(f"\n{'='*60}")
@@ -328,17 +332,41 @@ def cmd_marginal(returns, regime_signal):
 # Main
 # ═══════════════════════════════════════════════════
 
+def cmd_discover_legs(start="2018-01-01"):
+    """跨资产防御腿发现:按对在册组合的边际 Δsharpe 排序,标 SHADOW 推荐。"""
+    from portfolio.cross_asset import search_cross_asset_legs
+
+    res = search_cross_asset_legs(start=start)
+    mb = res["baseline"]
+    print(f"\n{'='*72}\n  跨资产防御腿发现(边际透镜,非单独 Sharpe)\n{'='*72}")
+    print(f"  在册 ACTIVE 基线: sh={mb['sharpe']:+.2f} cal={mb['calmar']:+.2f} mdd={mb['maxdd']:+.1%}\n")
+    print(f"  {'腿':<20s}{'单Sh':>6s}{'相关':>7s}{'2018':>8s}{'Δsh':>7s}{'Δcal':>7s}  SHADOW?")
+    print("  " + "-" * 66)
+    for l in res["legs"]:
+        flag = "★推荐" if l["shadow_recommend"] else ""
+        print(f"  {l['leg']:<20s}{l['standalone_sharpe']:+6.2f}{l['corr_to_book']:+7.2f}"
+              f"{l['ret_2018']:+8.1%}{l['d_sharpe']:+7.2f}{l['d_calmar']:+7.2f}  {flag}")
+    rec = res["recommended"]
+    print(f"\n  SHADOW 推荐({len(rec)}): " + (", ".join(l["leg"] for l in rec) if rec else "无"))
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--compose", choices=["equal_weight", "risk_parity", "regime_adaptive"],
-                    help="Run portfolio composition")
+    ap.add_argument("--compose", choices=["equal_weight", "risk_parity", "regime_adaptive", "capped"],
+                    help="Run portfolio composition(capped=防御腿封顶30%,LIVE 配比)")
     ap.add_argument("--analyze", action="store_true", help="Run full analysis")
     ap.add_argument("--marginal", action="store_true", help="Regime-aware marginal evaluation")
+    ap.add_argument("--discover-legs", action="store_true", help="跨资产防御腿发现(边际排序)")
     args = ap.parse_args()
 
-    if not args.compose and not args.analyze and not args.marginal:
+    if not any([args.compose, args.analyze, args.marginal, args.discover_legs]):
         ap.print_help()
         return
+
+    if args.discover_legs:
+        cmd_discover_legs()
+        if not any([args.compose, args.analyze, args.marginal]):
+            return
 
     returns, regime = load_all_strategies()
 

@@ -16,8 +16,6 @@ import numpy as np
 import pandas as pd
 
 from strategies.small_cap import (
-    StrategyConfig,
-    backtest_weights,
     build_rebalance_weights,
     load_price_panels,
     run_small_cap_strategy,
@@ -65,25 +63,22 @@ def test_backtest_result_metrics():
 
 
 # ---------------------------------------------------------------------------
-# Test 2: Engine.run(weights) == legacy backtest_weights()
+# Test 2: Engine.run(weights) uses the canonical engine weights path
 # ---------------------------------------------------------------------------
 
 def test_engine_run_weights():
-    """BacktestEngine.run with pre-computed weights must match legacy backtest_weights."""
+    """BacktestEngine.run with pre-computed weights must match its canonical weights path."""
     close, weights_dict, timing = _make_test_signal_weights()
     prices = PricePanel(close=close, volume=pd.DataFrame(), amount=pd.DataFrame())
     config = BacktestConfig(start="2018-01-01")
     engine = BacktestEngine(prices=prices, config=config)
 
-    # Legacy path
-    ret_legacy, detail_legacy = backtest_weights(close, weights_dict, timing)
-
-    # Engine path
     signal = Signal(weights=weights_dict, timing=timing)
-    result = engine._run_weight_backtest(weights_dict, timing, signal)
+    result_public = engine.run(signal)
+    result_direct = engine._run_weight_backtest(weights_dict, timing, signal)
 
-    pd.testing.assert_series_equal(result.returns, ret_legacy, check_names=False)
-    pd.testing.assert_frame_equal(result.detail, detail_legacy, check_names=False)
+    pd.testing.assert_series_equal(result_public.returns, result_direct.returns, check_names=False)
+    pd.testing.assert_frame_equal(result_public.detail, result_direct.detail, check_names=False)
     print("✅ test_engine_run_weights passed")
 
 
@@ -164,6 +159,30 @@ def test_engine_backtest_compat():
 
 
 # ---------------------------------------------------------------------------
+# Test 7: factor diagnostics skip constant cross-sections without scipy warnings
+# ---------------------------------------------------------------------------
+
+def test_calc_ic_skips_constant_cross_section_without_warning():
+    """Constant factor/return cross-sections have undefined IC and must be quiet."""
+    import warnings
+    from scipy.stats import ConstantInputWarning
+    from engine.factor_analysis import calc_ic
+
+    idx = pd.date_range("2026-01-01", periods=1)
+    cols = [f"{i:06d}" for i in range(30)]
+    factor = pd.DataFrame([np.ones(30)], index=idx, columns=cols)
+    forward_ret = pd.DataFrame([np.arange(30)], index=idx, columns=cols)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", ConstantInputWarning)
+        ic = calc_ic(factor, forward_ret)
+
+    assert not any(isinstance(w.message, ConstantInputWarning) for w in caught)
+    assert ic.isna().iloc[0]
+    print("✅ test_calc_ic_skips_constant_cross_section_without_warning passed")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -175,4 +194,5 @@ if __name__ == "__main__":
     test_backtest_result_properties()
     test_small_cap_strategy_engine()
     test_engine_backtest_compat()
+    test_calc_ic_skips_constant_cross_section_without_warning()
     print("\n🎉 All tests passed!")

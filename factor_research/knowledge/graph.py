@@ -19,8 +19,10 @@ from __future__ import annotations
 
 import json
 import os
+import hashlib
 from dataclasses import dataclass, field
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Optional
 
 # 失败候选的默认动作:按 stage 分级。
@@ -36,6 +38,8 @@ _PRIORITY = {"SKIP": 0.0, "DEPRIORITIZE": 0.3, "REQUIRE_RETEST": 1.0}
 def _atom_attrs(hyp) -> dict:
     """从 Hypothesis 抽出可匹配属性(字符串化,便于稳定比较)。"""
     attrs = {
+        "id": getattr(hyp, "id", ""),
+        "name": getattr(hyp, "name", ""),
         "factor_fn_name": getattr(hyp, "factor_fn_name", ""),
         "timing_fn_name": getattr(hyp, "timing_fn_name", "") or "",
     }
@@ -227,6 +231,155 @@ class KnowledgeGraph:
         active_gates = sum(len(f.gates) for f in self.all_valid())
         return (f"KnowledgeGraph: {total} findings "
                 f"({valid} valid, {exp} expired, {active_gates} active gates)")
+
+
+LESSON_CATEGORIES = {
+    "TIMING_PEEK",
+    "FUND_ALIGNMENT",
+    "AMOUNT_FORMULA",
+    "WARMUP",
+    "DELISTED",
+    "WF_NEGATIVE_WINDOW",
+    "CORRELATION",
+}
+
+_LESSON_HARD_ACTION = {
+    "TIMING_PEEK": "SKIP",
+    "FUND_ALIGNMENT": "SKIP",
+    "AMOUNT_FORMULA": "SKIP",
+    "DELISTED": "SKIP",
+    "WARMUP": "DEPRIORITIZE",
+    "WF_NEGATIVE_WINDOW": "DEPRIORITIZE",
+    "CORRELATION": "DEPRIORITIZE",
+}
+
+
+def classify_pending_lesson(lesson: dict) -> str:
+    """Classify a pending lesson into the canonical machine-action categories."""
+    text = " ".join(str(lesson.get(k, "")) for k in ("trigger", "pattern", "detail", "fix")).lower()
+    if "timing_peek" in text or "timing shift" in text or "shift(1)" in text:
+        return "TIMING_PEEK"
+    if "fund_alignment" in text or "avail_date" in text or "report_date" in text:
+        return "FUND_ALIGNMENT"
+    if "amount_formula" in text or "raw_close" in text or "adjusted close" in text:
+        return "AMOUNT_FORMULA"
+    if "warmup" in text or "预热" in text or "leading nan" in text:
+        return "WARMUP"
+    if "delisted" in text or "退市" in text:
+        return "DELISTED"
+    if "wf_negative_window" in text or "negative window" in text:
+        return "WF_NEGATIVE_WINDOW"
+    if "correlation" in text or "相关" in text:
+        return "CORRELATION"
+    return "CORRELATION" if "corr" in text else "WARMUP"
+
+
+def _lesson_key(lesson: dict) -> tuple[str, str]:
+    return str(lesson.get("fingerprint", "")), str(lesson.get("pattern", ""))
+
+
+def _merge_lesson(existing: dict, incoming: dict) -> dict:
+    out = dict(existing)
+    out["hit_count"] = int(out.get("hit_count", 0) or 0) + int(incoming.get("hit_count", 0) or 0)
+    first_values = [str(v) for v in (out.get("first_seen"), incoming.get("first_seen")) if v]
+    last_values = [str(v) for v in (out.get("last_seen"), incoming.get("last_seen")) if v]
+    if first_values:
+        out["first_seen"] = min(first_values)
+    if last_values:
+        out["last_seen"] = max(last_values)
+    strategies = set(out.get("strategies", []) or [])
+    strategies.update(incoming.get("strategies", []) or [])
+    out["strategies"] = sorted(str(s) for s in strategies if str(s))
+    for key in ("detail", "fix", "trigger"):
+        if len(str(incoming.get(key, ""))) > len(str(out.get(key, ""))):
+            out[key] = incoming.get(key, "")
+    return out
+
+
+def load_pending_lessons(pending_dir: str | Path) -> tuple[list[dict], int]:
+    """Load and merge pending lesson JSON files by (fingerprint, pattern)."""
+    root = Path(pending_dir)
+    merged: dict[tuple[str, str], dict] = {}
+    files_read = 0
+    if not root.exists():
+        return [], files_read
+    for fp in sorted(root.glob("*.json")):
+        try:
+            lesson = json.loads(fp.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        files_read += 1
+        key = _lesson_key(lesson)
+        if key in merged:
+            merged[key] = _merge_lesson(merged[key], lesson)
+        else:
+            merged[key] = dict(lesson)
+    return list(merged.values()), files_read
+
+
+def _lesson_finding_id(category: str, lesson: dict) -> str:
+    fp = str(lesson.get("fingerprint", "unknown"))
+    pattern_hash = hashlib.sha1(str(lesson.get("pattern", "")).encode("utf-8")).hexdigest()[:8]
+    return f"lesson_{category.lower()}_{fp}_{pattern_hash}"
+
+
+def pending_lesson_to_finding(lesson: dict) -> Finding:
+    """Convert one merged pending lesson into a durable Finding."""
+    category = classify_pending_lesson(lesson)
+    action = _LESSON_HARD_ACTION.get(category, "DEPRIORITIZE")
+    pattern = str(lesson.get("pattern", ""))
+    detail = str(lesson.get("detail", ""))
+    fix = str(lesson.get("fix", ""))
+    hit_count = int(lesson.get("hit_count", 0) or 0)
+    reason = f"{category}: {pattern}; hits={hit_count}; {fix or detail}"
+    gates = []
+    for strategy in sorted(set(lesson.get("strategies", []) or [])):
+        strategy = str(strategy)
+        if not strategy:
+            continue
+        gates.append(SearchGate(match={"name": strategy}, action=action, reason=reason))
+        gates.append(SearchGate(match={"factor_fn_name": strategy}, action=action, reason=reason))
+    return Finding(
+        id=_lesson_finding_id(category, lesson),
+        statement=f"{category}: {pattern} ({hit_count} hits)",
+        domain="lesson",
+        confidence=0.9 if action == "SKIP" else 0.75,
+        evidence=sorted(set(lesson.get("strategies", []) or [])),
+        created=str(lesson.get("first_seen") or date.today().isoformat())[:10],
+        expires=(date.today() + timedelta(days=180)).isoformat(),
+        depends_on=[],
+        gates=gates,
+        metrics={
+            "lesson_category": category,
+            "hit_count": hit_count,
+            "last_seen": str(lesson.get("last_seen", "")),
+            "detail": detail,
+            "fix": fix,
+        },
+    )
+
+
+def sync_pending_lessons_to_graph(
+    pending_dir: str | Path | None = None,
+    store_path: str | Path | None = None,
+) -> dict:
+    """Merge pending lesson drafts into durable knowledge/findings.json gates."""
+    root = Path(pending_dir) if pending_dir is not None else Path(__file__).resolve().parents[1] / "workflow" / "pending_lessons"
+    store = str(store_path or DEFAULT_STORE)
+    lessons, files_read = load_pending_lessons(root)
+    kg = KnowledgeGraph(store)
+    gates_written = 0
+    for lesson in lessons:
+        finding = pending_lesson_to_finding(lesson)
+        gates_written += len(finding.gates)
+        kg.add(finding)
+    return {
+        "files_read": files_read,
+        "merged_lessons": len(lessons),
+        "findings_written": len(lessons),
+        "gates_written": gates_written,
+        "store_path": store,
+    }
 
 
 # 默认 store:git-tracked 的 durable 知识(对照 pending_lessons),非 data_lake 临时态

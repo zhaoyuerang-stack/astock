@@ -1,0 +1,58 @@
+"""Run evolutionary search using classic Alpha101 seeds and penalizing turnover and correlation.
+
+Usage:
+  python3 scripts/research/run_alphas_evolution_search.py
+"""
+from __future__ import annotations
+
+import os
+import sys
+import warnings
+from pathlib import Path
+
+warnings.filterwarnings("ignore")
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from services.actions.autoresearch_search import run_autoresearch_island_search
+from factory.autoresearch.repositories import CandidateRepository, ReviewQueue, ExperimentLog
+
+def main():
+    print("=" * 80)
+    print("  Evolving Classic Alphas Seed Evolution Search")
+    print("=" * 80)
+
+    repository = CandidateRepository()
+    review_queue = ReviewQueue()
+    experiment_log = ExperimentLog()
+
+    print("\nRunning Island Search with 3 islands, 4 generations, population 6...", flush=True)
+    search_res = run_autoresearch_island_search(
+        islands=3,
+        generations=4,
+        population=6,
+        top_k=3,
+        final_stage="l3",
+        use_llm=False,  # Force using our interleaved classic alphas seeds in _SEEDS
+        start="2018-01-01",
+        sample_dates=120,
+        repository=repository,
+        experiment_log=experiment_log,
+        review_queue=review_queue,
+        turnover_weight=0.15,  # Penalize high turnover to tame classic alphas
+        corr_weight=0.30,      # Penalize correlation with the existing book
+    )
+
+    print(f"\nSearch complete. Evaluated: {search_res.evaluated}.", flush=True)
+    print(f"Champions found: {len(search_res.champions)}", flush=True)
+    print("-" * 80, flush=True)
+    print(f"{'Fingerprint':<12} {'Island':<6} {'Gen':<4} {'ICIR':<8} {'Fitness':<8} {'Turnover':<8} {'Formula'}", flush=True)
+    print("-" * 80, flush=True)
+    for c in search_res.champions:
+        print(f"{c.fingerprint[:12]:<12} {c.island:<6} {c.generation:<4} {c.icir:>+7.4f} {c.fitness:>7.4f} {c.turnover:>7.4f} {c.expr}", flush=True)
+    print("-" * 80, flush=True)
+
+if __name__ == "__main__":
+    main()

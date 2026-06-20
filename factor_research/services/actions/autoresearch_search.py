@@ -7,9 +7,15 @@ from __future__ import annotations
 
 from datetime import date
 
-from contracts.views import AutoResearchChampionView, AutoResearchIslandSearchResponse
+from contracts.views import (
+    AutoResearchChampionView,
+    AutoResearchIslandSearchResponse,
+    AutoResearchOOSChampionView,
+    AutoResearchWalkForwardResponse,
+)
 from factory.autoresearch import CandidateRepository
 from factory.autoresearch.islands import run_island_search
+from factory.autoresearch.walkforward import run_walk_forward_search
 
 from .autoresearch import _load_validation_data
 from .autoresearch_llm import generate_llm_candidates
@@ -20,6 +26,54 @@ _ISLAND_THEMES = [
     "流动性与微观结构(Amihud 类)",
     "波动率与风险溢价",
 ]
+
+
+def _stamped_vintage(start: str, close) -> str:
+    """vintage 带数据内容指纹:数据湖日内漂移时,不同面板绝不共享同一凭证。"""
+    from lake.fingerprint import stamp_vintage
+
+    return stamp_vintage(f"data_lake:{start}:{date.today().isoformat()}", close)
+
+
+def active_book_panels(close, volume, amount) -> list:
+    """在册 ACTIVE 母策略的因子面板(高=该策略做多),供边际适应度算收益相关。
+
+    ACTIVE 集 = small-cap-size.v2.0 + illiquidity.v1.0(见 registry_correlation_audit:
+    其余为 SHADOW)。面板口径必须与 close 一致(walk-forward 下传截断面板)。
+    任一面板算不出 → 跳过该腿(best-effort,不拖垮搜索)。
+    """
+    panels = []
+    try:
+        from factors.small_cap import small_cap_factor
+        panels.append(small_cap_factor(amount, 60).reindex(index=close.index, columns=close.columns))
+    except Exception:
+        pass
+    try:
+        from factors.momentum import illiquidity
+        panels.append(illiquidity(close, volume, 20).reindex(index=close.index, columns=close.columns))
+    except Exception:
+        pass
+    return panels
+
+
+def _llm_seeds(islands: int, adapter, repository, experiment_log=None) -> tuple[list, str]:
+    """按主题给各岛 LLM 播种;LLM 未配置时退回确定性种子(seeded_by 如实标注)。
+
+    experiment_log 提供时注入失败台账反思(P3),播种绕开已被系统性证伪的形态。
+    """
+    seeds: list = []
+    for i in range(islands):
+        theme = _ISLAND_THEMES[i % len(_ISLAND_THEMES)]
+        # 逐岛容错:单岛解析/生成失败不拖垮其余岛的播种;原因如实打印不静默
+        try:
+            accepted, _, _ = generate_llm_candidates(
+                n=2, theme=theme, adapter=adapter, repository=repository,
+                experiment_log=experiment_log,
+            )
+            seeds.extend(accepted)
+        except ValueError as e:
+            print(f"[llm_seeds] 岛{i}({theme})播种失败: {str(e)[:120]}", flush=True)
+    return seeds, ("llm" if seeds else "seeds")
 
 
 def run_autoresearch_island_search(
@@ -33,6 +87,10 @@ def run_autoresearch_island_search(
     start: str = "2018-01-01",
     sample_dates: int | None = 120,
     rng_seed: int = 7,
+    novelty_weight: float = 0.25,
+    corr_weight: float = 0.3,
+    turnover_weight: float = 0.15,
+    rediscovery_corr: float = 0.5,
     repository: CandidateRepository | None = None,
     experiment_log=None,
     review_queue=None,
@@ -45,22 +103,15 @@ def run_autoresearch_island_search(
 ) -> AutoResearchIslandSearchResponse:
     if close is None or volume is None or amount is None or forward_ret is None:
         close, volume, amount, forward_ret = _load_validation_data(start)
-    vintage = vintage_id or f"data_lake:{start}:{date.today().isoformat()}"
+    vintage = vintage_id or _stamped_vintage(start, close)
     repository = repository or CandidateRepository()
 
-    seeds, seeded_by = [], "seeds"
+    # 边际适应度:对在册 ACTIVE 组合去相关(伪多样性审计后默认开启)
+    reference_panels = active_book_panels(close, volume, amount) if corr_weight > 0 else None
+
+    seeds, seeded_by = ([], "seeds")
     if use_llm:
-        try:
-            for i in range(islands):
-                theme = _ISLAND_THEMES[i % len(_ISLAND_THEMES)]
-                accepted, _, _ = generate_llm_candidates(
-                    n=2, theme=theme, adapter=adapter, repository=repository
-                )
-                seeds.extend(accepted)
-            if seeds:
-                seeded_by = "llm"
-        except ValueError:
-            seeds = []  # LLM 未配置 → 确定性种子,seeded_by 保持 "seeds"
+        seeds, seeded_by = _llm_seeds(islands, adapter, repository, experiment_log)
 
     result = run_island_search(
         close, volume, amount, forward_ret,
@@ -73,6 +124,11 @@ def run_autoresearch_island_search(
         seeds=seeds or None,
         rng_seed=rng_seed,
         sample_dates=sample_dates,
+        novelty_weight=novelty_weight,
+        corr_weight=corr_weight,
+        turnover_weight=turnover_weight,
+        rediscovery_corr=rediscovery_corr,
+        reference_panels=reference_panels,
         repository=repository,
         experiment_log=experiment_log,
         review_queue=review_queue,
@@ -87,6 +143,94 @@ def run_autoresearch_island_search(
             AutoResearchChampionView(
                 fingerprint=c.fingerprint, island=c.island, generation=c.generation,
                 icir=c.icir, expr=c.expr, status=c.status, decision=c.decision, reason=c.reason,
+                novelty=c.novelty, corr_to_book=c.corr_to_book, turnover=c.turnover, fitness=c.fitness,
+            )
+            for c in result.champions
+        ],
+    )
+
+
+def run_autoresearch_walk_forward(
+    *,
+    cutoff: str,
+    oos_end: str | None = None,
+    islands: int = 4,
+    generations: int = 3,
+    population: int = 8,
+    top_k: int = 5,
+    final_stage: str = "l0",
+    use_llm: bool = True,
+    start: str = "2018-01-01",
+    sample_dates: int | None = 120,
+    rng_seed: int = 7,
+    novelty_weight: float = 0.25,
+    corr_weight: float = 0.3,
+    turnover_weight: float = 0.15,
+    rediscovery_corr: float = 0.5,
+    repository: CandidateRepository | None = None,
+    experiment_log=None,
+    review_queue=None,
+    adapter=None,
+    close=None,
+    volume=None,
+    amount=None,
+    vintage_id: str | None = None,
+    runners: dict | None = None,
+) -> AutoResearchWalkForwardResponse:
+    """元级防未来的岛屿搜索:演化只见 <=cutoff,冠军在 (cutoff, oos_end] 一次性 OOS 评分。
+
+    不接收预计算 forward_ret——训练/OOS 的 forward_ret 必须由 walkforward
+    引擎从各自截断后的 close 重算,外部传入的全样本版本本身就是泄露源。
+    """
+    if close is None or volume is None or amount is None:
+        close, volume, amount, _ = _load_validation_data(start)
+    vintage = vintage_id or _stamped_vintage(start, close)
+    repository = repository or CandidateRepository()
+
+    seeds, seeded_by = ([], "seeds")
+    if use_llm:
+        seeds, seeded_by = _llm_seeds(islands, adapter, repository, experiment_log)
+
+    result = run_walk_forward_search(
+        close, volume, amount,
+        cutoff=cutoff,
+        oos_end=oos_end,
+        vintage_id=vintage,
+        repository=repository,
+        runners=runners,
+        reference_builder=active_book_panels,  # walkforward 在截断面板上调用,防未来
+        n_islands=islands,
+        generations=generations,
+        population=population,
+        top_k=top_k,
+        final_stage=final_stage,
+        seeds=seeds or None,
+        rng_seed=rng_seed,
+        sample_dates=sample_dates,
+        novelty_weight=novelty_weight,
+        corr_weight=corr_weight,
+        turnover_weight=turnover_weight,
+        rediscovery_corr=rediscovery_corr,
+        experiment_log=experiment_log,
+        review_queue=review_queue,
+    )
+    return AutoResearchWalkForwardResponse(
+        vintage_id=vintage,
+        cutoff=result.cutoff,
+        oos_start=result.oos_start,
+        oos_end=result.oos_end,
+        islands=islands,
+        generations=generations,
+        evaluated=result.evaluated,
+        seeded_by=seeded_by,
+        champions=[
+            AutoResearchOOSChampionView(
+                fingerprint=c.fingerprint, expr=c.expr,
+                train_icir=c.train_icir, train_status=c.train_status, train_decision=c.train_decision,
+                train_novelty=c.train_novelty, train_corr_to_book=c.train_corr_to_book,
+                train_turnover=c.train_turnover, train_fitness=c.train_fitness,
+                oos_icir=c.oos_icir, oos_ic_mean=c.oos_ic_mean,
+                oos_decision=c.oos_decision, oos_reason=c.oos_reason,
             )
             for c in result.champions
         ],

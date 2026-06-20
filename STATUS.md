@@ -1,8 +1,78 @@
 # STATUS — 当前进度
 
-> 更新:2026-06-12。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
+> 更新:2026-06-19。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
+
+**2026-06-19(因子页升级为机构级研究审计面板)**: 把 `/factors` 策略表从「收益排行榜」改成「哪些因子还没被杀死」的审计面板,并把 9-Gate 已算但被丢弃的证据全量落库可视化。
+  · **后端透传**: `StrategyView` 增 `style_betas/failure_boundaries/decay_signal`(家族级只读,`services/read/registry`)。
+  · **Phase 2A 加宽留存**: `NineGatesReport.summarize()` 此前只留 DSR/PSR/WF/CV/tail——把 gate2(`nw_icir`/`monotonicity_corr`/`ic_decay`)、gate3(`neut_nw_icir`/`icir_retention` 中性化后残差)、gate6(`cost_decay_rate`/`capacity_limit_aum`/`annual_1x/2x/3x`)、gate7(`bull/bear_sharpe` regime 拆分)一并落台账(全是已算丢弃,非新计算)。重跑 11 在册回填。实测 illiquidity/v3.1:neut retention 169%(中性化后反升=真特质 alpha)、cost decay 64%、**bull 5.2 / bear -4.9(强 regime 依赖)**。
+  · **Phase 2B/2C 新计算**: 9-Gate 持久化时顺带留存 gate5 日收益序列到 `data_lake/version_returns/`(零额外回测);`scripts/research/lineage_pbo.py` 读之,**把家族多版本当 CSCV 策略池**算 PBO(`pbo_cscv` 已存),并按 lineage 算父子收益相关 + 正交增量 alpha(=回归截距年化,**非残差均值**),合并写回 nine_gate(先读后并,不覆盖 2A)。实测 illiquidity PBO=**0.93(high)**、corr 链 0.96→0.90→0.79、v3.1 对 v1.3 仍有 **incΑ 12.9%**(高相关但有实质增量);`-full` 变体对父版本 corr=1.0/incΑ≈0(sanity 通过);large-cap PBO=0.02。
+  · **前端四视图**: `web/components/factors/EvaluationViews.tsx`(Leaderboard 按 production_score 排序而非年化 / Family lineage 折叠 + PBO 徽章 + ρ 值 / Gate 热力图 / Drilldown 真实三段样本+风险归因+血缘)。**删除详情卡硬编码 mock**(原写死 0.4043,真实 v1.0=0.323)。算不出的(param 邻域通过率,需 param grid)诚实标「未计算」。tsc+lint 绿、分层守卫过、live API+页面 200 验证。
+
+**2026-06-18(运维)**: 日更失败告警落地——补上无人值守监控闭环的唯一缺口(此前 status=failed 只写 JSON,靠人工查日志)。
+  · **公共通道** `scripts/ops/notify.py`:Obsidian(写 `30.output/2.[A]inbox/ai_data/日更告警_YYYY-MM.md`,按月滚动 append,**主通道**)+ 桌面通知(osascript) + 可插拔 Bark/邮件(SMTP),仅标准库;**告警是旁路,任一通道失败只记日志,绝不影响日更 status/launchd 返回码**。密钥走 gitignored `data_lake/agent/notify_config.json`(同 llm_config 模式),开关走 `settings.yaml::notify`(desktop/obsidian/alert_on/recovery,经 NotifyConfig→get_settings)。注:`notify.py __main__` 自测刻意 `obsidian=False`,绝不写真实 vault(踩过坑,见 memory `no-selftest-writes-to-real-data`)。
+  · **接入** `scheduled_daily_update.py::maybe_alert`:finally 块按 status 推送——failed/partial_ok 告警、ok 恢复报平安、skipped_* 静默。**去重**:launchd 盘后重试 4 次,per-day sentinel 同 status 只推一次;失败转 ok 主动报「已恢复」+清哨兵,避免「最后成功了还在焦虑」。
+  · **验证**:`tests/test_notify.py`(7 例:转义/桌面fallback/通道失败不抛/去重/恢复/静默/skipped,已入 test_all.sh);osascript 真实通路 exit=0;分层守卫通过。
+
+**2026-06-18**: 台账治理完整性整改(P0+P1)——把「判断归确定性代码、禁手填记分牌」落到台账层。
+  · **hit 唯一权威**: 抽出 `engine.metrics.compute_hit()`(严格 年化>15% & |回撤|<20%),`register()` 每次按 metrics 重算覆盖 hit、禁手填;`core.engine.BacktestResult.hit` 同改调用它(此前 engine 用 `>=/<=`、metrics 用 `>/<`,边界口径分叉,已统一)。`engine.metrics` 新增机构级指标(Sortino/VaR/CVaR/偏度峰度/尾比 + 基准相对 IR/TE/Alpha/Beta/捕获率)。
+  · **双轨准入**: `status="在册"` 必须过 `register()` 闸门——standalone(hit=True)或 diversifier(须 rationale,如负相关/组合夏普增量)。一次性迁移 `migrate_two_track_admission()` 把历史 **22 在册重算裁定为 12**(7 standalone + 5 diversifier 对冲腿),其余 10 降级(非删除)。整改前实测有 10 个被手填 hit=True、5 个诚实不达标却在册。
+  · **审批映射修复**: `governance._approval_from_status` 在册→APPROVED/候选→PENDING/退役·参考·已证伪→REJECTED(旧逻辑 `status in ["LIVE","active"]` 永不命中,全误落 PENDING)。
+  · **Nine-Gate 落台账**: 版本新增 `nine_gate` 字段;`NineGatesReport.summarize()` 抽 DSR/PSR/n_trials/WF/CV;`attach_nine_gate()` 写入;`run_nine_gates_all.py --persist` 一键回填。实测 size-earnings/v1.0 虽过 hit 门槛但 **DSR_p=0.377 不显著(gate4 FAIL)**——「单体达标≠扛得住多重检验」已可见于台账。
+  · **不可篡改账本**: `research_ledger` 加 hash-chain(entry_hash=sha256(prev_hash+内容))+ `verify_chain()` 检篡改 + `migrate_chain()` 回填存量(704 行)。**模型卡持久化**: `sync_model_cards_from_registry()` 从台账生成真实卡入 `model_inventory.json`(原仅 test 卡)。
+  · **验证**: 新增 `tests/test_governance_integrity.py`(11 例全过)并入 `test_all.sh`;受影响子系统回归全绿。遗留(非本次引入):`test_knowledge`(HEAD 的 findings.json 含昨日 factory 结论)、`test_llm_providers`(本机配了真实 DeepSeek key,subvert independent_of_llm 断言)、`test_nine_gates`(断言 9 道门已 stale,实际 10 道含 Gate7A,不在 CI)。
+  · **激活(后端能力贯通到可见/可决策)**: ①治理页 `web/app/governance/page.tsx` 渲染 admission 轨徽章 + DSR/PSR/n_trials + 机构风险卡(Sortino/VaR/CVaR/尾比),validation 判定改读 nine_gate DSR(取代硬编码 Sharpe≥0.35),修掉「页面 PASS / 台账 FAIL」脱节(tsc+eslint 绿)。②决策链:`trade_readiness` 读生产策略台账闸门(`get_strategy_gate_status`),在册但 DSR 未通过→不自动放行+强制人工审批。③机构指标随 Gate5→nine_gate 落库 + API 透传。④**DSR 审计自动化 + 覆盖扩至在册 11/12**。口径可披露且公平:窗口由 `_taibook_start` 逐版对齐台账 period;n_trials 由 `_family_n_trials` 取逐家族迭代数(地板 3),替代全库 695(过罚)与硬编码 15(过松)。**自动补审**:`ILLIQ_SPECS` 让 illiquidity 适配器配置驱动(v1.0/v1.1/v1.3/v3.1)、`audit_stale_registered()`+`--audit-stale` 扫未审在册自动跑并落台账(不适配者记 SKIP)、挂入 `scheduled_weekly_maintenance` → 系统每周自我保持覆盖。**一致口径结果:4 个 standalone 扛过多重检验** — small-cap-size/v2.0(p=0.017)、illiquidity v3.1(p=0.034)/v1.0(p=0.032)/v1.1(p=0.043);illiquidity v1.3 混合(p=0.086)与 size-earnings/v1.0(p=0.152)接近未过;**发现:纯 Amihud 三代全过、掺 size 反削弱**。对冲分流腿 DSR FAIL 属预期(diversifier 轨)。W2 闭环对生产策略发火:`model_dsr_passed=True`。唯一遗留:industry-neglect/v1.3(行业级因子,需独立于个股中心 9-Gate 的审计框架)。
+
+**2026-06-17**: 从“因子回测研究平台”正式升级为“机构级 Quant OS”系统。
+  · **行动桌面三大独立看板激活与重组 (Ops Desk Dashboards)**: 彻底激活并独立重构了`/candidates` (股票候选)、`/signals` (策略信号) 以及 `/trade-plans` (交易计划) 页面。在 `/candidates` 页无条件展示 25 只因子推荐候选股，排除在 `BEAR` 时数据丢失的痛点，并嵌入泡沫过滤机制说明；在 `/signals` 页展现小盘股指数与 16 日均线趋势偏离度、Regime 极性判定与影子系统对照，提供调仓诊断；在 `/trade-plans` 页支持交易指令审查、交易员电子签名与委托 HASH 锁定、Broker CSV 委托单导出，并成功重构 `overview/page.tsx` 保持极简交易台面，实现全站 TypeScript 类型安全与 Next.js 零警告编译。
+  · **P2 收口**: 风控页当前杠杆口径已改为优先读取最新 `signals/YYYY-MM-DD.json` 的 `band_exposure/leverage`,无信号时回退静态配置并显式标注;Python 工程化入口已补 `pyproject.toml` / venv 安装说明 / 运行时依赖 pin,`requirements.txt` 与 `pyproject.toml` 口径对齐。
+  · **研报逻辑链本体与 Web 呈现 (Report Logic Chain & Web UI)**: 在 `factory/ontology/report_logic.py` 中落地 `TransmissionNode` 和 `LogicalChain` 本体，定义了周期品、大消费和硬科技这三个典型行业的因果逻辑传导链模板；新增了 `scripts/research/report_nlp_pipeline.py` 与 `scripts/research/industry_logical_chain.py` 提取映射管线，打通从 PDF 解析 -> DeepSeek 逻辑链提取 -> 自动映射至因子 `Hypothesis` -> JSON 信号库落盘的闭环；后端新增了 `/logical-chains` API 路由，前端新建了 `LogicalChainsView.tsx` 组件并将其作为“研报逻辑传导链条”选项卡集成到“研究实验”页面，实现了定性因果传导逻辑的可视化展示。
+  · **候选策略批量促进 (Bulk Promotion)**: 编写并执行 `scripts/ops/bulk_promote.py`，自动批准了 Review Queue 中 2 个待定候选，并将 4 个全新演化候选因子 (`autoresearch_2335eeab`, `autoresearch_234c8ab7`, `autoresearch_8de70997`, `autoresearch_e181a275`) 和 7 个小盘历史 L3 因子 (`small_cap_factor__window*`) 批量促成登记到 `strategy_versions.json`，策略在册数扩展至 21 个。
+  · **日更信号生成检验 (Signal Verification)**: 优化 `scripts/ops/paper_trade.py` 中的 Obsidian markdown 写入模块，添加异常捕获以确保其在限制路径或沙盒权限下也能健壮运行；执行 `run_daily.py --no-update` 确认所有新增因子在日更与模拟盘结算流中完美生成信号，无阻碍性报错。
+  · **模型风险管理模块** (`model_risk/`): 新增 ModelCard 管理、独立验证报告 (`validate_strategy_performance`)、Challenger 业绩对标、风格与容量 Limitations 校验、Live IC 与 live-vs-backtest 漂移 Decay 监控，实现 Fed SR 11-7 标准的模型风险全生命周期闭环与签名工作流。
+  · **组合构建优化器** (`portfolio/`): 新增 expected alpha forecast 因子合成、shrunk covariance matrix 估计 (`RiskModel`)、行业/个股/风格 exposures/turnover constraints 规范，以及基于 SLSQP 的 cost-aware 组合优化重新构建 (`PortfolioOptimizer` + `CostAwareRebalancer`)。
+  · **全量实验台账** (`research_ledger/`): 实现 Immutable append-only Research Ledger。记录所有试错路径与 AST 哈希，提供 Deflated Sharpe Ratio / Probabilistic Sharpe Ratio 计算的客观基础，抑制隐性 p-hacking。
+  · **防未来泄露交叉验证** (`core/analysis/nine_gates.py`): 增加 Gate 7A: Purged + Embargoed CV。在持有期 > 1 天时强制隔离重叠标签数据 (purge window = horizon, embargo window = max(horizon, rebalance))。
+  · **资金容量与拥挤度度量** (`capacity/`): 实现 Dollar Capacity 测算、Volume Participation Rate 追踪、因子拥挤度 (weighted correlation) 监测与 IC 衰减模型。
+  · **执行与 TCA 合规层** (`execution/`): 支持 T+1、涨跌停、停牌交易模拟器 (`OrderSimulator`)，TWAP/VWAP algo routing，合规前置 compliance 校验，TCA 成本分解及应急一键熔断 Kill Switch。
+  · **GIPS绩效归因与审计包** (`reporting/`): 支持 Beta/Size风格/特异 Selection 分解，Gross-to-Net 费后净值衰减归因，并一键打包签名生成 Audit Pack。
+  · **三层 Regime 决策层与前端看板**: 拆分识别/信度/Policy以动态平滑调整仓位。前端新增 `/trade-readiness` 和 `/governance` 页，实现合规与准备度的交互看板。
+
+**2026-06-16**: 落地 9 道门禁 (9-Gate R2P) 因子评估与淘汰风控流水线 + 周度全自动寻优审计调度 + 个股因子诊断 CLI + 自动搜寻维度设计 + 容量评估体系升级。
+  · **9-Gate 评估框架** (`core/analysis/nine_gates.py`): 建立符合顶尖机构实践的 Research-to-Production 评估流水线，包含 Gate 0 数据审计（数值扰动泄露测试）、Gate 1 经济假设校验、Gate 2 单因子统计（NW-ICIR/衰减/五分位单调性）、Gate 3 风格与行业中性化审计（NumPy OLS 横截面回归）、Gate 4 多重检验惩罚（DSR/PSR）、Gate 5 组合真实成本回测（1.25x杠杆）、Gate 6 冲击成本与容量建模（升级为波动率平方根模型 + 5日拆单自适应优化器）、Gate 7 OOS 滚动与极端 Regime 压力测试、Gate 8 生产实盘监控模型。
+  · **容量评估体系升级** (`core/analysis/nine_gates.py`): 将原先的线性滑点模型重构为**波动率平方根冲击成本模型**，并引入**自适应多日拆单执行优化器**（平衡单日冲击成本与延迟 Alpha 衰减，在 1~5 天中寻找最优 execution days $N$），使中大盘/低 Vol 策略在大资金下的净收益曲线更合乎实盘真实逻辑。
+  · **通用策略评估 CLI** (`scripts/research/run_nine_gates_all.py`): 支持对在册任一策略（`small_cap`, `size_earnings`, `large_cap`, `hq_momentum`）一键跑完 9-Gate 审计并输出 Markdown 评级报告至 `reports/research/`。
+  · **周度定时寻优与审计** (`scripts/ops/scheduled_factor_search.py`): 修复了从 `ReviewQueue` 提取时的字典解包 bug，以及 4 参数因子生成器与 9-Gate 评估器 `PricePanel` 签名的冲突。已成功跑通整个进化搜索和 9-Gate 审计闭环，自动为 L3 冠军生成了 `reports/research/autoresearch_*_9_gates_report.md` 报告。
+  · **个股因子与风控诊断 CLI** (`apps/stock_cli.py`): 新增个股诊断分析工具，支持对单只股票 of Amihud 因子、Size 暴露、历史明细以及 Salience Veto 风控状态（bottom 30% 协方差否决判定）进行一键钻取分析，并支持停牌日期自动回溯。
+  · **自动维度搜寻设计** (`dimension_search_design.md`): 完成了数据维度自动探通工具设计规范，涵盖数据质量 L0 审计、防未来对齐校验、Rank IC 批量扫描和 LLM 反思联动播种流程。
+  · **系统流程归档** (`WORKFLOW.md`): 将新维度接入审计、9-Gate 门禁审计以及个股风控分析归档至平台核心业务流程图。
+
+**2026-06-14**: tushare 付费数据层 + CNE6 风格审计 + 多 agent 系统级分工(数据基础设施大扩 + 协作框架)。
+  · **科创板 688 修复**: `lake/load_lake.py::_normalize_star_volume` 688 volume ÷100(原是股非手,amount 放大 100x);连带小盘会选入 688 → `StrategyConfig.exclude_star=True` 显式排除(纳入≈零 alpha 还降夏普,tradability 50万门槛/20cm)。小盘 v2.0 同口径重测 25.9%/1.69(旧 22.2% 陈旧,差异源于引擎迁移非 688)重登记台账。每日信号(illiquidity)免疫(0% 持 688)。见 LESSONS + memory。
+  · **CNE6 风格中性化审计**(`scripts/research/style_neutralization.py`): 借 Barra 机制 + 复用 Alpha Audit(NW+RidgeCV+置换),把风格当 base、alpha 当 candidate 测特质增量。**真 Barra Size=ln(total_mv)**(来自 tushare,独立于 -log amount,破自循环):small_cap 是 size 押注(相关 -0.70,TRUE_BUT_SMALL)、momentum 被 Barra 动量吸收(NOISE)、**唯 illiquidity 有真特质 alpha**(+0.017 REAL,也是 LIVE 信号)。memory `cne6-style-neutralization`。
+  · **tushare 数据层**(`lake/sources/tushare.py` + `scripts/data/update_tushare.py` + `load_tushare_panel`): registry 驱动摄取(by_date/by_stock/by_index/once)+ 统一加载入口(口径自动路由:by_date 不 shift / anndate 公告日 ffill 防未来)+ vintage manifest。**17 数据集 / 71M 行**:市值股本估值换手股息(daily_basic)、财务指标+三大报表(fina_indicator/income/balancesheet/cashflow)、复权(adj_factor)、分红(dividend)、资金流(moneyflow)、涨跌停价/停复牌(stk_limit/suspend)、业绩预告快报(forecast/express)、股东户数/增减持(holdernumber/holdertrade)、基准指数/申万行业(index)。**cyq_perf(筹码)/limit_list_d(连板)= 积分墙**(真因已确诊):2000 积分下 cyq_perf **5次/天**、limit_list_d **1次/小时** 硬配额,回填不可能——非代码 bug,需升积分或放弃这两情绪维度。`call()` 已修成对"X次/天/小时"硬配额 fail-fast(原误当可重试限速,白等 6×60s)。token 走环境变量/gitignore(2000 积分边界见 memory `tushare-data-layer`)。
+  · **便宜模型干苦力**: DeepSeek v4-flash 接为苦力(候选生成/批量 NLP,`get_adapter()`),判断恒为确定性代码(Alpha Audit/L0-L3)。实测 AutoResearch 5 候选→代码毙 4 留 1(1/5 漏斗)。CLAUDE.md 加「LLM 分工铁律」。memory `cheap-model-grunt-work`。
+  · **多 agent 系统级分工**(`MULTI_AGENT.md`): 按时间形态×可用性分工——DeepSeek(API,7×24)=常驻骨干;Codex/Antigravity(订阅,爆发)=并行编码/浏览器取数,用完即走;Claude Code=架构编排。硬铁律:常驻系统禁依赖订阅 agent 在线;判断恒为代码。memory `multi-agent-division`。
+  · **研报-NLP 可行性**: opendataloader-pdf 验证可行(文本/表格抽取优,需 Java 已装),缺 PDF 源(待 Antigravity 浏览器抓取)。
+  · **并行经验**: tushare 限速按接口,跨接口并发安全(实测 9 进程零退避);CLAUDE.md 加「机器与并行」(M5/10核/24GB)。重响应接口(cyq/limit_list)高并发易超时,call() 重试硬化 3→6。
+
+**2026-06-12(夜)**: 否决器(VetoFilter)机制落地为 Policy 层观察态,不入 LIVE。
+  · **本体**:新增 `factors/veto.py::loser_veto_reversal`,定义为宿主候选池排除分数,不是独立策略;台账登记 helper 只写 `条件假设/观察`,宿主写入 config。
+  · **接入**:`strategies/small_cap.py::build_rebalance_weights(..., veto_factor, veto_q)` 在 top_n 前剔除死亡分位并补满仓位,T 日截面/T+1 生效,不降仓、不盘中踢仓。
+  · **评估**:`scripts/research/veto_filter_marginal.py` 只输出带/不带宿主的边际 Δ 指标和逐年分解,不输出 veto 独立净值。
+  · **工厂回路**:`factory/lines/line2_validation/veto_triage.py` 将 L1 死亡但 L0 |ICIR| 仍强的候选路由到 veto-review 分支,不扰动 L0-L3 主线。`tests/test_veto_filter.py` 已接入 test_all。
+
+**2026-06-12(晚)**: 数据湖假崩盘事故根治 + 数据可信机制四件套(机制设计缺陷修复)。
+  · **事故**: 腾讯源 hfqday 缺失静默回退不复权 day → 后复权湖末两日假崩盘(全市场中位 -59.6%);只修大表不修逐只文件 → 日更 compact 复发循环;当日所有 OOS 回测 NAV 指标中毒(rank-IC 类免疫)。复盘见 LESSONS。
+  · **修复**: ⓪ tencent.py 根治(hfq 缺失即跳过,绝不混口径)+ 逐只文件治愈 4324 只/6411 行 + 大表经闸门重建对照 raw 验证;① 写路径不变量 `lake/invariants.py`(末5日截面 |r|>30% 占比>5% 拒绝落盘)强制接入 compact;② vintage 实化 `lake/fingerprint.py`(实验凭证带数据内容指纹);③ 数据湖唯一写入口守卫 `check_lake_writers.py`(3 个历史直写者记欠债);④ 结果哨兵 `BacktestResult.anomalies`(超物理边界先怀疑数据)。全部入 test_all.sh。
+  · **当日研究结论(干净数据复核后)**: AutoResearch 冠军 OOS ICIR 0.29-0.47 成立;"死亡十分位否决器"(L1 废料反向用作排除器)训练 +0.87%/OOS +5.40%每年,但分年 3/7 为正(2021 -9.5%)——regime 依赖增强件,**不过稳健线不入册**,留作条件化假设。
+
+**2026-06-12**: AutoResearch 自进化基建 P0/P1——元级 walk-forward 防未来 + 行为新颖性适应度。
+  · **语义指纹**: fingerprint 归一化(项序交换/同类项权重合并/thesis 剥离),等价 AST 不再重复跑 L0(补上 06-11 注记的语义去重)。
+  · **P0 元级 walk-forward**(`factory/autoresearch/walkforward.py`): 堵元级未来函数——岛屿进化此前用全样本 L0 ICIR 选种,演化引擎本身在偷看未来。训练面板物理截断 <=cutoff(forward_ret 从截断 close **重算**,切片版末端掺未来价格),冠军在 (cutoff, oos_end] 用 canonical run_l0 一次性 OOS 评分,零第二套口径。service `run_autoresearch_walk_forward`,响应每冠军同时报 train_icir/oos_icir(对照即元过拟合证据)。测试 spy 断言训练期面板物理不含 cutoff 后任何一行。
+  · **P1 行为新颖性适应度**(`factory/autoresearch/novelty.py`): fitness = |ICIR| + 0.25×novelty;新颖性 = 候选因子面板 vs (已评估档案+外部参考池) 的最近邻行为距离,复用 redundancy 复合分(L0 可得成分:截面|spearman|+top分位持仓 Jaccard,权重质量归一)。最近邻不被稀释、|spearman| 抓反向克隆、暖机零方差行剔除(DSL fill_value 全 0 行陷阱);walk-forward 下行为距离自动只用 cutoff 前数据。novelty_weight=0 退回纯绩效。
+  · 后续(已评审未做):P2 行为网格(2维×3~4档,每格一精英,行为坐标须取自 L1 持仓而非因子标签——外部 PoC 用因子名当生态位是恒真命题,结论不采信)、P3 LLM 失败台账反思(只聚合 cutoff 前)、缓做滚动聚类竞技场。API router 未暴露 walk-forward;多折滚动由调用方循环。
 
 **2026-06-12**: P5 债券轮动落地模拟盘 + web 端完整跟单闭环。
   · **paper_trade 支持 511010 国债ETF**(P5,已 WF 验证 7/8 窗口:年化+25.7%/-12.5%/夏普1.90):四段执行顺序 卖股→卖债→买股→闲钱买债;BEAR 全部闲置资金买债,BULL 卖光换股;ETF 费率 0.05%(settings `etf_buy/sell_cost`);估值含债券。执行引擎抽到 `portfolio/paper_engine.py`(无 chdir,可被 API import),`scripts/ops/paper_trade.py` 只留 CLI+Obsidian。单测 `tests/test_paper_etf.py`(已挂 test_all.sh)。
@@ -158,6 +228,291 @@ python3 apps/portfolio_cli.py --analyze # 组合分析
 - **A 股 alpha 单维**: 45 候选 + 工厂 55 hyp, 唯一赢家是非流动性/小盘。基本面/低波/动量/资金面全灭。
 - **信息→行动断层**(2026-06-07): 知道组合负贡献一周以上没动 LIVE。组合管理纪律=边际负→立即 SHADOW，不删除但停止吸纳。
 - **MA16 = plateau 不是 spike**(2026-06-07): MA10-20 都 work，MA16 不是 magic number。轻度 in-sample tuning，不是 v2.2 那样的 bug。
+
+## AutoResearch 自进化闭环验证 (2026-06-12)
+
+机制就位:P0 元级防未来(walk-forward 物理截断)+ P1 新颖性适应度 + P3 失败台账反思 +
+弃牌堆分诊 + 语义指纹整体符号归一(F≡-F 折叠)。**闭环对照实证 P3 改变了生成分布**:
+同算力(97 评估)下,基线确定性种子 3 次复跑全部收敛回反转低波吸引子(novelty≤0.43);
+注入失败台账后(LLM+反思)冠军 novelty 0.68-0.88,迁移到基本面/流动性新区域。
+
+**冠军长窗诚实验证**(L0→L1→L2 @ start=2018,真实成本,**无择时裸因子**):
+
+| 冠军 | 类别 | L1年化 | L1回撤 | 夏普 | 注册bar(回撤<20%) |
+|------|------|--------|--------|------|------|
+| momentum(60)+revenue_yoy(基本面动量) | 真新 | 31.2% | -33.2% | 0.98 | ✗ 回撤超限 |
+| volume_ratio(30)+revenue_yoy(低关注成长) | 真新 | 13.6% | -37.4% | 0.55 | ✗ |
+| illiquidity−vol(20) | **复用在册** | 10.4% | -28.0% | 0.56 | ✗ |
+| illiquidity−vol(60) | **复用在册** | 12.8% | -30.5% | 0.70 | ✗ |
+
+**诚实结论(证伪优先)**:① 4/4 过 autoresearch L1/L2 闸门 → 搜索确实产出长窗可活的真实截面信号;
+② **但无一达注册 bar**——裸因子回撤 -28%~-37%,正是铁律预言的"A股日频无 PureTrend 必 -30%+";
+③ 2 个 illiquidity 冠军**复用在册 illiquidity + size-low-vol 母策略**——"对上一代新颖 ≠ 对注册册新颖",
+暴露 reference_panels 缺口;④ **真正的发现 = `momentum(60)+revenue_yoy` 基本面动量**(L1 31%/ICIR 0.48/
+3-4 regime 正),是注册册没有的机制,回撤是无择时构造产物非信号问题。
+**fund_mom 已过 workflow 正式入册**(`fundamental-momentum/v0.1`,2026-06-12):phase1 防未来 PASS;
+phase2 三段(含 PureTrend MA16 择时)IS +28.9%/OOS +23.1%/压力 +28.6%,成本+50% decay 23%、
+与 active max|corr|=0.605、OOS/IS decay 0.80 全 PASS;phase3 walk-forward 10/12 窗口正、
+聚合 OOS +32.5%/夏普 1.24/卡玛 1.06。**但诚实裁决 `hit=0.0`**:择时后回撤仍 -28.5%(phase3 -30.6%),
+**未达单母策略 回撤<20% bar**——证伪了"加择时即可压进 bar"的乐观预期;负窗 2018(-19.6%)/2023(-14.3%)
+是风格逆风年,与小盘 v2.0 同构的疯牛依赖。**定位:高收益高回撤的组合配料(corr 0.605 部分分散),
+非独立 LIVE**;台账如实记 hit=0.0。报告 `reports/discovery/fundamental-momentum_phase{2,3_wf}.json`。
+**下一步**:补 reference_panels(让搜索绕开在册区域,本轮 2 个 illiquidity 冠军即复用在册之误);
+fund_mom 进组合层做边际评级 / SHADOW 观察,不单吊。
+报告 `reports/research/{autoresearch_closed_loop,champion_longwindow_validation}.json`。
+
+## 在册母策略"伪多样性"审计 (2026-06-12)
+
+证实**进化方向应优化组合多样性而非单策略深度**。6 策略 2018-2026 相关审计:
+- **5 条股票腿两两平均相关 0.76**(small-cap/illiquidity/size-low-vol/size-earnings 互相 0.77-0.86);
+  **尾部(市场最差20%日)相关 0.69**——崩盘时也不解耦。这不是 5 个策略,是**同一个小盘/流动性
+  风险溢价赌注**的 5 件外套。
+- **fund_mom 是相关性最低的股票腿(0.66-0.69)**——印证它是"最佳可得的股票腿分散件",
+  但 0.68 仍是同一赌注的变体,非正交。
+- **真正的唯一分散源 = 国债 ETF(-0.09,逐年皆正 +1.7%~+5.6%)**,且它在 **SHADOW** 不在组合。
+- **逆风年签名 = 2018**:唯一为正的是国债(+4.2%),5 条股票腿全负(-4%~-19%,fund_mom 最差 -19%)。
+  (修正:2023 并非真逆风年,小盘 +17.9%/illiq +19.8% 都为正——之前误判;2026 YTD 软,fund_mom -20.8%。)
+
+**战略结论**:第 N 个小盘相关策略的边际价值≈0(与在册 0.76 相关)。稀缺、高边际的 niche 是
+**去相关/逆风为正的防御腿**。而当前搜索用标量 |ICIR| 适应度**结构上找不到它**——A 股里 ICIR 最高的
+因子恰恰就是小盘相关那批,标量适应度只会一直产出 0.76 相关的股票腿。**这量化论证了下一步 =
+边际适应度(reference_panels + 相关惩罚)+ 防御腿靶向搜索**,而非继续深挖股票 alpha。
+报告 `reports/research/registry_correlation_audit.json`。
+
+**边际适应度已落地 + A/B 真实验证(2026-06-12)**:适应度扩为
+`|ICIR| + novelty_weight×行为新颖 − corr_weight×对在册组合收益相关`(有符号:同涨同跌罚、
+反相关奖)。同种子同数据只变 corr_weight 的 A/B 真搜索:**基线(cw=0)冠军对在册均值相关
+0.60(4/5 在 0.63-0.82 红海),边际(cw=0.3)降到 0.26(4/5 去相关,含一个 0.00 的
+revenue_yoy 重仓反转)**。机制确认:搜索被推出 0.76 红海;且不盲目弃高 edge——
+`momentum(20)+volume_ratio` ICIR 0.49 即便带 0.63 相关仍留榜(惩罚是倾斜非硬筛)。
+**诚实局限**:去相关冠军多是反转型(`-(momentum...)`),是**股票内**去相关而非真防御腿;
+DSL 白名单只有股票因子,表达不了国债——机制对了,但搜索**空间**还困在股票里,真防御腿仍需跨资产。
+报告 `reports/research/marginal_fitness_ab.json`。
+
+**换手惩罚进适应度(2026-06-13)**:证据——fund_mom 成本拖累约 12pp/年(gross~38%→net~26%),
+但搜索目标曾完全换手盲(L0 纯 IC、岛屿适应度无换手项、canonical L1 只 gate 净 annual/maxdd)。
+且边际去相关项偏好反转型=最高换手,与成本相冲。适应度加第四项 `− turnover_weight×换手代理`
+(top-N 成员相邻期 Jaccard 流失率,复用 corr 项已提取的选股,近零额外成本;默认 0.15)。
+corr 项要反转、turnover 项压反转 → 逼搜索去"去相关但不靠高频反转"的真稀缺区。
+**A/B 实证(tw=0 vs 0.15,隔离)**:冠军均值换手 **0.583→0.302(腰斩)**,均值 |ICIR| 0.621→0.517
+(降 17%)。基线两个最高 |ICIR|(0.68/0.63)冠军换手 0.986/0.985(近全换)被换手臂全部淘汰,
+换手臂还挖到 0.156 换手的 `-(net_profit_yoy+vol)`(基本面=天然慢)。**诚实**:|ICIR| 是**毛**信号,
+降 17% 是预期代价(最高 IC 的恰是最 churn 的);净收益是否更优需 L1 对账(毛 ICIR 低估了换手臂的净边际)。
+报告 `reports/research/turnover_fitness_ab.json`。
+**L1 净年化对账(毛 vs 净变数字)**:两臂冠军走 L0→L1 真实成本——基线均值净年化 +3.6%,
+换手臂 **+5.8%(净反超 +2.2pp)**,确认毛 ICIR 误导:基线 3 个反转冠军毛 IC 更高(0.58-0.62)
+却净负(-3.2%/0%/-1.3%)。**但诚实三点**:① 不是碾压而是均值/一致性胜——单个最佳净年化
+反而是基线最高换手那个(turn 0.99/毛 IC 0.68 → 净 +18.3%):毛 edge 够大时高换手也能净赢,
+换手惩罚拿尾部上行换一致性;② 全员无择时回撤 -72%~-81%(不可投),**唯一例外是换手臂的
+`-(net_profit_yoy+vol)`**(turn 0.16/dd -28.7%)——最低换手+基本面=唯一可部署的;③ 真投资性闸门
+是回撤(择时),与换手正交。报告 `reports/research/turnover_ab_l1_net.json`。
+**四项适应度 + LLM 综合搜索(2026-06-13)**:服务层默认全开(novelty .25/corr .3/turnover .15)+ LLM,
+100 评估。冠军 `momentum(20)×-0.87 + net_profit_yoy×-0.59`:fit 0.71 = |ICIR| 0.64 + 新颖 0.37 +
+相关 **0.00** + 换手 **0.16**——四轴全优(强 edge/新颖/去相关/低换手)。高 |ICIR| 但高相关高换手的
+候选(如 |ICIR| 0.63 但 corr 0.76/turn 0.61 → fit 仅 0.51)被正确压到榜下。综合效果确认四项协同。
+报告 `reports/research/four_term_search.json`。
+**跨资产腿入常规发现流程**:`portfolio/cross_asset.py::search_cross_asset_legs`(组合层可复用契约)+
+`portfolio_cli.py --discover-legs`(按边际 Δsharpe 排序、标 SHADOW 推荐);研究脚本下沉共用同一函数。
+黄金 518880 MA60 已入 SHADOW 第二防御腿(Δsh +0.37,与国债正交)。
+
+**跨资产防御腿搜索(2026-06-13)**:把跨资产腿纳入与股票搜索同一套边际透镜
+(5 ETF × MA{20,40,60,120,240},按对在册边际 Δsharpe 排序,**不按单独 Sharpe**)。
+- **最佳防御腿 = 国债 511010 MA60**:Δsharpe +0.64 / Δcalmar +0.36,对在册相关 -0.08,
+  2018 逆风 +4.2%,崩盘日 +3‱。复现了既有 SHADOW 审计(marginal +0.65)→ 交叉验证我的
+  边际透镜与 composer 口径一致;确认该腿应入组合。
+- **新发现:黄金 518880 是第二条真分散腿**(相关 ~0.00,崩盘日 +7‱=最强对冲,Δsh +0.30~0.37),
+  当前不在册——值得作为防御腿候选。
+- 红利/恒生是**伪装的股票 beta**(相关 +0.20~0.34、2018 全负、崩盘日 -15~-24‱),边际 Δsh 全负,正确淘汰。
+- **诚实修正**:我预测"单独 Sharpe≥0.95 闸门会误杀债券腿"——**错了**,国债 MA60 单独 Sharpe 1.72 过闸门。
+  闸门缺陷真实但更窄:它误杀的是**黄金 MA40**(Sharpe 0.91<0.95 却 Δsh +0.30)。债券腿高 Sharpe+去相关两全。
+报告 `reports/research/cross_asset_leg_search.json`。
+
+**四项适应度 walk-forward OOS 综合验证(2026-06-14)**:cutoff 2024-12-31,演化只见 ≤cutoff,
+冠军在 2025-2026 一次性 OOS(reference_builder 在截断面板构造在册参考,corr 项防未来)。
+**OOS 持续 6/6**(train/oos ICIR 同号、|oosICIR|≥0.1)——元级防未来 + 四项选择不过拟合,机制可靠。
+**但暴露 corr_weight=0.3 对高 IC 在册因子太弱**:5/6 冠军是 `-(illiquidity(16)+vol)`、对在册相关 +0.50~0.57、
+换手 0.8~0.9——它们是**在册 illiquidity 因子的重新发现**(corr 0.54 就是 book 本身),毛 |ICIR| 0.73-0.76
+大到 0.3 惩罚压不住。**唯一逃出的宝石 = `-(roe×0.59+volume_ratio(20)×0.5)`**:corr 0.00、换手 0.09、
+train ICIR 0.38 → **OOS ICIR 0.54(OOS 反而走强)**,质量+流动性反转、正交在册、低换手——四项想找的正是它,
+只是没排在最前。**行动项**:corr 惩罚对在册高 IC 因子需更强,或加硬重发现闸(corr>0.5 直接判重发现不入冠军)。
+报告 `reports/research/wf_fourterm.json`。
+**重发现硬闸 OOS 复验证(2026-06-14)**:同 cutoff/seed 重跑,rediscovery_corr=0.5 开。
+**冠军中重发现 5/6 → 0/6**——illiquidity(16) corr-0.54 重发现被硬闸 edge 归零、全部清出榜;
+新冠军全部正交(5/6 corr 0.00,余 1 个 corr 0.46 软罚),且转向 **value/quality/low-vol**
+(bp_proxy/roe/volatility(120))——正是与 book 的 size/流动性 正交的风格。
+**但 OOS edge 明显变弱**:重发现的 |oosICIR| 0.54~0.67(因 illiquidity 是真强因子),
+正交候选只 0.07~0.20,OOS 持续 5/6(magnitude 大跌)。**核心教训**:硬闸成功(0 重发现),
+但揭示**equity DSL 里正交于 book 的 alpha 本身就弱**——强 equity alpha 就是 book(size/流动性),
+没有又强又正交的新 equity 因子可挖。**这再次坐实:真分散必须来自跨资产(国债/黄金腿),
+不是在 equity 里找更强的正交因子。** 报告 `reports/research/wf_fourterm_gated.json`。
+
+## 跨资产多腿组合 / 卡玛 1.6 验证(2026-06-14)
+窗口 2014-2026(含 2015 股灾/2018 熊),股票 ACTIVE 2 腿 → +国债 → +国债+黄金。
+**结论:卡玛 1.6 不可由"加防御腿"诚实达到。**
+- risk_parity "命中" 卡玛 1.84 是**退化解**:防御腿低波 → RP 灌满债券 → 年化崩到 8.9%(破满意线 20%)。
+- equity:defensive 混合扫描(等权防御子组合):100:0 卡玛 1.36 → 60:40 卡玛 **1.28**——
+  **加防御腿单调降卡玛**(年化 35%→23.6% 比回撤 -26%→-18% 缩得更快,Calmar=ann/|mdd| 反降)。
+- **但腿的真实价值确凿**:夏普 1.75→1.93、回撤 -25.9%→-18.4%、2018 最差年 -14.3%→-7.6%——
+  把高收益引擎变**更安全**,是风险/收益取舍,非卡玛手段。
+**关键澄清**:卓越线是"年化≥28% **或** 卡玛≥1.6"(OR);**股票本体年化 35% 已从年化臂达卓越线**,
+本就不是高卡玛引擎。"冲卡玛 1.6"在追错臂。提卡玛的真路是降股票**自身**回撤(择时/sizing),非加低收益腿。
+报告 buhki12rm/baoukon1c(/tmp/multileg.log, /tmp/blend.log)。
+
+## fund_mom 完整定性(2026-06-14,借审计 + 本地回测三测收口)
+`fundamental-momentum/v0.1 = momentum(60)+revenue_yoy`,三个测试给出完整画像:
+- **独立强**:pure momentum(60) L1 净 20.1% vs fund_mom **31.2%**——revenue_yoy 加 +11.1pp,**非死重,不简化**(修正了凭审计推的早期误判)。
+- **对 book 冗余且负边际**:对 small-cap/illiquidity 相关 **0.68/0.69**;加入 ACTIVE book 后 risk_parity **Δsharpe -0.30 / Δcalmar -0.41**(equal_weight -0.41/-0.50)——独立强但组合稀释。
+- **审计一致**:RidgeCV 联合增量证 revenue_yoy 对完整量价 pool 冗余;portfolio 层证 fund_mom 对 book 负边际——两个层级同指向。
+**定位**:在册(独立验证通过,口径透明)但**不进 LIVE 组合**(对小账户因相关性与边际负而不进,但对大账户是首选扩容件);2026-06-17容量回测实证:中位数市值达 **91.3 亿**(小盘的5倍),日均成交额(ADV)达 **8.4 亿 CNY**(小盘的24-90倍),容量上限估算为 **4.0 亿 CNY**。当 AUM > 2000万 时,是降低小盘挤压效应的首选大容量策略。报告 `reports/research/{pure_mom_vs_fundmom,fund_mom_marginal}.json`。
+
+## 在册 hedged 母策略审计(2026-06-14,默认配置初判)
+审 hq-momentum-hedged / large-cap-growth-hedged / d-le-sc-hedged 对 ACTIVE book 的相关+边际:
+- **去相关属实(已独立验证,config-robust)**:三者对 small-cap/illiquidity 相关 **-0.05~-0.12**——
+  对冲真把 beta 剥掉了,**不是伪多样性**(与 fund_mom 的 0.68 截然不同)。large-cap-growth
+  台账自报"-0.096",我独立复算 -0.11,**相关声明属实**。
+- **但默认配置下独立 edge 弱/负 → 负边际**:独立 Sharpe hq +0.38 / large-cap **-0.29** / d-le-sc **-0.21**
+  (后两者 2018-2026 亏钱);加入 book 后 risk_parity Δsharpe -0.12~-0.37。**这是另一种多样性陷阱:
+  真去相关但独立无 edge → 摊薄强 book**(非伪多样性)。
+- **口径警告**:我跑的是各 strategy 模块**默认配置**,非台账登记的调优版(如 large-cap v1.1 用 CPV 惩罚、
+  OOS 2023-2026 自报 5.66%/0.58)。负边际是基线配置的初判,**调优版边际需用登记 config 重审才公允**。
+- industry-neglect-rotation 无单一 run 接口,未审。
+**净结论**:registry 的 hedged 族**不是伪多样性(去相关真实)**,但默认配置独立 edge 不足以产生正边际;
+入 LIVE 前须用登记 config 重审 + 验独立 edge 是否真为正。报告 `reports/research/registry_hedged_audit.json`。
+
+**调优 config 重审(2026-06-14)**:用登记 config(large-cap v1.1 CPV0.5 等)+ 分 full18/oos23 双窗:
+- **hq-momentum & large-cap-growth v1.1**:full 2018-2026 独立 Sh +0.21/-0.03、边际 **-0.12/-0.16(负)**;
+  OOS 2023-2026 独立 Sh +0.67/+0.69、边际 **+0.04/+0.14(正)**。**正边际只在 2023-2026=登记窗口**——
+  这不是干净 OOS,是调参的 in-sample 窗。机制:它们是大盘/质量,2023-2026 恰逢小盘(book)走弱才占优,
+  2018-2022 小盘疯牛时拖累。**= regime-conditional 分散件:小盘弱时帮、小盘强时拖**,不是静态可加 LIVE。
+- **d-le-sc v1.1**:两窗皆负(独立 Sh -0.27/-0.70,边际 -0.42/-0.60)——拒。
+- **修正**:large-cap 早前默认配置 -0.29 的判是错版本(跑了 v1.0 baseline 而非 v1.1 CPV);调优版独立确实更好,
+  但仍 full-window 负边际。**第三种多样性陷阱**:去相关 + edge 仅在登记窗有效(regime 依赖/疑过拟登记窗)。
+**对比**:跨资产国债/黄金 = 逆风年(2018)正 + 牛年不拖(corr -0.09、逐年皆正);hedged equity 牛年拖累
+(full 负边际)→ **跨资产 > hedged-equity 作分散件**。这几个 hedged 族要用须 regime-aware 配置,非静态 risk_parity。
+报告 `reports/research/registry_hedged_audit_tuned.json`。
+
+## LIVE 组合升级:国债+黄金转 ACTIVE(2026-06-14)
+ACTIVE 从 2 腿(small-cap+illiquidity)→ **4 腿(+国债 511010 MA60 + 黄金 518880 MA60)**。
+理由:跨资产腿无条件正边际(国债 Δsh+0.64 逐年皆正/黄金 +0.37 最强尾部对冲、两者正交、对 A 股 corr -0.09),
+区别于 hedged-equity 的 regime 条件边际(只在登记窗正)。**实测 before/after(equal_weight 生产默认)**:
+- 旧 2 腿:ann 29.7% / sh 1.88 / cal 1.88 / mdd -15.8% / 2018 -5.3%
+- **新 4 腿:ann 19.1% / sh 2.23 / cal 2.28 / mdd -8.4% / 2018 -0.5%** —— 夏普+0.35、卡玛+0.40、回撤近腰斩、2018 抹平。
+**风险/收益取舍 + 一个 flag**:年化 29.7%→19.1%(equal_weight 4 腿=50% 防御过重,**跌破满意线 20% 年化臂**),
+但卡玛 2.28≥1.6 **从卡玛臂达卓越线**(旧版从年化臂达)——引擎从"高收益卓越"转"高卡玛卓越"。
+**已做 capped 权重(2026-06-14)**:`composer.capped_weight` + `compose(method='capped', defensive=, cap=0.30)`,
+防御腿(国债+黄金,role=defensive 标签 + `defensive_strategies()`)合计封顶 30%,进攻腿分 70%。
+扫描确认**LIVE 配比定为 capped 30%**:
+| 配比 | 年化 | 夏普 | 卡玛 | 回撤 | 2018 |
+|---|---|---|---|---|---|
+| 旧 2 腿 | 29.7% | 1.88 | 1.88 | -15.8% | — |
+| equal(50%防御) | 19.1% | 2.23 | 2.28 | -8.4% | ✗年化<20% |
+| **capped 30%** | **23.3%** | **2.08** | **2.05** | **-11.4%** | -2.3% ✓ |
+capped 20/25/30% 全过满意线(年化 23-26%)且夏普 2.0+/卡玛 2.0+;30% 取最大防御=最稳。
+对比旧 2 腿:夏普 +0.20、回撤 -15.8%→-11.4%、年化仍 23.3%(守满意线)、卡玛 2.05 达卓越。
+**铁律**:这两腿组合**禁 vanilla risk_parity**(低波债券被灌满→年化崩到 8.2%,已实测);LIVE 用 capped 30%。
+
+## 全在册因子 Alpha Audit(2026-06-14,leave-one-out)
+用 research_toolkit.audit_factor 审 11 个因子(每个 vs 其余全部),"独立性地图":
+| 因子 | 判决 | 真增量 | NW ICIR(raw) |
+|---|---|---|---|
+| momentum60 | **REAL** | +0.038 | 0.133(0.455) |
+| momentum20 | **REAL** | +0.033 | 0.157(0.496) |
+| net_profit_yoy | TRUE_BUT_SMALL | +0.005 | 0.062 |
+| roe | TRUE_BUT_SMALL | +0.001 | 0.034 |
+| illiquidity | NOISE | +0.000 | 0.075 |
+| small_cap | NOISE | **-0.121** | 0.131 |
+| volatility20/volume_ratio/bp/ep/revenue_yoy | NOISE | 负~0 | — |
+
+**结论(因子级实锤本会话主线)**:① **只有 momentum 是 REAL**(载荷因子,移除则其余补不上)——
+trend 是与 size/流动性/价值 簇正交的独立轴;② **量价/size/流动性簇(small_cap/illiquidity/vol/
+volume_ratio)互为冗余**——leave-one-out 下个个判 NOISE(small_cap 甚至 -0.12=加它反而拖累),
+**4 个名字 = 1 个赌注**(实锤伪多样性 0.69 相关);③ 基本面(roe/npy 真但太小、bp/ep/revenue_yoy 噪声)
+= price-in。**60 因子→2 独立轴(momentum + 量价簇)**,现因子级逐个验证。
+**注意**:① leave-one-out 下近邻对(momentum60/20)互相掩盖,故 momentum 真增量是"扣掉另一个动量后"的残值,实际动量轴更强;② **新洞察**:momentum 因子级 REAL 但 LIVE 无独立动量腿(equity 是 small_cap+illiquidity 同簇)——
+不过 fund_mom 证 momentum 策略对 book 仍相关(IC 增量≠组合边际)。报告 `reports/research/audit_all_factors.json`。
+
+## momentum 独立 LIVE 腿测试(2026-06-14)——拒,因子正交不传导到组合
+audit 说 momentum 因子级 REAL,试单独建 LIVE 腿:
+- **A 股 60 日动量 = 反转**:追涨 Sharpe **-0.59**(回撤 -92.7%,结果哨兵正确触发拦下);追跌(买输家)
+  Sharpe +0.57/年化 +19%/回撤 -40%。可交易方向是反转。
+- **反转动量腿对在册腿相关 +0.57/+0.58**(小盘/illiquidity)——和 fund_mom 的 0.68 同级。
+- **边际为负**:加到 equity book Δsharpe **-0.37**(1.88→1.51)、加到 full ACTIVE **-0.38**(2.76→2.37)。**拒,不入 LIVE。**
+**结论(第三次实锤 IC 增量≠组合边际)**:momentum 因子级 REAL(截面正交信息),但 momentum top-N **策略**
+和小盘/illiquidity 持仓重叠——**A 股里最小、最不流动、最被砸的股票是同一批**,top-N 只交易排名极端,
+极端处三个因子选出同一批票。**因子正交 ≠ 组合分散**:正交在全截面 IC,重叠在 top-N 持仓。
+真分散仍只有跨资产(国债/黄金),equity 内无论哪个因子建腿都和小盘簇撞。报告 `reports/research/`(mom_leg)。
+
+## industry-rotation v1.3(扩容量候选)审计(2026-06-14)
+v1.3 华西11因子ETF轮动+国债overlay,问"它是高容量的真第二家族还是小盘溢价换壳":
+- 独立:ann 15.9% / 夏普 0.95 / 卡玛 0.66 / 回撤 -24%(2013-2026)。
+- **对小盘/illiquidity 相关 +0.73/+0.74**——是**小盘/反拥挤溢价的行业 ETF 版**,同一个赌注换壳;
+  对国债 -0.04(它自带债券 overlap,与我们国债腿重复)。
+- **边际负**:加 equity book Δsharpe -0.32、加 full ACTIVE -0.37 → 对我们小账户冗余。
+**结论(扩容 ≠ 新分散,且有 alpha 税)**:① v1.3 **确实扩容量**(标的是行业 ETF,容量远超微盘 ~2千万)——
+这是用户记的"放大容量的组合";② **但它是同一个小盘/反拥挤赌注换 ETF 壳**(corr 0.73),非新家族,
+对小账户负边际;③ **且更弱**(夏普 0.95 vs 小盘 ~1.4)——**capacity tax:用流动 ETF 表达微盘溢价会稀释**
+(行业平均抹掉个股微盘 premium)。**扩容量和保 alpha 互斥**:越往 ETF 容量走,越靠近大资金待的地方,
+edge 越稀释——正是 limits-to-arbitrage 的另一面。v1.3 对小账户无用;只有规模撑破 ~2千万 才用它换(稀释的)容量。
+报告 `/tmp/audit_v13.log`。
+
+## 全候选 Alpha Audit 总记分卡(2026-06-14,审计闭环)
+本会话用统一审计透镜(因子级 NW+RidgeCV / 策略级 marginal+相关)审了全部在册候选,完整 map:
+| 候选 | 类型 | 对 book 相关 | 边际/真增量 | 判决 |
+|---|---|---|---|---|
+| **国债 511010 MA60** | 跨资产 | **-0.09** | Δsh **+0.64**,9/9 年正 | **REAL ✓ LIVE** |
+| **黄金 518880 MA60** | 跨资产 | **-0.01** | Δsh **+0.37**,8/9 年正 | **REAL ✓ LIVE** |
+| momentum(因子) | 因子级 | — | 真增量 +0.038 | REAL(但策略级相关) |
+| momentum 腿(策略) | equity | +0.57 | Δsh -0.37 | 拒(因子正交不传导) |
+| fund_mom | equity | +0.68 | Δsh -0.30 | 拒(相关+负边际) |
+| hedged×3(hq/large-cap/d-le-sc) | equity 对冲 | -0.06~-0.18 | 仅登记窗正,full 负 | 拒(regime 条件/过拟登记窗) |
+| industry-rot v1.3 | ETF 扩容 | +0.73 | Δsh -0.32 | 拒(小盘溢价换壳+capacity tax) |
+| 小盘簇(small_cap/illiq/vol/volume_ratio) | equity | 互 0.69-0.76 | leave-one-out NOISE | = 1 个赌注 |
+| 基本面(roe/npy/rev/bp/ep) | 基本面 | — | price-in | NOISE/真但太小 |
+
+**审计闭环结论**:全因子/全策略逐个验证后,**唯一通过的真分散是跨资产国债+黄金**(去相关、正边际、
+逐年皆正——国债 2018 逆风年 +4% 时全 equity 流血)。equity 侧无论因子层正交与否,策略层 top-N 都和
+小盘簇撞(持仓重叠);基本面 price-in;扩容量(v1.3)是稀释版换壳。**这把"真分散只在跨资产、edge 是
+小容量 limits-to-arbitrage 溢价"从论断变成了候选级穷举证明。** 国债平时稳(夏普1.72/年化3%)、黄金治尾部
+(年化13.9%/2025+52%),两者互补。报告 `/tmp/audit_xasset.log`。
+
+## regime 门控 small-cap↔large-cap 测试(2026-06-14)
+信号用既有未拟合的小盘 PureTrend MA16(in=受宠/out=失宠,占比 61/39),失宠时把空仓换成 large-cap v1.1:
+| 组合 | 年化 | 夏普 | 卡玛 | 回撤 |
+|---|---|---|---|---|
+| static equity book | 29.7% | 1.88 | **1.88** | **-15.8%** |
+| regime-gated | **34.1%** | **2.01** | 1.75 | **-19.5%** |
+| large-cap 单独 | -0.2% | -0.02 | — | -28.5% |
+**结论(部分成立但不推荐静态上线)**:① 门控**确实收割了 large-cap 的条件 edge**(失宠期 large-cap 为正,
+故 +4.4pp 年化/+0.13 夏普),证明 regime 逻辑对;② **但回撤变差**(-15.8→-19.5%)、卡玛降(1.88→1.75)——
+**large-cap 是 regime 赌注不是对冲**;③ 逐年 5 帮/4 拖,不稳健,收益集中在 2019/2024。
+**根本缺陷**:门控在 equity 内部轮动(小盘→大盘),**broad 市场下跌时两头都是股票一起跌**(2018/2024 部分),
+不护回撤;真护回撤要轮**出** equity(国债/黄金,非股票)。**"小盘失宠"≠"市场好"** —— 失宠常伴市场承压,
+此时 large-cap 也跌。门控不入 LIVE(回撤变差、违背回撤优先);要风险降低,失宠时该开的是跨资产防御腿不是 large-cap。
+报告 `/tmp/regime_gate.log`。
+**回撤分布修正(2026-06-14,纠正上面"一致变差"的武断判断)**:看分布而非单一 max——gated **典型更好**
+(中位 DD -3.4% vs static -4.0%,水下天数 35% vs 40%),恶化**全在尾部**(深回撤段 5 次 vs 1 次、
+95 分位 -14.5% vs -10.5%、最深 -19.5% 落在 2018 熊市底 broad bear)。**所以是真·风险偏好选择不是一票否决**:
++4.4pp 年化 + 更好典型回撤,代价更肥尾部(偶发 -15~-20%,仍在 20% bar 内)。能吃下尾部则 gated 更高收益有价值。
+**但 gate 给收益不给容量**:受宠期 61% 资金全在小盘、仍被 ~2千万 顶住;容量来自纯 large-cap(8亿但弱edge),
+alpha 来自小盘,两 regime 不可兼得。**收益(gate 可得)和容量(需纯 large-cap)是两个互斥的杠杆。**
+**已落成 LIVE 可配置模式(默认关,2026-06-14)**:`portfolio/regime_gate.py::live_returns(regime_gated=False)`。
+默认关 = 现行 capped 30%(实测 23.3%/2.08/2.05/-11.4%,与 composer 一致,行为不变);
+开启 = equity 子组合按小盘 PT-MA16 regime 切 小盘↔large-cap + 30% 防御腿混合,**全版实测
+26.4%/2.21/卡玛1.80/回撤-14.7%**(比 equity-only 测的 -19.5% 温和,防御腿垫住,仍 <20% bar):
++3.1pp 年化、+0.13 夏普,换 卡玛 2.05→1.80、回撤 +3.3pp。纯函数 apply_regime_gate 单测,
+REGIME_GATED_DEFAULT=False 测试守门,接入 test_all。是风险偏好开关,不是默认行为。
+**全样本压力测试 2010-2026(2026-06-14,强化门控可信度)**:
+| 组合 | 窗口 | 年化 | 夏普 | 卡玛 | 回撤 |
+|---|---|---|---|---|---|
+| 门控-equity-only | 2010-2026 全 | **33.3%** | **1.63** | **1.14** | **-29.2%** |
+| static equity | 2010-2026 全 | 29.4% | 1.50 | 0.96 | -30.6% |
+| 门控-full(含防御) | 2013-2026(ETF下限) | 29.2% | 1.97 | 1.41 | -20.7% |
+**关键修正**:① **全样本上门控全面优于 static**——年化 +3.9pp、夏普 +0.13、卡玛 +0.18,**回撤还略好**
+(-29.2% vs -30.6%)。我之前"门控恶化回撤"是 **2018-2026 窗口的局部现象**,全样本不成立,**非过拟登记窗**;
+② 门控 **2011 熊市真护跌**(-3.2% vs static -10.0%,large-cap 那年扛住),但 2018 拖(-10.9% vs -5.7%)
+——protection 视 large-cap 自身是否也跌,inconsistent 但净正;③ 全版含防御把回撤垫到 -20.7%(略破 20% bar);
+④ 注:年化被 2015 疯牛(门控 +291%)抬高,两者都吃这个不可重复年。**净:门控比 2018 窗显示的更稳健,
+全样本是清晰改进(默认仍关,风险偏好开)。** 报告 `/tmp/stress_gate.log`。
 
 ## 关键产出
 

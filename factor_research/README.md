@@ -2,16 +2,31 @@
 
 这个目录是一套 A 股因子研究、数据校验和策略运行系统。当前主线已经迁移到 `data_lake/` 真实口径：
 
-- 策略：小盘 60 日成交额因子 + 小盘股等权指数择时 + 1.25 倍杠杆
-- 目标：年化收益 >= 35%，最大回撤 <= 15%
+- 策略：AmihudIlliq 20d + Salience Veto 30% + PureTrend MA16 Band 动态敞口(0~1.5x) + 511010 国债ETF轮动
+- 目标：单母策略入册 年化>15% / 回撤<20%；项目级满意线 年化≥20% & 夏普≥1.0，卓越线 年化≥28% 或 卡玛≥1.6(原 35%/15% 锚定 data_full 水分，已退役)
 - 旧口径结果：`data_full` 年化约 40.4%，但含幸存者偏差水分
-- 真实成本基线：`data_lake` 2018-2026 年化约 21.2%，最大回撤约 -16.2%
+- 当前生产基线：`data_lake` 2018-2026 年化约 37.8%，最大回撤约 -12.0%
 - 阶段状态：阶段 0 已关闭；当前在阶段 1 多目标工厂化
 - 版本登记：`strategy_versions.json`
+
+## Python 环境
+
+Apple Silicon macOS 上建议先建本地 venv，再装项目依赖和开发工具：
+
+```bash
+cd /Users/kiki/astcok/factor_research
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -U pip
+python3 -m pip install -e '.[dev]'
+```
+
+`pyproject.toml` 集中管理 `pytest` / `ruff` / `mypy` 配置，`requirements.txt` 保留运行时兼容清单。若必须使用系统 Python，再按 `requirements.txt` 里的提示加 `--break-system-packages`。
 
 ## 目录说明
 
 - `run_daily.py`：每日生产入口，更新数据、校验、生成信号和持仓 JSON。
+- `api/`：FastAPI 只读/受控动作接口，默认本机端口 `8011`。
 - `strategy_lake.py`：真实口径策略复测入口。
 - `validate_final.py`：全市场日线数据质量校验入口。
 - `test_load_lake.py`：轻量验证数据湖加载层。
@@ -25,6 +40,7 @@
 - `lake/`：数据湖加载、聚合、校验和数据源模块。
 - `results/`：策略配置、净值图、进化历史等结果文件。
 - `signals/`：每日信号输出。
+- `paper/`：自动模拟盘账户、交易流水和净值曲线；只模拟，不连接真实券商。
 - `reports/`：报告和导出文件。
 
 ## 日常查看信号
@@ -39,7 +55,7 @@ python3 run_daily.py --no-update
 输出重点看：
 
 - `最新交易日`：确认数据日期是否符合预期。
-- `小盘指数 vs MA16`：确认当前是持仓还是空仓。
+- `小盘指数 vs MA16` / `Band exposure`：确认当前动态敞口、持仓或空仓。
 - `调仓判断`：确认今日是否需要调仓。
 - `操作` 和 `持仓`：用于生成当日执行参考。
 
@@ -101,6 +117,21 @@ reports/ops/daily_update/YYYY-MM-DD.json
 ```
 
 包装脚本会在数据落后应有交易日时跳过信号生成，避免用旧数据覆盖 `signals/state.json`。
+当信号生成成功时，包装脚本会继续运行 paper_trade 自动模拟盘；真实账户仍不自动下单，Web/Obsidian 输出只作为人工跟单参考。
+
+## Web/API 看板
+
+本机产品看板由 FastAPI + Next.js 组成：
+
+```bash
+cd /Users/kiki/astcok/factor_research
+python3 -m uvicorn api.main:app --port 8011 --reload
+
+cd /Users/kiki/astcok/web
+npm run dev
+```
+
+前端默认调用 `http://127.0.0.1:8011`，页面覆盖总览、数据、风险、组合、模拟盘、实验室和设置。安装 launchd 后，`com.astcok.api` 和 `com.astcok.web` 会分别常驻 `:8011` 和 `:3000`。
 
 ## 复测真实口径策略
 

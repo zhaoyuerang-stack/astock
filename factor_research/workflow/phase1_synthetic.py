@@ -496,6 +496,7 @@ class Phase1Checker:
     # ── lesson generation ──
 
     def _maybe_save_lessons(self, checks: list[CheckResult]):
+        saved = 0
         for c in checks:
             if c.verdict not in ("FAIL", "WARN"):
                 continue
@@ -511,6 +512,7 @@ class Phase1Checker:
                 if self.family not in ex.get("strategies", []):
                     ex.setdefault("strategies", []).append(self.family)
                 lf.write_text(json.dumps(ex, ensure_ascii=False, indent=2))
+                saved += 1
             else:
                 lf.write_text(json.dumps({
                     "fingerprint": fp,
@@ -522,6 +524,13 @@ class Phase1Checker:
                     "last_seen": str(pd.Timestamp.now()),
                     "strategies": [self.family],
                 }, ensure_ascii=False, indent=2))
+                saved += 1
+        if saved:
+            try:
+                from knowledge.graph import sync_pending_lessons_to_graph
+                sync_pending_lessons_to_graph()
+            except Exception as exc:
+                print(f"[knowledge] pending lessons sync failed: {exc}", flush=True)
 
 
 def _suggest_fix(check_id: str) -> str:

@@ -49,6 +49,12 @@ class StrategyView(BaseModel):
     metrics: dict = Field(default_factory=dict)
     config: dict = Field(default_factory=dict)
     notes: str = ""
+    capacity_m: float = 0.0
+    admission: dict = Field(default_factory=dict)   # 双轨准入 {track, rationale}
+    nine_gate: dict = Field(default_factory=dict)   # Nine-Gate 审计摘要 {dsr_p, gate4_verdict, n_trials, ...}
+    style_betas: dict = Field(default_factory=dict)        # 家族级风格暴露 {size, value, momentum, ...} —— 判断是否风格伪装
+    failure_boundaries: dict = Field(default_factory=dict)  # 家族级失效边界 {max_drawdown, max_drawdown_days, ...}
+    decay_signal: str = ""                                  # 家族级失效信号(死因/下一步触发条件)
 
 
 class FactorView(BaseModel):
@@ -58,6 +64,7 @@ class FactorView(BaseModel):
     hypothesis: str = ""
     regime: str = ""
     n_versions: int = 0
+    n_registered: int = 0     # 该家族「在册」版本数(0 = 候选/噪音池,未产出有效 alpha)
     status: str = ""
 
 
@@ -77,7 +84,22 @@ class DataQualityView(BaseModel):
     severe_count: int = 0           # 真问题股票数(负价/OHLC错)
     jump_count: int = 0             # 跳变标记数(含正常现象)
     verdict: str = ""               # 可用 / 关注 / 不建议回测
+    triage_summary: dict = Field(default_factory=dict)
+    production_blocked: bool = False
+    backtest_blocked: bool = False
     duckdb: dict | None = None      # 可选:DuckDB 即席复核
+
+
+class StockProfileView(BaseModel):
+    """Single-stock data profile backed by data_lake."""
+    code: str
+    name: str = ""
+    latest_price: dict = Field(default_factory=dict)
+    returns: dict = Field(default_factory=dict)
+    daily_basic: dict = Field(default_factory=dict)
+    moneyflow: dict = Field(default_factory=dict)
+    data_sources: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
 
 class FactorHealthView(BaseModel):
@@ -168,6 +190,29 @@ class RegisteredExperimentView(BaseModel):
     data_scope: dict = Field(default_factory=dict)
 
 
+class ResearchRunView(BaseModel):
+    """Machine-readable research script run archived in research_ledger."""
+    run_id: str = ""
+    script: str = ""
+    hypothesis: str = ""
+    source: str = ""
+    run_at: str = ""
+    data_vintage: dict = Field(default_factory=dict)
+    metrics: dict = Field(default_factory=dict)
+    verdict: str = ""
+    next_action: str = ""
+    decision_state: str = ""   # refuted | pending_review | shadow | promote | informational
+    artifact_paths: list[str] = Field(default_factory=list)
+    notes: str = ""
+
+
+class ResearchRunIndexView(BaseModel):
+    """Read-optimized index derived from immutable research-run ledger rows."""
+    generated_at: str = ""
+    summary: dict = Field(default_factory=dict)
+    latest_runs: list[ResearchRunView] = Field(default_factory=list)
+
+
 class AutoResearchCandidateView(BaseModel):
     """Auto Factor Research candidate submitted as controlled JSON AST."""
     fingerprint: str
@@ -191,6 +236,11 @@ class AutoResearchReviewItemView(BaseModel):
     review_action: str = ""    # "" = 待复核;approve / reject = 已人工决策
     reviewer_notes: str = ""
     reviewed_at: str = ""
+    promote_job_id: str = ""
+    target_status: str = ""
+    registry_status: str = ""
+    promote_detail: str = ""
+    promote_error: str = ""
 
 
 class AutoResearchReviewRequest(BaseModel):
@@ -226,6 +276,9 @@ class AutoResearchPromoteResponse(BaseModel):
     version: str = ""
     registered: bool = False
     detail: str = ""
+    target_status: str = ""
+    registry_status: str = ""
+    phase_summary: dict = Field(default_factory=dict)
 
 
 class AutoResearchLLMGenResponse(BaseModel):
@@ -246,6 +299,10 @@ class AutoResearchChampionView(BaseModel):
     status: str = ""
     decision: str = ""
     reason: str = ""
+    novelty: float = 0.0     # 行为新颖性 [0,1]:vs 已评估候选+参考池的最近邻距离
+    corr_to_book: float = 0.0  # 对在册 ACTIVE 组合的有符号收益相关(负=防御腿,边际价值高)
+    turnover: float = 0.0    # top-N 成员相邻期流失率 [0,1](高=换手快=成本高)
+    fitness: float = 0.0     # |ICIR| + novelty_w×novelty − corr_w×corr_to_book − turnover_w×turnover
 
 
 class AutoResearchIslandSearchResponse(BaseModel):
@@ -258,10 +315,59 @@ class AutoResearchIslandSearchResponse(BaseModel):
     champions: list[AutoResearchChampionView] = Field(default_factory=list)
 
 
+class ActionTokenView(BaseModel):
+    """Local action confirmation token for write/costly endpoints."""
+    header: str = "X-Action-Token"
+    token: str = ""
+    source: str = ""                # env | file
+
+
+class ActionJobView(BaseModel):
+    """Process-local action job returned by minute-level endpoints."""
+    job_id: str
+    kind: str = ""
+    status: str = "queued"          # queued | running | succeeded | failed
+    created_at: str = ""
+    started_at: str = ""
+    finished_at: str = ""
+    result: dict | None = None
+    error: str = ""
+
+
+class AutoResearchOOSChampionView(BaseModel):
+    fingerprint: str
+    expr: str = ""
+    train_icir: float = 0.0
+    train_status: str = ""
+    train_decision: str = ""
+    train_novelty: float = 0.0
+    train_corr_to_book: float = 0.0
+    train_turnover: float = 0.0
+    train_fitness: float = 0.0
+    oos_icir: float | None = None
+    oos_ic_mean: float | None = None
+    oos_decision: str = ""
+    oos_reason: str = ""
+
+
+class AutoResearchWalkForwardResponse(BaseModel):
+    """元级 walk-forward 搜索结果:训练截断于 cutoff,冠军一次性 OOS 评分。"""
+    vintage_id: str = ""
+    cutoff: str = ""
+    oos_start: str = ""
+    oos_end: str = ""
+    islands: int = 0
+    generations: int = 0
+    evaluated: int = 0
+    seeded_by: str = "seeds"        # seeds | llm
+    champions: list[AutoResearchOOSChampionView] = Field(default_factory=list)
+
+
 # ── Phase 5 Agent ──────────────────────────────────────────────────────────────
 class AgentAskRequest(BaseModel):
     request: str
     context: dict = Field(default_factory=dict)   # {current_page, selected_object_id, ...}
+    messages: list[dict] = Field(default_factory=list)  # [{role:user|assistant, content}]
 
 
 class AgentAskResponse(BaseModel):
@@ -270,6 +376,46 @@ class AgentAskResponse(BaseModel):
     tool: str | None = None
     risk: str | None = None        # 命中工具的风险级
     llm_ready: bool = False        # 是否已接真 LLM(当前规则式 = False)
+
+
+class AgentSessionCreateRequest(BaseModel):
+    page_context: str = ""
+    title: str = "AI 会话"
+    user_id: str = "local"
+
+
+class AgentSessionAskRequest(BaseModel):
+    request: str
+    context: dict = Field(default_factory=dict)
+
+
+class AgentSessionMessageView(BaseModel):
+    role: str = ""
+    content: str = ""
+    created_at: str = ""
+    metadata: dict = Field(default_factory=dict)
+
+
+class AgentSessionView(BaseModel):
+    session_id: str
+    user_id: str = "local"
+    title: str = "AI 会话"
+    page_context: str = ""
+    status: str = "active"
+    created_at: str = ""
+    updated_at: str = ""
+    messages: list[AgentSessionMessageView] = Field(default_factory=list)
+
+
+class AgentSessionAskResponse(AgentAskResponse):
+    session: AgentSessionView
+
+
+class AgentKnowledgeSourceView(BaseModel):
+    source_id: str
+    source_type: str
+    title: str
+    source_path: str
 
 
 # ── Phase 6 系统设置 / 审计 ─────────────────────────────────────────────────────
@@ -376,9 +522,16 @@ class BondInstructionView(BaseModel):
     note: str = ""
 
 
+class CandidateStockRow(BaseModel):
+    code: str = ""
+    name: str = ""
+
+
 class TradePlanView(BaseModel):
     """今日操作卡:今日成交 + 明日计划 + 轮动指令 + 账户 + 确认状态。"""
     signal_date: str = ""
+    account_date: str = ""
+    last_exec_signal_date: str = ""
     generated_at: str = ""
     stale: bool = False
     stale_reason: str = ""
@@ -387,11 +540,15 @@ class TradePlanView(BaseModel):
     in_market: bool = False
     band_exposure: float = 0.0
     action: str = ""
+    small_index_vs_ma16: float = 0.0
+    binary_in_market_shadow: bool = False
+    base_in_market: bool = False
     executed: list[PaperTradeRow] = Field(default_factory=list)
     blocked: list[PaperBlockedRow] = Field(default_factory=list)
     plan: list[PaperPlanItem] = Field(default_factory=list)
     bond: BondInstructionView | None = None
     positions: list[PaperPositionRow] = Field(default_factory=list)
+    candidates: list[CandidateStockRow] = Field(default_factory=list)
     nav: float = 0.0
     cash: float = 0.0
     position_value: float = 0.0
@@ -411,6 +568,7 @@ class NavCurveView(BaseModel):
     points: list[NavPoint] = Field(default_factory=list)
     inception: str = ""
     init_capital: float = 0.0
+    latest_nav_date: str = ""
     latest_nav: float = 0.0
     total_return: float = 0.0
     max_drawdown: float = 0.0
@@ -419,3 +577,41 @@ class NavCurveView(BaseModel):
 class PaperTradesView(BaseModel):
     trades: list[PaperTradeRow] = Field(default_factory=list)
     total: int = 0
+
+
+class ProductionReadinessView(BaseModel):
+    """生产信号发布前的统一闸门结果。"""
+    allowed: bool = False
+    blocking_reasons: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    data_date: str = ""
+    expected_trade_date: str = ""
+    governance_status: str = ""
+    decay_status: str = ""
+    paper_status: str = ""
+    trading_day_status: str = ""
+    data_issue_status: str = ""
+    data_issue_categories: list[str] = Field(default_factory=list)
+    generated_at: str = ""
+
+
+class TradeReadinessView(BaseModel):
+    allowed_to_trade: bool
+    data_status: str
+    model_version: str
+    factor_health: str
+    portfolio_risk: str
+    cost_forecast: str
+    liquidity_status: str
+    regime_status: str
+    regime_confidence: float
+    kill_switch_status: str
+    human_approval_required: bool
+    details: dict = Field(default_factory=dict)
+
+
+class GovernanceView(BaseModel):
+    model_cards: list[dict] = Field(default_factory=list)
+    validation_reports: list[dict] = Field(default_factory=list)
+    experiments_ledger: list[dict] = Field(default_factory=list)
+    committees: list[dict] = Field(default_factory=list)

@@ -71,15 +71,25 @@ def current_portfolio(with_target: bool = True) -> PortfolioView:
     acct = _read_json("paper/account.json")
     state = _read_json("signals/state.json")
     sig = _latest_signal_json()
-    positions = acct.get("positions", {}) or {}
-    cur = [Holding(code=str(c), weight=float(v.get("weight", 0.0)) if isinstance(v, dict) else 0.0)
-           for c, v in positions.items()]
+    
+    from portfolio.paper_engine import valuation
+    date = str(sig.get("date", "")) or str(acct.get("last_date", ""))
+    nav, pos_value, detail = valuation(acct, date) if date else (acct.get("cash", 0.0), 0.0, [])
+    
+    cur = []
+    for item in detail:
+        w = item["mv"] / nav if nav > 0 else 0.0
+        cur.append(Holding(code=item["code"], weight=w))
+        
     rotation = sig.get("rotation", {}) or {}
+    raw_stance = state.get("last_action", sig.get("action", ""))
+    stance = "持债避险" if acct.get("bond", {}).get("shares", 0) > 0 else raw_stance
+    
     view = PortfolioView(
-        nav=float(acct.get("cash", 0.0)) + 0.0,
+        nav=float(nav),
         cash=float(acct.get("cash", 0.0)),
         current_positions=cur,
-        stance=state.get("last_action", sig.get("action", "")),
+        stance=stance,
         regime=sig.get("regime", ""),
         note=rotation.get("note", ""),
     )

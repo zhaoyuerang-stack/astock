@@ -31,7 +31,7 @@ export default function NavChart({ data }: { data: NavCurveView }) {
       <div className="flex items-baseline justify-between mb-2">
         <div className="text-sm font-medium">模拟盘净值曲线</div>
         <div className="text-[12px] text-subink">
-          最新 <span className="text-ink font-medium">{fmt(data.latest_nav)}</span>
+          最新{data.latest_nav_date ? ` ${data.latest_nav_date}` : ""} <span className="text-ink font-medium">{fmt(data.latest_nav)}</span>
           <span className={`ml-2 ${data.total_return >= 0 ? "text-ok" : "text-danger"}`}>
             {data.total_return >= 0 ? "+" : ""}{(data.total_return * 100).toFixed(2)}%
           </span>

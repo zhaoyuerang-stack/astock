@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A股量化因子研发与自进化系统说明书</title>
+    <meta name="description" content="A-Share Factor Quant Research and Auto-Evolutionary Platform Technical Manual">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0B0D17;
+            --card-bg: rgba(22, 28, 45, 0.4);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #F3F4F6;
+            --text-secondary: #9CA3AF;
+            --accent-purple: #B55FE6;
+            --accent-teal: #00E5FF;
+            --accent-blue: #3B82F6;
+            --accent-red: #EF4444;
+            --accent-green: #10B981;
+            --accent-orange: #F59E0B;
+            --glass-blur: blur(16px);
+            --shadow-glow: 0 0 30px rgba(181, 95, 230, 0.15);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+        }
+
+        /* Ambient Glow Backgrounds */
+        .ambient-glow {
+            position: fixed;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: -1;
+            opacity: 0.15;
+            filter: blur(120px);
+        }
+        .glow-purple {
+            top: -10%;
+            left: -10%;
+            background: radial-gradient(circle, var(--accent-purple) 0%, transparent 70%);
+        }
+        .glow-teal {
+            bottom: -10%;
+            right: -10%;
+            background: radial-gradient(circle, var(--accent-teal) 0%, transparent 70%);
+        }
+
+        /* App Layout */
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar Navigation */
+        aside {
+            width: 280px;
+            background: rgba(11, 13, 23, 0.8);
+            border-right: 1px solid var(--card-border);
+            backdrop-filter: var(--glass-blur);
+            position: fixed;
+            height: 100vh;
+            left: 0;
+            top: 0;
+            padding: 2.5rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        .logo {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-teal));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 3rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo::before {
+            content: '';
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent-teal);
+            box-shadow: 0 0 10px var(--accent-teal);
+        }
+
+        .nav-menu {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .nav-item a {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid transparent;
+        }
+
+        .nav-item a:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.03);
+            border-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .nav-item.active a {
+            color: var(--text-primary);
+            background: rgba(181, 95, 230, 0.1);
+            border-color: rgba(181, 95, 230, 0.2);
+            box-shadow: var(--shadow-glow);
+        }
+
+        /* Main Content */
+        main {
+            margin-left: 280px;
+            flex: 1;
+            padding: 3rem 4rem;
+            max-width: 1200px;
+        }
+
+        /* Sections */
+        section {
+            padding-top: 2rem;
+            margin-bottom: 5rem;
+            scroll-margin-top: 3rem;
+        }
+
+        h1, h2, h3 {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        h1 {
+            font-size: 3rem;
+            background: linear-gradient(to right, #ffffff, #a5b4fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+        }
+
+        h2 {
+            font-size: 2rem;
+            margin-bottom: 1.5rem;
+            border-left: 4px solid var(--accent-purple);
+            padding-left: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        p {
+            color: var(--text-secondary);
+            font-size: 1.05rem;
+            line-height: 1.7;
+            margin-bottom: 1.5rem;
+        }
+
+        .subtitle {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            margin-bottom: 3rem;
+        }
+
+        /* Premium Cards */
+        .glass-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 2rem;
+            backdrop-filter: var(--glass-blur);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, border-color 0.3s ease;
+            margin-bottom: 2rem;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(181, 95, 230, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* Interactive 9-Gate Deck */
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .gate-card-wrapper {
+            perspective: 1000px;
+            height: 200px;
+        }
+
+        .gate-card {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+
+        .gate-card-wrapper:hover .gate-card {
+            transform: rotateY(180deg);
+        }
+
+        .gate-front, .gate-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 14px;
+            border: 1px solid var(--card-border);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .gate-front {
+            background: linear-gradient(135deg, rgba(25, 30, 50, 0.6), rgba(15, 18, 30, 0.8));
+            justify-content: space-between;
+        }
+
+        .gate-back {
+            background: linear-gradient(135deg, rgba(181, 95, 230, 0.15), rgba(0, 229, 255, 0.05));
+            border-color: rgba(181, 95, 230, 0.2);
+            transform: rotateY(180deg);
+            justify-content: center;
+        }
+
+        .gate-num {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2rem;
+            font-weight: 800;
+            color: rgba(255, 255, 255, 0.15);
+        }
+
+        .gate-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .gate-badge {
+            align-self: flex-start;
+            padding: 0.25rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-pass {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .badge-fail {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .badge-warn {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--accent-orange);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        .gate-details {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .gate-target {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--accent-teal);
+        }
+
+        /* Interactive Mock Terminal Console */
+        .terminal-console {
+            background: #05070F;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8);
+            font-family: 'Fira Code', monospace;
+            padding: 1.5rem;
+            margin-top: 2rem;
+            font-size: 0.9rem;
+        }
+
+        .terminal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .terminal-buttons {
+            display: flex;
+            gap: 6px;
+        }
+
+        .term-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .term-red { background: #EF4444; }
+        .term-yellow { background: #F59E0B; }
+        .term-green { background: #10B981; }
+
+        .terminal-title {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+        }
+
+        .terminal-select {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            font-family: inherit;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .terminal-select:hover {
+            border-color: var(--accent-purple);
+        }
+
+        .terminal-output {
+            color: var(--accent-green);
+            white-space: pre-wrap;
+            min-height: 250px;
+            transition: opacity 0.3s ease;
+        }
+
+        /* Toolkit Grids */
+        .tool-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        .tool-badge {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--accent-blue);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: inline-block;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1.5rem;
+            font-size: 0.95rem;
+        }
+
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        th {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        td {
+            color: var(--text-secondary);
+        }
+
+        tr:hover td {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.01);
+        }
+
+        code {
+            font-family: 'Fira Code', monospace;
+            background: rgba(255, 255, 255, 0.06);
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: var(--accent-teal);
+        }
+    </style>
+</head>
+<body>
+    <div class="ambient-glow glow-purple"></div>
+    <div class="ambient-glow glow-teal"></div>
+
+    <div class="container">
+        <!-- Sidebar Navigation -->
+        <aside>
+            <div class="logo">ASTCOK QUANT</div>
+            <ul class="nav-menu">
+                <li class="nav-item active" data-target="overview"><a href="#overview">系统总览</a></li>
+                <li class="nav-item" data-target="nine-gates"><a href="#nine-gates">9-Gate 风险审计</a></li>
+                <li class="nav-item" data-target="auto-research"><a href="#auto-research">AutoResearch 进化</a></li>
+                <li class="nav-item" data-target="stock-diagnostics"><a href="#stock-diagnostics">个股诊断沙盒</a></li>
+                <li class="nav-item" data-target="research-toolkit"><a href="#research-toolkit">研究工具箱</a></li>
+                <li class="nav-item" data-target="data-lake"><a href="#data-lake">数据资产湖</a></li>
+            </ul>
+        </aside>
+
+        <!-- Main Content -->
+        <main>
+            <!-- System Overview -->
+            <section id="overview">
+                <h1>A股量化因子研发与自进化系统说明书</h1>
+                <p class="subtitle">深度非流动性折价定价、多岛自适应遗传演变与 9-Gate 风险审计生产管线</p>
+                
+                <div class="glass-card">
+                    <h2>系统定位 & 不对称哲学</h2>
+                    <p>本平台是一套面向 A 股全市场的机构级因子自动搜寻、稳健性检验以及生产风控系统。核心策略哲学并非盲目最大化夏普比率，而是专注于构建<strong>“不对称收益结构”</strong>：</p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>组件</th>
+                                <th>不对称捕获机制</th>
+                                <th>生产落地状态</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>illiquidity</code> 因子</td>
+                                <td>散户过度博弈下的流动性风险补偿 + 壳资源彩票溢价</td>
+                                <td><code>LIVE</code> (主力生产 v3.1)</td>
+                            </tr>
+                            <tr>
+                                <td><code>PureTrend</code> 择时</td>
+                                <td>利用均线距离趋势跟踪天然截断左尾，砍掉暴跌 Regime</td>
+                                <td><code>LIVE</code> (连续曝光 0-1.5x)</td>
+                            </tr>
+                            <tr>
+                                <td><code>Salience Veto</code> 风控</td>
+                                <td>协方差一票否决剔除末端 30% 异常爆雷股/过度拥挤股</td>
+                                <td><code>LIVE</code> (防雷风控层)</td>
+                            </tr>
+                            <tr>
+                                <td><code>511010 国债轮动</code></td>
+                                <td>熊市防守期将空仓资金轮入债券，获取纯 carry 增益</td>
+                                <td><code>LIVE</code> (跨资产轮动)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- 9-Gate Systematic Risk Audit -->
+            <section id="nine-gates">
+                <h2>9-Gate Systematic Risk Audit</h2>
+                <p>任何被提议的新因子或新策略，必须无条件通过以下 **9-Gate** 顶级量化审计门禁，方可准入模拟盘或实盘：</p>
+                
+                <div class="grid-3">
+                    <div class="gate-card-wrapper">
+                        <div class="gate-card">
+                            <div class="gate-front">
+                                <span class="gate-num">00</span>
+                                <span class="gate-title">Data Audit 数据审计</span>
+                                <span class="gate-badge badge-pass">PASS</span>
+                            </div>
+                            <div class="gate-back">
+                                <span class="gate-details">空值率/极值/数据穿越测试</span>
+                                <span class="gate-target">NaN &lt; 20% | Outliers &lt; 0.1%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="gate-card-wrapper">
+                        <div class="gate-card">
+                            <div class="gate-front">
+                                <span class="gate-num">01</span>
+                                <span class="gate-title">Economic Thesis 经济假设</span>
+                                <span class="gate-badge badge-pass">PASS</span>
+                            </div>
+                            <div class="gate-back">
+                                <span class="gate-details">拒绝纯随机挖掘，检验学术逻辑</span>
+                                <span class="gate-target">Mechanic &gt; 50 chars + Citation</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="gate-card-wrapper">
+                        <div class="gate-card">
+                            <div class="gate-front">
+                                <span class="gate-num">02</span>
+                                <span class="gate-title">Single Factor 因子检验</span>
+                                <span class="gate-badge badge-pass">PASS</span>
+                            </div>
+                            <div class="gate-back">
+                                <span class="gate-details">Rank IC/NW-ICIR/五分位单调</span>
+                                <span class="gate-target">Rank IC &gt; 0.03 | MonotonicITY = 1.0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="gate-card-wrapper">
+                        <div class="gate-card">
+                            <div class="gate-front">
+                                <span class="gate-num">03</span>
+                                <span class="gate-title">Neutralization 中性化</span>
+                                <span class="gate-badge badge-pass">PASS</span>
+                            </div>
+                            <div class="gate-back">
+                                <span class="gate-details">Barra 行业与 Size 风格剥离</span>
+                                <span class="gate-target">ICIR Retention &gt; 30%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="gate-card-wrapper">
+                        <div class="gate-card">
+                            <div class="gate-front">
+                                <span class="gate-num">04</span>
+                                <span class="gate-title">Multi-Testing DSR 惩罚</span>
+                                <span class="gate-badge badge-fail">FAIL</span>
+                            </div>
+                            <div class="gate-back">
+                                <span class="gate-details">试错惩罚，防过拟合自欺</span>
+                                <span class="gate-target">DSR p-value &lt; 0.05 | PSR &gt; 95%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="gate-card-wrapper">
+                        <div class="gate-card">
+                            <div class="gate-front">
+                                <span class="gate-num">05</span>
+                                <span class="gate-title">Backtest 组合回测</span>
+                                <span class="gate-badge badge-fail">FAIL</span>
+                            </div>
+                            <div class="gate-back">
+                                <span class="gate-details">裸因子多头真实费后净值</span>
+                                <span class="gate-target">Return &gt; 15% | MaxDD &lt; 20%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="gate-card-wrapper">
+                        <div class="gate-card">
+                            <div class="gate-front">
+                                <span class="gate-num">06</span>
+                                <span class="gate-title">Cost & Capacity 冲击建模</span>
+                                <span class="gate-badge badge-warn">WARN</span>
+                            </div>
+                            <div class="gate-back">
+                                <span class="gate-details">成本滑点衰减与 ADV 曲线</span>
+                                <span class="gate-target">Net Sharpe &gt; 0.5 @ AUM scale</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="gate-card-wrapper">
+                        <div class="gate-card">
+                            <div class="gate-front">
+                                <span class="gate-num">07</span>
+                                <span class="gate-title">Regime Stress OOS 压力</span>
+                                <span class="gate-badge badge-warn">WARN</span>
+                            </div>
+                            <div class="gate-back">
+                                <span class="gate-details">OOS滚动胜率与极端牛熊表现</span>
+                                <span class="gate-target">Delay 1d Sharpe &gt; 0.5</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="gate-card-wrapper">
+                        <div class="gate-card">
+                            <div class="gate-front">
+                                <span class="gate-num">08</span>
+                                <span class="gate-title">Live Monitoring 监控模型</span>
+                                <span class="gate-badge badge-pass">PASS</span>
+                            </div>
+                            <div class="gate-back">
+                                <span class="gate-details">期望边界监控与硬止损阈值</span>
+                                <span class="gate-target">Tracking Error &lt; 5%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top: 1.5rem; font-size: 0.9rem; color: var(--text-secondary); text-align: center;">
+                    💡 提示: 悬停/点击上方卡片可翻转查看审计逻辑与指标阈值
+                </div>
+            </section>
+
+            <!-- AutoResearch -->
+            <section id="auto-research">
+                <h2>AutoResearch 自动寻优与反思进化</h2>
+                <div class="glass-card">
+                    <p>系统每周日凌晨 2:30 定时通过 <code>launchd</code> 自动调用 <code>scheduled_factor_search.py</code> 进行因子的自进化挖掘，其闭环引擎工作如下：</p>
+                    <ul>
+                        <li style="margin-bottom: 1rem; margin-left: 1.5rem;">
+                            <strong>LLM 播种与反思 (Failure Ledger)</strong>：DeepSeek 苦力层结合历史失败台账（包含历次死因如 L0 截面无信息、L1 换手率太高被成本吃光），避开已被证伪的逻辑空间，提出全新概念。
+                        </li>
+                        <li style="margin-bottom: 1rem; margin-left: 1.5rem;">
+                            <strong>多岛屿进化 (Multi-Island Evolve)</strong>：多岛并行演化，基于真实 A 股面板运行 Rank IC/ICIR/新颖度(novelty)综合适应度打分，进行精选和杂交变异。
+                        </li>
+                        <li style="margin-bottom: 1rem; margin-left: 1.5rem;">
+                            <strong>自动化 9-Gate 提审</strong>：通过 L3 OOS 验证的因子，一键转化为真实 9-Gate 评估，将结果 Markdown 报告推送到前端评审台。
+                        </li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Individual Stock Sandbox -->
+            <section id="stock-diagnostics">
+                <h2>个股诊断与风控分析 (SandBox)</h2>
+                <p>通过个股多维分析器 <code>apps/stock_cli.py</code>，输入 A 股代码可对股票的因子强度、市值分位和风控拦截进行穿透诊断：</p>
+                
+                <div class="terminal-console">
+                    <div class="terminal-header">
+                        <div class="terminal-buttons">
+                            <span class="term-dot term-red"></span>
+                            <span class="term-dot term-yellow"></span>
+                            <span class="term-dot term-green"></span>
+                        </div>
+                        <span class="terminal-title">stock_cli.py --code</span>
+                        <select id="stockSelector" class="terminal-select" onchange="runMockCli()">
+                            <option value="000001">平安银行 (000001)</option>
+                            <option value="600519">贵州茅台 (600519)</option>
+                            <option value="300750">宁德时代 (300750)</option>
+                        </select>
+                    </div>
+                    <div id="termOutput" class="terminal-output">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Research Toolkit -->
+            <section id="research-toolkit">
+                <h2>研究工具箱 (Research Toolkit)</h2>
+                <p>存放于 <code>research_toolkit/</code> 的底层核心量化测谎与规则处理引擎，是系统策略质量的保护伞：</p>
+                <div class="tool-grid">
+                    <div class="glass-card">
+                        <span class="tool-badge">Alpha Audit</span>
+                        <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">测谎机制 (alpha_audit.py)</h3>
+                        <p style="font-size: 0.95rem; line-height: 1.6;">
+                            通过 Newey-West 校正重叠期收益相关性，并基于 RidgeCV 联合非线性拟合和随机置换测试（Permutation test），隔离 NaN 模式对预测精度的干扰，给因子颁发 <code>REAL</code>, <code>TRUE_BUT_SMALL</code>, 或 <code>NOISE</code> 的真理 verdict。
+                        </p>
+                    </div>
+
+                    <div class="glass-card">
+                        <span class="tool-badge">Veto & Marginal</span>
+                        <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">策略风控与边际贡献 (marginal.py)</h3>
+                        <p style="font-size: 0.95rem; line-height: 1.6;">
+                            支持在一级宿主选股前切入 <code>apply_veto_filter</code>，并提供 regime 敏感型的边际 ΔSharpe 分析，判断多因子合成后是否具备净特质阿尔法，避免因子“换皮”导致的伪多样性风险。
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Data Lake -->
+            <section id="data-lake">
+                <h2>数据资产湖架构</h2>
+                <div class="glass-card">
+                    <p>通过 <code>Tushare</code> 数据接口与 <code>TDX</code> 通达信本地抓取整合，我们在 <code>data_lake/</code> 下维持了一个包含 <strong>7100万行</strong> 数据的全方位 A 股底层数据库：</p>
+                    <ul>
+                        <li style="margin-bottom: 0.75rem;"><strong>数据对齐</strong>：所有数据根据 <code>by_date</code> (不 shift 纯历史) 与 <code>anndate</code> (根据财报/业绩快报的真实公告日向后 ffill，防未来穿越) 严格物理归拢。</li>
+                        <li style="margin-bottom: 0.75rem;"><strong>安全机制</strong>：写路径拦截器 <code>lake/invariants.py</code> 自动监测并拦截单日跌幅超过 50% 占比大于 5% 的假崩盘数据写入。</li>
+                    </ul>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Interactive JS Sandbox -->
+    <script>
+        // Active Nav Highlighter
+        const sections = document.querySelectorAll('section');
+        const navItems = document.querySelectorAll('.nav-item');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(sec => {
+                const secTop = sec.offsetTop;
+                const secHeight = sec.clientHeight;
+                if (pageYOffset >= (secTop - 150)) {
+                    current = sec.getAttribute('id');
+                }
+            });
+
+            navItems.forEach(item => {
+                item.classList.remove('active');
+                if (item.getAttribute('data-target') === current) {
+                    item.classList.add('active');
+                }
+            });
+        });
+
+        // Mock CLI Output Simulation
+        const stockData = {
+            "000001": `================================================================================
+  INDIVIDUAL STOCK DIAGNOSTICS: 000001
+================================================================================
+Loading price panels...
+
+============================================================
+  Summary as of: 2026-06-12
+============================================================
+  Stock Ticker       : 000001
+  Latest Close Price : 2219.95 CNY
+  Daily Volume       : 2,032,355 手
+  Daily Amount       : 22.844 亿元
+------------------------------------------------------------
+  Amihud Illiquidity : 6.14e-12  (全市场排名前 98.3% 最不活跃个股)
+  Size Factor (Small): -20.80  (全市场排名前 89.2% 极小市值/成交额个股)
+  Salience Veto Score: -0.0082  (百分比分位数: 48.4%)
+  Veto Decision      : ✅ PASSED / 通过 (Safe) (阈值百分位: 30.0%)
+============================================================
+
+  Recent 20 Days Factor and Market History:
+  ---------------------------------------------------------------------------
+  Date       |    Close |    Volume |  Amount(亿) |      Illiq |     Veto
+  ---------------------------------------------------------------------------
+  2026-06-08 |  2134.14 | 1,090,926 |     12.033 |   5.91e-12 |  -0.0075
+  2026-06-09 |  2149.19 | 1,149,672 |     12.796 |   6.10e-12 |  -0.0071
+  2026-06-10 |  2185.88 | 1,543,176 |     17.469 |   6.25e-12 |  -0.0094
+  2026-06-11 |  2182.02 | 1,156,222 |     13.065 |   5.96e-12 |  -0.0092
+  2026-06-12 |  2219.95 | 2,032,355 |     22.844 |   6.14e-12 |  -0.0082
+  ---------------------------------------------------------------------------`,
+            "600519": `================================================================================
+  INDIVIDUAL STOCK DIAGNOSTICS: 600519
+================================================================================
+Loading price panels...
+
+============================================================
+  Summary as of: 2026-06-12
+============================================================
+  Stock Ticker       : 600519
+  Latest Close Price : 8916.17 CNY
+  Daily Volume       : 13,871 手
+  Daily Amount       : 1.231 亿元
+------------------------------------------------------------
+  Amihud Illiquidity : 1.25e-14  (全市场排名前 3.1% 最活跃个股)
+  Size Factor (Small): -15.42  (全市场排名前 0.8% 最大市值个股)
+  Salience Veto Score: -0.0195  (百分比分位数: 15.6%)
+  Veto Decision      : ❌ VETOED / 已否决 (Bubble Risk) (阈值百分位: 30.0%)
+============================================================
+⚠️ 警告: 该个股由于凸显性协方差分位数 (15.6%) 处于全市场尾端 30%，存在高博弈气泡风险，已被一票否决排除选股候选池！
+
+  Recent 20 Days Factor and Market History:
+  ---------------------------------------------------------------------------
+  Date       |    Close |    Volume |  Amount(亿) |      Illiq |     Veto
+  ---------------------------------------------------------------------------
+  2026-06-08 |  9113.65 |    15,103 |      1.376 |   1.14e-14 |  -0.0210
+  2026-06-09 |  9032.14 |    12,492 |      1.128 |   1.18e-14 |  -0.0205
+  2026-06-10 |  8911.23 |    18,443 |      1.643 |   1.21e-14 |  -0.0201
+  2026-06-11 |  8804.12 |    16,812 |      1.480 |   1.23e-14 |  -0.0198
+  2026-06-12 |  8916.17 |    13,871 |      1.231 |   1.25e-14 |  -0.0195
+  ---------------------------------------------------------------------------`,
+            "300750": `================================================================================
+  INDIVIDUAL STOCK DIAGNOSTICS: 300750
+================================================================================
+Loading price panels...
+
+============================================================
+  Summary as of: 2026-06-12
+============================================================
+  Stock Ticker       : 300750
+  Latest Close Price : 312.45 CNY
+  Daily Volume       : 124,103 手
+  Daily Amount       : 3.877 亿元
+------------------------------------------------------------
+  Amihud Illiquidity : 4.56e-13  (全市场排名前 12.4% 活跃个股)
+  Size Factor (Small): -17.20  (全市场排名前 4.2% 大市值个股)
+  Salience Veto Score: -0.0041  (百分比分位数: 78.9%)
+  Veto Decision      : ✅ PASSED / 通过 (Safe) (阈值百分位: 30.0%)
+============================================================
+
+  Recent 20 Days Factor and Market History:
+  ---------------------------------------------------------------------------
+  Date       |    Close |    Volume |  Amount(亿) |      Illiq |     Veto
+  ---------------------------------------------------------------------------
+  2026-06-08 |   305.10 |   139,123 |      4.244 |   4.10e-13 |  -0.0035
+  2026-06-09 |   308.20 |   110,490 |      3.405 |   4.25e-13 |  -0.0038
+  2026-06-10 |   311.45 |   115,221 |      3.588 |   4.30e-13 |  -0.0040
+  2026-06-11 |   310.00 |   109,211 |      3.385 |   4.45e-13 |  -0.0039
+  2026-06-12 |   312.45 |   124,103 |      3.877 |   4.56e-13 |  -0.0041
+  ---------------------------------------------------------------------------`
+        };
+
+        function runMockCli() {
+            const selector = document.getElementById("stockSelector");
+            const output = document.getElementById("termOutput");
+            const code = selector.value;
+            
+            output.style.opacity = 0;
+            setTimeout(() => {
+                output.innerText = stockData[code];
+                output.style.opacity = 1;
+            }, 200);
+        }
+
+        // Init
+        runMockCli();
+    </script>
+</body>
+</html>

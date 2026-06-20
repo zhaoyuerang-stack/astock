@@ -13,6 +13,7 @@ from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, Cost
 from factors.small_cap import small_cap_factor, small_cap_timing
 from factors.utils import safe_zscore, mad_clip
 from lake.load_lake import load_prices, load_raw_close
+from research_toolkit import apply_veto_filter
 
 
 # ---------------------------------------------------------------------------
@@ -30,9 +31,20 @@ class StrategyConfig:
     rebalance_days: int = 20
     leverage: float = 1.25
     cost: CostModel = CostModel()
+    exclude_star: bool = True  # 排除科创板(688):保留验证过的口径(50万门槛/20cm,tradability 受限);
+                               # 修复 688 amount bug 后它们会入选,纳入与否是显式策略决策(默认排除,待专项验证)
 
     def to_dict(self):
         return asdict(self)
+
+
+def _drop_star(*panels):
+    """从价量面板剔除科创板(688)列 —— 显式 universe 策略,不依赖数据 bug 隐式排除。"""
+    out = []
+    for p in panels:
+        star = [c for c in p.columns if str(c).startswith("688")]
+        out.append(p.drop(columns=star) if star else p)
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -61,8 +73,13 @@ def load_price_panels(start="2010-01-01"):
 # Weight construction
 # ---------------------------------------------------------------------------
 
-def build_rebalance_weights(factor, close, top_n, rebalance_days):
-    """Convert factor panel to scheduled target weights."""
+def build_rebalance_weights(factor, close, top_n, rebalance_days, *, veto_factor=None, veto_q=0.10):
+    """Convert factor panel to scheduled target weights.
+
+    ``veto_factor`` is a policy-layer VetoFilter. It filters the candidate pool
+    before top-N selection and then refills from survivors; it never reduces
+    target position count or acts between rebalance dates.
+    """
     fdates = factor.dropna(how="all").index.intersection(close.index)
     if len(fdates) < 100:
         return {}
@@ -76,9 +93,16 @@ def build_rebalance_weights(factor, close, top_n, rebalance_days):
         f = factor.loc[rd].dropna()
         active = close.loc[rd].dropna().index
         f = f.reindex(active).dropna()
-        if len(f) < top_n:
-            continue
-        weights[effective] = pd.Series(1.0 / top_n, index=f.nlargest(top_n).index)
+        if veto_factor is not None:
+            selected = apply_veto_filter(f, veto_factor.loc[rd], top_n=top_n, veto_q=veto_q)
+        else:
+            selected = (
+                pd.Series(1.0 / top_n, index=f.nlargest(top_n).index, dtype="float64")
+                if len(f) >= top_n
+                else pd.Series(dtype="float64")
+            )
+        if len(selected) == top_n:
+            weights[effective] = selected
     return weights
 
 
@@ -89,6 +113,8 @@ def build_rebalance_weights(factor, close, top_n, rebalance_days):
 def run_small_cap_strategy(config=StrategyConfig()):
     """Run small-cap-size strategy via BacktestEngine."""
     close, volume, amount = load_price_panels(config.start)
+    if config.exclude_star:
+        close, volume, amount = _drop_star(close, volume, amount)
     prices = PricePanel(close=close, volume=volume, amount=amount)
     if not load_raw_close(start=config.start).empty:
         raw = load_raw_close(start=config.start).reindex(index=close.index, columns=close.columns)

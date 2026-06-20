@@ -12,16 +12,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
-from contracts.models import AgentOutput, AgentTask
-from services.agent.llm_adapter import get_adapter, llm_ready
-from services.agent.tools import requires_confirmation, tool_registry
+from contracts.models import AgentTask
+from services.agent.llm_adapter import get_adapter
+from services.agent.skills import route_skill
 
 ROOT = Path(__file__).resolve().parents[2]
 _TASK_LOG = ROOT / "data_lake" / "agent" / "agent_tasks.jsonl"
 
 _KEYWORD_TOOL = [
+    (("个股", "股票", "股价", "行情", "代码"), "stock_profile"),
     (("数据", "质量", "脏", "缺失", "quality"), "data_quality"),
     (("因子", "alpha", "ic"), "factors"),
     (("策略", "台账", "母策略"), "strategies"),
@@ -36,10 +38,27 @@ _PAGE_DEFAULT = {
     "portfolio": "portfolio", "risk": "risk", "experiments": "experiments",
     "overview": "strategies",
 }
+_GROUND_TRUTH_SUMMARY_TOOLS = {
+    "data_quality",
+    "factors",
+    "strategies",
+    "portfolio",
+    "risk",
+    "experiments",
+    "stock_profile",
+}
 
 
 def _route(request: str, context: dict, tools: dict) -> str | None:
     r = (request or "").lower()
+    if _extract_stock_code(request):
+        return "stock_profile"
+    if any(k in r for k in ("怎么用", "如何使用", "使用", "说明", "手册", "工具", "页面", "导航")):
+        return None
+    if any(k in r for k in ("为什么", "为何", "不能", "不可以", "规则", "边界")) and any(
+        k in r for k in ("下单", "买入", "卖出", "调仓", "交易")
+    ):
+        return None
     for kws, tool in _KEYWORD_TOOL:
         if any(k.lower() in r for k in kws):
             return tool
@@ -47,6 +66,11 @@ def _route(request: str, context: dict, tools: dict) -> str | None:
     if via in tools:
         return via
     return _PAGE_DEFAULT.get(context.get("current_page", ""))
+
+
+def _extract_stock_code(request: str) -> str | None:
+    m = re.search(r"(?<!\d)(\d{6})(?:\.(?:sh|sz|SH|SZ))?(?!\d)", request or "")
+    return m.group(1) if m else None
 
 
 def _task_id(request: str, context: dict) -> str:
@@ -63,7 +87,12 @@ def _log_task(task: AgentTask) -> None:
 
 
 # ── 各工具结果 → 结构化解读 ────────────────────────────────────────────────────
-def _summarize(tool_name: str, data) -> AgentOutput:
+def _wants_best_strategy(request: str) -> bool:
+    r = request or ""
+    return any(k in r for k in ("哪个", "哪一个", "最好", "最佳", "最强", "第一", "排名"))
+
+
+def _summarize(tool_name: str, data, request: str = "") -> AgentOutput:
     if tool_name == "data_quality":
         return AgentOutput(
             summary=f"数据质量「{data['verdict']}」:全市场 {data['total']} 只,真问题 {data['severe_count']} 只,跳变 {data['jump_count']}(多为除权/涨跌停)。",
@@ -71,6 +100,26 @@ def _summarize(tool_name: str, data) -> AgentOutput:
             risk=[f"{data['severe_count']} 只真问题需隔离/修复"] if data["severe_count"] else [],
             recommendation=["跳变不等于脏数据,勿据 clean_ratio 误判"],
             confidence=0.9)
+    if tool_name == "stock_profile":
+        px = data.get("latest_price", {})
+        rets = data.get("returns", {})
+        basic = data.get("daily_basic", {})
+        mf = data.get("moneyflow", {})
+        evidence = [
+            f"最新交易日 {px.get('date')}, 收盘 {px.get('close')}",
+            f"20日收益 {rets.get('ret_20d'):.2%}" if rets.get("ret_20d") is not None else "20日收益缺数据",
+            f"60日收益 {rets.get('ret_60d'):.2%}" if rets.get("ret_60d") is not None else "60日收益缺数据",
+        ]
+        if basic:
+            evidence.append(f"PE_TTM {basic.get('pe_ttm')}, PB {basic.get('pb')}, 总市值 {basic.get('total_mv')}")
+        if mf:
+            evidence.append(f"最新资金流净额 {mf.get('net_mf_amount')}")
+        return AgentOutput(
+            summary=f"{data.get('code')} {data.get('name')} 最新收盘 {px.get('close')}({px.get('date')})。",
+            evidence=evidence,
+            recommendation=["这是数据画像,不构成买卖建议"],
+            confidence=0.9,
+        )
     if tool_name == "risk":
         breaches = [c["rule"] for c in data["checks"] if c["status"] == "breach"]
         warns = [c["rule"] for c in data["checks"] if c["status"] == "warn"]
@@ -90,6 +139,34 @@ def _summarize(tool_name: str, data) -> AgentOutput:
                            evidence=[f"{d['display_name'] or d['name']}({d['n_versions']}版本)" for d in data], confidence=0.85)
     if tool_name == "strategies":
         live = [s for s in data if s["status"] == "在册"]
+        if _wants_best_strategy(request):
+            ranked = sorted(
+                live,
+                key=lambda s: (
+                    float((s.get("metrics") or {}).get("sharpe") or 0.0),
+                    float((s.get("metrics") or {}).get("calmar") or 0.0),
+                    float((s.get("metrics") or {}).get("annual") or 0.0),
+                ),
+                reverse=True,
+            )
+            if ranked:
+                best = ranked[0]
+                m = best.get("metrics") or {}
+                return AgentOutput(
+                    summary=(
+                        f"默认按夏普排序,当前在册策略里最佳是 {best['strategy_id']}: "
+                        f"年化 {float(m.get('annual') or 0.0):.2%}, "
+                        f"最大回撤 {float(m.get('maxdd') or 0.0):.2%}, "
+                        f"夏普 {float(m.get('sharpe') or 0.0):.2f}, "
+                        f"卡玛 {float(m.get('calmar') or 0.0):.2f}。"
+                    ),
+                    evidence=[
+                        f"{s['strategy_id']}: sharpe={(s.get('metrics') or {}).get('sharpe')}, calmar={(s.get('metrics') or {}).get('calmar')}"
+                        for s in ranked[:5]
+                    ],
+                    recommendation=["“最好”口径可改为按夏普、卡玛、回撤或样本外 WF 指标排序"],
+                    confidence=0.9,
+                )
         return AgentOutput(summary=f"台账 {len(data)} 个版本,在册 {len(live)}。",
                            evidence=[f"{s['strategy_id']}: {s['status']}" for s in data[:8]], confidence=0.85)
     if tool_name == "experiments":
@@ -106,49 +183,62 @@ def _help(context: dict) -> AgentOutput:
         confidence=0.6)
 
 
+def _navigation_for(tool_name: str | None, context: dict) -> list[str]:
+    if tool_name == "data_quality":
+        return ["/data"]
+    if tool_name == "stock_profile":
+        return ["/data"]
+    if tool_name == "risk":
+        return ["/risk"]
+    if tool_name == "portfolio":
+        return ["/portfolio"]
+    if tool_name == "experiments":
+        return ["/experiments"]
+    if tool_name in {"factors", "strategies"}:
+        return ["/experiments"]
+    if tool_name == "run_backtest":
+        return ["/experiments"]
+    if tool_name == "rebalance":
+        return ["/trade-readiness", "/portfolio"]
+    page = context.get("current_page", "")
+    return [f"/{page}"] if page else []
+
+
+def _attach_sources(out: AgentOutput, request: str, tool_name: str | None, context: dict) -> AgentOutput:
+    if tool_name in _GROUND_TRUTH_SUMMARY_TOOLS:
+        out.citations = []
+        out.source_types = sorted({"runtime", "ui_context"} if context else {"runtime"})
+        out.suggested_navigation = _navigation_for(tool_name, context)
+        return out
+    hits = retrieve_knowledge(request, limit=4)
+    out.citations = [AgentCitation(**citation_from_hit(h)) for h in hits]
+    source_types = {h.source_type for h in hits}
+    if tool_name:
+        source_types.add("runtime")
+    if context:
+        source_types.add("ui_context")
+    out.source_types = sorted(source_types)
+    out.suggested_navigation = _navigation_for(tool_name, context)
+    return out
+
+
 def ask(request: str, context: dict | None = None) -> dict:
     """返回 {output: AgentOutput, task_id, tool, risk, llm_ready}。"""
     context = context or {}
-    tools = tool_registry()
     task = AgentTask(task_id=_task_id(request, context),
                      page_context=context.get("current_page", ""),
                      user_request=request, status="running")
-
-    tool_name = _route(request, context, tools)
-    tool = tools.get(tool_name) if tool_name else None
-
-    if tool is None:
-        out = _help(context)
-        task.output_type = "summary"
-    elif requires_confirmation(tool.risk):
-        # 不越权:不执行,返回提案
-        out = AgentOutput(
-            summary=f"「{tool.desc}」属 {tool.risk} 风险动作,需人工二次确认后才执行——Agent 不自动执行。",
-            recommendation=[f"如确认,请在对应页面手动触发 {tool.name}"],
-            risk=["高风险动作默认不执行"] if tool.risk == "high" else [],
-            requires_human_confirmation=True, confidence=0.9)
-        task.output_type = "recommendation"
-        task.tools_used = [tool.name]
-    else:
-        try:
-            data = tool.fn()
-            out = _summarize(tool.name, data)
-            # LLM(若接入)只改写 summary 文字;evidence/risk/数字仍确定性 grounded
-            adapter = get_adapter()
-            if adapter.available():
-                prose = adapter.synthesize(request, context, tool.name, data)
-                if prose:
-                    if tool.name == "data_quality" and "数据质量" not in prose:
-                        prose = f"数据质量: {prose}"
-                    out.summary = prose
-            task.tools_used = [tool.name]
-            task.output_type = "explanation"
-        except Exception as e:  # noqa: BLE001
-            out = AgentOutput(summary=f"工具 {tool.name} 执行失败:{e}", confidence=0.3)
-
+    skill = route_skill(request, context)
+    result = skill.answer(request, context)
+    out = result["output"]
+    tool_name = result.get("tool")
+    if tool_name:
+        task.tools_used = [tool_name]
+    task.output_type = "explanation"
     task.status = "completed"
     task.output = out.summary
     task.confidence = out.confidence
+    task.context_refs = [c.source_path for c in out.citations]
     _log_task(task)
     return {"output": out.model_dump(), "task_id": task.task_id,
-            "tool": tool_name, "risk": tool.risk if tool else None, "llm_ready": llm_ready()}
+            "tool": tool_name, "risk": result.get("risk"), "llm_ready": result.get("llm_ready", False)}

@@ -28,13 +28,13 @@ class CostModelConfig:
 
 
 # ---------------------------------------------------------------------------
-# Strategy defaults (illiquidity v3.0, current LIVE production config)
+# Strategy defaults (illiquidity v3.1, current LIVE production config)
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class StrategyConfig:
     family: str = "illiquidity"
-    version: str = "v3.0"
+    version: str = "v3.1"
     start: str = "2018-01-01"
     size_window: int = 60
     timing_ma: int = 16
@@ -64,6 +64,19 @@ class FactoryConfig:
     top_n_choices: tuple = (15, 20, 25, 40, 60, 80, 120)
     leverage_choices: tuple = (1.0, 1.25)
     review_corr_threshold: float = 0.50
+    auto_promote_after_approve: bool = False
+
+
+# ---------------------------------------------------------------------------
+# Notification / alerting (运维告警)
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class NotifyConfig:
+    desktop: bool = True                        # macOS 桌面通知(零依赖)
+    obsidian: bool = True                       # 写入 Obsidian vault(30.output/2.[A]inbox/ai_data)
+    alert_on: tuple = ("failed", "partial_ok")  # 哪些日更 status 触发告警
+    recovery: bool = True                       # 失败后转 ok 时发"已恢复"
 
 
 # ---------------------------------------------------------------------------
@@ -76,6 +89,7 @@ class Settings:
     strategy: StrategyConfig = field(default_factory=StrategyConfig)
     data: DataConfig = field(default_factory=DataConfig)
     factory: FactoryConfig = field(default_factory=FactoryConfig)
+    notify: NotifyConfig = field(default_factory=NotifyConfig)
 
     @classmethod
     def from_yaml(cls, path: Optional[str] = None):
@@ -96,6 +110,7 @@ class Settings:
             strategy=StrategyConfig(**d.get("strategy", {})),
             data=DataConfig(**d.get("data", {})),
             factory=FactoryConfig(**d.get("factory", {})),
+            notify=NotifyConfig(**d.get("notify", {})),
         )
 
 

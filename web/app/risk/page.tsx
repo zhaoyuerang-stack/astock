@@ -3,8 +3,10 @@
 import { useCallback, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import MetricCard from "@/components/ui/MetricCard";
+import Card from "@/components/ui/Card";
+import DataTable from "@/components/ui/DataTable";
 import { api } from "@/lib/api";
-import type { RiskReport } from "@/lib/types";
+import type { RiskReport, RiskRuleCheck } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 
@@ -62,33 +64,21 @@ export default function RiskPage() {
             <MetricCard label="待确认动作" value={String(r.control_actions.length)} tone={r.control_actions.length ? "warn" : "ok"} />
           </div>
 
-          <div className="card mb-5">
-            <div className="text-sm font-medium mb-3">风险规则 / 熔断规则</div>
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr className="text-subink text-left border-b border-cardline">
-                  <th className="py-1.5 font-medium">规则</th>
-                  <th className="py-1.5 font-medium text-right">当前值</th>
-                  <th className="py-1.5 font-medium text-right">阈值</th>
-                  <th className="py-1.5 font-medium text-right">状态</th>
-                </tr>
-              </thead>
-              <tbody>
-                {r.checks.map((c) => (
-                  <tr key={c.rule} className="border-b border-cardline/60">
-                    <td className="py-1.5 text-ink">{c.rule}{c.note ? <span className="text-[11px] text-subink"> · {c.note}</span> : null}</td>
-                    <td className="py-1.5 text-right text-ink">{fmt(c.current)}</td>
-                    <td className="py-1.5 text-right text-subink">{fmt(c.threshold)}</td>
-                    <td className={`py-1.5 text-right ${STATUS_TONE[c.status]}`}>{STATUS_LABEL[c.status]}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <Card title="风险规则 / 熔断规则" className="mb-5">
+            <DataTable<RiskRuleCheck>
+              rows={r.checks}
+              getRowKey={(c) => c.rule}
+              columns={[
+                { key: "rule", header: "规则", className: "text-ink", render: (c) => (<>{c.rule}{c.note ? <span className="text-[11px] text-subink"> · {c.note}</span> : null}</>) },
+                { key: "current", header: "当前值", align: "right", className: "text-ink", render: (c) => fmt(c.current) },
+                { key: "threshold", header: "阈值", align: "right", className: "text-subink", render: (c) => fmt(c.threshold) },
+                { key: "status", header: "状态", align: "right", render: (c) => <span className={STATUS_TONE[c.status]}>{STATUS_LABEL[c.status]}</span> },
+              ]}
+            />
             <div className="text-[11px] text-subink mt-2">注:行业/市值集中度规则待 data_lake 补 industry_map/market_cap 后接入(当前无数据,不臆造)。</div>
-          </div>
+          </Card>
 
-          <div className="card">
-            <div className="text-sm font-medium mb-3">风控操作建议(ControlAction · 需人工二次确认)</div>
+          <Card title="风控操作建议(ControlAction · 需人工二次确认)">
             {r.control_actions.length === 0 ? (
               <div className="text-sm text-ok">✅ 无超限,无待确认动作。</div>
             ) : (
@@ -115,7 +105,7 @@ export default function RiskPage() {
                 ))}
               </div>
             )}
-          </div>
+          </Card>
         </>
       )}
     </div>

@@ -15,8 +15,9 @@ phase4_register 内部只调 strategy_registry.register_family/register;
 
 用法:
   cd /Users/kiki/astcok/factor_research
-  python3 workflow/promote.py --pool          # 升所有 L3_PASSED
+  python3 workflow/promote.py --pool                       # 升所有 L3_PASSED
   python3 workflow/promote.py --pool --marginal
+  python3 workflow/promote.py --pool --nine-gate           # 入册后自动回填 9-Gate
 """
 from __future__ import annotations
 
@@ -27,9 +28,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+NINE_GATE_STRATEGY_TO_FAMILY = {
+    "small_cap": "small-cap-size",
+    "size_earnings": "size-earnings",
+    "large_cap": "large-cap-growth-hedged",
+    "hq_momentum": "hq-momentum-hedged",
+}
+
 
 def promote_spec(spec, version="v1.0", warmup_start="2010-01-01",
-                 force=False, run_marginal=False, regime="", decay_signal="", hyp=None):
+                 force=False, run_marginal=False, regime="", decay_signal="", hyp=None,
+                 run_nine_gate=False, nine_gate_strategy=None, nine_gate_runner=None,
+                 nine_gate_trials=15, nine_gate_start=None, target_status=""):
     """把一个 workflow FactorSpec 走完整 phase1~4,返回 RegistrationReport。
 
     spec 可来自 from_factory.hypothesis_to_spec(hyp) 或 explore.make_candidates()。
@@ -70,20 +80,168 @@ def promote_spec(spec, version="v1.0", warmup_start="2010-01-01",
     if hyp is not None:
         _record_kg(hyp, p1, p3)
 
+    # ── 证据链:查促成晋级的 L0-L3 实验 ID(锚定到台账) ──
+    hyp_id, evidence_ids = "", []
+    if hyp is not None:
+        hyp_id = hyp.id
+        try:
+            from factory.repositories.experiment_log import ExperimentLog
+            evidence_ids = [e.experiment_id for e in ExperimentLog().list_by_hypothesis(hyp_id)]
+        except Exception as e:
+            print(f"  (证据链查询跳过 non-fatal): {type(e).__name__}: {str(e)[:60]}", flush=True)
+
     # ── phase4 登记(唯一台账写入口) ──
     print("[phase4] 登记...", flush=True)
     report = Phase4Register(spec.name, version).register(
         p1, p2, p3,
         hypothesis=getattr(spec, "hypothesis", ""),
         regime=regime, decay_signal=decay_signal, force=force,
+        hypothesis_id=hyp_id, evidence_experiment_ids=evidence_ids,
+        target_status=target_status,
     )
+    if report is not None:
+        report.phase_summary = _phase_summary(p1, p2, p3, report)
     print(report, flush=True)
+
+    # ── [可选] Nine-Gate 完整审计 → 回填台账 DSR/PSR/PBO 摘要 ──
+    if run_nine_gate:
+        if report and report.registered:
+            print("[nine-gate] 完整审计并回填台账...", flush=True)
+            ng_result = run_nine_gate_after_registration(
+                report,
+                strategy_name=nine_gate_strategy,
+                runner=nine_gate_runner,
+                n_trials=nine_gate_trials,
+                start=nine_gate_start,
+            )
+            print(f"  → {ng_result.get('status')}: {ng_result.get('strategy', '')}", flush=True)
+        else:
+            print("[nine-gate] 跳过: phase4 未登记成功", flush=True)
 
     # ── [可选] 边际评级 → ACTIVE/SHADOW ──
     if run_marginal and report.registered:
         _run_marginal(spec, report)
 
     return report
+
+
+def _phase_summary(p1, p2, p3, report) -> dict:
+    """Compact phase summary for async job results."""
+    p1_fails = [getattr(r, "check_id", "") for r in (p1 or []) if getattr(r, "is_fail", False)]
+    p2_segments = {}
+    for label, seg in ((p2 or {}).get("segments") or {}).items():
+        p2_segments[label] = {
+            "annual": seg.get("annual"),
+            "maxdd": seg.get("maxdd"),
+            "sharpe": seg.get("sharpe"),
+        }
+    p3_agg = (p3 or {}).get("aggregate", {}) if isinstance(p3, dict) else {}
+    return {
+        "phase1": {
+            "status": "PASS" if not p1_fails else "FAIL",
+            "failures": [x for x in p1_fails if x],
+        },
+        "phase2": {
+            "segments": p2_segments,
+            "cost_sensitivity": (p2 or {}).get("cost_sensitivity", {}).get("verdict"),
+            "correlation": (p2 or {}).get("correlation", {}).get("verdict"),
+        },
+        "phase3": {
+            "verdict": p3_agg.get("verdict"),
+            "annual": p3_agg.get("annual"),
+            "maxdd": p3_agg.get("maxdd"),
+            "sharpe": p3_agg.get("sharpe"),
+        },
+        "phase4": {
+            "registered": getattr(report, "registered", False),
+            "status": getattr(report, "status", ""),
+            "detail": getattr(report, "detail", ""),
+        },
+    }
+
+
+def _infer_nine_gate_strategy(family: str) -> str | None:
+    """Registry family id -> run_nine_gates_all strategy name."""
+    for strategy_name, family_id in NINE_GATE_STRATEGY_TO_FAMILY.items():
+        if family_id == family:
+            return strategy_name
+    return None
+
+
+def _default_nine_gate_runner(strategy_name, n_trials=15, persist=False, version=None, start=None):
+    """Lazy adapter so importing promote.py stays light."""
+    from scripts.research.run_nine_gates_all import run_evaluation
+    return run_evaluation(
+        strategy_name,
+        n_trials=n_trials,
+        persist=persist,
+        version=version,
+        start=start,
+    )
+
+
+def _attach_nine_gate_control_status(family: str, version: str, status: str, *,
+                                     strategy: str = "", error: str = "") -> dict:
+    """Persist a control-plane Nine-Gate status without changing registration state."""
+    summary = {
+        "status": status,
+        "strategy": strategy,
+    }
+    if error:
+        summary["error"] = error[:800]
+    try:
+        from strategy_registry import attach_nine_gate
+        attach_nine_gate(family, version, summary)
+    except Exception as attach_error:
+        summary["attach_error"] = f"{type(attach_error).__name__}: {str(attach_error)[:300]}"
+    return summary
+
+
+def run_nine_gate_after_registration(report, *, strategy_name=None, runner=None,
+                                     n_trials=15, start=None) -> dict:
+    """Run full 9-Gate after a successful Phase4 registration.
+
+    A Nine-Gate failure is deliberately non-transactional: the registry entry stays,
+    but its nine_gate field records FAILED_TO_RUN so governance/readiness can block it.
+    """
+    if report is None:
+        return {"status": "SKIPPED", "reason": "no_report"}
+    family = getattr(report, "family", "")
+    version = getattr(report, "version", "")
+    if not getattr(report, "registered", False):
+        return {"status": "SKIPPED", "family": family, "version": version,
+                "reason": "not_registered"}
+
+    strategy = strategy_name or _infer_nine_gate_strategy(family)
+    if not strategy:
+        return _attach_nine_gate_control_status(
+            family, version, "FAILED_TO_RUN",
+            error=f"No 9-Gate strategy mapping for family={family!r}",
+        )
+
+    effective_runner = runner or _default_nine_gate_runner
+    try:
+        summary = effective_runner(
+            strategy,
+            n_trials=n_trials,
+            persist=True,
+            version=version,
+            start=start,
+        )
+        if isinstance(summary, dict) and summary:
+            persisted = dict(summary)
+            persisted.setdefault("status", "PERSISTED")
+            persisted.setdefault("strategy", strategy)
+            from strategy_registry import attach_nine_gate
+            attach_nine_gate(family, version, persisted)
+        return {"status": "PERSISTED", "family": family, "version": version,
+                "strategy": strategy}
+    except Exception as e:
+        return _attach_nine_gate_control_status(
+            family, version, "FAILED_TO_RUN",
+            strategy=strategy,
+            error=f"{type(e).__name__}: {str(e)[:700]}",
+        )
 
 
 def _record_kg(hyp, p1, p3):
@@ -172,9 +330,21 @@ if __name__ == "__main__":
     ap.add_argument("--version", default="v1.0")
     ap.add_argument("--marginal", action="store_true", help="登记后算边际贡献")
     ap.add_argument("--force", action="store_true", help="phase1/2 不过也强制登记(标候选)")
+    ap.add_argument("--nine-gate", action="store_true", help="登记成功后运行 9-Gate 并回填台账")
+    ap.add_argument("--nine-gate-strategy", default=None, help="覆盖 9-Gate CLI 策略名")
+    ap.add_argument("--nine-gate-trials", type=int, default=15, help="9-Gate 多重检验 trial 数")
+    ap.add_argument("--nine-gate-start", default=None, help="覆盖 9-Gate 回测起始日期")
     args = ap.parse_args()
 
     if args.pool:
-        promote_pool_l3(version=args.version, run_marginal=args.marginal, force=args.force)
+        promote_pool_l3(
+            version=args.version,
+            run_marginal=args.marginal,
+            force=args.force,
+            run_nine_gate=args.nine_gate,
+            nine_gate_strategy=args.nine_gate_strategy,
+            nine_gate_trials=args.nine_gate_trials,
+            nine_gate_start=args.nine_gate_start,
+        )
     else:
         print("指定 --pool 升 L3_PASSED 候选;或在代码中调 promote_hypothesis(hyp)。")

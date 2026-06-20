@@ -1,1 +1,209 @@
-{}
+{
+  "validated_2a91a524182eaef4": {
+    "id": "validated_2a91a524182eaef4",
+    "statement": "✓ autoresearch_234c8ab7 [phase3] sharpe=1.50 annual=32.1%",
+    "domain": "factor",
+    "confidence": 0.9,
+    "evidence": [
+      "2a91a524182eaef4"
+    ],
+    "created": "2026-06-17",
+    "expires": "2026-12-14",
+    "depends_on": [],
+    "metrics": {
+      "wf_sharpe": 1.504597168297274,
+      "annual": 0.32128834452962046,
+      "wf_maxdd": -0.3542486989660558
+    },
+    "gates": []
+  },
+  "validated_ce6ecd6271c50a96": {
+    "id": "validated_ce6ecd6271c50a96",
+    "statement": "✓ autoresearch_2335eeab [phase3] sharpe=1.30 annual=28.7%",
+    "domain": "factor",
+    "confidence": 0.9,
+    "evidence": [
+      "ce6ecd6271c50a96"
+    ],
+    "created": "2026-06-17",
+    "expires": "2026-12-14",
+    "depends_on": [],
+    "metrics": {
+      "wf_sharpe": 1.2976837694823866,
+      "annual": 0.286826803644708,
+      "wf_maxdd": -0.2857500480912327
+    },
+    "gates": []
+  },
+  "validated_d8b09631c1030612": {
+    "id": "validated_d8b09631c1030612",
+    "statement": "✓ autoresearch_e181a275 [phase3] sharpe=1.35 annual=31.2%",
+    "domain": "factor",
+    "confidence": 0.9,
+    "evidence": [
+      "d8b09631c1030612"
+    ],
+    "created": "2026-06-17",
+    "expires": "2026-12-14",
+    "depends_on": [],
+    "metrics": {
+      "wf_sharpe": 1.3523951316850813,
+      "annual": 0.3117786911265842,
+      "wf_maxdd": -0.30148296467385594
+    },
+    "gates": []
+  },
+  "validated_86796bbeddf1361f": {
+    "id": "validated_86796bbeddf1361f",
+    "statement": "✓ autoresearch_8de70997 [phase3] sharpe=1.49 annual=34.3%",
+    "domain": "factor",
+    "confidence": 0.9,
+    "evidence": [
+      "86796bbeddf1361f"
+    ],
+    "created": "2026-06-17",
+    "expires": "2026-12-14",
+    "depends_on": [],
+    "metrics": {
+      "wf_sharpe": 1.485835009172262,
+      "annual": 0.3430696382673199,
+      "wf_maxdd": -0.3073363437628468
+    },
+    "gates": []
+  },
+  "validated_e79df6bc58583a88": {
+    "id": "validated_e79df6bc58583a88",
+    "statement": "✓ small_cap_factor__window20 [phase3] sharpe=1.80 annual=35.6%",
+    "domain": "factor",
+    "confidence": 0.9,
+    "evidence": [
+      "e79df6bc58583a88"
+    ],
+    "created": "2026-06-17",
+    "expires": "2026-12-14",
+    "depends_on": [],
+    "metrics": {
+      "wf_sharpe": 1.802563111867865,
+      "annual": 0.3555964881370293,
+      "wf_maxdd": -0.2708023602702907
+    },
+    "gates": []
+  },
+  "validated_ce583c66c961bfa4": {
+    "id": "validated_ce583c66c961bfa4",
+    "statement": "✓ small_cap_factor__window30 [phase3] sharpe=1.62 annual=31.7%",
+    "domain": "factor",
+    "confidence": 0.9,
+    "evidence": [
+      "ce583c66c961bfa4"
+    ],
+    "created": "2026-06-17",
+    "expires": "2026-12-14",
+    "depends_on": [],
+    "metrics": {
+      "wf_sharpe": 1.6158785577409565,
+      "annual": 0.3171620608225672,
+      "wf_maxdd": -0.25436125487630823
+    },
+    "gates": []
+  },
+  "validated_5320ac1823a6fdb2": {
+    "id": "validated_5320ac1823a6fdb2",
+    "statement": "✓ small_cap_factor__window45 [phase3] sharpe=1.59 annual=29.6%",
+    "domain": "factor",
+    "confidence": 0.9,
+    "evidence": [
+      "5320ac1823a6fdb2"
+    ],
+    "created": "2026-06-17",
+    "expires": "2026-12-14",
+    "depends_on": [],
+    "metrics": {
+      "wf_sharpe": 1.5898399966002454,
+      "annual": 0.2961473272083804,
+      "wf_maxdd": -0.29801176932447804
+    },
+    "gates": []
+  },
+  "validated_a291ee8f81693d9e": {
+    "id": "validated_a291ee8f81693d9e",
+    "statement": "✓ small_cap_factor__window60 [phase3] sharpe=1.52 annual=27.6%",
+    "domain": "factor",
+    "confidence": 0.9,
+    "evidence": [
+      "a291ee8f81693d9e"
+    ],
+    "created": "2026-06-17",
+    "expires": "2026-12-14",
+    "depends_on": [],
+    "metrics": {
+      "wf_sharpe": 1.5210356633791187,
+      "annual": 0.2761459366846813,
+      "wf_maxdd": -0.25263983534770607
+    },
+    "gates": []
+  },
+  "validated_33726e8df8496699": {
+    "id": "validated_33726e8df8496699",
+    "statement": "✓ small_cap_factor__window90 [phase3] sharpe=1.15 annual=20.7%",
+    "domain": "factor",
+    "confidence": 0.9,
+    "evidence": [
+      "33726e8df8496699"
+    ],
+    "created": "2026-06-17",
+    "expires": "2026-12-14",
+    "depends_on": [],
+    "metrics": {
+      "wf_sharpe": 1.1456132372762746,
+      "annual": 0.2065901537842017,
+      "wf_maxdd": -0.3011848436307153
+    },
+    "gates": []
+  },
+  "validated_9639f3ba3407b1ac": {
+    "id": "validated_9639f3ba3407b1ac",
+    "statement": "✓ small_cap_factor__window120 [phase3] sharpe=0.91 annual=14.7%",
+    "domain": "factor",
+    "confidence": 0.9,
+    "evidence": [
+      "9639f3ba3407b1ac"
+    ],
+    "created": "2026-06-17",
+    "expires": "2026-12-14",
+    "depends_on": [],
+    "metrics": {
+      "wf_sharpe": 0.9058438023129474,
+      "annual": 0.14666481902778095,
+      "wf_maxdd": -0.2757896878108703
+    },
+    "gates": []
+  },
+  "validated_172294761bad9251": {
+    "id": "validated_172294761bad9251",
+    "statement": "✗ small_cap_factor__window252 [phase3] sharpe=0.00 annual=0.0%",
+    "domain": "factor",
+    "confidence": 0.8,
+    "evidence": [
+      "172294761bad9251"
+    ],
+    "created": "2026-06-17",
+    "expires": "2026-12-14",
+    "depends_on": [],
+    "metrics": {
+      "wf_sharpe": 0,
+      "annual": 0,
+      "wf_maxdd": 0
+    },
+    "gates": [
+      {
+        "match": {
+          "factor_fn_name": "factors.small_cap.small_cap_factor",
+          "window": "252"
+        },
+        "action": "DEPRIORITIZE",
+        "reason": "phase3 验证未过(✗ small_cap_factor__window252 [phase3] sharpe=0.00 annual=0.0%);180天后到期重测"
+      }
+    ]
+  }
+}

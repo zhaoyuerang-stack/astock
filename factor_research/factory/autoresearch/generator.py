@@ -9,10 +9,15 @@ from .validator import validate_candidate_ast
 
 _SEEDS = [
     ("momentum", {"window": 20}, "volume_ratio", {"window": 5}),
+    ("alpha_003", {}, "bp_proxy", {}),
     ("momentum", {"window": 60}, "volatility", {"window": 20}),
+    ("alpha_055", {}, "roe", {}),
     ("momentum", {"window": 120}, "illiquidity", {"window": 20}),
+    ("alpha_013", {}, "volatility", {"window": 60}),
     ("volume_ratio", {"window": 10}, "volatility", {"window": 60}),
+    ("alpha_050", {}, "ep_proxy", {}),
     ("illiquidity", {"window": 40}, "momentum", {"window": 20}),
+    ("alpha_044", {}, "net_profit_yoy", {}),
     ("roe", {}, "momentum", {"window": 60}),
     ("net_profit_yoy", {}, "volume_ratio", {"window": 20}),
     ("revenue_yoy", {}, "momentum", {"window": 120}),

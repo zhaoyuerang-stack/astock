@@ -18,7 +18,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
-from engine.factor_analysis import calc_ic, ic_summary
+from engine.factor_analysis import calc_ic, ic_summary, newey_west_icir
 
 from factory.ontology import (
     Decision,
@@ -69,6 +69,7 @@ def run_l0(
     forward_ret: pd.DataFrame,
     vintage_id: str,
     sample_dates: Optional[int] = None,
+    horizon: int = 20,
 ) -> Experiment:
     """运行单 Hypothesis 的 L0 IC scan。
 
@@ -97,6 +98,16 @@ def run_l0(
         ic_ir = summary.get("ICIR", float("nan"))
         ic_count = summary.get("count", 0)
 
+        # NW 重叠校正口径(horizon>1 的 raw ICIR 因重叠虚高,h=20 实测 ~3.5x)。
+        # 闸门仍用 raw ic_ir:同 horizon 下相对排序有效 + 阈值按 raw 标定(内部自洽);
+        # nw_icir 仅落账供诚实绝对量级解读,不改判决口径(避免破坏既有阈值校准)。
+        # max_lag 按 IC 序列自相关长度设——全量评估=horizon;采样时按采样步长折算。
+        nw_lag = horizon
+        if sample_dates and sample_dates < len(forward_ret):
+            step = max(1, len(forward_ret) // sample_dates)
+            nw_lag = max(1, round(horizon / step))
+        nw_icir = newey_west_icir(ic.values, max_lag=nw_lag) if len(ic) > 1 else float("nan")
+
         # 决策
         if pd.isna(ic_ir) or ic_count < GATES_L0["min_ic_count"]:
             decision = Decision.DISCARD
@@ -108,13 +119,17 @@ def run_l0(
             decision = Decision.PROMOTE
             reason = f"ICIR={ic_ir:+.3f} pass"
 
+        metrics = {
+            k: (float(v) if not pd.isna(v) else 0.0)
+            for k, v in summary.items()
+        }
+        metrics["ICIR_nw"] = float(nw_icir) if not pd.isna(nw_icir) else 0.0
         result = ExperimentResult(
-            metrics={
-                k: (float(v) if not pd.isna(v) else 0.0)
-                for k, v in summary.items()
-            },
+            metrics=metrics,
             details={
                 "ic_ir": float(ic_ir) if not pd.isna(ic_ir) else None,
+                "ic_ir_nw": float(nw_icir) if not pd.isna(nw_icir) else None,
+                "icir_口径": "ICIR=raw(闸门口径) / ICIR_nw=NW 重叠校正(诚实绝对量级)",
                 "ic_mean": float(summary.get("IC_mean", 0.0)),
                 "ic_count": int(ic_count),
                 "decision_reason": reason,

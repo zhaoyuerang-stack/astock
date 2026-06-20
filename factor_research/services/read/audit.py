@@ -13,6 +13,7 @@ from contracts.views import AuditEntry, AuditView
 ROOT = Path(__file__).resolve().parents[2]
 _TASK_LOG = ROOT / "data_lake" / "agent" / "agent_tasks.jsonl"
 _CONFIG_AUDIT = ROOT / "data_lake" / "agent" / "config_audit.jsonl"
+_ACTION_AUDIT = ROOT / "data_lake" / "agent" / "action_audit.jsonl"
 _AUTORESEARCH_REVIEW = ROOT / "data_lake" / "factory" / "autoresearch" / "review_queue.jsonl"
 
 
@@ -28,6 +29,21 @@ def recent_audit(limit: int = 40) -> AuditView:
                 continue
             entries.append(AuditEntry(kind="config", summary=c.get("summary", ""),
                                       detail=c.get("detail", ""), status=c.get("date", ""), actor="human"))
+
+    # 显式动作确认(倒序):写/分钟级任务的提交记录,不含 token/payload 明文
+    if _ACTION_AUDIT.exists():
+        for l in reversed([x for x in _ACTION_AUDIT.read_text(encoding="utf-8").splitlines() if x.strip()][-limit:]):
+            try:
+                a = json.loads(l)
+            except ValueError:
+                continue
+            entries.append(AuditEntry(
+                kind="action",
+                summary=a.get("summary", ""),
+                detail=a.get("detail", ""),
+                status=a.get("status", "") or a.get("date", ""),
+                actor=a.get("actor", "human"),
+            ))
 
     # AutoResearch 人工复核决策(倒序;只取带 review_action 的记录)
     if _AUTORESEARCH_REVIEW.exists():

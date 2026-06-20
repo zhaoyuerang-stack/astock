@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import json
+import threading
 from dataclasses import asdict
 from pathlib import Path
 from typing import Iterator
 
 from .models import Candidate, CandidateDecision, CandidateEvaluationResult, CandidateStatus
+
+_repo_lock = threading.Lock()
 
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[2] / "data_lake" / "factory" / "autoresearch"
@@ -60,8 +63,9 @@ class CandidateRepository:
                     self._cache[candidate.fingerprint] = candidate
 
     def _append(self, candidate: Candidate) -> None:
-        with self.path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(_json_ready(asdict(candidate)), ensure_ascii=False) + "\n")
+        with _repo_lock:
+            with self.path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(_json_ready(asdict(candidate)), ensure_ascii=False) + "\n")
         self._cache[candidate.fingerprint] = candidate
 
     @staticmethod
@@ -85,8 +89,9 @@ class ExperimentLog:
 
     def append(self, result: CandidateEvaluationResult) -> None:
         rec = _json_ready(asdict(result))
-        with self.path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        with _repo_lock:
+            with self.path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
     def iter_all(self) -> Iterator[CandidateEvaluationResult]:
         if not self.path.exists():
@@ -126,8 +131,9 @@ class ReviewQueue:
             "reason": result.reason,
             "metrics": result.metrics,
         }
-        with self.path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        with _repo_lock:
+            with self.path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
         self._items[candidate.fingerprint] = rec
         return True
 
@@ -148,6 +154,7 @@ class ReviewQueue:
         action: str,
         notes: str = "",
         reviewed_at: str = "",
+        **extra,
     ) -> dict:
         """Append a human review decision. Latest record per fingerprint wins on load."""
         rec = dict(self._items[fingerprint])
@@ -159,10 +166,30 @@ class ReviewQueue:
                 "reviewed_at": reviewed_at,
             }
         )
-        with self.path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-        self._items[fingerprint] = rec
+        rec.update({k: v for k, v in extra.items() if v is not None})
+        self._append_record(rec)
         return rec
+
+    def record_status(self, fingerprint: str, status: CandidateStatus, **fields) -> dict:
+        """Append a non-review status transition. Latest record per fingerprint wins on load."""
+        rec = dict(self._items[fingerprint])
+        rec["status"] = status.value
+        rec.update({k: v for k, v in fields.items() if v is not None})
+        self._append_record(rec)
+        return rec
+
+    def record_fields(self, fingerprint: str, **fields) -> dict:
+        """Append metadata fields while preserving the latest status."""
+        rec = dict(self._items[fingerprint])
+        rec.update({k: v for k, v in fields.items() if v is not None})
+        self._append_record(rec)
+        return rec
+
+    def _append_record(self, rec: dict) -> None:
+        with _repo_lock:
+            with self.path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        self._items[rec["fingerprint"]] = rec
 
     def _load(self) -> None:
         if not self.path.exists():

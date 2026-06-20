@@ -55,6 +55,16 @@ def _norm_openai_base(url: str) -> str:
     return u.rstrip("/")
 
 
+# 解读(synthesize)系统提示:讲解归 LLM,数字归数据。防编造的硬护栏在 skills._number_guard,
+# 这里再用 prompt 收紧一道,降低被护栏误伤回退的概率。
+_SYNTH_SYSTEM = (
+    "你是量化研究副驾驶,职责是把工具返回的真实数据讲解清楚、教用户理解系统,而不是编造。"
+    "硬约束:(1) 只能使用「数据」JSON 里出现的数字,逐字照搬,不要重新格式化、换算或推断任何数字;"
+    "(2) 数据里没有的事实就直说「数据未提供/缺数据」,绝不补全或猜测;"
+    "(3) 不给买卖建议、不承诺收益;(4) 简洁中文,可适当解释指标含义帮助用户理解。"
+)
+
+
 # ── 适配器接口 ─────────────────────────────────────────────────────────────────
 class LLMAdapter:
     name = "null"
@@ -63,15 +73,15 @@ class LLMAdapter:
     def available(self) -> bool:
         return False
 
-    def route(self, request: str, context: dict, tool_names: list[str]) -> str | None:
+    def route(self, request: str, context: dict, tool_names: list[str], timeout: int | None = 15) -> str | None:
         """选一个白名单工具名,或 None(planner 走确定性 fallback)。"""
         return None
 
-    def synthesize(self, request: str, context: dict, tool_name: str, data) -> str | None:
-        """把工具结果写成中文解读,或 None(planner 用确定性 _summarize)。"""
+    def synthesize(self, request: str, context: dict, tool_name: str, data, timeout: int | None = 20) -> str | None:
+        """把工具结果写成中文解读,或 None(skills 回退确定性摘要)。"""
         return None
 
-    def complete(self, system: str, user: str, max_tokens: int = 2000) -> str | None:
+    def complete(self, system: str, user: str, max_tokens: int = 2000, timeout: int | None = None) -> str | None:
         """通用补全(如 AutoResearch 候选生成)。不可用 / 失败 → None。"""
         return None
 
@@ -96,8 +106,10 @@ class OpenAICompatAdapter(LLMAdapter):
     def available(self) -> bool:
         return bool(self.api_key and self.model and self.base_url)
 
-    def _chat(self, system: str, user: str, max_tokens: int = 1200) -> str:
+    def _chat(self, system: str, user: str, max_tokens: int = 1200, timeout: int | None = None) -> str:
         # 推理(thinking)模型会先花 token 思考,max_tokens 需留足,否则 content 为空
+        # 生成型调用实测 20-35s,默认 30s 读超时掐在边缘上 → 按 max_tokens 放宽
+        # timeout 显式传入时用之(交互路由/解读用短超时,避免落到 120s 地板把请求挂死)
         url = f"{self.base_url}/chat/completions"
         try:
             data = _http_post(
@@ -105,16 +117,17 @@ class OpenAICompatAdapter(LLMAdapter):
                 {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
                 {"model": self.model, "temperature": 0.2, "max_tokens": max_tokens,
                  "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]},
+                timeout=timeout if timeout is not None else max(120, max_tokens // 25),
             )
         except urllib.error.HTTPError as e:
             raise RuntimeError(f"HTTP {e.code} @ {url}(检查 base_url/model)") from e
         return data["choices"][0]["message"]["content"].strip()
 
-    def route(self, request, context, tool_names):
+    def route(self, request, context, tool_names, timeout: int | None = 15):
         try:
             ans = self._chat(
                 f"你是路由器。只能从以下工具里选一个:{tool_names}。只回工具名,或回 none。",
-                f"页面={context.get('current_page','')} 请求={request}", max_tokens=256).strip().strip('"').lower()
+                f"页面={context.get('current_page','')} 请求={request}", max_tokens=256, timeout=timeout).strip().strip('"').lower()
             # 推理模型可能带思考前缀,取末尾出现的工具名
             for t in tool_names:
                 if t in ans:
@@ -123,17 +136,22 @@ class OpenAICompatAdapter(LLMAdapter):
         except Exception:  # noqa: BLE001
             return None
 
-    def synthesize(self, request, context, tool_name, data):
+    def synthesize(self, request, context, tool_name, data, timeout: int | None = 30):
         try:
+            history = context.get("messages") or []
+            history_text = "\n".join(
+                f"{m.get('role', '')}: {m.get('content', '')}" for m in history[-8:] if isinstance(m, dict)
+            )
             return self._chat(
-                "你是量化研究副驾驶。根据工具返回的 JSON 写简洁中文解读,不得编造任何数字。",
-                f"问题:{request}\n工具:{tool_name}\n数据:{json.dumps(data, ensure_ascii=False)[:3000]}")
+                _SYNTH_SYSTEM,
+                f"历史对话:\n{history_text}\n\n当前问题:{request}\n工具:{tool_name}\n数据:{json.dumps(data, ensure_ascii=False)[:3000]}",
+                max_tokens=1500, timeout=timeout)   # 思考模型留足 token,否则 content 为空
         except Exception:  # noqa: BLE001
             return None
 
-    def complete(self, system, user, max_tokens=2000):
+    def complete(self, system, user, max_tokens=2000, timeout: int | None = None):
         try:
-            return self._chat(system, user, max_tokens=max_tokens)
+            return self._chat(system, user, max_tokens=max_tokens, timeout=timeout)
         except Exception:  # noqa: BLE001
             return None
 
@@ -154,7 +172,7 @@ class AnthropicAdapter(LLMAdapter):
     def available(self) -> bool:
         return bool(self.api_key and self.model)
 
-    def _msg(self, system: str, user: str, max_tokens: int = 1200) -> str:
+    def _msg(self, system: str, user: str, max_tokens: int = 1200, timeout: int | None = None) -> str:
         url = f"{self.base_url}/v1/messages"
         try:
             data = _http_post(
@@ -162,15 +180,16 @@ class AnthropicAdapter(LLMAdapter):
                 {"x-api-key": self.api_key, "anthropic-version": "2023-06-01", "Content-Type": "application/json"},
                 {"model": self.model, "system": system, "max_tokens": max_tokens,
                  "messages": [{"role": "user", "content": user}]},
+                timeout=timeout if timeout is not None else 30,
             )
         except urllib.error.HTTPError as e:
             raise RuntimeError(f"HTTP {e.code} @ {url}(检查 base_url/model)") from e
         return data["content"][0]["text"].strip()
 
-    def route(self, request, context, tool_names):
+    def route(self, request, context, tool_names, timeout: int | None = 15):
         try:
             ans = self._msg(f"只能从工具 {tool_names} 选一个,只回工具名或 none。",
-                            f"页面={context.get('current_page','')} 请求={request}", max_tokens=256).strip().strip('"').lower()
+                            f"页面={context.get('current_page','')} 请求={request}", max_tokens=256, timeout=timeout).strip().strip('"').lower()
             for t in tool_names:
                 if t in ans:
                     return t
@@ -178,16 +197,21 @@ class AnthropicAdapter(LLMAdapter):
         except Exception:  # noqa: BLE001
             return None
 
-    def synthesize(self, request, context, tool_name, data):
+    def synthesize(self, request, context, tool_name, data, timeout: int | None = 30):
         try:
-            return self._msg("你是量化研究副驾驶,根据 JSON 写简洁中文解读,不得编造数字。",
-                             f"问题:{request}\n工具:{tool_name}\n数据:{json.dumps(data, ensure_ascii=False)[:3000]}")
+            history = context.get("messages") or []
+            history_text = "\n".join(
+                f"{m.get('role', '')}: {m.get('content', '')}" for m in history[-8:] if isinstance(m, dict)
+            )
+            return self._msg(_SYNTH_SYSTEM,
+                             f"历史对话:\n{history_text}\n\n当前问题:{request}\n工具:{tool_name}\n数据:{json.dumps(data, ensure_ascii=False)[:3000]}",
+                             timeout=timeout)
         except Exception:  # noqa: BLE001
             return None
 
-    def complete(self, system, user, max_tokens=2000):
+    def complete(self, system, user, max_tokens=2000, timeout: int | None = None):
         try:
-            return self._msg(system, user, max_tokens=max_tokens)
+            return self._msg(system, user, max_tokens=max_tokens, timeout=timeout)
         except Exception:  # noqa: BLE001
             return None
 

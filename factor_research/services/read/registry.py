@@ -28,5 +28,11 @@ def list_strategies() -> list[StrategyView]:
                 metrics=v.get("metrics", {}) or {},
                 config=v.get("config", {}) or {},
                 notes=v.get("notes", ""),
+                capacity_m=float(fam.get("capacity_m", 0.0)),
+                admission=v.get("admission", {}) or {},
+                nine_gate=v.get("nine_gate", {}) or {},
+                style_betas=fam.get("style_betas", {}) or {},
+                failure_boundaries=fam.get("failure_boundaries", {}) or {},
+                decay_signal=fam.get("decay_signal", "") or "",
             ))
     return out

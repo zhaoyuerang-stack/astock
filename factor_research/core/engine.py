@@ -26,6 +26,8 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 
+from engine.metrics import compute_hit, institutional_metrics, TARGET_ANNUAL, TARGET_MAXDD
+
 
 # ---------------------------------------------------------------------------
 # Config & Data Containers
@@ -41,7 +43,14 @@ class CostModel:
 
 @dataclass(frozen=True)
 class BacktestConfig:
-    """Global backtest parameters."""
+    """Global backtest parameters.
+
+    ``start`` is the **statistics window** start: simulation runs over the full
+    price panel (preserving factor warmup and holding continuity), then the
+    returns/turnover/cost series are truncated to ``>= start`` before metrics.
+    Historically this field was dead (full-panel stats regardless of start),
+    which silently diluted OOS metrics with idle pre-start days.
+    """
     start: str = "2018-01-01"
     cost: CostModel = field(default_factory=CostModel)
     leverage: float = 1.25
@@ -183,12 +192,30 @@ class BacktestResult:
         return self.annual / abs(self.maxdd) if self.maxdd < 0 else 0.0
 
     @property
+    def anomalies(self) -> list:
+        """结果哨兵:统计上近乎不可能的结果形态,优先怀疑数据而非行情。
+
+        阈值取"分散组合物理上限之外":|组合日收益|>35%(20cm 全跌停 × 1.5 杠杆
+        = 30% 才到边界;2026-06 假崩盘日为 -60% 量级)或回撤 >90%。
+        只报警不改数——哨兵触发时先查数据(末几日截面分布),再信结论。
+        """
+        flags = []
+        if len(self.returns):
+            worst = self.returns.abs().max()
+            if worst > 0.35:
+                d = self.returns.abs().idxmax()
+                flags.append(f"组合单日|r|={worst:.1%} @ {pd.Timestamp(d).date()} 超物理边界,疑数据问题")
+        if self.maxdd < -0.90:
+            flags.append(f"回撤 {self.maxdd:.1%} 近乎清零,疑数据问题")
+        return flags
+
+    @property
     def hit(self) -> bool:
-        # Use thresholds from the stored config if available; else fall back to defaults.
+        # 唯一权威判定走 engine.metrics.compute_hit（严格不等号），阈值可被 config 覆盖。
         # NOTE: @property cannot accept extra arguments — thresholds come from self.config.
-        t_annual = self.config.target_annual if self.config else 0.15
-        t_maxdd = self.config.target_maxdd if self.config else 0.20
-        return (self.annual >= t_annual) and (abs(self.maxdd) <= t_maxdd)
+        t_annual = self.config.target_annual if self.config else TARGET_ANNUAL
+        t_maxdd = self.config.target_maxdd if self.config else TARGET_MAXDD
+        return compute_hit(self.annual, self.maxdd, t_annual, t_maxdd)
 
     @property
     def metrics(self) -> dict:
@@ -211,6 +238,7 @@ class BacktestResult:
             "calmar": self.calmar,
             "hit": self.hit,
             "n": self.n,
+            **institutional_metrics(self.returns),
         }
 
     @property
@@ -367,7 +395,15 @@ class BacktestEngine:
         to = pd.Series(turnover[1:], index=ret.index)
         co = pd.Series(cost_paid[1:], index=ret.index)
 
-        return BacktestResult(
+        # start = 统计窗口起点:全面板连续模拟(保留预热/持仓连续性)后切片统计,
+        # 否则把 start 前的空仓/预热期算进年化会稀释指标(LESSONS 2026-06-12)
+        if config.start:
+            stats_from = pd.Timestamp(config.start)
+            ret = ret.loc[stats_from:]
+            to = to.loc[stats_from:]
+            co = co.loc[stats_from:]
+
+        result = BacktestResult(
             returns=ret,
             turnover=to,
             cost=co,
@@ -375,6 +411,9 @@ class BacktestEngine:
             version=getattr(signal_meta, "version", ""),
             config=config,
         )
+        for msg in result.anomalies:
+            print(f"🚨 [结果哨兵] {msg} —— 采信前先检查数据湖末几日截面分布", flush=True)
+        return result
 
 
 # ---------------------------------------------------------------------------
@@ -431,6 +470,13 @@ def _factor_to_weights(
         f = factor.loc[rd].dropna()
         f = f.reindex(active).dropna()
         if len(f) < top_n:
+            if len(f) == 0:
+                w = pd.Series(0.0, index=[active[0]], name=effective)
+                rows.append(w)
+            continue
+        if f.std() <= 1e-8:
+            w = pd.Series(0.0, index=[active[0]], name=effective)
+            rows.append(w)
             continue
         top = f.nlargest(top_n).index
         w = pd.Series(1.0 / top_n, index=top, name=effective)

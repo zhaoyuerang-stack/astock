@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import MetricCard from "@/components/ui/MetricCard";
-import { api, num } from "@/lib/api";
+import { api, num, pct } from "@/lib/api";
 import type {
   AutoResearchCandidateView,
   AutoResearchFunnelView,
   AutoResearchIslandSearchResponse,
+  AutoResearchLLMGenResponse,
   AutoResearchPromoteResponse,
   AutoResearchReviewItemView,
   AutoResearchRunResponse,
@@ -30,6 +31,8 @@ const STATUS_LABEL: Record<string, string> = {
 const MAIN_STAGES = ["generated", "l0_passed", "l1_passed", "l2_passed", "l3_passed", "promoted_to_review"];
 const SIDE_STAGES = ["shelved", "discarded", "approved", "rejected_by_human", "retired"];
 const RUN_STAGES = ["l0", "l1", "l2", "l3"] as const;
+const JOB_POLL_MS = 1500;
+const JOB_TIMEOUT_MS = 15 * 60 * 1000;
 
 function statusTone(status: string): string {
   if (status === "discarded" || status === "rejected_by_human") return "text-danger";
@@ -121,6 +124,10 @@ export default function AutoResearchLab() {
     setRunResult(null);
     api
       .runAutoresearchSeeds({ limit: runLimit, max_stage: runStage })
+      .then((job) => api.waitForExperimentJob<AutoResearchRunResponse>(job.job_id, {
+        intervalMs: JOB_POLL_MS,
+        timeoutMs: JOB_TIMEOUT_MS,
+      }))
       .then((r) => {
         setRunResult(r);
         return reload();
@@ -135,6 +142,10 @@ export default function AutoResearchLab() {
     setLlmInfo(null);
     api
       .runAutoresearchLLM({ n: llmN, theme: llmTheme, max_stage: runStage })
+      .then((job) => api.waitForExperimentJob<AutoResearchLLMGenResponse>(job.job_id, {
+        intervalMs: JOB_POLL_MS,
+        timeoutMs: JOB_TIMEOUT_MS,
+      }))
       .then((r) => {
         setLlmInfo({ model: r.model, accepted: r.accepted, rejected: r.rejected });
         setRunResult(r.run);
@@ -150,6 +161,10 @@ export default function AutoResearchLab() {
     setIslandResult(null);
     api
       .runIslandSearch({ islands: 4, generations: 3, population: 8 })
+      .then((job) => api.waitForExperimentJob<AutoResearchIslandSearchResponse>(job.job_id, {
+        intervalMs: JOB_POLL_MS,
+        timeoutMs: JOB_TIMEOUT_MS,
+      }))
       .then((r) => {
         setIslandResult(r);
         return reload();
@@ -163,6 +178,10 @@ export default function AutoResearchLab() {
     setPromoteErr(null);
     api
       .promoteAutoresearch(fingerprint)
+      .then((job) => api.waitForExperimentJob<AutoResearchPromoteResponse>(job.job_id, {
+        intervalMs: JOB_POLL_MS,
+        timeoutMs: JOB_TIMEOUT_MS,
+      }))
       .then((r) => {
         setPromoteResults((prev) => ({ ...prev, [fingerprint]: r }));
         return reload();
@@ -191,10 +210,17 @@ export default function AutoResearchLab() {
   const pending = queue.filter((it) => !it.review_action);
   const decided = queue.filter((it) => it.review_action);
 
+  // Conversion rates for research decision-making
+  const approvalRate = stageCount("approved") + stageCount("rejected_by_human") > 0
+    ? stageCount("approved") / (stageCount("approved") + stageCount("rejected_by_human"))
+    : 0;
+  const discardRate = funnel && funnel.total > 0 ? stageCount("discarded") / funnel.total : 0;
+  const shelvedRate = funnel && funnel.total > 0 ? stageCount("shelved") / funnel.total : 0;
+
   return (
-    <>
+    <div className="space-y-6">
       {err && (
-        <div className="card text-sm text-danger mb-4">
+        <div className="card text-sm text-danger mb-4 bg-danger/10 border-danger/30">
           API 错误:{err}
           <br />
           请确认后端已启动(uvicorn :8011)。
@@ -205,33 +231,33 @@ export default function AutoResearchLab() {
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
             <MetricCard label="DSL 候选总数" value={String(funnel.total)} sub="受控 JSON AST · fingerprint 去重" />
-            <MetricCard label="待人工复核" value={String(funnel.review_queue)} tone="ok" sub="promote 终点,不直接写台账" />
-            <MetricCard label="已淘汰" value={String(stageCount("discarded"))} tone="danger" sub="真实 L0-L3 闸门证伪" />
-            <MetricCard label="已搁置" value={String(stageCount("shelved"))} tone="warn" sub="L3 走样不稳 / 复杂度超预算" />
+            <MetricCard label="待人工复核" value={String(funnel.review_queue)} tone="ok" sub={`复核通过率: ${pct(approvalRate, 1)}`} />
+            <MetricCard label="已淘汰" value={String(stageCount("discarded"))} tone="danger" sub={`漏斗淘汰率: ${pct(discardRate, 1)}`} />
+            <MetricCard label="已搁置" value={String(stageCount("shelved"))} tone="warn" sub={`搁置占比: ${pct(shelvedRate, 1)}`} />
           </div>
 
           {/* 候选漏斗 */}
           <div className="card mb-5">
-            <div className="text-sm font-medium mb-3">候选漏斗(生成 → 真实 L0~L3 → 人工复核)</div>
-            <div className="flex items-end gap-2 h-32">
+            <div className="text-sm font-semibold mb-3">候选漏斗(生成 → 真实 L0~L3 → 人工复核)</div>
+            <div className="flex items-end gap-2.5 h-36 bg-jilan/10 p-4 rounded-xl border border-line/20">
               {MAIN_STAGES.map((stage) => {
                 const count = stageCount(stage);
                 return (
-                  <div key={stage} className="flex-1 flex flex-col items-center justify-end h-full">
-                    <span className="text-[12px] text-ink mb-1">{count}</span>
+                  <div key={stage} className="flex-1 flex flex-col items-center justify-end h-full group">
+                    <span className="text-[12px] text-ink font-mono font-bold mb-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">{count}</span>
                     <div
-                      className="w-full rounded-t bg-brand"
-                      style={{ height: `${(count / maxCount) * 100}%`, minHeight: count ? "4px" : "0" }}
+                      className="w-full rounded-t bg-brand hover:bg-brand-light transition-all duration-300 shadow-sm"
+                      style={{ height: `${(count / maxCount) * 80}%`, minHeight: count ? "4px" : "0" }}
                     />
-                    <span className="text-[11px] text-subink mt-1">{STATUS_LABEL[stage]}</span>
+                    <span className="text-[11px] text-subink font-medium mt-2">{STATUS_LABEL[stage]}</span>
                   </div>
                 );
               })}
             </div>
-            <div className="flex gap-4 mt-3 text-[12px] text-subink">
+            <div className="flex flex-wrap gap-2.5 mt-4">
               {SIDE_STAGES.map((stage) => (
-                <span key={stage}>
-                  {STATUS_LABEL[stage]}:<span className="text-ink"> {stageCount(stage)}</span>
+                <span key={stage} className="px-2.5 py-1 bg-jilan/25 border border-line/40 rounded-lg text-[11px] text-subink">
+                  {STATUS_LABEL[stage]}:<span className="text-ink font-bold font-quant ml-1">{stageCount(stage)}</span>
                 </span>
               ))}
             </div>
@@ -239,127 +265,144 @@ export default function AutoResearchLab() {
 
           {/* 运行种子候选 */}
           <div className="card mb-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-sm font-medium">运行种子候选(真实 data_lake 回测)</div>
-              <div className="flex items-center gap-2 text-[12px]">
-                <label className="text-subink">候选数</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={36}
-                  value={runLimit}
-                  onChange={(e) => setRunLimit(Math.max(1, Math.min(36, Number(e.target.value) || 1)))}
-                  className="w-14 px-1.5 py-1 rounded border border-cardline text-ink"
-                  disabled={running}
-                />
-                <label className="text-subink ml-2">最深阶段</label>
-                {RUN_STAGES.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setRunStage(s)}
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-3 pb-3 border-b border-line/30">
+              <div className="text-sm font-semibold">运行种子候选(真实 data_lake 回测)</div>
+              <div className="flex flex-wrap items-center gap-3 text-[12px]">
+                <div className="flex items-center gap-1.5">
+                  <label className="text-subink">候选数</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={36}
+                    value={runLimit}
+                    onChange={(e) => setRunLimit(Math.max(1, Math.min(36, Number(e.target.value) || 1)))}
+                    className="w-14 px-2 py-1 rounded-md border border-line/60 text-ink bg-white"
                     disabled={running}
-                    className={`px-2 py-1 rounded ${runStage === s ? "bg-brand text-white" : "bg-bg text-subink border border-cardline"}`}
-                  >
-                    {s.toUpperCase()}
-                  </button>
-                ))}
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  <label className="text-subink mr-1">最深阶段</label>
+                  {RUN_STAGES.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setRunStage(s)}
+                      disabled={running}
+                      className={`px-2.5 py-1 rounded-md transition-all duration-150 ${runStage === s ? "bg-brand text-white font-semibold shadow-sm" : "bg-white text-subink border border-line hover:border-brand/40"}`}
+                    >
+                      {s.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
                 <button
                   onClick={runSeeds}
                   disabled={running}
-                  className="ml-3 px-3 py-1 rounded bg-brand text-white disabled:opacity-50"
+                  className="px-4 py-1.5 rounded-lg bg-brand text-white font-semibold disabled:opacity-50 hover:bg-brand/90 transition-colors shadow-sm"
                 >
                   {running ? "运行中…" : "运行"}
                 </button>
               </div>
             </div>
-            <div className="text-[12px] text-subink mb-2">
-              L0=IC 粗筛(秒级);L1~L3=真实成本回测,首次运行需加载数据湖(约 20s+,15 个候选全链路约 80s)。
+            <div className="text-[12px] text-subink mb-3 leading-relaxed">
+              💡 <strong>机制说明：</strong> L0=IC 粗筛(秒级); L1~L3=真实成本回测,首次运行需加载数据湖(约 20s+,15 个候选全链路约 80s)。
             </div>
-            <div className="flex items-center gap-2 text-[12px] mb-2 pt-2 border-t border-cardline/60">
-              <label className="text-subink">LLM 生成</label>
-              <input
-                type="number" min={1} max={20} value={llmN}
-                onChange={(e) => setLlmN(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
-                className="w-14 px-1.5 py-1 rounded border border-cardline text-ink"
-                disabled={llmBusy}
-              />
+            <div className="flex flex-wrap items-center gap-3 text-[12px] pt-3 border-t border-line/40">
+              <div className="flex items-center gap-1.5">
+                <label className="text-subink">LLM 生成数</label>
+                <input
+                  type="number" min={1} max={20} value={llmN}
+                  onChange={(e) => setLlmN(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+                  className="w-14 px-2 py-1 rounded-md border border-line/60 text-ink bg-white"
+                  disabled={llmBusy}
+                />
+              </div>
               <input
                 value={llmTheme} onChange={(e) => setLlmTheme(e.target.value)}
                 placeholder="研究主题(可选,如:流动性溢价)"
-                className="w-56 px-2 py-1 rounded border border-cardline text-ink"
+                className="w-56 px-2 py-1 rounded-md border border-line/60 text-ink bg-white"
                 disabled={llmBusy}
               />
               <button onClick={runLLM} disabled={llmBusy || islandBusy || running}
-                className="px-3 py-1 rounded bg-brand text-white disabled:opacity-50">
+                className="px-4 py-1.5 rounded-lg bg-brand text-white font-semibold disabled:opacity-50 hover:bg-brand/90 transition-colors shadow-sm">
                 {llmBusy ? "生成验证中…" : "LLM 生成并验证"}
               </button>
               <button onClick={runIslands} disabled={llmBusy || islandBusy || running}
-                className="ml-2 px-3 py-1 rounded bg-navy text-white disabled:opacity-50"
+                className="px-4 py-1.5 rounded-lg bg-brand/10 border border-brand/35 text-brand font-semibold disabled:opacity-50 hover:bg-brand/20 transition-colors shadow-sm"
                 title="4 岛 × 3 代 × 8 个体,适应度=真实 L0 |ICIR|,LLM 可用时按主题播种">
-                {islandBusy ? "岛屿搜索中…" : "岛屿搜索(分钟级)"}
+                {islandBusy ? "岛屿搜索中…" : "岛屿搜索 (遗传算法)"}
               </button>
             </div>
-            {searchErr && <div className="text-sm text-danger mb-2">失败:{searchErr}</div>}
+            {searchErr && <div className="text-sm text-danger mt-3 bg-danger/10 p-2 rounded border border-danger/20">失败:{searchErr}</div>}
             {llmInfo && (
-              <div className="text-[12px] text-subink mb-2">
-                LLM <span className="font-mono">{llmInfo.model}</span> · 通过白名单校验 <span className="text-ink">{llmInfo.accepted}</span> 个
+              <div className="text-[12px] text-subink mt-3 bg-jilan/20 p-2 rounded border border-line/40">
+                LLM <span className="font-mono">{llmInfo.model}</span> · 通过白名单校验 <span className="text-ink font-semibold">{llmInfo.accepted}</span> 个
                 {llmInfo.rejected.length > 0 && (
-                  <span> · 拒绝 {llmInfo.rejected.length} 个:<span className="text-warn">{llmInfo.rejected.join(";")}</span></span>
+                  <span> · 拒绝 {llmInfo.rejected.length} 个: <span className="text-danger font-medium">{llmInfo.rejected.join(";")}</span></span>
                 )}
               </div>
             )}
             {islandResult && (
-              <div className="mb-2">
-                <div className="text-[12px] text-subink mb-1">
-                  岛屿搜索:{islandResult.islands} 岛 × {islandResult.generations} 代,真实 L0 评估 {islandResult.evaluated} 次,
-                  播种来源 {islandResult.seeded_by === "llm" ? "LLM" : "确定性种子"} · 冠军:
+              <div className="mt-4 border-t border-line/30 pt-3">
+                <div className="text-[12px] text-subink mb-2">
+                  岛屿搜索: {islandResult.islands} 岛 × {islandResult.generations} 代, 真实 L0 评估 {islandResult.evaluated} 次,
+                  播种来源: {islandResult.seeded_by === "llm" ? "LLM 主题" : "确定性种子"} · 各岛冠军:
                 </div>
                 <table className="w-full text-[13px]">
                   <thead>
-                    <tr className="text-subink text-left border-b border-cardline">
-                      <th className="py-1 font-medium">岛</th>
-                      <th className="py-1 font-medium text-right">|ICIR|</th>
-                      <th className="py-1 font-medium">表达式</th>
-                      <th className="py-1 font-medium">状态</th>
-                      <th className="py-1 font-medium">原因</th>
+                    <tr className="text-subink text-left border-b border-line/60">
+                      <th className="py-2 px-2 font-semibold">岛屿</th>
+                      <th className="py-2 px-2 font-semibold text-right">|ICIR|</th>
+                      <th className="py-2 px-2 font-semibold">表达式</th>
+                      <th className="py-2 px-2 font-semibold">状态</th>
+                      <th className="py-2 px-2 font-semibold">筛选原因</th>
                     </tr>
                   </thead>
                   <tbody>
                     {islandResult.champions.map((c) => (
-                      <tr key={c.fingerprint} className="border-b border-cardline/60">
-                        <td className="py-1 text-subink">#{c.island}</td>
-                        <td className="py-1 text-right text-ink">{num(Math.abs(c.icir), 3)}</td>
-                        <td className="py-1 text-ink">{c.expr}</td>
-                        <td className={`py-1 ${statusTone(c.status)}`}>{STATUS_LABEL[c.status] ?? c.status}</td>
-                        <td className="py-1 text-subink truncate max-w-[260px]" title={c.reason}>{c.reason}</td>
+                      <tr key={c.fingerprint} className="border-b border-line/40 hover:bg-jilan/10">
+                        <td className="py-2 px-2 text-subink font-medium">#{c.island}</td>
+                        <td className="py-2 px-2 text-right text-brand font-mono font-bold">{num(Math.abs(c.icir), 3)}</td>
+                        <td className="py-2 px-2 text-ink font-mono">{c.expr}</td>
+                        <td className={`py-2 px-2 font-semibold ${statusTone(c.status)}`}>{STATUS_LABEL[c.status] ?? c.status}</td>
+                        <td className="py-2 px-2 text-subink truncate max-w-[260px]" title={c.reason}>{c.reason}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
-            {runErr && <div className="text-sm text-danger">运行失败:{runErr}</div>}
+            {runErr && <div className="text-sm text-danger mt-3 bg-danger/10 p-2 rounded border border-danger/20">运行失败:{runErr}</div>}
             {runResult && (
-              <div className="overflow-x-auto">
-                <div className="text-[12px] text-subink mb-1">
-                  vintage: <span className="font-mono">{runResult.vintage_id}</span> · max_stage: {runResult.max_stage.toUpperCase()}
+              <div className="overflow-x-auto mt-4 border-t border-line/30 pt-3">
+                <div className="text-[12px] text-subink mb-2">
+                  流水线批次: <span className="font-mono text-brand">{runResult.vintage_id}</span> · 深度级别: {runResult.max_stage.toUpperCase()}
                 </div>
                 <table className="w-full text-[13px]">
                   <thead>
-                    <tr className="text-subink text-left border-b border-cardline">
-                      <th className="py-1.5 font-medium">fingerprint</th>
-                      <th className="py-1.5 font-medium">已跑阶段</th>
-                      <th className="py-1.5 font-medium">状态</th>
-                      <th className="py-1.5 font-medium">原因</th>
+                    <tr className="text-subink text-left border-b border-line/60">
+                      <th className="py-2 px-2 font-semibold">fingerprint</th>
+                      <th className="py-2 px-2 font-semibold">已验证协议</th>
+                      <th className="py-2 px-2 font-semibold">最终状态</th>
+                      <th className="py-2 px-2 font-semibold">系统决定原因</th>
                     </tr>
                   </thead>
                   <tbody>
                     {runResult.results.map((r) => (
-                      <tr key={r.fingerprint} className="border-b border-cardline/60">
-                        <td className="py-1.5 font-mono text-[11px] text-subink">{r.fingerprint.slice(0, 10)}</td>
-                        <td className="py-1.5 text-subink">{r.protocols.map((p) => p.replace(/_.*$/, "").toUpperCase()).join(" → ") || "—"}</td>
-                        <td className={`py-1.5 ${statusTone(r.status)}`}>{STATUS_LABEL[r.status] ?? r.status}</td>
-                        <td className="py-1.5 text-subink truncate max-w-[360px]" title={r.reason}>{r.reason}</td>
+                      <tr key={r.fingerprint} className="border-b border-line/40 hover:bg-jilan/10">
+                        <td className="py-2 px-2">
+                          <span 
+                            className="font-mono text-[11px] text-brand hover:underline cursor-pointer"
+                            title="点击复制 Fingerprint"
+                            onClick={() => {
+                              navigator.clipboard.writeText(r.fingerprint);
+                              alert("已复制 Fingerprint 到剪贴板");
+                            }}
+                          >
+                            {r.fingerprint.slice(0, 10)}
+                          </span>
+                        </td>
+                        <td className="py-2 px-2 text-subink font-mono">{r.protocols.map((p) => p.replace(/_.*$/, "").toUpperCase()).join(" → ") || "—"}</td>
+                        <td className={`py-2 px-2 font-semibold ${statusTone(r.status)}`}>{STATUS_LABEL[r.status] ?? r.status}</td>
+                        <td className="py-2 px-2 text-subink truncate max-w-[360px]" title={r.reason}>{r.reason}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -370,65 +413,76 @@ export default function AutoResearchLab() {
 
           {/* 人工复核工作台 */}
           <div className="card mb-5">
-            <div className="text-sm font-medium mb-3">
-              人工复核工作台(promote 终点 · approve 仍不写 LIVE 台账,入册走 workflow promote)
+            <div className="text-sm font-semibold mb-3">
+              人工复核工作台 (promote 终点 · approve 仍不写 LIVE 台账,入册走主晋级 workflow)
             </div>
-            {reviewErr && <div className="text-sm text-danger mb-2">复核失败:{reviewErr}</div>}
+            {reviewErr && <div className="text-sm text-danger mb-2 bg-danger/10 p-2 rounded">复核失败:{reviewErr}</div>}
             {reviewTarget && (
-              <div className="flex items-center gap-2 mb-3 p-2 rounded bg-bg border border-cardline text-[13px]">
-                <span className={reviewTarget.action === "approve" ? "text-ok" : "text-danger"}>
+              <div className="flex items-center gap-2 mb-3 p-3 rounded-lg bg-jilan/25 border border-line text-[13px]">
+                <span className={reviewTarget.action === "approve" ? "text-ok font-semibold" : "text-danger font-semibold"}>
                   {reviewTarget.action === "approve" ? "批准" : "拒绝"}
                 </span>
-                <span className="font-mono text-[11px] text-subink">{reviewTarget.fingerprint.slice(0, 10)}</span>
+                <span className="font-mono text-[11px] text-subink bg-white px-2 py-0.5 rounded border border-line/40">{reviewTarget.fingerprint.slice(0, 10)}</span>
                 <input
                   value={reviewNotes}
                   onChange={(e) => setReviewNotes(e.target.value)}
                   placeholder="复核意见(建议填写,进入审计)"
-                  className="flex-1 px-2 py-1 rounded border border-cardline text-ink"
+                  className="flex-1 px-3 py-1.5 rounded border border-line/60 text-ink bg-white"
                   disabled={reviewBusy}
                 />
                 <button onClick={submitReview} disabled={reviewBusy}
-                  className="px-3 py-1 rounded bg-brand text-white disabled:opacity-50">
+                  className="px-4 py-1.5 rounded-lg bg-brand text-white font-semibold disabled:opacity-50 hover:bg-brand/90 transition-colors shadow-sm">
                   {reviewBusy ? "提交中…" : "确认"}
                 </button>
                 <button onClick={() => { setReviewTarget(null); setReviewNotes(""); }} disabled={reviewBusy}
-                  className="px-3 py-1 rounded bg-bg text-subink border border-cardline">
+                  className="px-3 py-1.5 rounded-lg bg-white text-subink border border-line hover:border-brand/40">
                   取消
                 </button>
               </div>
             )}
             {pending.length === 0 ? (
-              <div className="text-[13px] text-subink">
-                待复核队列为空——尚无候选通过完整 L0~L3 闸门。高淘汰率是闸门在证伪,属健康信号。
+              <div className="text-[13px] text-subink bg-jilan/10 p-3 rounded-lg border border-line/20">
+                💡 待复核队列为空——尚无候选通过完整 L0~L3 漏斗。高淘汰率代表流水线正在进行强力证伪，属健康运作状态。
               </div>
             ) : (
               <table className="w-full text-[13px]">
                 <thead>
-                  <tr className="text-subink text-left border-b border-cardline">
-                    <th className="py-1.5 font-medium">fingerprint</th>
-                    <th className="py-1.5 font-medium">表达式</th>
-                    <th className="py-1.5 font-medium">引擎理由</th>
-                    <th className="py-1.5 font-medium text-right">操作</th>
+                  <tr className="text-subink text-left border-b border-line/60">
+                    <th className="py-2 px-2 font-semibold">fingerprint</th>
+                    <th className="py-2 px-2 font-semibold">表达式</th>
+                    <th className="py-2 px-2 font-semibold">引擎理由</th>
+                    <th className="py-2 px-2 font-semibold text-right">操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pending.map((it) => (
-                    <tr key={it.fingerprint} className="border-b border-cardline/60">
-                      <td className="py-1.5 font-mono text-[11px] text-subink">{it.fingerprint.slice(0, 10)}</td>
-                      <td className="py-1.5 text-ink">{astSummary(it.candidate)}</td>
-                      <td className="py-1.5 text-subink truncate max-w-[280px]" title={it.reason}>{it.reason}</td>
-                      <td className="py-1.5 text-right whitespace-nowrap">
+                    <tr key={it.fingerprint} className="border-b border-line/40 hover:bg-jilan/10">
+                      <td className="py-2 px-2">
+                        <span 
+                          className="font-mono text-[11px] text-brand hover:underline cursor-pointer"
+                          title="点击复制 Fingerprint"
+                          onClick={() => {
+                            navigator.clipboard.writeText(it.fingerprint);
+                            alert("已复制 Fingerprint 到剪贴板");
+                          }}
+                        >
+                          {it.fingerprint.slice(0, 10)}
+                        </span>
+                      </td>
+                      <td className="py-2 px-2 text-ink font-mono">{astSummary(it.candidate)}</td>
+                      <td className="py-2 px-2 text-subink truncate max-w-[280px]" title={it.reason}>{it.reason}</td>
+                      <td className="py-2 px-2 text-right whitespace-nowrap">
                         <button
                           onClick={() => { setReviewTarget({ fingerprint: it.fingerprint, action: "approve" }); setReviewNotes(""); }}
                           disabled={reviewBusy}
-                          className="text-[12px] px-2 py-0.5 rounded bg-ok/10 text-ok border border-ok/30 mr-1"
+                          className="text-[12px] px-2.5 py-1 rounded bg-ok/10 text-ok border border-ok/30 mr-1.5 hover:bg-ok/20"
                         >
                           批准
                         </button>
                         <button
                           onClick={() => { setReviewTarget({ fingerprint: it.fingerprint, action: "reject" }); setReviewNotes(""); }}
                           disabled={reviewBusy}
-                          className="text-[12px] px-2 py-0.5 rounded bg-danger/10 text-danger border border-danger/30"
+                          className="text-[12px] px-2.5 py-1 rounded bg-danger/10 text-danger border border-danger/30 hover:bg-danger/20"
                         >
                           拒绝
                         </button>
@@ -439,35 +493,56 @@ export default function AutoResearchLab() {
               </table>
             )}
             {decided.length > 0 && (
-              <div className="mt-4">
-                <div className="text-[12px] text-subink mb-2">已决策({decided.length})</div>
+              <div className="mt-5 border-t border-line/40 pt-4">
+                <div className="text-[12px] text-subink font-semibold mb-2">已决策候选 ({decided.length})</div>
                 {promoteErr && <div className="text-sm text-danger mb-2">入册失败:{promoteErr}</div>}
                 <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="text-subink text-left border-b border-line/50">
+                      <th className="py-2 px-2 font-semibold">fingerprint</th>
+                      <th className="py-2 px-2 font-semibold">表达式</th>
+                      <th className="py-2 px-2 font-semibold">决策</th>
+                      <th className="py-2 px-2 font-semibold">意见</th>
+                      <th className="py-2 px-2 font-semibold">决策时间</th>
+                      <th className="py-2 px-2 font-semibold text-right">入册操作</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {decided.map((it) => {
                       const promoted = promoteResults[it.fingerprint];
                       return (
-                        <tr key={it.fingerprint} className="border-b border-cardline/60">
-                          <td className="py-1 font-mono text-[11px] text-subink whitespace-nowrap pr-3">{it.fingerprint.slice(0, 10)}</td>
-                          <td className="py-1 text-ink pr-3 whitespace-nowrap">{astSummary(it.candidate)}</td>
-                          <td className={`py-1 pr-3 whitespace-nowrap ${it.review_action === "approve" ? "text-ok" : "text-danger"}`}>
+                        <tr key={it.fingerprint} className="border-b border-line/45 hover:bg-jilan/10">
+                          <td className="py-2 px-2">
+                            <span 
+                              className="font-mono text-[11px] text-brand hover:underline cursor-pointer"
+                              title="点击复制 Fingerprint"
+                              onClick={() => {
+                                navigator.clipboard.writeText(it.fingerprint);
+                                alert("已复制 Fingerprint 到剪贴板");
+                              }}
+                            >
+                              {it.fingerprint.slice(0, 10)}
+                            </span>
+                          </td>
+                          <td className="py-2 px-2 text-ink font-mono whitespace-nowrap pr-3">{astSummary(it.candidate)}</td>
+                          <td className={`py-2 px-2 font-semibold ${it.review_action === "approve" ? "text-ok" : "text-danger"}`}>
                             {it.review_action === "approve" ? "已批准" : "已拒绝"}
                           </td>
-                          <td className="py-1 text-subink truncate max-w-[240px]" title={it.reviewer_notes}>{it.reviewer_notes || "—"}</td>
-                          <td className="py-1 text-subink whitespace-nowrap pr-3">{it.reviewed_at}</td>
-                          <td className="py-1 text-right whitespace-nowrap">
+                          <td className="py-2 px-2 text-subink truncate max-w-[240px]" title={it.reviewer_notes}>{it.reviewer_notes || "—"}</td>
+                          <td className="py-2 px-2 text-subink whitespace-nowrap pr-3">{it.reviewed_at}</td>
+                          <td className="py-2 px-2 text-right whitespace-nowrap">
                             {it.review_action === "approve" && !promoted && (
                               <button
                                 onClick={() => promoteCandidate(it.fingerprint)}
                                 disabled={promoteBusy !== null}
                                 title="走 workflow phase1~4(合成防未来审计 → 三段回测 → walk-forward → 唯一台账登记),分钟级"
-                                className="text-[12px] px-2 py-0.5 rounded bg-brand/10 text-brand border border-brand/30 disabled:opacity-50"
+                                className="text-[12px] px-3 py-1 rounded bg-brand/10 text-brand border border-brand/35 hover:bg-brand/20 disabled:opacity-50"
                               >
                                 {promoteBusy === it.fingerprint ? "入册中(分钟级)…" : "正式入册"}
                               </button>
                             )}
                             {promoted && (
-                              <span className={promoted.registered ? "text-ok" : "text-warn"} title={promoted.detail}>
+                              <span className={promoted.registered ? "text-ok font-semibold text-[12px]" : "text-warn font-semibold text-[12px]"} title={promoted.detail}>
                                 {promoted.registered ? `已入册 ${promoted.version}` : "未达入册闸门"}
                               </span>
                             )}
@@ -483,42 +558,53 @@ export default function AutoResearchLab() {
 
           {/* 候选台账 */}
           <div className="card">
-            <div className="text-sm font-medium mb-3">候选列表(append-only · fingerprint 可复现)</div>
+            <div className="text-sm font-semibold mb-3">候选列表(append-only · fingerprint 可复现)</div>
             <div className="max-h-80 overflow-y-auto">
               <table className="w-full text-[13px]">
                 <thead>
-                  <tr className="text-subink text-left border-b border-cardline sticky top-0 bg-white">
-                    <th className="py-1 font-medium">fingerprint</th>
-                    <th className="py-1 font-medium">表达式</th>
-                    <th className="py-1 font-medium text-right">复杂度</th>
-                    <th className="py-1 font-medium">状态</th>
-                    <th className="py-1 font-medium">备注</th>
+                  <tr className="text-subink text-left border-b border-line sticky top-0 bg-jilan">
+                    <th className="py-2 px-3 font-semibold">fingerprint</th>
+                    <th className="py-2 px-3 font-semibold">表达式</th>
+                    <th className="py-2 px-3 font-semibold text-right">复杂度</th>
+                    <th className="py-2 px-3 font-semibold">状态</th>
+                    <th className="py-2 px-3 font-semibold">说明与备注</th>
                   </tr>
                 </thead>
                 <tbody>
                   {candidates.map((c) => (
-                    <tr key={c.fingerprint} className="border-b border-cardline/60">
-                      <td className="py-1 font-mono text-[11px] text-subink whitespace-nowrap pr-3">{c.fingerprint.slice(0, 10)}</td>
-                      <td className="py-1 text-ink pr-3 whitespace-nowrap">{astSummary(c.ast)}</td>
-                      <td className="py-1 text-right text-subink pr-3">{num(c.complexity_score, 1)}</td>
-                      <td className={`py-1 pr-3 whitespace-nowrap ${statusTone(c.status)}`}>{STATUS_LABEL[c.status] ?? c.status}</td>
-                      <td className="py-1 text-subink truncate max-w-[300px]" title={c.notes}>{c.notes || "—"}</td>
+                    <tr key={c.fingerprint} className="border-b border-line/45 hover:bg-jilan/10">
+                      <td className="py-2 px-3">
+                        <span 
+                          className="font-mono text-[11px] text-brand hover:underline cursor-pointer"
+                          title="点击复制 Fingerprint"
+                          onClick={() => {
+                            navigator.clipboard.writeText(c.fingerprint);
+                            alert("已复制 Fingerprint 到剪贴板");
+                          }}
+                        >
+                          {c.fingerprint.slice(0, 10)}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 text-ink font-mono pr-3 whitespace-nowrap">{astSummary(c.ast)}</td>
+                      <td className="py-2 px-3 text-right text-subink font-mono pr-3">{num(c.complexity_score, 1)}</td>
+                      <td className={`py-2 px-3 font-semibold ${statusTone(c.status)}`}>{STATUS_LABEL[c.status] ?? c.status}</td>
+                      <td className="py-2 px-3 text-subink truncate max-w-[300px]" title={c.notes}>{c.notes || "—"}</td>
                     </tr>
                   ))}
                   {candidates.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-2 text-subink">暂无候选,点击上方「运行」生成种子候选。</td>
+                      <td colSpan={5} className="py-4 text-center text-subink">暂无候选,点击上方「运行」生成种子候选。</td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
-            <div className="text-[11px] text-subink mt-3">
-              AI 生成内容仅供研究参考,不构成投资建议。回测结果不代表未来收益,实盘交易存在亏损风险。
+            <div className="text-[11px] text-subink mt-4 bg-jilan/10 p-3 rounded-lg border border-line/20 leading-relaxed">
+              ⚠️ <strong>申明：</strong> AI 生成内容仅供研究参考,不构成投资建议。回测结果不代表未来收益,实盘交易存在亏损风险。
             </div>
           </div>
         </>
       )}
-    </>
+    </div>
   );
 }

@@ -22,10 +22,8 @@ ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
+from lake.sources.registry import resolve_source  # noqa: E402
 from lake.sources.exchange import (  # noqa: E402
-    MarginFetcher,
-    NorthboundFetcher,
-    NorthboundIndividualFetcher,
     merge_margin,
     merge_northbound,
     merge_northbound_stock,
@@ -90,14 +88,14 @@ def main():
     }
 
     if do_all or args.margin:
-        fetcher = MarginFetcher(max_workers=args.workers, timeout=30, retries=2)
+        fetcher = resolve_source("margin", max_workers=args.workers, timeout=30, retries=2)
         stats = fetcher.run(keys, skip_existing=args.skip_existing, progress_every=50)
         merged = merge_margin()
         report["margin"] = stats
         report["outputs"]["margin_all"] = "data_lake/capital/margin_all.parquet" if merged is not None else None
 
     if do_all or args.northbound:
-        fetcher = NorthboundFetcher(max_workers=1, timeout=30, retries=2)
+        fetcher = resolve_source("northbound", max_workers=1, timeout=30, retries=2)
         stats = fetcher.run(keys, skip_existing=args.skip_existing, progress_every=20)
         merged = merge_northbound()   # writes to northbound_daily_all.parquet (不覆盖 stock 版)
         report["northbound"] = stats
@@ -105,7 +103,7 @@ def main():
 
     if args.northbound_stock:
         codes = top_liquidity_codes(limit=args.code_limit)
-        fetcher = NorthboundIndividualFetcher(max_workers=args.workers, timeout=30, retries=2)
+        fetcher = resolve_source("northbound_stock", max_workers=args.workers, timeout=30, retries=2)
         stats = fetcher.run(codes, skip_existing=args.skip_existing, progress_every=50)
         merged = merge_northbound_stock()
         report["northbound_stock"] = {

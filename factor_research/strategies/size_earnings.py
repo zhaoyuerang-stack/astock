@@ -7,17 +7,15 @@ Factor: 0.5 × size(60d amount) + 0.5 × net_profit_yoy (z-scored)
 Timing: PureTrend(MA16) × VolTarget(25%/60d)
 Leverage: 1.10x
 """
-from dataclasses import dataclass, asdict
-from pathlib import Path
+from dataclasses import asdict, dataclass
 
 import numpy as np
 import pandas as pd
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from factors.small_cap import small_cap_factor, small_cap_timing
-from factors.utils import safe_zscore, mad_clip
-from lake.load_lake import load_prices, load_raw_close, load_fundamental_panel
-
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
+from factors.composite import size_earnings_factor
+from factors.small_cap import small_cap_timing
+from lake.load_lake import load_fundamental_panel, load_prices, load_raw_close
 
 # ---------------------------------------------------------------------------
 # Config
@@ -52,7 +50,8 @@ def load_price_panels(start="2010-01-01"):
     """Load close/volume/amount panels.  Amount uses unadjusted price."""
     px = load_prices(start=start, fields=("close", "volume"))
     raw = load_raw_close(start=start)
-    amount = px["volume"] * 100 * raw.reindex(index=px["volume"].index, columns=px["volume"].columns)
+    raw = raw.reindex(index=px["volume"].index, columns=px["volume"].columns)
+    amount = px["volume"] * 100 * raw
     close, volume = px["close"], px["volume"]
     # Truncate tail where raw prices lag (causing NaN amount on latest days)
     valid = amount.notna().sum(axis=1)
@@ -71,15 +70,14 @@ def load_price_panels(start="2010-01-01"):
 
 def build_factor(amount, trade_dates, blend_weight=0.5):
     """Build size + NPY blended factor (date×code, z-scored)."""
-    size = small_cap_factor(amount, window=60)
     fund = load_fundamental_panel(trade_dates, codes=None, fields=["net_profit_yoy"])
     npy = fund.get("net_profit_yoy", pd.DataFrame())
-    if npy.empty:
-        # Fallback: pure size if no fundamental data
-        return size
-    npy = npy.reindex(trade_dates).ffill()
-    npy_z = safe_zscore(mad_clip(npy))
-    return safe_zscore(mad_clip(blend_weight * size + (1 - blend_weight) * npy_z))
+    return size_earnings_factor(
+        amount,
+        npy,
+        size_window=60,
+        blend_weight=blend_weight,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -105,8 +103,12 @@ def build_vol_target(close, amount, target_vol=0.25, lookback=60,
 # Weight construction
 # ---------------------------------------------------------------------------
 
-def build_rebalance_weights(factor, close, top_n, rebalance_days):
-    """Convert factor panel to scheduled target weights."""
+def build_rebalance_weights(factor, close, top_n, rebalance_days, *, veto_factor=None, veto_q=0.10):
+    """Convert factor panel to scheduled target weights.
+
+    ``veto_factor`` is a policy-layer VetoFilter applied to the candidate pool
+    before top-N selection (refill from survivors, rebalance-day only).
+    """
     fdates = factor.dropna(how="all").index.intersection(close.index)
     if len(fdates) < 100:
         return {}
@@ -120,6 +122,10 @@ def build_rebalance_weights(factor, close, top_n, rebalance_days):
         f = factor.loc[rd].dropna()
         active = close.loc[rd].dropna().index
         f = f.reindex(active).dropna()
+        if veto_factor is not None:
+            v = veto_factor.loc[rd].reindex(f.index).dropna()
+            if len(v):
+                f = f.reindex(v[v > v.quantile(veto_q)].index).dropna()
         if len(f) < top_n:
             continue
         weights[effective] = pd.Series(1.0 / top_n, index=f.nlargest(top_n).index)
@@ -130,8 +136,9 @@ def build_rebalance_weights(factor, close, top_n, rebalance_days):
 # Strategy execution
 # ---------------------------------------------------------------------------
 
-def run_strategy(config=StrategyConfig()):
+def run_strategy(config=None):
     """Run size-earnings strategy via BacktestEngine."""
+    config = config or StrategyConfig()
     close, volume, amount = load_price_panels(config.start)
     trade_dates = close.index
     prices = PricePanel(close=close, volume=volume, amount=amount)
@@ -182,8 +189,9 @@ def run_strategy(config=StrategyConfig()):
     }
 
 
-def latest_signal(config=StrategyConfig()):
+def latest_signal(config=None):
     """Latest signal for live trading."""
+    config = config or StrategyConfig()
     result = run_strategy(config)
     close = result["close"]
     factor = result["factor"]

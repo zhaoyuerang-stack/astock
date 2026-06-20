@@ -10,6 +10,15 @@ export interface AgentContext {
   risk: string[];
   recommendation: string[];
   nextActions: string[];
+  citations: {
+    source_id: string;
+    source_type: string;
+    title: string;
+    source_path: string;
+    excerpt: string;
+  }[];
+  sourceTypes: string[];
+  suggestedNavigation: string[];
 }
 
 const empty: AgentContext = {
@@ -20,6 +29,9 @@ const empty: AgentContext = {
   risk: [],
   recommendation: [],
   nextActions: [],
+  citations: [],
+  sourceTypes: [],
+  suggestedNavigation: [],
 };
 
 interface AgentState {

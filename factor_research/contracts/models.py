@@ -1,10 +1,17 @@
-"""SPEC §7 八个核心数据模型(Pydantic v2)。
+"""SPEC §7 核心数据模型(Pydantic v2)。
 
-这是产品的 write-schema 契约。Phase 0 完整定义全部 8 个,但只**接线**
-Strategy / ExperimentResult / FactorDefinition 三条;Portfolio / Risk / Control /
-Agent 字段齐全但留后续 Phase 填业务。
+这是产品的 write-schema 契约,但**不是运行时本体的真相源**。
 
 铁律:纯 DTO,不 import 任何业务层。
+
+单一本体来源:Hypothesis / Experiment / ExperimentResult 的运行时本体唯一定义在
+``factory.ontology``(内容哈希冻结 dataclass,被 factory/workflow/knowledge 20+ 文件承重)。
+为消除"两套语言说同一件事",这三个曾在本文件重复定义的 DTO 已删除——需要这些概念时
+一律 import ``factory.ontology``。
+
+本文件现保留:
+  · 尚未接线的产品 write-schema 占位:FactorDefinition / Strategy / PortfolioState
+  · 真实在用的活跃 DTO:ControlAction / AgentOutput / AgentTask
 """
 from __future__ import annotations
 
@@ -12,21 +19,6 @@ from datetime import date, datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
-
-
-# ── §7.1 Hypothesis ────────────────────────────────────────────────────────────
-class Hypothesis(BaseModel):
-    hypothesis_id: str
-    name: str
-    description: str = ""
-    market_assumption: str = ""
-    expected_mechanism: str = ""
-    failure_condition: str = ""
-    related_factors: list[str] = Field(default_factory=list)
-    related_strategies: list[str] = Field(default_factory=list)
-    status: str = "draft"  # draft|testing|validated|rejected|archived
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
 
 
 # ── §7.2 FactorDefinition ──────────────────────────────────────────────────────
@@ -45,41 +37,9 @@ class FactorDefinition(BaseModel):
     created_at: Optional[datetime] = None
 
 
-# ── §7.3 Experiment ────────────────────────────────────────────────────────────
-class Experiment(BaseModel):
-    experiment_id: str
-    name: str
-    hypothesis_id: str = ""
-    factor_id: str = ""
-    strategy_id: str = ""
-    data_version: str = ""
-    code_version: str = ""
-    config_hash: str = ""
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
-    parameters: dict = Field(default_factory=dict)
-    status: str = "pending"  # pending|running|completed|failed|archived
-    owner: str = ""
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-
-
-# ── §7.4 ExperimentResult ──────────────────────────────────────────────────────
-class ExperimentResult(BaseModel):
-    experiment_id: str
-    annual_return: float = 0.0
-    max_drawdown: float = 0.0
-    sharpe: float = 0.0
-    win_rate: float = 0.0
-    ic_mean: float = 0.0
-    rank_ic_mean: float = 0.0
-    ic_ir: float = 0.0
-    long_short_return: float = 0.0
-    turnover: float = 0.0
-    cost_adjusted_return: float = 0.0
-    conclusion: str = ""
-    pass_review: bool = False
-    created_at: Optional[datetime] = None
+# ── §7.3 Experiment / §7.4 ExperimentResult ────────────────────────────────────
+# 运行时本体唯一来源 = factory.ontology.{Experiment, ExperimentResult}(见模块 docstring)。
+# 此处不再重复定义 Pydantic DTO。
 
 
 # ── §7.5 Strategy ──────────────────────────────────────────────────────────────
@@ -129,6 +89,15 @@ class ControlAction(BaseModel):
 
 
 # ── §7.8 AgentTask + §9.4 agent_output ─────────────────────────────────────────
+class AgentCitation(BaseModel):
+    """Knowledge/tool source cited by an Agent answer."""
+    source_id: str = ""
+    source_type: str = ""  # system_manual|rules|runtime|research|ui_context
+    title: str = ""
+    source_path: str = ""
+    excerpt: str = ""
+
+
 class AgentOutput(BaseModel):
     """SPEC §9.4 结构化输出。"""
     summary: str = ""
@@ -136,6 +105,9 @@ class AgentOutput(BaseModel):
     risk: list[str] = Field(default_factory=list)
     recommendation: list[str] = Field(default_factory=list)
     next_actions: list[str] = Field(default_factory=list)
+    citations: list[AgentCitation] = Field(default_factory=list)
+    source_types: list[str] = Field(default_factory=list)
+    suggested_navigation: list[str] = Field(default_factory=list)
     confidence: float = 0.0
     requires_human_confirmation: bool = False
 

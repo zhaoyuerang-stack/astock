@@ -3,6 +3,7 @@
 import type { TradePlanView } from "@/lib/types";
 
 const fmt = (x: number) => x.toLocaleString("zh-CN", { maximumFractionDigits: 0 });
+const shortTime = (x: string) => x ? x.replace("T", " ").slice(0, 19) : "—";
 
 function SideTag({ side }: { side: string }) {
   const buy = side === "BUY" || side === "买入";
@@ -26,6 +27,12 @@ export default function PlanCard({ plan }: { plan: TradePlanView }) {
       {plan.stale && (
         <div className="card text-sm text-warn border border-warn/30">⚠️ {plan.stale_reason}</div>
       )}
+
+      <div className="card text-[12px] text-subink flex flex-wrap gap-x-4 gap-y-1">
+        <span>模拟盘结算日: <b className="text-ink">{plan.account_date || plan.signal_date || "—"}</b></span>
+        <span>本次执行信号: <b className="text-ink">{plan.last_exec_signal_date || "—"}</b></span>
+        <span>视图刷新: <b className="text-ink font-mono">{shortTime(plan.generated_at)}</b></span>
+      </div>
 
       {/* 债券轮动指令卡(P5)—— 最醒目位 */}
       {plan.bond?.active && (
@@ -58,7 +65,7 @@ export default function PlanCard({ plan }: { plan: TradePlanView }) {
 
       {/* 今日成交 */}
       <div className="card">
-        <div className="text-sm font-medium mb-2">📋 今日成交({plan.signal_date})</div>
+        <div className="text-sm font-medium mb-2">📋 今日成交/受阻({plan.account_date || plan.signal_date})</div>
         {plan.executed.length === 0 ? (
           <div className="text-[13px] text-subink">今日无成交({plan.action || "—"})。</div>
         ) : (

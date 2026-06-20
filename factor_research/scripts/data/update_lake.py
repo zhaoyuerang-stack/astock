@@ -14,14 +14,18 @@ import warnings; warnings.filterwarnings("ignore")
 import os, json, argparse
 from pathlib import Path
 from datetime import date, datetime
+from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parents[2]
+_CHINA_TZ = ZoneInfo("Asia/Shanghai")
+def _china_today():
+    return datetime.now(_CHINA_TZ).date()
 os.chdir(ROOT)
 import sys
 sys.path.insert(0, str(ROOT))
 import pandas as pd
 import akshare as ak
-from lake.sources.tencent import TencentDailyFetcher
-from lake.sources.exchange import MarginFetcher, merge_margin
+from lake.sources.registry import resolve_source
+from lake.sources.exchange import merge_margin
 
 LAKE = Path("data_lake")
 MANIFEST = LAKE / "_manifest.json"
@@ -35,24 +39,49 @@ def save_manifest(m):
     MANIFEST.write_text(json.dumps(m, ensure_ascii=False, indent=2))
 
 
+def _is_drift(prev, last_date, fp):
+    """末日不变但指纹变 = 同日数据被改写(漂移),不是正常增量(增量会推进 last_date)。"""
+    return bool(prev and prev.get("last_date") == last_date and prev.get("fingerprint") != fp)
+
+
+def stamp_data_vintage(prev=None):
+    """更新后给价量 close 面板盖内容指纹存 manifest(漂移检测,非快照副本)。
+
+    走 load_prices(含 688 单位归一修复)——重跑指纹不符=数据漂移。
+    若末日不变而指纹变(如 2026-06-12 同日三次重写事故)→ 立即告警。
+    """
+    from lake.load_lake import load_prices
+    from lake.fingerprint import panel_fingerprint
+    close = load_prices(fields=("close",))["close"]
+    fp = panel_fingerprint(close)
+    last = str(close.index[-1].date())
+    if _is_drift(prev, last, fp):
+        print(f"  ⚠️ 数据漂移!末日 {last} 不变但指纹变 ({prev.get('fingerprint')}→{fp})"
+              f"——同日数据被改写,需核查")
+    return {"stamped_at": datetime.now().isoformat(timespec="seconds"),
+            "last_date": last, "shape": list(close.shape), "fingerprint": fp}
+
+
 # ── 价量增量 ──
 def update_prices():
-    daily = LAKE / "price/daily"
-    today = pd.Timestamp(date.today())
-    f = TencentDailyFetcher()
+    from lake.sources.tushare_price import fetch_new_day
+    from lake.compact import compact_prices
+    from lake.invariants import LakeInvariantError
 
-    # ── 发现缺失代码(退市股等)，尝试首次下载 ──
+    daily = LAKE / "price/daily"
+    today = pd.Timestamp(_china_today())
+
+    # ── 新上市/缺失代码：用 Tencent 下载完整历史（逐只，量少不触发 WAF）──
+    f = resolve_source("price_hfq")
     codes_fp = LAKE / "meta/codes.parquet"
     added = 0
     if codes_fp.exists():
         all_codes = set(pd.read_parquet(codes_fp)["code"].tolist())
         existing = {fp.stem for fp in daily.glob("*.parquet")
                     if fp.stem.isdigit() and len(fp.stem) == 6}
-        missing = all_codes - existing
-        # 过滤北交所(920xxx, 腾讯API无数据)
-        missing = {c for c in missing if not c.startswith("92")}
+        missing = {c for c in all_codes - existing if not c.startswith("92")}
         if missing:
-            print(f"[价量] 缺失代码 {len(missing)} 只(退市/停更)，尝试下载...", flush=True)
+            print(f"[价量] 缺失代码 {len(missing)} 只(新上市/退市)，Tencent 下载历史...", flush=True)
             f.start = "2010-01-01"
             for i, code in enumerate(sorted(missing)):
                 try:
@@ -64,40 +93,115 @@ def update_prices():
                     continue
                 if (i + 1) % 50 == 0:
                     print(f"  缺失下载 {i+1}/{len(missing)} (新增{added})", flush=True)
-            if added > 0:
-                print(f"[价量] 新增退市/缺失股 {added} 只", flush=True)
+            if added:
+                print(f"[价量] 新增 {added} 只", flush=True)
 
-    # ── 增量更新已有文件 ──
-    files = sorted(daily.glob("*.parquet"))
-    updated, skipped = 0, 0
-    for i, fp in enumerate(files):
-        df = pd.read_parquet(fp)
-        last = df["date"].max()
-        if last >= today:
-            skipped += 1
-            continue
-        f.start = (last + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+    # ── 找出需要补的交易日（日历 > 当前最新日期）──
+    daily_all_fp = LAKE / "price/daily_all.parquet"
+    cal = pd.to_datetime(
+        pd.read_parquet(LAKE / "meta/trade_calendar.parquet")["date"]
+    ).sort_values()
+
+    # 当前数据的最新交易日
+    if daily_all_fp.exists():
+        latest_ts = pd.to_datetime(
+            pd.read_parquet(daily_all_fp, columns=["date"])["date"]
+        ).max()
+    else:
+        latest_ts = pd.Timestamp("2010-01-01")
+
+    new_dates = cal[(cal > latest_ts) & (cal <= today)].tolist()
+    if not new_dates:
+        print(f"[价量] 已最新({latest_ts.date()}), 无需增量", flush=True)
+        compact_status = "skipped"
+        return {"price_daily": {"last_check": str(date.today()),
+                                "updated": 0, "added_delisted": added,
+                                "compact": compact_status}}
+
+    print(f"[价量] 需补 {len(new_dates)} 个交易日: "
+          f"{new_dates[0].date()} ~ {new_dates[-1].date()}", flush=True)
+
+    # ── 逐日从 tushare 批量拉取（2 次 API/日，全市场）──
+    all_new_rows: list[pd.DataFrame] = []
+    # daily_all 用来提供前日 hfq 收盘基准
+    daily_all_df = (pd.read_parquet(daily_all_fp, columns=["date", "code", "close"])
+                    if daily_all_fp.exists() else pd.DataFrame())
+
+    for i, td in enumerate(new_dates):
+        # 前一交易日（日历里 td 的前一条，或 latest_ts）
+        earlier = cal[cal < td]
+        prev_td = earlier.iloc[-1] if len(earlier) else td - pd.Timedelta(days=1)
+
+        # 前日 hfq 收盘 Series（index=code）
+        if not daily_all_df.empty:
+            prev_slice = daily_all_df[
+                pd.to_datetime(daily_all_df["date"]) == prev_td
+            ]
+        else:
+            prev_slice = pd.DataFrame()
+
+        prev_closes = (prev_slice.set_index("code")["close"]
+                       if not prev_slice.empty else pd.Series(dtype=float))
+
+        print(f"  [价量 {i+1}/{len(new_dates)}] {td.date()} prev={prev_td.date()} "
+              f"基准={len(prev_closes)}只", flush=True)
         try:
-            new = f.fetch_one(fp.stem)
-        except Exception:
+            new_df = fetch_new_day(td, prev_td, prev_closes)
+        except Exception as exc:
+            print(f"  [价量] {td.date()} tushare 失败: {exc}", flush=True)
             continue
-        if new is not None and len(new):
-            merged = (pd.concat([df, new]).drop_duplicates("date")
-                      .sort_values("date").reset_index(drop=True))
-            merged.to_parquet(fp, index=False)
-            updated += 1
-        if (i + 1) % 500 == 0:
-            print(f"  价量 {i+1}/{len(files)} (更新{updated} 跳过{skipped})", flush=True)
-    print(f"[价量] 更新{updated}只, 跳过{skipped}只(已最新)", flush=True)
 
-    # ── 增量更新后重新合并大表(含退市股) ──
-    if updated > 0 or added > 0:
-        print("重新合并 daily_all.parquet ...", flush=True)
-        from lake.compact import compact_prices
-        compact_prices(daily, LAKE / "price/daily_all.parquet")
+        if new_df.empty:
+            print(f"  [价量] {td.date()} 返回空(非交易日?)", flush=True)
+            continue
+
+        all_new_rows.append(new_df)
+        # 更新 daily_all_df 缓存，让下一个新日期能用当日数据作基准
+        daily_all_df = pd.concat(
+            [daily_all_df, new_df[["date", "code", "close"]]],
+            ignore_index=True
+        )
+
+    if not all_new_rows:
+        print("[价量] 无新数据写入", flush=True)
+        return {"price_daily": {"last_check": str(date.today()),
+                                "updated": 0, "added_delisted": added,
+                                "compact": "skipped"}}
+
+    # ── 把新行写入 per-stock parquet ──
+    combined = pd.concat(all_new_rows, ignore_index=True)
+    combined["date"] = pd.to_datetime(combined["date"])
+    updated = 0
+    for code, grp in combined.groupby("code"):
+        fp = daily / f"{code}.parquet"
+        new_rows = grp.drop(columns=["code"]).reset_index(drop=True)
+        if fp.exists():
+            old = pd.read_parquet(fp)
+            old["date"] = pd.to_datetime(old["date"])
+            merged = (pd.concat([old, new_rows])
+                      .drop_duplicates("date")
+                      .sort_values("date")
+                      .reset_index(drop=True))
+        else:
+            merged = new_rows.sort_values("date").reset_index(drop=True)
+        merged.to_parquet(fp, index=False)
+        updated += 1
+
+    print(f"[价量] tushare 增量写入 {updated} 只 × {len(all_new_rows)} 日", flush=True)
+
+    # ── 重建大表 ──
+    compact_status = "skipped"
+    print("重新合并 daily_all.parquet ...", flush=True)
+    try:
+        compact_prices(daily, daily_all_fp)
+        compact_status = "ok"
+    except LakeInvariantError as e:
+        compact_status = f"REJECTED: {e}"
+        print(f"  🚨 大表合并被不变量拒绝(旧 daily_all 保留): {e}", flush=True)
 
     return {"price_daily": {"last_check": str(date.today()),
-                            "updated": updated, "added_delisted": added}}
+                            "updated": updated, "added_delisted": added,
+                            "compact": compact_status}}
 
 
 # ── 财务增量（按报告期补新季度）──
@@ -160,7 +264,7 @@ def update_capital_margin():
     if not keys:
         print("[两融] 已最新，无新交易日", flush=True)
         return {"capital_margin": {"last_check": str(date.today()), "updated_days": 0}}
-    fetcher = MarginFetcher(max_workers=3, timeout=30, retries=2)
+    fetcher = resolve_source("margin", max_workers=3, timeout=30, retries=2)
     stats = fetcher.run(keys, skip_existing=True, progress_every=50)
     merge_margin()
     return {"capital_margin": {"last_check": str(date.today()), "updated_days": stats.get("ok", 0), "empty": stats.get("empty", 0), "error": stats.get("error", 0)}}
@@ -203,5 +307,10 @@ if __name__ == "__main__":
         m.update(update_weekly_monthly())
     if do_all or args.validate:
         m.update(run_validate())
+    if do_all or args.prices:
+        m["data_vintage"] = stamp_data_vintage(m.get("data_vintage"))
     save_manifest(m)
+    vintage = m.get("data_vintage", {})
     print(f"\n增量更新完成，manifest: {MANIFEST}", flush=True)
+    if vintage:
+        print(f"数据指纹: {vintage.get('fingerprint')} (末日 {vintage.get('last_date')})", flush=True)

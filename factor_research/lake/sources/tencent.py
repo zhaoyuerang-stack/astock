@@ -4,10 +4,12 @@ import requests
 import pandas as pd
 from datetime import date
 from lake.base import Fetcher, RateLimiter
+from lake.sources.registry import register
 
 URL = "http://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
 
 
+@register("tencent_daily")
 class TencentDailyFetcher(Fetcher):
     """
     腾讯 fqkline 后复权日线。单次最多640条 → 用END日期往前滚动分批，覆盖到 start。
@@ -51,7 +53,10 @@ class TencentDailyFetcher(Fetcher):
             if not isinstance(node, dict):
                 break
             k = node.get(sym, {})
-            arr = k.get("hfqday") or k.get("day") or []
+            # 铁律:本源是后复权湖,hfqday 缺失时绝不回退 "day"(不复权)——
+            # 静默混口径会把不复权价灌进后复权序列(2026-06-10 全市场假崩盘事故根因)。
+            # 宁可当日缺数等下次更新,不可写入错口径。
+            arr = k.get("hfqday") or []
             if not arr:
                 break
             new = [r for r in arr if r[0] not in seen]

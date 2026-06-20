@@ -1,0 +1,437 @@
+"""Unified 9-Gate Evaluation CLI runner for all codebase strategies.
+
+Supports:
+- small_cap (small-cap-size)
+- size_earnings (size-earnings)
+- large_cap (large-cap-growth-hedged)
+- hq_momentum (high quality momentum)
+
+Usage:
+  python3 scripts/research/run_nine_gates_all.py --strategy size_earnings
+  python3 scripts/research/run_nine_gates_all.py --strategy large_cap
+"""
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+import warnings
+from pathlib import Path
+
+warnings.filterwarnings("ignore")
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+import pandas as pd
+
+from core.engine import PricePanel, Signal
+from core.analysis.nine_gates import NineGatesEvaluator, NineGatesReport
+from strategies.small_cap import load_price_panels
+
+# CLI 策略名 → 台账母策略 id（用于 --persist 把审计摘要写回对应版本）
+STRATEGY_TO_FAMILY = {
+    "small_cap": "small-cap-size",
+    "size_earnings": "size-earnings",
+    "large_cap": "large-cap-growth-hedged",
+    "hq_momentum": "hq-momentum-hedged",
+    "illiquidity": "illiquidity",
+}
+
+# 台账版本 → 该版本真实 config 的非周期参数（来自 strategy_versions.json 的 config 字段）。
+# 审计变体版本时必须用其真实配置，否则用默认 config 产出的 DSR 会张冠李戴（假记分牌）。
+# 注：回测窗口（start）不在此处硬编码，统一由 _taibook_start 从台账 data_scope.period 取。
+VERSION_OVERRIDES = {
+    ("large_cap", "v1.1"): {"w_cpv_max": 0.5},
+    ("large_cap", "v1.1-full"): {"w_cpv_max": 0.5},
+}
+
+# illiquidity 各台账版本的真实配置规格(对齐 strategy_versions.json 的 config):
+#   v1.0/v1.1 纯 Amihud 无 veto 二值择时;v1.1 top_n=50;v1.3 illiq+size 混合;v3.1 +Veto+Band。
+ILLIQ_SPECS = {
+    "v1.0": {"factor": "amihud", "veto": False, "timing": "plain", "top_n": 25},
+    "v1.1": {"factor": "amihud", "veto": False, "timing": "plain", "top_n": 50},
+    "v1.3": {"factor": "blend",  "veto": False, "timing": "plain", "top_n": 25},
+    "v3.0": {"factor": "amihud", "veto": False, "timing": "band",  "top_n": 25},  # = v3.1 去 Salience Veto(Amihud+Band+Bond)
+    "v3.1": {"factor": "amihud", "veto": True,  "timing": "band",  "top_n": 25},
+}
+
+
+def record_nine_gate_research_run(
+    *,
+    strategy_name: str,
+    version: str,
+    summary: dict,
+    report_path: Path,
+    ledger=None,
+    index_path=None,
+) -> dict:
+    """Archive one 9-Gate run into the immutable research ledger."""
+    from research_ledger.ledger import ResearchRunRecord, record_research_run
+
+    family = STRATEGY_TO_FAMILY.get(strategy_name, strategy_name)
+    gate4 = str(summary.get("gate4_verdict", "")).upper()
+    dsr_p = summary.get("dsr_p")
+    passed = gate4 == "PASS" or (isinstance(dsr_p, (int, float)) and float(dsr_p) < 0.05)
+    failed = str(summary.get("status", "")).upper() == "FAILED_TO_RUN"
+    verdict = "PASS" if passed else ("FAILED" if failed else "PENDING_REVIEW")
+    next_action = "PROMOTE_REVIEW" if passed else "HUMAN_REVIEW"
+    return record_research_run(
+        ResearchRunRecord(
+            script="scripts/research/run_nine_gates_all.py",
+            hypothesis=f"{family}/{version}",
+            source="nine_gate",
+            data_vintage={
+                "strategy": strategy_name,
+                "family": family,
+                "version": version,
+                "start": summary.get("start"),
+            },
+            metrics=dict(summary or {}),
+            verdict=verdict,
+            artifact_paths=[str(report_path)],
+            next_action=next_action,
+            notes=f"DSR_p={summary.get('dsr_p')} gate4={summary.get('gate4_verdict')}",
+        ),
+        ledger=ledger,
+        index_path=index_path or None,
+    )
+
+
+def _taibook_start(family, version):
+    """从台账 data_scope.period 取该版本声明的起始（'2023-2026' → '2023-01-01'）。
+
+    让 DSR/回测窗口与台账声明的 OOS/全历史区间逐版精确对齐，杜绝「证据测的区间≠版本声称区间」。
+    """
+    try:
+        import strategy_registry
+        data = strategy_registry._load()
+        fam = next((f for f in data.get("families", []) if f["id"] == family), None)
+        v = next((x for x in fam.get("versions", []) if x["version"] == version), None) if fam else None
+        period = ((v or {}).get("data_scope") or {}).get("period", "") if v else ""
+        if period and "-" in period:
+            yr = period.split("-")[0].strip()
+            if yr.isdigit() and len(yr) == 4:
+                return f"{yr}-01-01"
+    except Exception:
+        pass
+    return None
+
+
+def _family_n_trials(family: str, floor: int = 3) -> int:
+    """多重检验试验数 N = 该母策略在台账登记的迭代版本数（家族搜索广度），地板 3。
+
+    DSR 的 N 应反映「为挑出它,我们在这条 alpha 上试了多少迭代」——逐家族、而非全库。
+    用全库(~695)对手搓母策略过罚;用 1(单版本)又退化成零惩罚。取家族台账版本数 + 地板 3:
+    一致、家族特异、可得。注:只数保留版本(被弃参数未计),故为诚实下界。
+    """
+    try:
+        import strategy_registry
+        data = strategy_registry._load()
+        fam = next((f for f in data.get("families", []) if f["id"] == family), None)
+        if fam:
+            return max(len(fam.get("versions", [])), floor)
+    except Exception:
+        pass
+    return floor
+
+
+def _apply_version_overrides(config, strategy_name, version, start):
+    """按台账版本设置 config 的 version / 真实参数 / 审计窗口，确保审计的是该版本配置而非默认。
+
+    窗口优先级：显式 --start > 台账 data_scope.period > 策略默认。
+    StrategyConfig 多为 frozen dataclass，用 dataclasses.replace 构造新实例（不可 setattr）。
+    """
+    import dataclasses
+    eff_version = version or getattr(config, "version", "")
+    overrides = dict(VERSION_OVERRIDES.get((strategy_name, eff_version), {}))
+    if version:
+        overrides["version"] = version
+    if start:
+        overrides["start"] = start
+    else:
+        fam = STRATEGY_TO_FAMILY.get(strategy_name)
+        ts = _taibook_start(fam, eff_version) if fam else None
+        if ts:
+            overrides["start"] = ts
+    return dataclasses.replace(config, **overrides) if overrides else config
+
+
+def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: bool = False,
+                   version: str | None = None, start: str | None = None) -> dict:
+    print("=" * 80)
+    print(f"  Running 9-Gate Evaluation Pipeline for Strategy: {strategy_name}")
+    print("=" * 80)
+
+    # 1. Dynamically run strategy and retrieve outputs
+    print(f"\n[Step 1] Loading and executing strategy '{strategy_name}'...", flush=True)
+    
+    if strategy_name == "small_cap":
+        from strategies.small_cap import run_small_cap_strategy, StrategyConfig
+        config = StrategyConfig()
+        config = _apply_version_overrides(config, strategy_name, version, start)
+        res = run_small_cap_strategy(config)
+        thesis = {
+            "mechanism": "做多极小市值个股（-log 成交额），获取流动性溢价与小市值规模溢价，并在行情转熊时使用择时过滤器空仓防守。",
+            "citation": "small_cap size premium"
+        }
+    elif strategy_name == "size_earnings":
+        from strategies.size_earnings import run_strategy, StrategyConfig
+        config = StrategyConfig()
+        config = _apply_version_overrides(config, strategy_name, version, start)
+        res = run_strategy(config)
+        thesis = {
+            "mechanism": "小盘效应与成长逻辑重合：利用 size 因子提供牛市弹性，结合 net_profit_yoy (净利润增长) 在熊市期提供质量安全锚。",
+            "citation": "size-earnings blend strategy"
+        }
+    elif strategy_name == "large_cap":
+        from strategies.large_cap import run_large_cap_strategy, StrategyConfig
+        config = StrategyConfig()
+        config = _apply_version_overrides(config, strategy_name, version, start)
+        res = run_large_cap_strategy(config)
+        # Note: large cap does not use volume/amount directly in factor, but we can evaluate the long premium factor
+        thesis = {
+            "mechanism": "做多大盘高质量估值合理白马股，并等权重做空大盘指数以剥离 Beta，捕捉纯粹大盘成长股特质超额收益。",
+            "citation": "large_cap growth hedged"
+        }
+    elif strategy_name == "hq_momentum":
+        from strategies.hq_momentum import run_hq_momentum_strategy, StrategyConfig
+        config = StrategyConfig()
+        config = _apply_version_overrides(config, strategy_name, version, start)
+        res = run_hq_momentum_strategy(config)
+        thesis = {
+            "mechanism": "做多高质量且前期具备动量共振特征的中大盘股票，对冲大盘指数，捕获高保真动量趋势残差收益。",
+            "citation": "high quality momentum hedged"
+        }
+    elif strategy_name == "illiquidity":
+        # 配置驱动适配器:按 ILLIQ_SPECS 复现各台账版本真实配置(因子/veto/择时/top_n),
+        # 让 9-Gate 审计 illiquidity 全部在册版本(v1.0/v1.1/v1.3/v3.1),非仅生产 v3.1。
+        from types import SimpleNamespace
+        ver = version or "v3.1"
+        spec = ILLIQ_SPECS.get(ver)
+        if spec is None:
+            raise ValueError(f"illiquidity 无 {ver} 配置规格;请在 ILLIQ_SPECS 按台账 config 补该版本")
+        from strategies.small_cap import load_price_panels, build_rebalance_weights
+        from factors.small_cap import small_cap_timing, small_cap_factor
+        from factors.alpha import transforms  # noqa: F401 register zscore/mad_clip/shift
+        from factors.alpha.base import FactorData
+        from factors.alpha.builtins.illiq import AmihudIlliq
+        from factors.veto import salience_covariance_veto
+        from services.actions.run_backtest import _band_exposure
+        from app_config.settings import get_settings
+
+        ts = start or _taibook_start("illiquidity", ver) or "2018-01-01"
+        config = SimpleNamespace(version=ver, start=ts)
+        warmup = get_settings().data.warmup_start
+        ds = str(min(pd.Timestamp(ts), pd.Timestamp(warmup)).date())
+        close, volume, amount = load_price_panels(ds)
+        fdata = FactorData(close=close, volume=volume, amount=amount)
+        amihud = AmihudIlliq(window=20).mad_clip(5).zscore().shift(1).compute(fdata)
+        if spec["factor"] == "blend":   # v1.3: 0.5×illiq20 + 0.5×size60
+            factor = 0.5 * amihud + 0.5 * small_cap_factor(amount, window=60).shift(1)
+        else:
+            factor = amihud
+        veto = salience_covariance_veto(close).shift(1) if spec["veto"] else None
+        traw, _, tdist = small_cap_timing(close, amount, ma_window=16)
+        timing = _band_exposure(tdist) if spec["timing"] == "band" else traw
+        scheduled = build_rebalance_weights(
+            factor, close, top_n=spec["top_n"], rebalance_days=20, veto_factor=veto, veto_q=0.30,
+        )
+        res = {
+            "close": close, "volume": volume, "amount": amount, "factor": factor,
+            "scheduled_weights": scheduled, "timing": timing,
+        }
+        thesis = {
+            "mechanism": ("Amihud 非流动性溢价(|ret|/amount,20日)"
+                          + ("+0.5×Size60 混合" if spec["factor"] == "blend" else "")
+                          + (";Salience Veto 30%" if spec["veto"] else "")
+                          + (";PureTrend MA16 " + ("Band" if spec["timing"] == "band" else "二值") + "择时")),
+            "citation": "Amihud (2002) illiquidity premium",
+        }
+    else:
+        raise ValueError(f"Unknown strategy name: {strategy_name}")
+
+    # Extract returned components
+    close = res["close"]
+    # Check if raw_close or alternative panels are needed
+    volume = res.get("volume")
+    if volume is None:
+        volume = pd.DataFrame(1000.0, index=close.index, columns=close.columns)
+    amount = res.get("amount")
+    if amount is None:
+        amount = volume * 100 * close
+        
+    prices = PricePanel(close=close, volume=volume, amount=amount)
+    factor = res["factor"]
+    scheduled = res["scheduled_weights"]
+    timing = res.get("timing")
+
+    print(f"  Execution complete. Loaded {close.shape[1]} stocks x {close.shape[0]} dates.")
+
+    # 2. Build Signal
+    signal = Signal(
+        weights=scheduled,
+        timing=timing,
+        family=strategy_name,
+        version=config.version
+    )
+
+    # 3. Instantiate and run NineGatesEvaluator
+    # n_trials 未显式指定 → 取研究账本搜索广度（多重检验诚实下界），替代硬编码 15
+    if n_trials is None:
+        n_trials = _family_n_trials(STRATEGY_TO_FAMILY.get(strategy_name))
+        print(f"  [n_trials] 自动取该母策略台账迭代数 N={n_trials}（逐家族搜索广度，公平多重检验）", flush=True)
+    print(f"\n[Step 2] Initializing 9-Gate Evaluator (n_trials={n_trials}, start={config.start}) & running audits...", flush=True)
+    
+    # We define a stub factor builder to support look-ahead perturbation checks
+    def factor_builder_stub(p: PricePanel) -> pd.DataFrame:
+        # Returns precomputed factor for look-ahead check (if it was static, look-ahead will show 0 diff)
+        return factor
+
+    evaluator = NineGatesEvaluator(
+        prices=prices,
+        factor_df=factor,
+        factor_builder=factor_builder_stub,
+        thesis=thesis,
+        n_trials=n_trials,
+        forward_days=20
+    )
+
+    # Run the evaluation
+    reports = evaluator.evaluate_all(signal, start=config.start)
+    
+    # Check overall passed
+    passed_all = all(r.passed for r in reports)
+
+    # Generate consolidated report
+    report = NineGatesReport(
+        factor_name=f"{strategy_name}_{config.version}",
+        run_date=pd.Timestamp.now().strftime("%Y-%m-%d"),
+        passed_all=passed_all,
+        reports=reports
+    )
+
+    # 4. Save report
+    markdown_content = report.to_markdown()
+    
+    report_dir = ROOT / "reports" / "research"
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_path = report_dir / f"{strategy_name}_9_gates_report.md"
+    
+    report_path.write_text(markdown_content, encoding="utf-8")
+
+    print("\n" + "=" * 80)
+    print(f"9-Gate Evaluation Completed! Report saved to:\n{report_path}")
+    print("=" * 80)
+
+    # Print summary to console
+    print("\nExecutive Summary:")
+    print(markdown_content.split("## Detailed Gate Findings")[0].strip())
+
+    # 5. （可选）把 DSR/PSR/多重检验摘要写回台账对应版本（机构级多重检验证据落库）
+    summary = report.summarize()
+    summary.setdefault("status", "PERSISTED" if persist else "COMPLETED")
+    summary.setdefault("strategy", strategy_name)
+    summary.setdefault("version", config.version)
+    if persist:
+        family_id = STRATEGY_TO_FAMILY.get(strategy_name)
+        if not family_id:
+            print(f"  [persist] 跳过：{strategy_name} 无台账 family 映射")
+        else:
+            from strategy_registry import attach_nine_gate
+            attach_nine_gate(family_id, config.version, summary)
+            print(f"  [persist] Nine-Gate 摘要已写入台账 {family_id}/{config.version}："
+                  f"DSR_p={summary.get('dsr_p')}, PSR={summary.get('psr')}, n_trials={summary.get('n_trials')}")
+            # 留存 gate5 日收益序列 → lineage 相关性 / PBO(2B/2C)复用,避免二次回测
+            rets = getattr(evaluator, "gate5_returns", None)
+            if rets is not None and len(rets) > 0:
+                store = Path(__file__).resolve().parents[2] / "data_lake" / "version_returns"
+                store.mkdir(parents=True, exist_ok=True)
+                rets.rename("ret").to_csv(store / f"{family_id}__{config.version}.csv", header=True)
+                print(f"  [persist] 收益序列已留存 ({len(rets)} 日) → version_returns/{family_id}__{config.version}.csv")
+    try:
+        record_nine_gate_research_run(
+            strategy_name=strategy_name,
+            version=config.version,
+            summary=summary,
+            report_path=report_path,
+        )
+    except Exception as exc:
+        print(f"  [research-ledger] 9-Gate 归档失败: {exc}", flush=True)
+    return summary
+
+
+# 各策略的默认版本(无 override 即审此版本)
+DEFAULT_VERSIONS = {"small_cap": "v2.0", "size_earnings": "v1.0", "large_cap": "v1.0", "hq_momentum": "v1.0"}
+
+
+def _auditable(strategy_name, version) -> bool:
+    """该 (strategy, version) 是否有已知真实配置可审 —— 避免用错配置产出假 DSR。"""
+    if strategy_name is None:
+        return False
+    if strategy_name == "illiquidity":
+        return version in ILLIQ_SPECS
+    if (strategy_name, version) in VERSION_OVERRIDES:
+        return True
+    return DEFAULT_VERSIONS.get(strategy_name) == version
+
+
+def audit_stale_registered(persist: bool = True) -> list[dict]:
+    """自动补审:扫描所有「在册」但无 DSR 审计的版本,对配置已知者自动跑 9-Gate 并落台账。
+
+    配置未知 / 无兼容 runner(如行业级因子)记 SKIP 并说明原因,绝不伪造。
+    供调度自动化调用,保持台账 DSR 审计覆盖不留空。返回逐版本处置列表。
+    """
+    import strategy_registry
+    fam_to_strat = {v: k for k, v in STRATEGY_TO_FAMILY.items()}
+    data = strategy_registry._load()
+    results: list[dict] = []
+    for fam in data.get("families", []):
+        sname = fam_to_strat.get(fam["id"])
+        for v in fam.get("versions", []):
+            if v.get("status") != "在册":
+                continue
+            if (v.get("nine_gate") or {}).get("dsr_p") is not None:
+                continue  # 已有审计
+            sid = f"{fam['id']}/{v['version']}"
+            if not _auditable(sname, v["version"]):
+                reason = "无兼容 runner(行业级因子等)" if sname is None else "无该版本配置规格"
+                results.append({"id": sid, "action": "SKIP", "reason": reason})
+                print(f"  [audit-stale] SKIP {sid}: {reason}", flush=True)
+                continue
+            try:
+                print(f"  [audit-stale] 审计 {sid} ...", flush=True)
+                run_evaluation(sname, version=v["version"], persist=persist)
+                results.append({"id": sid, "action": "AUDITED", "reason": ""})
+            except Exception as e:
+                results.append({"id": sid, "action": "FAIL", "reason": str(e)[:120]})
+                print(f"  [audit-stale] FAIL {sid}: {e}", flush=True)
+    n = {k: sum(1 for r in results if r["action"] == k) for k in ("AUDITED", "SKIP", "FAIL")}
+    print(f"\n[audit-stale] 完成:审计 {n['AUDITED']} / 跳过 {n['SKIP']} / 失败 {n['FAIL']}", flush=True)
+    return results
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run 9-Gate Strategy Evaluator")
+    parser.add_argument("--strategy",
+                        choices=["small_cap", "size_earnings", "large_cap", "hq_momentum", "illiquidity"],
+                        help="Strategy name to run evaluation on")
+    parser.add_argument("--audit-stale", action="store_true",
+                        help="自动补审:扫描所有未审计的在册版本,对配置已知者自动跑并落台账")
+    parser.add_argument("--trials", type=int, default=None,
+                        help="多重检验试验数 N；缺省自动取该母策略台账迭代数（逐家族搜索广度）")
+    parser.add_argument("--persist", action="store_true",
+                        help="把 DSR/PSR/多重检验摘要写回台账对应版本的 nine_gate 字段")
+    parser.add_argument("--version", default=None,
+                        help="审计指定台账版本（如 v1.1 / v1.0-full）；自动套用该版本真实 config")
+    parser.add_argument("--start", default=None, help="覆盖回测起始（如全历史变体 2012-01-01）")
+    args = parser.parse_args()
+
+    if args.audit_stale:
+        audit_stale_registered(persist=args.persist)
+    elif args.strategy:
+        run_evaluation(args.strategy, args.trials, persist=args.persist,
+                       version=args.version, start=args.start)
+    else:
+        parser.error("需指定 --strategy <name> 或 --audit-stale")

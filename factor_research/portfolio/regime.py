@@ -157,3 +157,44 @@ def defensive_grade(
         "bear_ok": bear_ok,
         "corr_ok": corr_ok,
     }
+
+
+def calculate_regime_confidence(
+    returns: pd.Series,
+    regimes: pd.Series,
+    window: int = 20
+) -> pd.Series:
+    """Calculate the confidence score (0 to 1) for the current market regime.
+
+    Uses rolling regime persistence over a window. If the regime is flipping frequently,
+    confidence is low.
+    """
+    # Persistence: fraction of last N days where regime was same as yesterday
+    same_reg = (regimes == regimes.shift(1)).astype(float)
+    persistence = same_reg.rolling(window, min_periods=5).mean()
+    return persistence.fillna(0.5).clip(0.0, 1.0)
+
+
+class PolicyEngine:
+    """Institutional Risk Budget Policy Engine.
+
+    Adjusts risk boundaries and leverage maximums depending on regime and confidence.
+    """
+    def __init__(self, default_max_exposure: float = 1.25):
+        self.default_max_exposure = default_max_exposure
+
+    def get_max_exposure(self, regime: str, confidence: float) -> float:
+        """Determine max allowable equity exposure."""
+        r = regime.lower()
+        if r in ["bear", "panic"]:
+            if confidence > 0.8:
+                return 0.30
+            elif confidence > 0.5:
+                return 0.60
+            else:
+                return 0.90
+        elif r == "chop":
+            if confidence > 0.7:
+                return 0.80
+            return 1.00
+        return self.default_max_exposure

@@ -1,4 +1,6 @@
 """Strategy lifecycle: status enum, valid transitions, gate conditions."""
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
 
@@ -50,3 +52,4 @@ def should_retire(monitor_metrics: MonitorMetrics) -> bool | str:
     if monitor_metrics.ic_decayed:
         return "因子 IC 归零或反转"
     return False
+

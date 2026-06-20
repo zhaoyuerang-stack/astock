@@ -2,9 +2,10 @@
 元数据构建：股票列表 / 交易日历 / 上市日
 （交易日历和上市日依赖价量数据，下载完成后执行）
 """
-import akshare as ak
 import pandas as pd
 from pathlib import Path
+
+import akshare as ak
 
 META = Path("data_lake/meta")
 META.mkdir(parents=True, exist_ok=True)
@@ -35,6 +36,79 @@ def build_calendar():
     pd.DataFrame({"date": cal}).to_parquet(META / "trade_calendar.parquet", index=False)
     print(f"[meta] 交易日历: {len(cal)} 个交易日 {cal.min().date()}~{cal.max().date()}")
     return cal
+
+
+def rebuild_trade_calendar_from_prices(
+    *,
+    root: Path | str = Path("."),
+    anchors: list[str] | None = None,
+    min_anchor_count: int = 5,
+) -> pd.Timestamp | None:
+    """Rebuild ``data_lake/meta/trade_calendar.parquet`` from anchor price files.
+
+    This is the sanctioned write path used by production scheduling. Keeping
+    the parquet write in ``lake`` prevents ops scripts from directly mutating
+    core lake metadata.
+    """
+    from collections import Counter
+
+    root = Path(root)
+    anchors = anchors or ["600519", "601398", "000001", "600036", "600000", "601988"]
+    counter = Counter()
+    for code in anchors:
+        fp = root / "data_lake" / "price" / "daily" / f"{code}.parquet"
+        if fp.exists():
+            counter.update(pd.read_parquet(fp, columns=["date"])["date"].tolist())
+    if not counter:
+        return None
+    cal = pd.DatetimeIndex(sorted(date for date, count in counter.items() if count >= min_anchor_count))
+    if not len(cal):
+        return None
+    out = root / "data_lake" / "meta" / "trade_calendar.parquet"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({"date": cal}).to_parquet(out, index=False)
+    return cal.max()
+
+
+def update_trade_calendar(*, root: Path | str = Path(".")) -> dict:
+    """从 tushare 更新交易日历到最新（trade_cal 接口，2000积分可用）。
+    日历过时会导致 update_prices() 不知道新交易日从而跳过更新。
+    """
+    from lake.sources.tushare import call
+    root = Path(root)
+    cal_fp = root / "data_lake" / "meta" / "trade_calendar.parquet"
+    if not cal_fp.exists():
+        return {"ok": False, "error": "calendar file not found"}
+
+    old_cal = pd.read_parquet(cal_fp)
+    old_cal["date"] = pd.to_datetime(old_cal["date"])
+    old_max = old_cal["date"].max()
+    today = pd.Timestamp.now().normalize()
+
+    # 只在日历比今天旧时才更新
+    if old_max >= today:
+        print(f"[calendar] 已最新({old_max.date()})", flush=True)
+        return {"ok": True, "latest": str(old_max.date()), "updated": False}
+
+    today_str = today.strftime("%Y%m%d")
+    df = call("trade_cal", {
+        "exchange": "SSE",
+        "start_date": old_max.strftime("%Y%m%d"),
+        "end_date": today_str,
+        "is_open": "1",
+    }, fields="cal_date")
+
+    if df.empty:
+        return {"ok": True, "latest": str(old_max.date()), "updated": False}
+
+    df["date"] = pd.to_datetime(df["cal_date"])
+    new_cal = (pd.concat([old_cal, df[["date"]]])
+               .drop_duplicates("date").sort_values("date").reset_index(drop=True))
+    new_cal.to_parquet(cal_fp, index=False)
+    new_max = new_cal["date"].max()
+    added = len(new_cal) - len(old_cal)
+    print(f"[calendar] 更新: {old_max.date()} → {new_max.date()} (+{added}个交易日)", flush=True)
+    return {"ok": True, "latest": str(new_max.date()), "updated": True, "added": added}
 
 
 def build_list_dates():

@@ -14,10 +14,25 @@ LAKE = Path(__file__).parent.parent / "data_lake"
 
 
 # ── 价量面板 ──
+def _normalize_star_volume(panels: dict) -> dict:
+    """科创板(688)volume 原始单位是**股**,主板/创业板是**手**——除以 100 归一到手,
+    使 `amount = volume×100×raw` 对全市场一致(LESSONS 2026-06-14:688 amount 曾被放大 100x,
+    寒武纪 688256 显示 17734亿/日 物理不可能;÷100 后 177亿 与真实一致)。
+    创业板 300 不受影响(volume 已是手)。
+    """
+    if "volume" in panels and not panels["volume"].empty:
+        v = panels["volume"]
+        star = [c for c in v.columns if str(c).startswith("688")]
+        if star:
+            v.loc[:, star] = v.loc[:, star] / 100.0
+    return panels
+
+
 def load_prices(codes=None, start="2010-01-01", fields=("close", "volume", "amount")):
     """加载日线 → {field: date×code 宽表}。
 
     优先读取 daily_all.parquet（大表），不存在则 fallback 到逐只文件。
+    科创板(688)volume 单位修正:见 _normalize_star_volume。
     """
     all_fp = LAKE / "price/daily_all.parquet"
     if all_fp.exists():
@@ -28,7 +43,7 @@ def load_prices(codes=None, start="2010-01-01", fields=("close", "volume", "amou
         if codes:
             df = df[df["code"].isin(codes)]
         df = repair_ohlc(apply_quarantine(df))   # 确定性清洗(隔离坏数据 + OHLC 自洽)
-        return {f: df.pivot(index="date", columns="code", values=f) for f in fields}
+        return _normalize_star_volume({f: df.pivot(index="date", columns="code", values=f) for f in fields})
 
     # fallback: 逐只 parquet
     daily = LAKE / "price/daily"
@@ -44,7 +59,7 @@ def load_prices(codes=None, start="2010-01-01", fields=("close", "volume", "amou
     long = pd.concat(frames, ignore_index=True)
     long = long[long["date"] >= pd.Timestamp(start)]
     long = repair_ohlc(apply_quarantine(long))   # 确定性清洗
-    return {f: long.pivot(index="date", columns="code", values=f) for f in fields}
+    return _normalize_star_volume({f: long.pivot(index="date", columns="code", values=f) for f in fields})
 
 
 from lake.schema import FUNDAMENTAL_FIELDS
@@ -166,6 +181,137 @@ def load_capital_panel(trade_dates, codes=None, start="2010-01-01", fields=CAPIT
         aligned = pivot.reindex(pivot.index.union(trade_idx)).sort_index().shift(1).reindex(trade_idx)
         panels[f] = aligned.reindex(columns=codes)
     return panels
+
+
+# ── 每日指标(tushare daily_basic:市值/股本/换手/估值)──
+from lake.schema import DAILY_BASIC_FIELDS
+
+
+def load_daily_basic_panel(trade_dates, codes=None, fields=DAILY_BASIC_FIELDS):
+    """加载 daily_basic → {field: date×code 面板}。
+
+    市值/换手/估值是**价格衍生当日量**(total_mv=total_share×close_T,T 日收盘已知),
+    与 close/amount 同口径,**不 shift**(区别于财务/资金面的 ffill+shift)。
+    ts_code(600519.SH)归一为 code(600519)。
+    """
+    fp = LAKE / "daily_basic/daily_basic_all.parquet"
+    trade_idx = pd.DatetimeIndex(trade_dates)
+    if not fp.exists():
+        return {f: pd.DataFrame(index=trade_idx, columns=codes, dtype=float) for f in fields}
+    cols = ["ts_code", "trade_date"] + [f for f in fields]
+    df = pd.read_parquet(fp, columns=cols)
+    return pivot_daily_basic(df, trade_idx, fields, codes)
+
+
+def pivot_daily_basic(df, trade_idx, fields, codes=None):
+    """daily_basic 长表(ts_code/trade_date/<fields>)→ {field: date×code}。纯函数,可测。"""
+    df = df.copy()
+    df["date"] = pd.to_datetime(df["trade_date"].astype(str))
+    df["code"] = df["ts_code"].str.split(".").str[0]
+    if codes:
+        df = df[df["code"].isin(codes)]
+    panels = {}
+    for f in fields:
+        pivot = df.pivot_table(index="date", columns="code", values=f, aggfunc="last")
+        panels[f] = pivot.reindex(trade_idx).reindex(columns=codes) if codes else pivot.reindex(trade_idx)
+    return panels
+
+
+# ── 财务指标(tushare fina_indicator:杠杆/质量/成长)──
+from lake.schema import FINA_INDICATOR_FIELDS
+
+
+def ffill_by_anndate(df, fields, trade_idx, codes=None):
+    """财报长表(ts_code/ann_date/<fields>)→ {field: date×code},公告日生效 ffill。
+
+    防未来铁律:用 ann_date(公告日)作生效日,ffill 到交易日 → T 日只用 T 日前已公告。
+    纯函数,可测。
+    """
+    df = df.dropna(subset=["ann_date"]).copy()
+    df["code"] = df["ts_code"].str.split(".").str[0]
+    df["avail"] = pd.to_datetime(df["ann_date"].astype(str))
+    if codes:
+        df = df[df["code"].isin(codes)]
+    panels = {}
+    for f in fields:
+        if f not in df.columns:
+            continue
+        sub = (df[["avail", "code", f]].dropna()
+               .sort_values("avail").drop_duplicates(["code", "avail"], keep="last"))
+        if sub.empty:
+            panels[f] = pd.DataFrame(index=trade_idx, columns=codes, dtype=float)
+            continue
+        pivot = sub.pivot_table(index="avail", columns="code", values=f, aggfunc="last")
+        panels[f] = pivot.reindex(pivot.index.union(trade_idx)).ffill().reindex(trade_idx)
+        if codes:
+            panels[f] = panels[f].reindex(columns=codes)
+    return panels
+
+
+def load_fina_indicator_panel(trade_dates, codes=None, fields=FINA_INDICATOR_FIELDS):
+    """加载 fina_indicator → {field: date×code},公告日 ffill(防未来)。"""
+    fp = LAKE / "financials/fina_indicator_all.parquet"
+    trade_idx = pd.DatetimeIndex(trade_dates)
+    if not fp.exists():
+        return {f: pd.DataFrame(index=trade_idx, columns=codes, dtype=float) for f in fields}
+    df = pd.read_parquet(fp)
+    return ffill_by_anndate(df, fields, trade_idx, codes)
+
+
+# ── Tushare 扩展维度统一加载入口(by_date 当日对齐 / anndate 公告日 ffill)──
+from lake.schema import TUSHARE_DATASETS
+
+
+def load_tushare_panel(dataset, trade_dates, fields=None, codes=None):
+    """统一加载任一 tushare 扩展维度 → {field: date×code}。
+
+    口径自动按数据集选择(见 TUSHARE_DATASETS):
+      by_date  价格/资金/市场当日量 → pivot 对齐,不 shift
+      anndate  财务/事件公告 → ann_date 公告日 ffill(防未来)
+    """
+    if dataset not in TUSHARE_DATASETS:
+        raise KeyError(f"未知 dataset {dataset};可选 {list(TUSHARE_DATASETS)}")
+    store, mode, default_fields = TUSHARE_DATASETS[dataset]
+    fields = fields or default_fields
+    fp = LAKE / store
+    trade_idx = pd.DatetimeIndex(trade_dates)
+    if not fp.exists():
+        return {f: pd.DataFrame(index=trade_idx, columns=codes, dtype=float) for f in fields}
+    df = pd.read_parquet(fp)
+    if mode == "by_date":
+        return pivot_daily_basic(df, trade_idx, fields, codes)
+    return ffill_by_anndate(df, fields, trade_idx, codes)
+
+
+# ── 宏观时序层(市场级单时序,防未来 lag)──
+def align_macro(df, trade_idx):
+    """宏观长表 → 对齐到交易日(防未来)。纯函数,可测。
+
+    monthly(含 'month' 列):参考月 M 的值 **M+2 月初才可见**(发布滞后,保守安全),ffill。
+    daily(含 'date'/'trade_date'):当日对齐(利率/北向 EOD 已知),ffill。
+    """
+    df = df.copy()
+    if "month" in df.columns:
+        m = pd.to_datetime(df["month"].astype(str), format="%Y%m")
+        df = df.drop(columns=["month"])
+        df.index = m + pd.offsets.MonthBegin(2)          # 防未来:M+2 月初可见
+    else:
+        dcol = "trade_date" if "trade_date" in df.columns else "date"
+        df.index = pd.to_datetime(df[dcol].astype(str))
+        df = df.drop(columns=[dcol])
+    df = df.apply(pd.to_numeric, errors="coerce").sort_index()
+    df = df[~df.index.duplicated(keep="last")]
+    return df.reindex(df.index.union(trade_idx)).ffill().reindex(trade_idx)
+
+
+def load_macro(name, trade_dates, fields=None):
+    """加载宏观时序 → date×field(防未来对齐)。name: cn_cpi/cn_ppi/cn_m/shibor/moneyflow_hsgt。"""
+    fp = LAKE / "macro" / f"{name}.parquet"
+    trade_idx = pd.DatetimeIndex(trade_dates)
+    if not fp.exists():
+        return pd.DataFrame(index=trade_idx)
+    out = align_macro(pd.read_parquet(fp), trade_idx)
+    return out[[c for c in fields if c in out.columns]] if fields else out
 
 
 # ── 一站式加载 ──

@@ -12,7 +12,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from contracts.views import FunnelView, HypothesisView, RegisteredExperimentView
+from contracts.views import FunnelView, HypothesisView, RegisteredExperimentView, ResearchRunIndexView
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -96,3 +96,10 @@ def registered_experiments() -> list[RegisteredExperimentView]:
             data_scope=v.get("data_scope", {}) if isinstance(v.get("data_scope"), dict) else {},
         ))
     return out
+
+
+def research_run_index() -> ResearchRunIndexView:
+    """Recent research conclusions archived from research_ledger."""
+    from research_ledger.ledger import load_research_run_index
+
+    return ResearchRunIndexView(**load_research_run_index())

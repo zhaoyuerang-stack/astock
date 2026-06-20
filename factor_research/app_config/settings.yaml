@@ -1,5 +1,5 @@
 # 全局配置 — 与 app_config/settings.py 中的 dataclass 默认值保持一致。
-# 这里的值是当前生产实际生效的值(illiquidity v3.0 LIVE)。
+# 这里的值是当前生产实际生效的值(illiquidity v3.1，registry 状态=在册)。
 # 修改后无需改动代码,Settings.from_yaml() 会读取此文件。
 
 cost:
@@ -9,7 +9,7 @@ cost:
 
 strategy:
   family: illiquidity
-  version: v3.0
+  version: v3.1
   start: "2018-01-01"
   size_window: 60
   timing_ma: 16
@@ -39,10 +39,10 @@ risk_policy:
 # Agent LLM —— 切模型只改这里(无 key/无配置 → 规则式 NullAdapter)。
 # LLM 只做"路由+解读",永不执行工具/下单(不越权门在 planner)。
 ai_model:
-  provider: none            # none | anthropic | openai_compatible
-  model: ""                 # deepseek-chat / qwen-max / claude-opus-4-8 / gpt-4o / glm-4 / kimi-k2 …
-  base_url: ""              # openai_compatible 必填
-  api_key_env: ANTHROPIC_API_KEY   # 从哪个环境变量读 key
+  provider: openai_compatible  # 便宜模型干苦力(候选生成);判断在确定性代码(Alpha Audit/回测),不靠 LLM
+  model: deepseek-v4-flash     # DeepSeek:候选生成性价比高,大批量低风险
+  base_url: https://api.deepseek.com/v1
+  api_key_env: DEEPSEEK_API_KEY    # 运行时配置(data_lake/agent/llm_config.json,已 gitignore)的 key 优先;否则读此环境变量;均无 → 退规则式
   # 示例:
   #  DeepSeek : provider=openai_compatible model=deepseek-chat base_url=https://api.deepseek.com/v1 api_key_env=DEEPSEEK_API_KEY
   #  通义Qwen : provider=openai_compatible model=qwen-max  base_url=https://dashscope.aliyun.com/compatible-mode/v1 api_key_env=DASHSCOPE_API_KEY
@@ -51,3 +51,12 @@ ai_model:
   #  Ollama本地: provider=openai_compatible model=qwen2.5 base_url=http://localhost:11434/v1 api_key_env=OLLAMA_KEY(任填)
   #  OpenAI   : provider=openai_compatible model=gpt-4o base_url=https://api.openai.com/v1 api_key_env=OPENAI_API_KEY
   #  Anthropic: provider=anthropic model=claude-opus-4-8 api_key_env=ANTHROPIC_API_KEY
+
+# 运维告警(scripts/ops/notify.py)。桌面通知零依赖开箱即用。
+# 远程通道(Bark 手机推送/邮件)密钥走 gitignored data_lake/agent/notify_config.json,
+# 绝不写此文件(settings.yaml 进 git);示例见 notify.py docstring。
+notify:
+  desktop: true                    # macOS 桌面通知(设 false 则只写 Obsidian)
+  obsidian: true                   # 写入 Obsidian: 30.output/2.[A]inbox/ai_data/日更告警_YYYY-MM.md(按月滚动 append)
+  alert_on: [failed, partial_ok]   # 哪些日更 status 触发告警(ok 不打扰)
+  recovery: true                   # 失败后转 ok 时发"已恢复"通知

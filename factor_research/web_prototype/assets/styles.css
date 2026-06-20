@@ -345,6 +345,44 @@ a {
   font-weight: 650;
 }
 
+.readiness-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 18px;
+}
+
+.readiness-grid h3 {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.readiness-grid h3 + .reason-list,
+.readiness-grid h3 + .muted {
+  margin-bottom: 14px;
+}
+
+.reason-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reason-list span {
+  min-height: 28px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .target-row {
   display: grid;
   grid-template-columns: 110px minmax(0, 1fr) 90px;
@@ -739,6 +777,7 @@ code {
   .split,
   .live-summary,
   .performance-grid,
+  .readiness-grid,
   .registry-card {
     display: grid;
     grid-template-columns: 1fr;

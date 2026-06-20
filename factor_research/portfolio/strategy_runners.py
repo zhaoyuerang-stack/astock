@@ -149,18 +149,39 @@ LIVE_STRATEGIES = {
         ),
     },
     "gov_bond_etf_511010.MA60": {
-        "desc": "国债 ETF 511010 + MA60 趋势 + 1.0x (跨资产, 三关全过 2026-06-08 入 SHADOW)",
-        "status": "SHADOW",
-        "shadow_since": "2026-06-08",
-        "shadow_reason": "三关验证全过 (WF MA10-60 plateau, 9/9 年 sh 改善, 5 个极端期防御)。SHADOW 30 日观察实盘后决定 weight",
-        "marginal_sharpe": +0.65,    # 实测加入 baseline 组合 Δsh +0.65 (Phase 2.2 audit)
+        "desc": "国债 ETF 511010 + MA60 趋势 + 1.0x (跨资产防御腿, 2026-06-14 转 ACTIVE)",
+        "role": "defensive",
+        # 2026-06-14 SHADOW→ACTIVE:跨资产腿搜索证无条件正边际(Δsh +0.64、逐年皆正、
+        # 牛年不拖、corr -0.09),区别于 hedged-equity 的 regime 条件正边际。
+        # 组合须用 equal_weight(compose 默认),禁 vanilla risk_parity(低波债券会被灌满权重→年化崩)。
+        "status": "ACTIVE",
+        "active_since": "2026-06-14",
+        "marginal_sharpe": +0.64,
         "validation": {
             "wf_oos_positive_years": "6/6",
-            "wf_avg_sh": 2.19,
+            "yearly_all_positive": True,
             "stress_period_defense": "5/5",
             "corr_to_a_stocks": -0.09,
+            "compose_caveat": "equal_weight only; risk_parity 退化为债券基金(年化崩到 8.9%)",
         },
         "fn": lambda start: _run_etf_trend("511010", ma=60, start=start),
+    },
+    "gold_etf_518880.MA60": {
+        "desc": "黄金 ETF 518880 + MA60 趋势 + 1.0x (第二防御腿, 2026-06-14 转 ACTIVE)",
+        "role": "defensive",
+        # 2026-06-14 SHADOW→ACTIVE:跨资产腿搜索 Δsh +0.37、corr -0.005、崩盘日 +7‱
+        #(全场最强尾部对冲)、2018 +3.7%;与国债正交(国债平时稳/黄金治尾部)。
+        "status": "ACTIVE",
+        "active_since": "2026-06-14",
+        "marginal_sharpe": +0.37,
+        "validation": {
+            "corr_to_book": -0.005,
+            "ret_2018": 0.037,
+            "down_capture_strongest": True,
+            "standalone_sharpe": 1.02,
+            "compose_caveat": "equal_weight only; risk_parity 灌满低波资产",
+        },
+        "fn": lambda start: _run_etf_trend("518880", ma=60, start=start),
     },
     "size-earnings.v1.0": {
         "desc": "size60 + NPY blend λ=0.5 + PT-MA16 × VolTarget(25%) + Lev1.10x (2026-06-07 转 SHADOW)",
@@ -208,3 +229,9 @@ def active_strategies() -> list[str]:
 def shadow_strategies() -> list[str]:
     """返回 SHADOW 策略名列表."""
     return [n for n, s in LIVE_STRATEGIES.items() if s.get("status") == "SHADOW"]
+
+
+def defensive_strategies() -> set[str]:
+    """返回 role=defensive 的 ACTIVE 腿(跨资产防御腿),供 compose(method='capped') 封顶权重。"""
+    return {n for n, s in LIVE_STRATEGIES.items()
+            if s.get("role") == "defensive" and s.get("status", "ACTIVE") == "ACTIVE"}

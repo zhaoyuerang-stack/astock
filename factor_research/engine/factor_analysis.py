@@ -27,7 +27,9 @@ def calc_ic(factor: pd.DataFrame, forward_ret: pd.DataFrame, method: str = "rank
         if len(common) < 30:
             continue
         fv, rv = f[common].values, r[common].values
-        if method == "rank":
+        if np.nanstd(fv) == 0 or np.nanstd(rv) == 0:
+            ic = np.nan
+        elif method == "rank":
             ic, _ = spearmanr(fv, rv)
         else:
             ic = np.corrcoef(fv, rv)[0, 1]
@@ -44,6 +46,34 @@ def ic_summary(ic: pd.Series) -> dict:
         "|IC|>0.02_ratio": (ic.abs() > 0.02).mean(),
         "count": len(ic),
     }
+
+
+def newey_west_icir(daily_ic, max_lag: int | None = None) -> float:
+    """Newey-West 重叠校正的 ICIR(Bartlett 核长期方差作分母)。
+
+    horizon>1 的 IC 序列因每日重叠强自相关——同一信息被重复计入,raw ICIR=mean/std
+    的分母被压低,系统性虚高(全市场 h=20 实测 raw/nw≈3.5x,见 LESSONS 2026-06-14)。
+    NW 用长期方差给出诚实绝对量级。max_lag 按 **IC 序列**自相关长度(≈horizon)设,
+    不按因子不变天数设(两者差一个数量级)。机制 port 自第二系统 src/eval/overlap.py
+    (结论本地重算,见 auto-memory)。
+    """
+    ic = np.asarray(daily_ic, dtype=float)
+    ic = ic[~np.isnan(ic)]
+    n = len(ic)
+    if n < 2:
+        return float("nan")
+    if max_lag is None:
+        max_lag = int(n ** 0.25)
+    max_lag = max(1, min(max_lag, n - 1))
+    mean = ic.mean()
+    var = ic.var()
+    lr_var = var  # lag 0
+    for lag in range(1, max_lag + 1):
+        w = 1.0 - lag / (max_lag + 1)  # Bartlett 权重
+        ac = np.corrcoef(ic[:-lag], ic[lag:])[0, 1]
+        if not np.isnan(ac):
+            lr_var += 2 * w * ac * var
+    return abs(mean) / np.sqrt(max(lr_var, 1e-12))
 
 
 def stratify_return(

@@ -6,20 +6,21 @@ run backtest across smoothing windows, and Walk-Forward validate.
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/ah_premium_full.py
 """
-import os, sys, time, json, urllib.request
+import os, sys, time
 from pathlib import Path
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np, pandas as pd
 from scipy.stats import spearmanr
 
 ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT); sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import load_price_panels, backtest_weights, StrategyConfig
+from core.engine import BacktestConfig, BacktestEngine, PricePanel, Signal
+from strategies.small_cap import load_price_panels
 from factors.small_cap import small_cap_factor
+from scripts.data.hk_daily import HK_DIR, close_series, load_or_fetch_hk_daily
 
 OUT = ROOT / "reports" / "research"; OUT.mkdir(parents=True, exist_ok=True)
-HK_DIR = ROOT / "data_lake" / "price" / "hk_daily"; HK_DIR.mkdir(parents=True, exist_ok=True)
 N_WORKERS = 8
 
 # ── FULL A-H pair mapping (148 pairs from Wind/CSRC cross-listing registry) ──
@@ -61,40 +62,9 @@ AH_PAIRS = {
 # Step 1: Download all HK data (thread-parallel, IO-bound)
 # ═══════════════════════════════════════════════════════════════
 def download_one_hk(h_code):
-    """Download single HK stock history, cache to parquet."""
-    cache_f = HK_DIR / f"{h_code}.parquet"
-    if cache_f.exists():
-        df = pd.read_parquet(cache_f)
-        if len(df) > 500:
-            return h_code, df
-
-    seen, rows, end_date = set(), [], "2026-12-31"
-    for _ in range(15):
-        url = (f"http://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
-               f"?param=hk{h_code},day,2010-01-01,{end_date},640,hfq")
-        try:
-            resp = urllib.request.urlopen(url, timeout=15)
-            data = json.loads(resp.read())
-            node = data.get("data", {}).get(f"hk{h_code}", {})
-            arr = node.get("hfqday") or node.get("day") or []
-            if not arr: break
-            new = [r for r in arr if r[0] not in seen]
-            if not new: break
-            for r in new: seen.add(r[0])
-            rows = new + rows
-            if arr[0][0] <= "2017-01-01": break
-            end_date = arr[0][0]
-        except Exception: break
-    if not rows: return h_code, None
-    df = pd.DataFrame([r[:6] for r in rows],
-                      columns=["date","open","close","high","low","volume"])
-    df["date"] = pd.to_datetime(df["date"])
-    for c in ["open","close","high","low","volume"]:
-        df[c] = pd.to_numeric(df[c], errors="coerce")
-    df = df.drop_duplicates("date").sort_values("date").reset_index(drop=True)
-    df = df[df["date"] >= pd.Timestamp("2018-01-01")]
-    df.to_parquet(cache_f, index=False)
-    return h_code, df.set_index("date")[["close"]].rename(columns={"close": f"hk_{h_code}"})
+    """Download single HK stock history through the sanctioned data cache."""
+    df = load_or_fetch_hk_daily(h_code, min_rows=500)
+    return h_code, close_series(df, h_code) if df is not None else None
 
 
 print(f"Downloading {len(AH_PAIRS)} HK stocks ({N_WORKERS} threads)...", flush=True)
@@ -105,7 +75,7 @@ with ThreadPoolExecutor(max_workers=N_WORKERS) as ex:
     for i, f in enumerate(as_completed(futures)):
         h, df = f.result()
         if df is not None and len(df) > 500:
-            hk_data[h] = df.iloc[:, 0]
+            hk_data[h] = df
         if (i+1) % 20 == 0:
             print(f"  {i+1}/{len(AH_PAIRS)} ({len(hk_data)} found, {time.time()-t0:.0f}s)", flush=True)
 print(f"  {len(hk_data)} HK stocks downloaded in {time.time()-t0:.0f}s", flush=True)
@@ -188,9 +158,14 @@ for rd in rebal:
     top_n = min(10, len(f))
     sched[eff] = pd.Series(1.0/top_n, index=f.nlargest(top_n).index)
 
-cfg = StrategyConfig(start="2018-01-01")
 ones = pd.Series(1.0, index=close.index, dtype="float64")
-ret_ah, detail_ah = backtest_weights(close, sched, ones, cfg)
+dummy = pd.DataFrame(1.0, index=close.index, columns=close.columns)
+engine = BacktestEngine(
+    prices=PricePanel(close=close, volume=dummy, amount=dummy),
+    config=BacktestConfig(start="2018-01-01"),
+)
+result_ah = engine.run(Signal(weights=sched, timing=ones, family="ah-premium", version="research"))
+ret_ah, detail_ah = result_ah.returns, result_ah.detail
 
 def annual(r):
     rr = r.fillna(0); n = max(len(rr)/252, 1)

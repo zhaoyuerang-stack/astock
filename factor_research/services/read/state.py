@@ -26,6 +26,8 @@ def _read_json(rel: str):
 
 def data_quality(with_duckdb: bool = True) -> DataQualityView:
     d = _read_json("data_lake/quality_report.json") or {}
+    triage = _read_json("reports/data/data_issue_triage.json") or {}
+    triage_summary = triage.get("summary") or {}
     breakdown = d.get("issue_breakdown", {}) or {}
     # 真问题:键含 负价格 / OHLC;正常现象:跳变
     severe = sum(c for k, c in breakdown.items() if ("负价" in k or "OHLC" in k))
@@ -47,6 +49,9 @@ def data_quality(with_duckdb: bool = True) -> DataQualityView:
         severe_count=severe,
         jump_count=jump,
         verdict=verdict,
+        triage_summary=triage_summary,
+        production_blocked=bool(triage_summary.get("production_blocked")),
+        backtest_blocked=bool(triage_summary.get("backtest_blocked")),
     )
     if with_duckdb:
         view.duckdb = _duckdb_scan()

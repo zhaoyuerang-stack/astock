@@ -72,8 +72,13 @@ def generate_llm_candidates(
     theme: str = "",
     adapter=None,
     repository: CandidateRepository | None = None,
+    experiment_log=None,
 ):
-    """LLM 生成 → 白名单校验 → 泄露守卫 → 去重。返回 (accepted, rejected_reasons, model)。"""
+    """LLM 生成 → 白名单校验 → 泄露守卫 → 去重。返回 (accepted, rejected_reasons, model)。
+
+    experiment_log 提供时注入结构化失败台账(P3 反思):聚合死因 + 证据门控教训,
+    优先级高于逐条历史,让生成端绕开已被系统性证伪的形态。
+    """
     if adapter is None:
         from services.agent.llm_adapter import get_adapter
 
@@ -82,18 +87,37 @@ def generate_llm_candidates(
         raise ValueError("LLM 未配置(系统设置页填 provider/model/key);候选生成不做静默降级")
     repository = repository or CandidateRepository()
 
+    ledger_block = ""
+    if experiment_log is not None:
+        from factory.autoresearch.reflection import build_failure_ledger, ledger_to_prompt
+
+        ledger_block = ledger_to_prompt(build_failure_ledger(experiment_log, repository))
+
     user = (
         f"请提出 {n} 个候选因子。"
         + (f"研究主题:{theme}。" if theme else "")
+        + (f"\n{ledger_block}\n上述教训优先级最高,与之冲突的方向直接放弃。" if ledger_block else "")
         + f"\n已尝试候选与结局(避开重复,绕开已被证伪的方向):\n{_feedback_lines(repository)}"
     )
-    text = adapter.complete(_dsl_system_prompt(), user, max_tokens=3000)
-    if not text:
-        raise ValueError(f"LLM({adapter.model})未返回内容")
+    # 思考型模型(如 DeepSeek)会先烧 token 推理再产出 JSON,留足余量防 content 为空;
+    # 同温度下输出偶发非 JSON(思考前缀/拒答),重试一次,错误带原文头部便于诊断
+    asts, last_err = None, None
+    for _ in range(2):
+        text = adapter.complete(_dsl_system_prompt(), user, max_tokens=6000)
+        if not text:
+            last_err = ValueError(f"LLM({adapter.model})未返回内容")
+            continue
+        try:
+            asts = _parse_ast_array(text)
+            break
+        except ValueError as e:
+            last_err = ValueError(f"{e}(head={text[:80]!r})")
+    if asts is None:
+        raise last_err
 
     accepted, rejected = [], []
     seen: set[str] = set()
-    for idx, ast in enumerate(_parse_ast_array(text)):
+    for idx, ast in enumerate(asts):
         try:
             candidate = validate_candidate_ast(ast)
             run_leakage_guard(candidate)
@@ -119,7 +143,8 @@ def run_autoresearch_llm(
 ) -> AutoResearchLLMGenResponse:
     """LLM 生成候选并走真实 L0~L3 验证线。"""
     accepted, rejected, model = generate_llm_candidates(
-        n=n, theme=theme, adapter=adapter, repository=repository
+        n=n, theme=theme, adapter=adapter, repository=repository,
+        experiment_log=run_kw.get("experiment_log"),
     )
     run = _run_candidates(accepted, max_stage=max_stage, repository=repository, **run_kw)
     return AutoResearchLLMGenResponse(

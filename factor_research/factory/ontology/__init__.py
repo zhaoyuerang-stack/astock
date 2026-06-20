@@ -20,6 +20,12 @@ from .invariants import (
     check_f1_economic_thesis,
     check_f2_cheap_first,
 )
+from .report_logic import (
+    TransmissionNode,
+    LogicalChain,
+    TransmissionNodeCategory,
+    NodeChange,
+)
 
 __all__ = [
     "EconomicThesis",
@@ -34,4 +40,8 @@ __all__ = [
     "InvariantViolation",
     "check_f1_economic_thesis",
     "check_f2_cheap_first",
+    "TransmissionNode",
+    "LogicalChain",
+    "TransmissionNodeCategory",
+    "NodeChange",
 ]

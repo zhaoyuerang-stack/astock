@@ -33,6 +33,12 @@ export interface StrategyView {
   metrics: Record<string, number>;
   config: Record<string, unknown>;
   notes: string;
+  capacity_m: number;
+  admission?: Record<string, any>;   // 双轨准入 {track, rationale}
+  nine_gate?: Record<string, any>;   // Nine-Gate 摘要 {dsr_p, gate4_verdict, n_trials, ...}
+  style_betas?: Record<string, number>;        // 家族级风格暴露 {size, value, momentum, ...}
+  failure_boundaries?: Record<string, number>; // 家族级失效边界 {max_drawdown, max_drawdown_days}
+  decay_signal?: string;                        // 家族级失效信号(死因/触发条件)
 }
 
 export interface FactorView {
@@ -41,6 +47,7 @@ export interface FactorView {
   hypothesis: string;
   regime: string;
   n_versions: number;
+  n_registered?: number;   // 在册版本数(0 = 候选/噪音池)
   status: string;
 }
 
@@ -55,6 +62,9 @@ export interface DataQualityView {
   severe_count: number;
   jump_count: number;
   verdict: string;
+  triage_summary?: Record<string, any>;
+  production_blocked?: boolean;
+  backtest_blocked?: boolean;
   duckdb: {
     available: boolean;
     note?: string;
@@ -240,13 +250,64 @@ export interface AutoResearchIslandSearchResponse {
   champions: AutoResearchChampionView[];
 }
 
+export interface ActionTokenView {
+  header: string;
+  token: string;
+  source: string;
+}
+
+export interface ActionJobView {
+  job_id: string;
+  kind: string;
+  status: "queued" | "running" | "succeeded" | "failed" | string;
+  created_at: string;
+  started_at: string;
+  finished_at: string;
+  result: Record<string, unknown> | null;
+  error: string;
+}
+
 // Phase 5 Agent
+export interface AgentCitation {
+  source_id: string;
+  source_type: string;
+  title: string;
+  source_path: string;
+  excerpt: string;
+}
+
+export interface AgentMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface AgentSessionMessage {
+  role: "user" | "assistant" | string;
+  content: string;
+  created_at: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface AgentSession {
+  session_id: string;
+  user_id: string;
+  title: string;
+  page_context: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  messages: AgentSessionMessage[];
+}
+
 export interface AgentOutput {
   summary: string;
   evidence: string[];
   risk: string[];
   recommendation: string[];
   next_actions: string[];
+  citations: AgentCitation[];
+  source_types: string[];
+  suggested_navigation: string[];
   confidence: number;
   requires_human_confirmation: boolean;
 }
@@ -257,6 +318,10 @@ export interface AgentAskResponse {
   tool: string | null;
   risk: string | null;
   llm_ready: boolean;
+}
+
+export interface AgentSessionAskResponse extends AgentAskResponse {
+  session: AgentSession;
 }
 
 // Phase 6 系统设置 / 审计
@@ -349,8 +414,15 @@ export interface BondInstructionView {
   note: string;
 }
 
+export interface CandidateStockRow {
+  code: string;
+  name: string;
+}
+
 export interface TradePlanView {
   signal_date: string;
+  account_date: string;
+  last_exec_signal_date: string;
   generated_at: string;
   stale: boolean;
   stale_reason: string;
@@ -359,11 +431,15 @@ export interface TradePlanView {
   in_market: boolean;
   band_exposure: number;
   action: string;
+  small_index_vs_ma16: number;
+  binary_in_market_shadow: boolean;
+  base_in_market: boolean;
   executed: PaperTradeRow[];
   blocked: PaperBlockedRow[];
   plan: PaperPlanItem[];
   bond: BondInstructionView | null;
   positions: PaperPositionRow[];
+  candidates: CandidateStockRow[];
   nav: number;
   cash: number;
   position_value: number;
@@ -383,6 +459,7 @@ export interface NavCurveView {
   points: NavPoint[];
   inception: string;
   init_capital: number;
+  latest_nav_date: string;
   latest_nav: number;
   total_return: number;
   max_drawdown: number;
@@ -391,4 +468,26 @@ export interface NavCurveView {
 export interface PaperTradesView {
   trades: PaperTradeRow[];
   total: number;
+}
+
+export interface TradeReadinessView {
+  allowed_to_trade: boolean;
+  data_status: string;
+  model_version: string;
+  factor_health: string;
+  portfolio_risk: string;
+  cost_forecast: string;
+  liquidity_status: string;
+  regime_status: string;
+  regime_confidence: number;
+  kill_switch_status: string;
+  human_approval_required: boolean;
+  details: Record<string, any>;
+}
+
+export interface GovernanceView {
+  model_cards: Record<string, any>[];
+  validation_reports: Record<string, any>[];
+  experiments_ledger: Record<string, any>[];
+  committees: Record<string, any>[];
 }

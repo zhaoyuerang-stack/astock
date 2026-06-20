@@ -8,6 +8,10 @@ echo "=== check_layer_deps.py (分层依赖 + 台账唯一写入口) ==="
 python3 scripts/ci/check_layer_deps.py
 
 echo ""
+echo "=== check_lake_writers.py (数据湖唯一写入口) ==="
+python3 scripts/ci/check_lake_writers.py
+
+echo ""
 echo "=== test_engine.py ==="
 python3 test_engine.py
 
@@ -24,12 +28,20 @@ echo "=== test_knowledge.py ==="
 python3 tests/test_knowledge.py
 
 echo ""
+echo "=== test_research_run_ledger.py (研究结果统一归档 + index) ==="
+python3 tests/test_research_run_ledger.py
+
+echo ""
 echo "=== test_autoresearch_engine.py (Auto Factor Research Lite) ==="
 python3 tests/test_autoresearch_engine.py
 
 echo ""
 echo "=== test_services_phase0.py (产品 services 接缝;全量比对设 PHASE0_FULL=1) ==="
 python3 tests/test_services_phase0.py
+
+echo ""
+echo "=== test_api_contracts.py (前后端契约 smoke) ==="
+python3 tests/test_api_contracts.py
 
 echo ""
 echo "=== test_risk_phase3.py (风控控制回路;集成设 PHASE3_FULL=1) ==="
@@ -40,6 +52,18 @@ echo "=== test_agent_phase5.py (Agent planner + 不越权分级) ==="
 python3 tests/test_agent_phase5.py
 
 echo ""
+echo "=== test_agent_skills.py (Agent skill LLM 意图路由 + 数字护栏) ==="
+python3 tests/test_agent_skills.py
+
+echo ""
+echo "=== test_stock_profile.py (个股画像 · 不复权真实股价) ==="
+python3 tests/test_stock_profile.py
+
+echo ""
+echo "=== test_fundamentals.py (基本面引擎:议价权/预期差 + 读层防未来对齐) ==="
+python3 tests/test_fundamentals.py
+
+echo ""
 echo "=== test_llm_providers.py (Agent LLM 多 provider + 安全不变量) ==="
 python3 tests/test_llm_providers.py
 
@@ -48,8 +72,104 @@ echo "=== test_settings_phase6.py (系统设置 · 成本铁律只读 + 审计) 
 python3 tests/test_settings_phase6.py
 
 echo ""
+echo "=== test_action_jobs_phase7.py (动作确认令牌 + 分钟级任务异步 job) ==="
+python3 tests/test_action_jobs_phase7.py
+
+echo ""
 echo "=== test_paper_etf.py (模拟盘债券 ETF 轮动 P5) ==="
 python3 tests/test_paper_etf.py
+
+echo ""
+echo "=== test_alpha_audit.py (research_toolkit Alpha Audit) ==="
+python3 tests/test_alpha_audit.py
+
+echo ""
+echo "=== test_factor_store.py (Factor Store 面板落库 + manifest) ==="
+python3 tests/test_factor_store.py
+
+echo ""
+echo "=== test_factor_store_scoring.py (Factor Store 统一评分层) ==="
+python3 -m pytest tests/test_factor_store_scoring.py -q
+
+echo ""
+echo "=== test_factor_store_backfill.py (核心因子真实回填编排) ==="
+python3 -m pytest tests/test_factor_store_backfill.py -q
+
+echo ""
+echo "=== test_regime_gate.py (regime 门控 LIVE 模式,默认关) ==="
+python3 tests/test_regime_gate.py
+
+echo ""
+echo "=== test_composer.py (capped 权重组合) ==="
+python3 tests/test_composer.py
+
+echo ""
+echo "=== test_veto_filter.py (Policy 层 VetoFilter 边际贡献机制) ==="
+python3 tests/test_veto_filter.py
+
+echo ""
+echo "=== test_research_toolkit.py (策略研究与控制规则验证工具箱) ==="
+python3 tests/test_research_toolkit.py
+
+echo ""
+echo "=== test_engine_start_window.py (BacktestConfig.start 统计窗口语义) ==="
+python3 tests/test_engine_start_window.py
+
+echo ""
+echo "=== test_lake_invariants.py (数据湖写路径不变量) ==="
+python3 tests/test_lake_invariants.py
+
+echo ""
+echo "=== test_star_exclude.py (科创板 volume 修正 + 小盘显式排除) ==="
+python3 tests/test_star_exclude.py
+
+echo ""
+echo "=== test_data_vintage.py (每日更新指纹 + 漂移检测) ==="
+python3 tests/test_data_vintage.py
+
+echo ""
+echo "=== test_style_neutralization.py (CNE6 风格中性化审计) ==="
+python3 tests/test_style_neutralization.py
+
+echo ""
+echo "=== test_institutional_upgrades.py (机构级治理/组合/容量模块 smoke) ==="
+python3 tests/test_institutional_upgrades.py
+
+echo ""
+echo "=== test_governance_integrity.py (hit唯一权威/双轨准入/审批映射/ledger链/Nine-Gate摘要) ==="
+python3 tests/test_governance_integrity.py
+
+echo ""
+echo "=== test_promote_nine_gate.py (promote后自动触发Nine-Gate并失败回填) ==="
+python3 tests/test_promote_nine_gate.py
+
+echo ""
+echo "=== test_tushare_daily_basic.py (daily_basic 归一 + pivot) ==="
+python3 tests/test_tushare_daily_basic.py
+
+echo ""
+echo "=== test_fina_indicator.py (财务指标公告日 ffill 防未来) ==="
+python3 tests/test_fina_indicator.py
+
+echo ""
+echo "=== test_macro.py (宏观时序层防未来 lag) ==="
+python3 tests/test_macro.py
+
+echo ""
+echo "=== test_report_nlp_pipeline.py (研报 NLP Inbox 提取管线) ==="
+python3 tests/test_report_nlp_pipeline.py
+
+echo ""
+echo "=== test_report_feedback_loop.py (研报 自我反馈闭环) ==="
+python3 tests/test_report_feedback_loop.py
+
+echo ""
+echo "=== test_ontology_shadow_pipeline.py (影子观察本体策略) ==="
+python3 tests/test_ontology_shadow_pipeline.py
+
+echo ""
+echo "=== test_notify.py (运维告警通道 + 日更失败告警去重/恢复) ==="
+python3 tests/test_notify.py
 
 echo ""
 echo "🎉 All tests passed!"

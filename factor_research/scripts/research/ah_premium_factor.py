@@ -14,7 +14,7 @@ Key A-H pairs (A-code → H-code):
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/ah_premium_factor.py
 """
-import os, sys, time, json, urllib.request
+import os, sys
 from pathlib import Path
 import numpy as np, pandas as pd
 from scipy.stats import spearmanr
@@ -24,42 +24,9 @@ os.chdir(ROOT); sys.path.insert(0, str(ROOT))
 
 from strategies.small_cap import load_price_panels
 from factors.small_cap import small_cap_factor
+from scripts.data.hk_daily import HK_DIR, close_series, load_or_fetch_hk_daily
 
 OUT = ROOT / "reports" / "research"; OUT.mkdir(parents=True, exist_ok=True)
-HK_DIR = ROOT / "data_lake" / "price" / "hk_daily"
-HK_DIR.mkdir(parents=True, exist_ok=True)
-
-# ── HK data fetching ──
-def fetch_hk_history(code, start="2018-01-01"):
-    """Fetch full HK stock history with pagination."""
-    seen, rows, end_date = set(), [], "2026-12-31"
-    for _ in range(15):
-        url = (f"http://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
-               f"?param=hk{code},day,2010-01-01,{end_date},640,hfq")
-        try:
-            resp = urllib.request.urlopen(url, timeout=15)
-            data = json.loads(resp.read())
-            node = data.get("data", {}).get(f"hk{code}", {})
-            arr = node.get("hfqday") or node.get("day") or []
-            if not arr: break
-            new = [r for r in arr if r[0] not in seen]
-            if not new: break
-            for r in new: seen.add(r[0])
-            rows = new + rows
-            earliest = arr[0][0]
-            if earliest <= "2017-01-01": break
-            end_date = earliest
-        except Exception: break
-        time.sleep(0.2)
-    if not rows: return None
-    df = pd.DataFrame([r[:6] for r in rows],
-                      columns=["date","open","close","high","low","volume"])
-    df["date"] = pd.to_datetime(df["date"])
-    for c in ["open","close","high","low","volume"]:
-        df[c] = pd.to_numeric(df[c], errors="coerce")
-    df = df.drop_duplicates("date").sort_values("date").reset_index(drop=True)
-    df = df[df["date"] >= pd.Timestamp(start)]
-    return df.set_index("date")[["close"]].rename(columns={"close": f"hk_{code}"})
 
 
 # ── A-H pair mapping (verified pairs with active trading) ──
@@ -76,14 +43,9 @@ AH_PAIRS = {
 print(f"Downloading {len(AH_PAIRS)} HK stocks...", flush=True)
 hk_data = {}
 for i, (a_code, h_code) in enumerate(AH_PAIRS.items()):
-    cache_file = HK_DIR / f"{h_code}.parquet"
-    if cache_file.exists():
-        hk_data[h_code] = pd.read_parquet(cache_file)["close"]
-    else:
-        df = fetch_hk_history(h_code)
-        if df is not None and len(df) > 100:
-            df.to_parquet(cache_file)
-            hk_data[h_code] = df.iloc[:, 0]  # close column
+    df = load_or_fetch_hk_daily(h_code, min_rows=100)
+    if df is not None:
+        hk_data[h_code] = close_series(df, h_code)
     if (i+1) % 5 == 0:
         print(f"  {i+1}/{len(AH_PAIRS)} done ({len(hk_data)} found)", flush=True)
 print(f"  Downloaded {len(hk_data)} HK stocks", flush=True)

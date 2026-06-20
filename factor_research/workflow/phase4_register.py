@@ -32,6 +32,24 @@ LESSONS_DIR = ROOT / "workflow" / "pending_lessons"
 LESSONS_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _extract_nine_gate_summary(phase2_data, phase3_data) -> dict:
+    """从 workflow phase2/phase3 产出抽取可得的审计摘要写入台账（缺键安全跳过）。
+
+    注意：完整 DSR/PSR/PBO 来自独立的 9-Gate 审计（run_nine_gates_all），工厂通道只产
+    walk-forward / OOS 摘要。本函数只落工厂能提供的部分，DSR 等由 nine_gates 回填。
+    """
+    p3 = phase3_data if isinstance(phase3_data, dict) else {}
+    agg = p3.get("aggregate", {}) if isinstance(p3.get("aggregate"), dict) else {}
+    out = {
+        "wf_sharpe": agg.get("sharpe"),
+        "wf_annual": agg.get("annual"),
+        "wf_positive_windows": agg.get("positive_windows"),
+        "wf_total_windows": agg.get("total_windows"),
+        "wf_verdict": agg.get("verdict"),
+    }
+    return {k: v for k, v in out.items() if v is not None}
+
+
 # ---------------------------------------------------------------------------
 # Reproducibility metadata
 # ---------------------------------------------------------------------------
@@ -180,6 +198,18 @@ def save_lessons_from_phases(phase1: list, phase2: dict, phase3: dict, family: s
                            family)
             lessons_saved += 1
 
+    if lessons_saved:
+        try:
+            from knowledge.graph import sync_pending_lessons_to_graph
+            summary = sync_pending_lessons_to_graph()
+            print(
+                f"  Knowledge graph synced: findings={summary['findings_written']} "
+                f"gates={summary['gates_written']}",
+                flush=True,
+            )
+        except Exception as exc:
+            print(f"  Knowledge graph sync failed: {exc}", flush=True)
+
     return lessons_saved
 
 
@@ -221,12 +251,16 @@ class RegistrationReport:
     repro_meta: dict
     lessons_saved: int
     detail: str = ""
+    status: str = ""
+    phase_summary: dict = field(default_factory=dict)
 
     def summary(self) -> str:
         icon = "✅" if self.registered else "❌"
+        status = self.status or ("registered" if self.registered else "blocked")
         lines = [
             f"Phase 4 Register: {self.family}/{self.version}",
             f"  Registered: {icon} {self.detail}",
+            f"  Status: {status}",
             f"  Lessons saved: {self.lessons_saved}",
             f"  Git: {self.repro_meta.get('git_commit','?')}",
             f"  Python: {self.repro_meta.get('python','?')}",
@@ -251,6 +285,9 @@ class Phase4Register:
         regime: str = "",
         decay_signal: str = "",
         force: bool = False,
+        hypothesis_id: str = "",
+        evidence_experiment_ids: Optional[list] = None,
+        target_status: str = "",
     ) -> RegistrationReport:
         """Register strategy. Saves lessons regardless; registers only if all clear or forced."""
 
@@ -271,7 +308,7 @@ class Phase4Register:
             return RegistrationReport(
                 family=self.family, version=self.version,
                 registered=False, repro_meta=repro, lessons_saved=n_lessons,
-                detail=f"Blocked: {blocked}",
+                detail=f"Blocked: {blocked}", status="blocked",
             )
 
         # Build metrics from Phase 2+3
@@ -281,6 +318,15 @@ class Phase4Register:
         # Write to registry
         try:
             from strategy_registry import register_family, register
+            from engine.metrics import compute_hit
+
+            # 自动入册只走 standalone 轨：单体达标(hit=True)才入「在册」，否则入「候选」。
+            # diversifier 轨需人工判断组合契合度，不在工厂自动通道里授予。
+            auto_hit = compute_hit(metrics.get("annual"), metrics.get("maxdd"))
+            shadow_target = str(target_status or "").upper() == "SHADOW"
+            reg_status = "候选" if shadow_target else ("在册" if (not blocked and auto_hit) else "候选")
+            reg_admission = ({"track": "standalone", "rationale": "Workflow Phase1-3 验证 + 单体达标"}
+                             if reg_status == "在册" else {})
 
             register_family(
                 self.family,
@@ -305,25 +351,32 @@ class Phase4Register:
                     "reproducibility": repro,
                 },
                 metrics=metrics,
-                status="在册" if not blocked else "候选",
+                status=reg_status,
+                admission=reg_admission,
                 notes=(
                     f"Workflow Phase 1-3 validated. "
                     f"WF: {phase3_data.get('aggregate',{}).get('annual',0):+.1%} ann / "
                     f"{phase3_data.get('aggregate',{}).get('maxdd',0):+.1%} dd."
+                    f"{' Target=SHADOW, auto-held as 候选.' if shadow_target else ''}"
                 ),
+                evidence={
+                    "hypothesis_id": hypothesis_id,
+                    "experiment_ids": list(evidence_experiment_ids or []),
+                },
+                nine_gate=_extract_nine_gate_summary(phase2_data, phase3_data),
             )
             print(f"  Registered: {self.family}/{self.version}", flush=True)
             return RegistrationReport(
                 family=self.family, version=self.version,
                 registered=True, repro_meta=repro, lessons_saved=n_lessons,
-                detail="Registered successfully",
+                detail="Registered successfully", status=reg_status,
             )
         except Exception as e:
             print(f"  Registration error: {e}", flush=True)
             return RegistrationReport(
                 family=self.family, version=self.version,
                 registered=False, repro_meta=repro, lessons_saved=n_lessons,
-                detail=str(e),
+                detail=str(e), status="error",
             )
 
     def _check_blocked(self, p1, p2, p3) -> Optional[str]:
@@ -371,8 +424,9 @@ class Phase4Register:
         m["sharpe"] = is_seg.get("sharpe", 0)
         m["calmar"] = is_seg.get("calmar", 0)
 
-        # Hit check
-        m["hit"] = m["annual"] >= 0.15 and abs(m["maxdd"]) <= 0.20
+        # Hit check —— 走唯一权威 compute_hit(严格不等号),与 register() 口径一致
+        from engine.metrics import compute_hit
+        m["hit"] = compute_hit(m["annual"], m["maxdd"])
 
         # WF metrics
         wf = p3.get("aggregate", {})

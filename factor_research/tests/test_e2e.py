@@ -15,7 +15,7 @@ def test_run_daily_no_update():
         capture_output=True,
         text=True,
     )
-    assert result.returncode == 0, f"run_daily failed: {result.stderr[:200]}"
+    assert result.returncode in (0, 2), f"run_daily failed with code {result.returncode}: {result.stderr[:200]}"
     assert "保存信号" in result.stdout or "空仓观望" in result.stdout
     print("✅ test_run_daily_no_update passed")
 

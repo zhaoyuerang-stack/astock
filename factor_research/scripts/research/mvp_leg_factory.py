@@ -20,7 +20,7 @@ from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, Cost
 from factors.small_cap import small_cap_factor, small_cap_timing
 from factors.utils import safe_zscore, mad_clip
 from strategies.small_cap import build_rebalance_weights
-from engine.regime import RegimeEngine
+from factory.regime import RegimeEngine
 from factory.analysis.asymmetry_audit import asymmetry_report
 from factors.fundamental import bp_proxy, ep_proxy, net_profit_yoy, roe, revenue_yoy
 

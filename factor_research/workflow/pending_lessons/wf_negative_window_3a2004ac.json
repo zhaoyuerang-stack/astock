@@ -4,13 +4,18 @@
   "pattern": "WF negative window 2017",
   "detail": "OOS annual=-8.0% in 2017",
   "fix": "Manual review needed.",
-  "hit_count": 5,
+  "hit_count": 10,
   "first_seen": "2026-06-06",
-  "last_seen": "2026-06-06",
+  "last_seen": "2026-06-17",
   "strategies": [
     "size-earnings-e2e",
     "small-cap-size",
     "illiquidity",
-    "size-low-vol"
+    "size-low-vol",
+    "autoresearch_2335eeab",
+    "small_cap_factor__window45",
+    "small_cap_factor__window60",
+    "small_cap_factor__window90",
+    "small_cap_factor__window120"
   ]
 }

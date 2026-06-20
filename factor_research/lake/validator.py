@@ -8,6 +8,8 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 
+from lake.data_issue_triage import DATA_ISSUE_CATEGORIES, ISSUE_SEVERITY, build_validation_triage
+
 
 class DataValidator:
     def __init__(self, calendar=None, anchors: dict = None,
@@ -154,3 +156,6 @@ class DataValidator:
             Path(save_path).parent.mkdir(parents=True, exist_ok=True)
             Path(save_path).write_text(json.dumps(report, ensure_ascii=False, indent=2))
         return report
+
+    def issue_triage_report(self, results: list, save_path: str = None):
+        return build_validation_triage(results, save_path=save_path)

@@ -36,6 +36,13 @@
     return `<span class="bar ${tone}"><span style="width:${width}%"></span></span>`;
   };
 
+  const readinessTone = (readiness) => readiness.allowed ? "ok" : "danger";
+
+  const reasonList = (items) => {
+    if (!items || !items.length) return `<span class="muted">无</span>`;
+    return `<div class="reason-list">${items.map(item => `<span>${item}</span>`).join("")}</div>`;
+  };
+
   const equityBars = (curve) => {
     const max = Math.max(...curve.map(point => point.strategy), ...curve.map(point => point.benchmark));
     return `
@@ -66,12 +73,13 @@
     if (!root) return;
     const fresh = data.dataFreshness.dataFresh;
     const live = data.liveTrading;
+    const readiness = data.productionReadiness;
     root.innerHTML = `
       <section class="grid metrics-grid">
         ${metricCard("今日建议", data.signal.action, data.signal.rebalanceReason, data.signal.inMarket ? "ok" : "warn")}
         ${metricCard("当前仓位", `${pct(live.investedRatio, 0)} 股票`, `${pct(live.cashRatio, 0)} 现金`, data.signal.inMarket ? "ok" : "warn")}
         ${metricCard("策略年化", pct(live.performance.strategyAnnual), `回撤 ${pct(live.performance.strategyMaxdd)}`, "ok")}
-        ${metricCard("数据状态", fresh ? "Fresh" : "Stale", `${data.dataFreshness.latestTradeDate} / ${data.dataFreshness.expectedTradeDate}`, fresh ? "ok" : "danger")}
+        ${metricCard("生产 Gate", readiness.allowed ? "Allowed" : "Blocked", `${readiness.dataDate} / ${readiness.expectedTradeDate}`, readinessTone(readiness))}
       </section>
 
       <section class="panel live-summary">
@@ -100,6 +108,27 @@
                 <small>${plan.reason}</small>
               </article>
             `).join("")}
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>生产发布 Gate</h2>
+          <span class="${readiness.allowed ? "badge ok" : "badge danger"}">${readiness.allowed ? "正式信号可发布" : "只生成草稿"}</span>
+        </div>
+        <div class="readiness-grid">
+          <dl class="kv">
+            <div><dt>数据日</dt><dd>${readiness.dataDate || "未知"}</dd></div>
+            <div><dt>应有交易日</dt><dd>${readiness.expectedTradeDate || "未知"}</dd></div>
+            <div><dt>治理状态</dt><dd>${readiness.governanceStatus}</dd></div>
+            <div><dt>衰减状态</dt><dd>${readiness.decayStatus}</dd></div>
+          </dl>
+          <div>
+            <h3>阻断原因</h3>
+            ${reasonList(readiness.blockingReasons)}
+            <h3>Warning</h3>
+            ${reasonList(readiness.warnings)}
           </div>
         </div>
       </section>
@@ -224,12 +253,13 @@
     const root = document.getElementById("ops");
     if (!root) return;
     const report = data.ops.dailyReport;
+    const readiness = data.productionReadiness;
     root.innerHTML = `
       <section class="grid metrics-grid">
         ${metricCard("最近日报", report.runDate, `status=${report.status}`, report.status === "failed" ? "danger" : "ok")}
         ${metricCard("数据新鲜度", report.dataFresh ? "Fresh" : "Stale", `${report.latestAfterUpdate} / ${report.expectedTradeDate}`, report.dataFresh ? "ok" : "danger")}
         ${metricCard("信号生成", report.signalGenerated ? "Yes" : "No", report.signalReason, report.signalGenerated ? "ok" : "warn")}
-        ${metricCard("中国时间 Gate", report.chinaGate, "launchd 使用本机时区", "neutral")}
+        ${metricCard("生产 Gate", readiness.allowed ? "Allowed" : "Blocked", readiness.blockingReasons.join(", ") || "no blockers", readinessTone(readiness))}
       </section>
 
       <section class="panel">

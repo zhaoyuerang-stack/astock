@@ -79,8 +79,15 @@ def test_config_save_mask_reset():
 
 def test_lockdown_independent_of_llm():
     """安全不变量:无论接哪个模型,降仓(high)仍仅提案,LLM 绕不过不越权门。"""
-    r = ask("帮我降仓调仓", {"current_page": "portfolio"})
-    assert r["tool"] == "rebalance" and r["output"]["requires_human_confirmation"] is True
+    from unittest.mock import patch, MagicMock
+    mock_adapter = MagicMock()
+    mock_adapter.available.return_value = True
+    # Return JSON intent classifying the request as rebalance
+    mock_adapter.complete.return_value = '{"skill": "system_status", "tool": "rebalance", "intent": "rebalance"}'
+    
+    with patch("services.agent.skills.get_adapter", return_value=mock_adapter):
+        r = ask("帮我降仓调仓", {"current_page": "portfolio"})
+        assert r["tool"] == "rebalance" and r["output"]["requires_human_confirmation"] is True
     print("✅ 不越权不变量:LLM 只能路由/解读,高风险动作仍仅提案不执行")
 
 

@@ -15,6 +15,17 @@ window.ASTCOK_DATA = {
     sampleQualityOk: true,
     sampleChecked: ["600519", "000001", "300750", "600036", "601398"]
   },
+  productionReadiness: {
+    allowed: false,
+    blockingReasons: ["data_stale", "governance:dsr_pending"],
+    warnings: ["decay:unknown"],
+    dataDate: "2026-06-01",
+    expectedTradeDate: "2026-06-03",
+    governanceStatus: "dsr_pending",
+    decayStatus: "unknown",
+    paperStatus: "ok",
+    tradingDayStatus: "trading_day"
+  },
   signal: {
     date: "2026-06-01",
     timing: "空仓",

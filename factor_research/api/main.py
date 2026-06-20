@@ -11,14 +11,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routers import (agent, backtest, data, experiments, factors, paper, portfolio,
-                         risk, settings, state, strategies)
+                         risk, settings, state, strategies, trade_readiness, governance)
 
 app = FastAPI(title="Quant Research Platform API", version="0.0-phase0")
 
-# Phase 1:允许本地 Next.js 开发服务器(3000)跨域调用。
+# Phase 1:允许本地 Next.js 开发服务器跨域调用。3001 是 3000 被占用时的 fallback。
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -34,6 +39,8 @@ app.include_router(risk.router)
 app.include_router(experiments.router)
 app.include_router(agent.router)
 app.include_router(settings.router)
+app.include_router(trade_readiness.router)
+app.include_router(governance.router)
 
 
 @app.get("/health")
@@ -44,4 +51,4 @@ def health() -> dict:
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8011)

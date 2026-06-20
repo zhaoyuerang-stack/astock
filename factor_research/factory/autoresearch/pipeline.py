@@ -132,6 +132,7 @@ def run_validation_pipeline(
     runners: dict[str, Callable] | None = None,
     sample_dates: int | None = None,
     max_stage: str = "l3",
+    knowledge_graph=None,
 ) -> CandidateEvaluationResult:
     """Run a candidate through the existing real L0/L1/L2/L3 validation functions."""
     repository = repository or CandidateRepository()
@@ -156,6 +157,45 @@ def run_validation_pipeline(
         return result
 
     hyp = ast_to_hypothesis(candidate)
+    if knowledge_graph is None:
+        try:
+            from knowledge.graph import load_graph
+            knowledge_graph = load_graph()
+        except Exception:
+            knowledge_graph = None
+
+    knowledge_gate = {"action": "", "reason": "", "priority_adjustment": 1.0}
+    if knowledge_graph is not None:
+        try:
+            should_skip, skip_reason = knowledge_graph.should_skip(hyp)
+            priority_adjustment = float(knowledge_graph.priority_adjustment(hyp))
+            knowledge_gate = {
+                "action": "SKIP" if should_skip else ("DEPRIORITIZE" if priority_adjustment < 1.0 else ""),
+                "reason": skip_reason,
+                "priority_adjustment": priority_adjustment,
+            }
+            if should_skip:
+                status = CandidateStatus.DISCARDED
+                result = CandidateEvaluationResult(
+                    fingerprint=candidate.fingerprint,
+                    status=status,
+                    decision=CandidateDecision.DISCARD,
+                    metrics={
+                        "complexity": {"score": complexity.score, "max_auto_stage": complexity.max_auto_stage},
+                        "leakage": {"passed": leakage.passed, "checks": leakage.checks},
+                        "knowledge_gate": knowledge_gate,
+                    },
+                    reason=f"knowledge graph skip: {skip_reason}",
+                )
+                repository.record(candidate.with_status(status, result.reason))
+                experiment_log.append(result)
+                return result
+        except Exception as exc:
+            knowledge_gate = {
+                "action": "ERROR",
+                "reason": f"{type(exc).__name__}: {str(exc)[:120]}",
+                "priority_adjustment": 1.0,
+            }
     experiments: list[Experiment] = []
     status = CandidateStatus.GENERATED
     reason = ""
@@ -187,9 +227,21 @@ def run_validation_pipeline(
         if exp.decision in (Decision.DISCARD, Decision.SHELVE):
             break
 
+    # 弃牌堆分诊:L1 死亡但 L0 信息量强的候选,标记进 VetoFilter 边际贡献复评
+    # (只做标记,不改主线状态;复评走 scripts/research/veto_filter_marginal.py)
+    veto_review = False
+    if len(experiments) >= 2:
+        from factory.lines.line2_validation.veto_triage import should_route_to_veto_review
+
+        veto_review = should_route_to_veto_review(experiments[0], experiments[1])
+    if veto_review:
+        reason = (reason + "; " if reason else "") + "L0 信息量强,转 VetoFilter 复评"
+
     metrics = {
         "complexity": {"score": complexity.score, "max_auto_stage": complexity.max_auto_stage},
         "leakage": {"passed": leakage.passed, "checks": leakage.checks},
+        "knowledge_gate": knowledge_gate,
+        "veto_review_candidate": veto_review,
         "experiments": [
             {
                 "experiment_id": e.experiment_id,

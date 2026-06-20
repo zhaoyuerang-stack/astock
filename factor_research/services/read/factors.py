@@ -19,6 +19,7 @@ def list_factors() -> list[FactorView]:
             hypothesis=fam.get("hypothesis", ""),
             regime=fam.get("regime", ""),
             n_versions=len(fam.get("versions", [])),
+            n_registered=sum(1 for v in fam.get("versions", []) if v.get("status") == "在册"),
             status=fam.get("status", ""),
         )
         for fam in data.get("families", [])

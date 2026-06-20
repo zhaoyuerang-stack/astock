@@ -4,8 +4,9 @@
 流程：①增量更新数据 → ②质量校验 → ③生成择时信号 → ④持仓清单
       → ⑤调仓判断(距上次≥20交易日) → ⑥保存 signals/YYYY-MM-DD.json
 
-策略: illiquidity v3.0 (AmihudIlliq |ret|/amount + PureTrend MA16 Band 择时 + 511010 国债ETF 轮动)
-      已全区间压力测试(2010-2026): +37.8%/-16.6%/1.99
+策略: illiquidity v3.1 (AmihudIlliq |ret|/amount + Salience Veto 30% + PureTrend MA16 Band 择时 + 511010 国债ETF 轮动)
+      已全区间压力测试(2010-2026): +37.8%/-11.9%/2.12
+
 
 用法：python3 run_daily.py            # 完整流程(含联网更新数据)
       python3 run_daily.py --no-update # 跳过数据更新，仅用现有数据出信号
@@ -27,7 +28,9 @@ from lake.validator import DataValidator
 from factors.alpha import transforms  # register zscore/mad_clip/shift
 from factors.alpha.base import FactorData
 from factors.alpha.builtins.illiq import AmihudIlliq
+from factors.veto import salience_covariance_veto
 from app_config.settings import get_settings
+from runtime.production_readiness import get_production_readiness
 
 _cfg = get_settings().strategy
 
@@ -65,6 +68,40 @@ def save_state(state):
         LAST_REBAL.unlink()
 
 
+def _model_dict(obj):
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    return obj.dict()
+
+
+def persist_signal_with_readiness(signal, new_state, readiness):
+    readiness_payload = _model_dict(readiness)
+    payload = dict(signal)
+    payload["production_readiness"] = readiness_payload
+    signal_date = signal["date"]
+
+    if readiness_payload.get("allowed"):
+        out = SIGNALS / f"{signal_date}.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
+        save_state(new_state)
+        return {
+            "published": True,
+            "signal_path": str(out),
+            "readiness": readiness_payload,
+        }
+
+    draft_dir = SIGNALS / "drafts"
+    draft_dir.mkdir(parents=True, exist_ok=True)
+    out = draft_dir / f"{signal_date}.json"
+    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
+    return {
+        "published": False,
+        "draft_path": str(out),
+        "readiness": readiness_payload,
+    }
+
+
 def decide_action(trade_dates, last_date, in_market, state):
     position = state.get("current_position", "cash")
     if not in_market:
@@ -89,7 +126,7 @@ def main():
     args = ap.parse_args()
 
     print("=" * 60)
-    print(f"  每日运行  {datetime.now(CHINA_TZ).strftime('%Y-%m-%d %H:%M')} CST  —  illiquidity v3.0")
+    print(f"  每日运行  {datetime.now(CHINA_TZ).strftime('%Y-%m-%d %H:%M')} CST  —  illiquidity v3.1")
     print("=" * 60)
 
     # ① 增量更新数据
@@ -120,6 +157,9 @@ def main():
     data = FactorData(close=close, volume=volume, amount=amount)
     factor_expr = AmihudIlliq(window=20).mad_clip(5).zscore().shift(1)
     factor = factor_expr.compute(data)
+
+    # Salience Veto factor: faded Salience Covariance (-ST_cov), shift(1) 防未来函数
+    faded_st_cov = salience_covariance_veto(close).shift(1)
 
     # PureTrend MA16 timing (shared with v2.0, proven)
     timing_raw, small_nav, timing_dist = small_cap_timing(close, amount, TIMING_MA)
@@ -154,13 +194,22 @@ def main():
     if regime == "bear":
         print(f"  ⚠️ BEAR regime → 建议: 空仓资金配置 511010 国债ETF")
     else:
-        print(f"  ℹ️ BULL regime → 全仓 illiq 股票")
+        print(f"  ℹ️ BULL regime → 按 Band exposure 配置 illiq 股票")
 
     # ④ 持仓清单
     print("\n[4/6] 持仓清单...")
     f = factor.loc[last].dropna()
     active = close.loc[last].dropna().index
-    holdings = f.reindex(active).dropna().nlargest(TOP_N).index.tolist()
+
+    # Apply Salience Veto Filter: veto bottom 30% of faded_st_cov (highest salience / bubble stocks)
+    veto_factor = faded_st_cov.loc[last].reindex(active).dropna()
+    if len(veto_factor):
+        threshold = veto_factor.quantile(0.30)
+        non_veto_stocks = veto_factor[veto_factor > threshold].index
+        f = f.reindex(non_veto_stocks).dropna()
+        print(f"  [Veto] Candidate pool filtered from {len(active)} to {len(non_veto_stocks)} stocks (vetoed {len(active)-len(non_veto_stocks)} stocks)")
+
+    holdings = f.nlargest(TOP_N).index.tolist()
 
     # ⑤ 调仓判断
     print("\n[5/6] 调仓判断...")
@@ -186,12 +235,12 @@ def main():
         "regime_dist": round(float(regime_dist), 4),       # shifted dist (防未来函数)
         "rotation": {
             "current_regime": regime,
-            "recommend_stocks": regime == "bull",           # bull→全仓 illiq
+            "recommend_stocks": regime == "bull",           # bull→按 band_exposure 配置 illiq
             "recommend_bond": regime == "bear",             # bear→换债券(511010)
             "bond_code": "511010",
             "bond_name": "国债ETF",
             "bond_allocation": "全部闲置资金",               # bear=100%现金→债券
-            "note": "BEAR时全部现金买511010; BULL时卖光511010买回股票",
+            "note": "BEAR时全部现金买511010; BULL时卖光511010并按Band exposure买回股票",
         },
         # ── SHADOW: Binary timing (2026-06-07 Band 接替后保留对比) ──
         "binary_in_market_shadow": binary_in_market,
@@ -204,15 +253,13 @@ def main():
         "action": action,
         "holdings": holdings if in_market else [],
         "top_n": TOP_N,
-        "strategy": "illiquidity", "strategy_version": "v3.0",
+        "strategy": "illiquidity", "strategy_version": "v3.1",
         # ── 向后兼容: 旧 shadow_band_* 字段保留 ──
         "shadow_band_exposure": round(band_exposure, 4),
         "shadow_band_in_market": band_in_market,
         "shadow_band_holdings": holdings if band_in_market else [],
+        "candidates": holdings,
     }
-    out = SIGNALS / f"{last.date()}.json"
-    out.write_text(json.dumps(signal, ensure_ascii=False, indent=2))
-
     new_state = {
         "current_position": "invested" if in_market else "cash",
         "last_rebalance_date": (
@@ -224,11 +271,13 @@ def main():
         "last_holdings": holdings if in_market else [],
         "last_action": action,
     }
-    save_state(new_state)
+    readiness = get_production_readiness(data_date=str(last.date()))
+    persist_result = persist_signal_with_readiness(signal, new_state, readiness)
+    out = Path(persist_result.get("signal_path") or persist_result.get("draft_path"))
 
     # ── 终端总结 ──
     print("\n" + "=" * 60)
-    print(f"  策略      : illiquidity v1.0 (Amihud 非流动性)")
+    print(f"  策略      : illiquidity v3.1 (Amihud 非流动性 + Salience Veto 30%)")
     print(f"  日期      : {last.date()}")
     print(f"  Regime    : {'🟢 BULL' if regime == 'bull' else '🔴 BEAR'} (shifted)")
     print(f"  择时      : {signal['timing']}  (小盘指数{dist:+.2%} vs MA{TIMING_MA})")
@@ -238,9 +287,32 @@ def main():
         print(f"  持仓({len(holdings)}只): {', '.join(holdings[:12])}{' ...' if len(holdings)>12 else ''}")
     if regime == "bear":
         print(f"  💡 建议   : 空仓资金配置 511010 国债ETF")
-    print(f"  已保存    : {out}")
+    if persist_result["published"]:
+        print(f"  Readiness : 已放行")
+        print(f"  已保存    : {out}")
+    else:
+        reasons = ", ".join(readiness.blocking_reasons) or "unknown"
+        print(f"  Readiness : 未放行: {reasons}")
+        print(f"  草稿      : {out}")
     print("=" * 60)
+
+    # ⑦ 自动结算模拟盘 (T+1成交与净值更新)
+    if not persist_result["published"]:
+        print("\n[7/6] 跳过自动结算模拟盘...")
+        print("  生产 readiness 未放行; draft 不触发模拟盘,正式信号保持旧版本。")
+        return 2
+
+    print("\n[7/6] 自动结算模拟盘...")
+    try:
+        import subprocess, sys
+        proc = subprocess.run([sys.executable, "-m", "scripts.ops.paper_trade"], capture_output=True, text=True)
+        print(proc.stdout)
+        if proc.stderr:
+            print(proc.stderr, file=sys.stderr)
+    except Exception as e:
+        print(f"  ⚠️ 自动结算失败: {e}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

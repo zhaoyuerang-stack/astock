@@ -6,13 +6,16 @@ Run:
 """
 import os
 import sys
+import tempfile
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
-from services.read.risk import _cap_check, load_risk_policy, risk_report
+import services.read.risk as risk_mod
+from services.read.risk import _cap_check, _registered_maxdd, _settings, load_risk_policy, risk_report
 from contracts.models import ControlAction
 
 
@@ -41,6 +44,15 @@ def test_breach_generates_control_action():
     print("✅ 超限 → ControlAction(待确认,未执行)")
 
 
+def test_current_strategy_drawdown_loaded_from_configured_version():
+    """风控历史回撤必须来自当前生产版本,不能误取台账第一个在册版本。"""
+    strategy = (_settings().get("strategy") or {})
+    assert strategy.get("family") == "illiquidity"
+    assert strategy.get("version") == "v3.1"
+    assert abs((_registered_maxdd() or 0.0) - (-0.1195)) < 1e-12
+    print("✅ 当前生产版本 maxdd 来自 illiquidity/v3.1 台账")
+
+
 def test_risk_report_integration():
     r = risk_report()
     assert r.verdict in ("正常", "预警", "超限")
@@ -49,13 +61,52 @@ def test_risk_report_integration():
           f"checks={[(c.rule, c.status) for c in r.checks]} actions={len(r.control_actions)}")
 
 
+def test_risk_report_uses_latest_signal_effective_leverage():
+    """风控当前杠杆必须优先读最新信号的 band_exposure/leverage。"""
+    with tempfile.TemporaryDirectory() as td:
+        tmp_root = Path(td)
+        (tmp_root / "signals").mkdir(parents=True, exist_ok=True)
+        (tmp_root / "signals" / "2026-06-16.json").write_text(
+            json.dumps({"date": "2026-06-16", "band_exposure": 1.37, "leverage": 9.9}),
+            encoding="utf-8",
+        )
+
+        original_root = risk_mod.ROOT
+        original_settings = risk_mod._settings
+        original_portfolio = risk_mod.target_portfolio
+        original_maxdd = risk_mod._registered_maxdd
+        try:
+            risk_mod.ROOT = tmp_root
+            risk_mod._settings = lambda: {
+                "strategy": {"family": "illiquidity", "version": "v3.1", "leverage": 1.25},
+                "risk_policy": {},
+            }
+            risk_mod.target_portfolio = lambda: []
+            risk_mod._registered_maxdd = lambda *args, **kwargs: None
+
+            r = risk_report()
+            leverage_check = next(c for c in r.checks if c.rule == "杠杆")
+            assert abs((leverage_check.current or 0.0) - 1.37) < 1e-12
+            assert "latest signal 2026-06-16" in r.evaluated_on
+            assert "band_exposure" in (leverage_check.note or "")
+            print("✅ 风控当前杠杆读取最新信号 band_exposure")
+        finally:
+            risk_mod.ROOT = original_root
+            risk_mod._settings = original_settings
+            risk_mod.target_portfolio = original_portfolio
+            risk_mod._registered_maxdd = original_maxdd
+
+
 if __name__ == "__main__":
     print("Running Phase 3 risk tests...\n")
     test_cap_check_levels()
     test_policy_loaded()
     test_breach_generates_control_action()
+    test_current_strategy_drawdown_loaded_from_configured_version()
     if os.environ.get("PHASE3_FULL"):
         test_risk_report_integration()
+        test_risk_report_uses_latest_signal_effective_leverage()
     else:
         print("ℹ️  跳过 risk_report 集成(现算 target,设 PHASE3_FULL=1 开启)")
+        test_risk_report_uses_latest_signal_effective_leverage()
     print("\n🎉 Phase 3 risk tests passed!")

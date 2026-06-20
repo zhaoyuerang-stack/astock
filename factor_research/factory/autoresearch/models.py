@@ -20,6 +20,9 @@ class CandidateStatus(Enum):
     DISCARDED = "discarded"
     PROMOTED_TO_REVIEW = "promoted_to_review"
     APPROVED = "approved"
+    PROMOTING = "promoting"
+    PROMOTED_SHADOW = "promoted_shadow"
+    PROMOTE_FAILED = "promote_failed"
     REJECTED_BY_HUMAN = "rejected_by_human"
     RETIRED = "retired"
 

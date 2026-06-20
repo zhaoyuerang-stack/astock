@@ -9,7 +9,7 @@ os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 import pandas as pd
 import akshare as ak
-from lake.sources.tencent import TencentDailyFetcher
+from lake.sources.registry import resolve_source
 from lake.validator import DataValidator
 
 
@@ -27,8 +27,8 @@ def main():
     print(f"全市场 {len(codes)} 只 | 腾讯后复权日线 | 回溯2010", flush=True)
 
     # 1. 下载（断点续传，已下的跳过）
-    fetcher = TencentDailyFetcher(out_dir="data_lake/price/daily",
-                                  start="2010-01-01", max_workers=6)
+    fetcher = resolve_source("price_hfq", out_dir="data_lake/price/daily",
+                             start="2010-01-01", max_workers=6)
     stats = fetcher.run(codes, skip_existing=True, progress_every=300)
     if stats["failures"]:
         print(f"\n重试 {len(stats['failures'])} 个失败...", flush=True)

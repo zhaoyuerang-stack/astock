@@ -117,6 +117,19 @@ def run_weekly(args):
                 [PYTHON, "-m", "scripts.research.live_readiness"],
                 dry_run=args.dry_run,
             )
+            # AutoResearch & 9-Gate 自动搜寻审计定时任务
+            report["factor_search"] = run_subprocess(
+                "automated factor search & 9-gate evaluation",
+                [PYTHON, "scripts/ops/scheduled_factor_search.py"],
+                dry_run=args.dry_run,
+            )
+            # 自动补审:对任何「在册」但缺 DSR 审计的版本(配置已知者)自动跑 9-Gate 并落台账,
+            # 保持台账多重检验覆盖不留空(行业级因子等不适配者会被记 SKIP)。
+            report["audit_stale"] = run_subprocess(
+                "auto-audit stale registered (补审未审计在册的 DSR)",
+                [PYTHON, "scripts/research/run_nine_gates_all.py", "--audit-stale", "--persist"],
+                dry_run=args.dry_run,
+            )
             report["status"] = "ok" if all(
                 report[name].get("ok")
                 for name in ["aggregate", "raw_close", "quality", "decay_monitor"]

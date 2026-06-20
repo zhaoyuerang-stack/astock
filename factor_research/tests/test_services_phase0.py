@@ -35,6 +35,8 @@ def test_backtest_smoke():
     assert res.n_stocks > 0 and res.n_days > 0
     assert res.annual == res.annual  # not NaN
     assert isinstance(res.hit, bool)
+    assert res.family == "illiquidity", res.family
+    assert res.version == "v3.1", res.version
     print(f"✅ backtest smoke: 年化={res.annual:+.2%} 夏普={res.sharpe:.2f} "
           f"回撤={res.maxdd:.2%} ({res.n_stocks}只×{res.n_days}日)")
 

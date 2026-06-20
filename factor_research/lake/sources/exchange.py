@@ -7,6 +7,7 @@ import akshare as ak
 import pandas as pd
 from lake.base import Fetcher, RateLimiter
 from lake.schema import MARGIN_RENAME, NORTHBOUND_RENAME
+from lake.sources.registry import register
 
 # RENAME mappings now live in lake.schema; module aliases for brevity.
 RENAME = MARGIN_RENAME
@@ -19,6 +20,7 @@ def _to_numeric(df, cols):
     return df
 
 
+@register("margin")
 class MarginFetcher(Fetcher):
     """
     个股两融明细，按交易日下载（沪+深合并）。key 是日期字符串 'YYYYMMDD'。
@@ -58,6 +60,7 @@ class MarginFetcher(Fetcher):
         return df[[c for c in keep if c in df.columns]]
 
 
+@register("northbound")
 class NorthboundFetcher(Fetcher):
     """北向持股每日个股统计，key 是日期字符串 'YYYYMMDD'。"""
 
@@ -97,6 +100,7 @@ class NorthboundFetcher(Fetcher):
         return df[[c for c in keep if c in df.columns]]
 
 
+@register("northbound_stock")
 class NorthboundIndividualFetcher(Fetcher):
     """北向单股完整持股历史，key 是股票代码。"""
 

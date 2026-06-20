@@ -3,11 +3,12 @@
 import { useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import MetricCard from "@/components/ui/MetricCard";
+import Card from "@/components/ui/Card";
 import { api, pct, signedPct, num } from "@/lib/api";
 import type { BacktestResult } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
 
-const DEFAULTS = { start: "2018-01-01", top_n: 25, rebalance_days: 20, factor_window: 60, timing_ma: 16, leverage: 1.25 };
+const DEFAULTS = { start: "2018-01-01", top_n: 25, rebalance_days: 20, factor_window: 20, timing_ma: 16 };
 
 export default function BacktestPage() {
   const [params, setParams] = useState(DEFAULTS);
@@ -61,7 +62,7 @@ export default function BacktestPage() {
 ## 分年度收益
 ${Object.entries(res.yearly_returns).map(([y, r]) => `- ${y}: ${signedPct(r)}`).join("\n")}
 
-> 口径 data_lake · 成本固化(买0.225%/卖0.275%/融资6.5%) · 研究辅助,不构成投资建议。
+> 口径 data_lake · 成本固化(买0.225%/卖0.275%/融资6.5%) · PureTrend MA16 Band 动态敞口(0~1.5x) · 研究辅助,不构成投资建议。
 `;
     const blob = new Blob([md], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
@@ -77,18 +78,17 @@ ${Object.entries(res.yearly_returns).map(([y, r]) => `- ${y}: ${signedPct(r)}`).
 
   return (
     <div>
-      <PageHeader title="策略回测" desc="生产口径回测(走 core.engine 唯一权威路径;前端不重算)" />
+      <PageHeader title="策略回测" desc="生产 illiquidity/v3.1 口径回测(前端不重算)" />
 
       {/* 配置栏 */}
       <div className="card mb-5">
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {([
             ["start", "起始日", "text"],
             ["top_n", "持仓数", "number"],
             ["rebalance_days", "调仓周期", "number"],
             ["factor_window", "因子窗口", "number"],
             ["timing_ma", "择时MA", "number"],
-            ["leverage", "杠杆", "number"],
           ] as const).map(([k, label, type]) => (
             <label key={k} className="text-[12px] text-subink">
               {label}
@@ -103,6 +103,9 @@ ${Object.entries(res.yearly_returns).map(([y, r]) => `- ${y}: ${signedPct(r)}`).
               />
             </label>
           ))}
+        </div>
+        <div className="mt-2 text-[11px] text-subink">
+          v3.1 使用 PureTrend MA16 Band 动态敞口(0~1.5x),不提供固定杠杆参数。
         </div>
         <div className="mt-3 flex items-center gap-3">
           <button
@@ -132,11 +135,11 @@ ${Object.entries(res.yearly_returns).map(([y, r]) => `- ${y}: ${signedPct(r)}`).
             <MetricCard label="入册达标" value={res.hit ? "达标 ✅" : "未达标 ❌"} tone={res.hit ? "ok" : "warn"} />
           </div>
 
-          <div className="card mb-5">
-            <div className="text-sm font-medium mb-1">分年度收益</div>
-            <div className="text-[11px] text-subink mb-3">
-              {res.n_stocks} 只 × {res.n_days} 日 · 年均换手 {num(res.turnover_annual, 1)}x · 成本拖累 {pct(res.cost_annual)}
-            </div>
+          <Card
+            title="分年度收益"
+            subtitle={`${res.n_stocks} 只 × ${res.n_days} 日 · 年均换手 ${num(res.turnover_annual, 1)}x · 成本拖累 ${pct(res.cost_annual)}`}
+            className="mb-5"
+          >
             <div className="flex items-end gap-3 h-40">
               {years.map(([y, r]) => (
                 <div key={y} className="flex-1 flex flex-col items-center justify-end h-full">
@@ -149,12 +152,12 @@ ${Object.entries(res.yearly_returns).map(([y, r]) => `- ${y}: ${signedPct(r)}`).
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         </>
       )}
 
       {!res && !loading && !err && (
-        <div className="card text-sm text-subink">配置参数后点「运行回测」。默认即生产 small-cap-size 口径。</div>
+        <div className="card text-sm text-subink">配置参数后点「运行回测」。默认即生产 illiquidity/v3.1 口径。</div>
       )}
     </div>
   );

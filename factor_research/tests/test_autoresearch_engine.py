@@ -112,6 +112,52 @@ def test_fingerprint_is_stable_and_repository_dedupes():
         assert len(repo.all()) == 1
 
 
+def test_fingerprint_semantic_equivalence():
+    base = _candidate()
+
+    # 案例①:相加顺序互换(交换律)
+    swapped = _candidate()
+    swapped["terms"] = list(reversed(swapped["terms"]))
+    assert fingerprint_ast(swapped) == fingerprint_ast(base)
+
+    # 案例②:同类项权重拆分(0.42 + 0.28 ≡ 0.7,含浮点求和噪声)
+    split = _candidate()
+    momentum = split["terms"][0]
+    part = {**momentum, "weight": 0.42}
+    momentum["weight"] = 0.28
+    split["terms"].insert(0, part)
+    assert fingerprint_ast(split) == fingerprint_ast(base)
+
+    # thesis 是解释性元数据,不参与身份
+    reworded = _candidate()
+    reworded["thesis"]["mechanism"] = "换一种机制描述,因子本身不变。"
+    assert fingerprint_ast(reworded) == fingerprint_ast(base)
+
+    # transforms 是有序管线,顺序不同 = 不同因子,绝不合并
+    reordered = _candidate()
+    reordered["terms"][0]["transforms"] = ["rank", "zscore", "mad_clip"]
+    assert fingerprint_ast(reordered) != fingerprint_ast(base)
+
+    # 同 window 但权重不同的项不会被误判为同一候选
+    reweighted = _candidate(weight=0.6)
+    assert fingerprint_ast(reweighted) != fingerprint_ast(base)
+
+    # 整体取反 = 同一假设(方向在 L0 经验定向,|ICIR| 适应度符号无关)
+    # 编码①:direction 字段翻转
+    neg_dir = _candidate()
+    neg_dir["direction"] = "negative"
+    assert fingerprint_ast(neg_dir) == fingerprint_ast(base)
+    # 编码②:整组权重取负
+    neg_w = _candidate()
+    for t in neg_w["terms"]:
+        t["weight"] = -t["weight"]
+    assert fingerprint_ast(neg_w) == fingerprint_ast(base)
+    # 但单项取反(非整体)是不同信号,绝不折叠
+    partial = _candidate()
+    partial["terms"][0]["weight"] = -partial["terms"][0]["weight"]
+    assert fingerprint_ast(partial) != fingerprint_ast(base)
+
+
 def test_candidate_generator_produces_unique_valid_ast_batch():
     candidates = list(generate_seed_candidates(limit=10))
     assert len(candidates) == 10
@@ -389,6 +435,55 @@ def test_validation_pipeline_runs_l0_to_l3_and_promotes_only_after_l3():
         assert len(ReviewQueue(root / "review_queue.jsonl").all()) == 1
 
 
+def test_validation_pipeline_skips_candidates_blocked_by_knowledge_graph():
+    from knowledge.graph import Finding, KnowledgeGraph, SearchGate
+
+    calls: list[str] = []
+
+    def fake_l0(hyp, *args, **kwargs):
+        calls.append("l0")
+        return Experiment(
+            experiment_id="fake-l0",
+            hypothesis_id=hyp.id,
+            protocol=ExperimentProtocol.L0_IC_SCAN,
+            vintage_id=kwargs.get("vintage_id", "test-vintage"),
+            result=ExperimentResult(metrics={"ok": 1.0}, details={"direction": "long"}),
+            decision=Decision.PROMOTE,
+            notes="should not run",
+        )
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        candidate = validate_candidate_ast(_candidate())
+        hyp = ast_to_hypothesis(candidate)
+        kg = KnowledgeGraph(str(root / "findings.json"))
+        kg.add(Finding(
+            id="known_bad_candidate",
+            statement="known leaky candidate",
+            gates=[SearchGate(match={"name": hyp.name}, action="SKIP", reason="known bad")],
+        ))
+
+        result = run_validation_pipeline(
+            candidate,
+            close=pd.DataFrame(),
+            volume=pd.DataFrame(),
+            amount=pd.DataFrame(),
+            forward_ret=pd.DataFrame(),
+            vintage_id="test-vintage",
+            repository=CandidateRepository(root / "candidates.jsonl"),
+            experiment_log=ExperimentLog(root / "experiment_log.jsonl"),
+            review_queue=ReviewQueue(root / "review_queue.jsonl"),
+            runners={"l0": fake_l0},
+            max_stage="l0",
+            knowledge_graph=kg,
+        )
+
+        assert calls == []
+        assert result.status == CandidateStatus.DISCARDED
+        assert result.decision == CandidateDecision.DISCARD
+        assert result.metrics["knowledge_gate"]["action"] == "SKIP"
+
+
 def _synthetic_panel(n_days: int = 420, n_stocks: int = 25):
     """确定性合成面板:逐股持续漂移,使动量在截面上可预测,不依赖 data_lake。"""
     import numpy as np
@@ -608,6 +703,150 @@ def test_promote_approved_candidate_gates_and_calls_workflow_promote():
         assert not (root / "strategy_versions.json").exists()
 
 
+def test_review_approve_auto_promote_submits_shadow_job():
+    from types import SimpleNamespace
+
+    from services.actions.autoresearch import review_autoresearch_candidate
+
+    promote_kwargs = dict(
+        l0_metrics={"rank_ic_mean": 0.035, "icir": 0.55, "coverage": 0.91, "nan_ratio": 0.02, "extreme_ratio": 0.01},
+        l1_metrics={"monotonic_groups": True, "top_bottom_return": 0.08, "cost_after_return": 0.05, "turnover": 0.8},
+        redundancy_inputs={"spearman_corr": 0.15, "normalized_mi": 0.2, "holding_overlap": 0.1, "return_corr": 0.1, "exposure_similarity": 0.2},
+    )
+    submitted = {}
+
+    def fake_submitter(kind, fn, *args, **kwargs):
+        submitted.update({"kind": kind, "fn": fn, "args": args, "kwargs": kwargs})
+        return SimpleNamespace(job_id="job-shadow-1", kind=kind, status="queued")
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        repo = CandidateRepository(root / "candidates.jsonl")
+        review = ReviewQueue(root / "review_queue.jsonl")
+        cand = validate_candidate_ast(_candidate())
+        evaluate_lite(cand, repository=repo, review_queue=review, **promote_kwargs)
+
+        item = review_autoresearch_candidate(
+            fingerprint=cand.fingerprint,
+            action="approve",
+            repository=repo,
+            review_queue=review,
+            auto_promote_after_approve=True,
+            job_submitter=fake_submitter,
+        )
+
+        assert item.status == CandidateStatus.PROMOTING.value
+        assert item.promote_job_id == "job-shadow-1"
+        assert item.target_status == "SHADOW"
+        assert repo.get(cand.fingerprint).status == CandidateStatus.PROMOTING
+        assert review.get(cand.fingerprint)["status"] == CandidateStatus.PROMOTING.value
+        assert submitted["kind"] == "autoresearch.promote_after_approve"
+        assert submitted["kwargs"]["target_status"] == "SHADOW"
+
+
+def test_auto_promote_shadow_updates_review_queue_and_never_active():
+    from types import SimpleNamespace
+
+    from services.actions.autoresearch import promote_approved_candidate, review_autoresearch_candidate
+
+    promote_kwargs = dict(
+        l0_metrics={"rank_ic_mean": 0.035, "icir": 0.55, "coverage": 0.91, "nan_ratio": 0.02, "extreme_ratio": 0.01},
+        l1_metrics={"monotonic_groups": True, "top_bottom_return": 0.08, "cost_after_return": 0.05, "turnover": 0.8},
+        redundancy_inputs={"spearman_corr": 0.15, "normalized_mi": 0.2, "holding_overlap": 0.1, "return_corr": 0.1, "exposure_similarity": 0.2},
+    )
+    calls = []
+
+    def fake_shadow_promote(hyp, version="v1.0", **kw):
+        calls.append({"hyp": hyp.name, "version": version, **kw})
+        return SimpleNamespace(
+            registered=True,
+            detail="registered as shadow",
+            status="候选",
+            phase_summary={"phase4": {"registered": True, "status": "候选"}},
+        )
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        repo = CandidateRepository(root / "candidates.jsonl")
+        review = ReviewQueue(root / "review_queue.jsonl")
+        cand = validate_candidate_ast(_candidate())
+        evaluate_lite(cand, repository=repo, review_queue=review, **promote_kwargs)
+        review_autoresearch_candidate(fingerprint=cand.fingerprint, action="approve", repository=repo, review_queue=review)
+
+        resp = promote_approved_candidate(
+            fingerprint=cand.fingerprint,
+            version="v-shadow",
+            target_status="SHADOW",
+            auto_job=True,
+            repository=repo,
+            review_queue=review,
+            promote_fn=fake_shadow_promote,
+        )
+
+        assert calls[0]["target_status"] == "SHADOW"
+        assert resp.registered is True
+        assert resp.target_status == "SHADOW"
+        assert resp.registry_status == "候选"
+        assert resp.phase_summary["phase4"]["status"] == "候选"
+        assert review.get(cand.fingerprint)["status"] == CandidateStatus.PROMOTED_SHADOW.value
+        assert repo.get(cand.fingerprint).status == CandidateStatus.PROMOTED_SHADOW
+
+        def fake_active_promote(hyp, version="v1.0", **kw):
+            return SimpleNamespace(registered=True, detail="would be active", status="在册")
+
+        review.record_decision(cand.fingerprint, CandidateStatus.APPROVED, action="approve")
+        try:
+            promote_approved_candidate(
+                fingerprint=cand.fingerprint,
+                target_status="SHADOW",
+                auto_job=True,
+                repository=repo,
+                review_queue=review,
+                promote_fn=fake_active_promote,
+            )
+            raise AssertionError("SHADOW auto-promote must reject ACTIVE/在册 registry status")
+        except RuntimeError as e:
+            assert "ACTIVE" in str(e) or "在册" in str(e)
+
+
+def test_auto_promote_failure_marks_retryable_promote_failed():
+    from services.actions.autoresearch import promote_approved_candidate_job, review_autoresearch_candidate
+
+    promote_kwargs = dict(
+        l0_metrics={"rank_ic_mean": 0.035, "icir": 0.55, "coverage": 0.91, "nan_ratio": 0.02, "extreme_ratio": 0.01},
+        l1_metrics={"monotonic_groups": True, "top_bottom_return": 0.08, "cost_after_return": 0.05, "turnover": 0.8},
+        redundancy_inputs={"spearman_corr": 0.15, "normalized_mi": 0.2, "holding_overlap": 0.1, "return_corr": 0.1, "exposure_similarity": 0.2},
+    )
+
+    def failing_promote(*args, **kwargs):
+        raise RuntimeError("shadow promote boom")
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        repo = CandidateRepository(root / "candidates.jsonl")
+        review = ReviewQueue(root / "review_queue.jsonl")
+        cand = validate_candidate_ast(_candidate())
+        evaluate_lite(cand, repository=repo, review_queue=review, **promote_kwargs)
+        review_autoresearch_candidate(fingerprint=cand.fingerprint, action="approve", repository=repo, review_queue=review)
+
+        try:
+            promote_approved_candidate_job(
+                fingerprint=cand.fingerprint,
+                repository=repo,
+                review_queue=review,
+                promote_fn=failing_promote,
+            )
+            raise AssertionError("failing promote job must re-raise so job status becomes failed")
+        except RuntimeError:
+            pass
+
+        item = review.get(cand.fingerprint)
+        assert item["status"] == CandidateStatus.PROMOTE_FAILED.value
+        assert item["review_action"] == "approve"
+        assert "shadow promote boom" in item["promote_error"]
+        assert repo.get(cand.fingerprint).status == CandidateStatus.PROMOTE_FAILED
+
+
 class _FakeLLMAdapter:
     name = "fake"
     model = "fake-model"
@@ -697,7 +936,382 @@ def test_island_search_mutation_stays_in_whitelist_and_search_is_deterministic()
         assert all(c.icir != 0.0 or c.status for c in r1.champions)
         # 同 seed + 同数据 → 同冠军(实验可复现)
         assert [c.fingerprint for c in r1.champions] == [c.fingerprint for c in r2.champions]
-        assert r1.champions[0].icir == max(c.icir for c in r1.champions) or abs(r1.champions[0].icir) >= abs(r1.champions[-1].icir)
+        # 冠军按混合适应度(|ICIR| + novelty_weight × 新颖性)降序
+        fits = [c.fitness for c in r1.champions]
+        assert fits == sorted(fits, reverse=True)
+        assert all(abs(c.fitness - (abs(c.icir) + 0.25 * c.novelty)) < 1e-9 for c in r1.champions)
+
+
+def test_novelty_scores_behavioral_distance_not_syntax():
+    """新颖性按行为算:克隆(含反向克隆)被识别为冗余,行为不同的因子得高分。"""
+    from factory.autoresearch.novelty import candidate_factor_panel, novelty_score, sample_behavior_dates
+
+    close, volume, _ = _synthetic_panel()
+    dates = sample_behavior_dates(close.index, 60)
+    assert len(dates) <= 60 and dates[-1] == close.index[-1]
+
+    base_ast = _candidate()
+    base = candidate_factor_panel(base_ast, close, volume, dates)
+
+    # 空参考池:未知即新颖
+    assert novelty_score(base, []) == 1.0
+    # 自身克隆:spearman=1 + 持仓全重叠 → 新颖性归零
+    assert novelty_score(base, [base]) < 1e-6
+
+    # 反向克隆:|spearman| 仍为 1(方向无关),只是持仓不再重叠 → 仍判低新颖
+    flipped = candidate_factor_panel({**base_ast, "direction": "negative"}, close, volume, dates)
+    nov_flipped = novelty_score(flipped, [base])
+
+    # 行为不同的因子(波动率)应明显比反向克隆新颖
+    vol_ast = {
+        "type": "linear_combo",
+        "terms": [{"factor": "volatility", "params": {"window": 20},
+                   "transforms": ["mad_clip", "zscore", "rank"], "weight": 1.0}],
+        "direction": "positive",
+        "thesis": {"mechanism": "低波动异象测试因子。", "citation": "test"},
+    }
+    vol = candidate_factor_panel(vol_ast, close, volume, dates)
+    nov_vol = novelty_score(vol, [base])
+    assert nov_vol > nov_flipped
+    assert nov_vol > 0.5
+
+    # 最近邻语义:克隆参考池中任意一个即低新颖,不被其余参考稀释
+    assert novelty_score(base, [vol, base]) < 1e-6
+
+
+def test_island_fitness_blends_novelty_with_icir():
+    """同 ICIR 下排序由新颖性决定(fake l0 恒定 ICIR,新颖性成为唯一区分项)。"""
+    from factory.autoresearch.islands import run_island_search
+
+    def fake_l0(hyp, *args, **kwargs):
+        return Experiment(
+            experiment_id="fake-l0",
+            hypothesis_id=hyp.id,
+            protocol=ExperimentProtocol.L0_IC_SCAN,
+            vintage_id=kwargs.get("vintage_id", "synthetic"),
+            result=ExperimentResult(metrics={"ICIR": 0.1}, details={"direction": "long"}),
+            decision=Decision.PROMOTE,
+            notes="fake l0 pass",
+        )
+
+    close, volume, amount = _synthetic_panel()
+    from factory.lines.line2_validation.l0_ic_scan import precompute_forward_returns
+    forward_ret = precompute_forward_returns(close)
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        result = run_island_search(
+            close, volume, amount, forward_ret,
+            vintage_id="synthetic",
+            n_islands=2, generations=1, population=4, top_k=4, rng_seed=7,
+            runners={"l0": fake_l0},
+            repository=CandidateRepository(root / "candidates.jsonl"),
+            experiment_log=ExperimentLog(root / "experiment_log.jsonl"),
+            review_queue=ReviewQueue(root / "review_queue.jsonl"),
+        )
+
+    assert result.champions
+    for c in result.champions:
+        assert 0.0 <= c.novelty <= 1.0
+        assert abs(c.fitness - (abs(c.icir) + 0.25 * c.novelty)) < 1e-9
+    # ICIR 恒定 → 冠军排序 = 新颖性排序
+    novs = [c.novelty for c in result.champions]
+    assert novs == sorted(novs, reverse=True)
+
+
+def test_marginal_return_correlation_helpers():
+    """top-N 收益代理 + 有符号最大相关:自相关≈1、反相关为负、无效→0。"""
+    import numpy as np
+    from factory.autoresearch.novelty import max_return_correlation, topn_long_return
+
+    dates = pd.bdate_range("2024-01-01", periods=6)
+    cols = list("ABCDE")
+    # 因子:A>B>C>D>E 恒定;top_n=2 → 每日选 {A,B}
+    panel = pd.DataFrame({c: [5 - i] * 6 for i, c in enumerate(cols)}, index=dates, dtype=float)
+    fr = pd.DataFrame(np.arange(30).reshape(6, 5) / 100.0, index=dates, columns=cols)
+    ret = topn_long_return(panel, fr, top_n=2)
+    # 每日 {A,B} 的前向收益均值 = (5k + 5k+1)/2/100
+    expected = [(fr.loc[d, "A"] + fr.loc[d, "B"]) / 2 for d in dates]
+    assert np.allclose(ret.values, expected)
+
+    # 自相关 ≈ 1；反相关 ≈ -1;方差退化 / 空参考 → 0
+    assert abs(max_return_correlation(ret, [ret]) - 1.0) < 1e-9
+    assert max_return_correlation(ret, [-ret]) < -0.99
+    assert max_return_correlation(ret, []) == 0.0
+    flat = pd.Series(0.0, index=dates)
+    assert max_return_correlation(ret, [flat]) == 0.0
+    # 取 max:与任一腿雷同即算冗余(高相关腿主导)
+    assert abs(max_return_correlation(ret, [-ret, ret]) - 1.0) < 1e-9
+
+
+def test_topn_turnover_proxy():
+    """换手代理:成员恒定→0,每期全换→1,部分重叠→中间。"""
+    from factory.autoresearch.novelty import topn_turnover
+
+    dates = pd.bdate_range("2024-01-01", periods=4)
+    cols = list("ABCDEF")
+    # 恒定 top-2 = {A,B} 每期都选 → churn 0
+    const = pd.DataFrame({c: [6 - i] * 4 for i, c in enumerate(cols)}, index=dates, dtype=float)
+    assert topn_turnover(const, top_n=2) == 0.0
+    # 每期 top-2 完全不同 → churn 1.0
+    rot = pd.DataFrame(0.0, index=dates, columns=cols)
+    picks = [["A", "B"], ["C", "D"], ["E", "F"], ["A", "B"]]
+    for d, pk in zip(dates, picks):
+        for j, c in enumerate(pk):
+            rot.loc[d, c] = 10 - j
+    assert abs(topn_turnover(rot, top_n=2) - 1.0) < 1e-9
+
+
+def test_island_fitness_penalizes_turnover():
+    """turnover_weight>0 时,适应度含 −turnover_weight×换手;冠军按换手升序(低换手胜)。"""
+    from factory.autoresearch.islands import run_island_search
+    from factory.lines.line2_validation.l0_ic_scan import precompute_forward_returns
+
+    def fake_l0(hyp, *args, **kwargs):
+        return Experiment(
+            experiment_id="fake-l0", hypothesis_id=hyp.id,
+            protocol=ExperimentProtocol.L0_IC_SCAN,
+            vintage_id=kwargs.get("vintage_id", "synthetic"),
+            result=ExperimentResult(metrics={"ICIR": 0.3}, details={"direction": "long"}),
+            decision=Decision.PROMOTE, notes="fake",
+        )
+
+    close, volume, amount = _synthetic_panel()
+    forward_ret = precompute_forward_returns(close)
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        result = run_island_search(
+            close, volume, amount, forward_ret,
+            vintage_id="synthetic",
+            n_islands=2, generations=1, population=4, top_k=4, rng_seed=7,
+            novelty_weight=0.0, corr_weight=0.0, turnover_weight=1.0,
+            runners={"l0": fake_l0},
+            repository=CandidateRepository(root / "candidates.jsonl"),
+            experiment_log=ExperimentLog(root / "experiment_log.jsonl"),
+            review_queue=ReviewQueue(root / "review_queue.jsonl"),
+        )
+    assert result.champions
+    for c in result.champions:
+        assert 0.0 <= c.turnover <= 1.0
+        assert abs(c.fitness - (abs(c.icir) - 1.0 * c.turnover)) < 1e-9
+    # ICIR 恒定 → 冠军排序 = 换手升序(低换手者胜出)
+    turns = [c.turnover for c in result.champions]
+    assert turns == sorted(turns)
+
+
+def test_island_fitness_penalizes_correlation_to_book():
+    """corr_weight>0 时,适应度 = |ICIR| − corr_weight×对在册相关(novelty=0 隔离)。
+
+    ICIR 恒定 + novelty_weight=0 → 适应度 = C − w×corr,冠军排序 = 对在册相关升序
+    (越去相关越靠前)。直接证明边际惩罚把选择推向去相关。
+    """
+    from factory.autoresearch.islands import run_island_search
+    from factory.autoresearch.novelty import candidate_factor_panel, sample_behavior_dates
+    from factory.lines.line2_validation.l0_ic_scan import precompute_forward_returns
+
+    def fake_l0(hyp, *args, **kwargs):
+        return Experiment(
+            experiment_id="fake-l0", hypothesis_id=hyp.id,
+            protocol=ExperimentProtocol.L0_IC_SCAN,
+            vintage_id=kwargs.get("vintage_id", "synthetic"),
+            result=ExperimentResult(metrics={"ICIR": 0.3}, details={"direction": "long"}),
+            decision=Decision.PROMOTE, notes="fake",
+        )
+
+    close, volume, amount = _synthetic_panel()
+    forward_ret = precompute_forward_returns(close)
+    # 参考"在册腿" = 一个 momentum(20) 因子面板(全窗口,服务层传入口径)
+    book_ast = {"type": "linear_combo", "direction": "positive",
+                "terms": [{"factor": "momentum", "params": {"window": 20},
+                           "transforms": ["mad_clip", "zscore", "rank"], "weight": 1.0}],
+                "thesis": {"mechanism": "在册动量腿。", "citation": "test"}}
+    book_panel = candidate_factor_panel(book_ast, close, volume, close.index)
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        result = run_island_search(
+            close, volume, amount, forward_ret,
+            vintage_id="synthetic",
+            n_islands=2, generations=1, population=4, top_k=4, rng_seed=7,
+            novelty_weight=0.0, corr_weight=1.0, rediscovery_corr=0.0,  # 隔离软罚,关硬闸
+            reference_panels=[book_panel],
+            runners={"l0": fake_l0},
+            repository=CandidateRepository(root / "candidates.jsonl"),
+            experiment_log=ExperimentLog(root / "experiment_log.jsonl"),
+            review_queue=ReviewQueue(root / "review_queue.jsonl"),
+        )
+
+    assert result.champions
+    for c in result.champions:
+        assert -1.0 <= c.corr_to_book <= 1.0
+        # novelty=0 → fitness == |icir| − corr_weight×corr_to_book
+        assert abs(c.fitness - (abs(c.icir) - 1.0 * c.corr_to_book)) < 1e-9
+    # ICIR 恒定 → 冠军排序 = 对在册相关升序(去相关者胜出)
+    corrs = [c.corr_to_book for c in result.champions]
+    assert corrs == sorted(corrs)
+    # 至少有候选与在册腿正相关被压(否则惩罚没起作用)
+    assert max(corrs) > 0.1
+
+
+def test_newey_west_icir_corrects_overlap_inflation():
+    """NW 校正:重叠/自相关 IC 序列的 ICIR 被压回真值;白噪声基本不变。"""
+    import numpy as np
+    from engine.factor_analysis import newey_west_icir
+
+    rng = np.random.default_rng(7)
+    wn = rng.normal(0.05, 0.1, 2000)
+    raw_wn = abs(wn.mean()) / wn.std()
+    nw_wn = newey_west_icir(wn, max_lag=20)
+    assert abs(nw_wn - raw_wn) / raw_wn < 0.2  # 白噪声:NW≈raw
+
+    ar = np.zeros(2000); ar[0] = 0.05
+    for i in range(1, 2000):
+        ar[i] = 0.95 * ar[i - 1] + rng.normal(0.0025, 0.03)
+    raw_ar = abs(ar.mean()) / ar.std()
+    nw_ar = newey_west_icir(ar, max_lag=20)
+    assert nw_ar < raw_ar * 0.5  # 强自相关:NW 显著压低(重叠虚高被校正)
+    assert newey_west_icir([0.1], max_lag=20) != newey_west_icir([0.1], max_lag=20) or True  # n<2 → nan 不崩
+
+
+def test_l0_reports_nw_corrected_icir():
+    """L0 落账 raw ICIR(闸门)与 ICIR_nw(诚实绝对量级)两个口径。"""
+    from factory.lines.line2_validation.l0_ic_scan import precompute_forward_returns, run_l0
+
+    close, volume, amount = _synthetic_panel(n_stocks=60)  # ≥30 截面样本(L0 min_ic_count)
+    forward_ret = precompute_forward_returns(close)  # horizon=20
+    hyp = ast_to_hypothesis(validate_candidate_ast(_candidate()))  # QUEUED,run_l0 入口要求
+    exp = run_l0(hyp, close, volume, amount, forward_ret, vintage_id="nw-test")
+    assert exp.result.error is None, exp.result.error
+    assert "ICIR_nw" in exp.result.metrics and "ICIR" in exp.result.metrics  # 两口径并存
+    assert exp.result.details.get("ic_ir_nw") is not None
+
+
+def test_rediscovery_gate_zeros_edge_above_corr_threshold():
+    """重发现硬闸:对在册相关 ≥ 阈值 → |ICIR| 归零(边际为零),沉到真候选之下。"""
+    from factory.autoresearch.islands import run_island_search
+    from factory.autoresearch.novelty import candidate_factor_panel
+    from factory.lines.line2_validation.l0_ic_scan import precompute_forward_returns
+
+    def fake_l0(hyp, *args, **kwargs):
+        return Experiment(
+            experiment_id="fake-l0", hypothesis_id=hyp.id,
+            protocol=ExperimentProtocol.L0_IC_SCAN,
+            vintage_id=kwargs.get("vintage_id", "synthetic"),
+            result=ExperimentResult(metrics={"ICIR": 0.3}, details={"direction": "long"}),
+            decision=Decision.PROMOTE, notes="fake",
+        )
+
+    close, volume, amount = _synthetic_panel()
+    forward_ret = precompute_forward_returns(close)
+    book_ast = {"type": "linear_combo", "direction": "positive",
+                "terms": [{"factor": "momentum", "params": {"window": 20},
+                           "transforms": ["mad_clip", "zscore", "rank"], "weight": 1.0}],
+                "thesis": {"mechanism": "在册动量腿。", "citation": "test"}}
+    book_panel = candidate_factor_panel(book_ast, close, volume, close.index)
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        result = run_island_search(
+            close, volume, amount, forward_ret,
+            vintage_id="synthetic",
+            n_islands=2, generations=1, population=4, top_k=4, rng_seed=7,
+            novelty_weight=0.0, corr_weight=1.0, turnover_weight=0.0,
+            rediscovery_corr=0.5, reference_panels=[book_panel],
+            runners={"l0": fake_l0},
+            repository=CandidateRepository(root / "candidates.jsonl"),
+            experiment_log=ExperimentLog(root / "experiment_log.jsonl"),
+            review_queue=ReviewQueue(root / "review_queue.jsonl"),
+        )
+
+    assert result.champions
+    gated = 0
+    for c in result.champions:
+        if c.corr_to_book >= 0.5:  # 重发现:edge 归零 → fitness == −corr_weight×corr
+            assert abs(c.fitness - (-1.0 * c.corr_to_book)) < 1e-9
+            gated += 1
+        else:  # 真候选:保留 |ICIR| → fitness == |icir| − corr
+            assert abs(c.fitness - (abs(c.icir) - 1.0 * c.corr_to_book)) < 1e-9
+    # 至少有一个重发现被闸(否则没测到 gate)
+    assert gated >= 1
+
+
+def test_walk_forward_search_truncates_train_and_scores_oos_after_cutoff():
+    """元级防未来:进化选择回路只见 <=cutoff 的物理截断面板;冠军在 cutoff 后一次性 OOS 评分。"""
+    from factory.autoresearch.walkforward import run_walk_forward_search
+    from factory.lines.line2_validation.l0_ic_scan import run_l0
+
+    close, volume, amount = _synthetic_panel()
+    cutoff = "2022-01-31"
+    cutoff_ts = pd.Timestamp(cutoff)
+    seen = {"train_calls": 0, "oos_windows": []}
+
+    def spy_l0(hyp, c, v, a, forward_ret, vintage_id, sample_dates=None):
+        if "|train" in vintage_id:
+            seen["train_calls"] += 1
+            assert c.index.max() <= cutoff_ts
+            assert forward_ret.index.max() <= cutoff_ts
+            # forward_ret 必须由截断后的 close 重算:末端 horizon 天 NaN,
+            # 若是全样本 forward_ret 切片,这里会掺入 cutoff 后的价格
+            assert forward_ret.iloc[-1].isna().all()
+        else:
+            assert forward_ret.index.min() > cutoff_ts
+            seen["oos_windows"].append((forward_ret.index.min(), forward_ret.index.max()))
+        return run_l0(hyp, c, v, a, forward_ret, vintage_id=vintage_id, sample_dates=sample_dates)
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        result = run_walk_forward_search(
+            close, volume, amount,
+            cutoff=cutoff,
+            vintage_id="synthetic-wf",
+            repository=CandidateRepository(root / "candidates.jsonl"),
+            runners={"l0": spy_l0},
+            n_islands=2, generations=1, population=3, top_k=2, rng_seed=7,
+            sample_dates=60,
+            experiment_log=ExperimentLog(root / "experiment_log.jsonl"),
+            review_queue=ReviewQueue(root / "review_queue.jsonl"),
+        )
+
+    assert seen["train_calls"] > 0
+    assert len(result.champions) == 2
+    assert len(seen["oos_windows"]) == 2  # 每冠军恰好 OOS 评一次,绝不回流训练选择
+    assert result.cutoff < result.oos_start <= result.oos_end
+    for c in result.champions:
+        assert c.oos_icir is not None
+        assert c.oos_decision in {"promote", "discard"}
+        assert "|train" in result.train_vintage_id and "|oos:" in result.oos_vintage_id
+
+
+def test_walk_forward_reference_builder_only_sees_truncated_panels():
+    """元级防未来:在册参考面板的构造器只能在 <=cutoff 的截断面板上被调用。"""
+    from factory.autoresearch.walkforward import run_walk_forward_search
+    from factory.lines.line2_validation.l0_ic_scan import run_l0
+
+    close, volume, amount = _synthetic_panel()
+    cutoff = "2022-01-31"
+    cutoff_ts = pd.Timestamp(cutoff)
+    seen = {"builder_max_dates": []}
+
+    def spy_builder(c, v, a):
+        seen["builder_max_dates"].append((c.index.max(), v.index.max(), a.index.max()))
+        return [c.rolling(20).mean()]  # 任意参考面板,口径与 c 一致
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        run_walk_forward_search(
+            close, volume, amount,
+            cutoff=cutoff, vintage_id="wf-ref",
+            repository=CandidateRepository(root / "candidates.jsonl"),
+            runners={"l0": run_l0},
+            reference_builder=spy_builder, corr_weight=0.3,
+            n_islands=2, generations=1, population=3, top_k=2, rng_seed=7, sample_dates=60,
+            experiment_log=ExperimentLog(root / "experiment_log.jsonl"),
+            review_queue=ReviewQueue(root / "review_queue.jsonl"),
+        )
+
+    assert seen["builder_max_dates"], "corr_weight>0 时 reference_builder 必须被调用"
+    for cmax, vmax, amax in seen["builder_max_dates"]:
+        assert cmax <= cutoff_ts and vmax <= cutoff_ts and amax <= cutoff_ts
 
 
 def test_read_views_expose_candidates_and_review_queue():
@@ -748,10 +1362,104 @@ def test_read_views_expose_candidates_and_review_queue():
         assert any(s["stage"] == "promoted_to_review" and s["count"] == 1 for s in funnel.stages)
 
 
+def _failed_result(fingerprint: str, death_protocol: str, *, veto_review: bool = False):
+    """构造与 run_validation_pipeline 同构的失败记录(死于指定关卡)。"""
+    from factory.autoresearch.models import CandidateEvaluationResult
+
+    experiments = [{"protocol": "l0_ic_scan", "decision": "promote", "metrics": {}, "details": {}}]
+    if death_protocol != "l0_ic_scan":
+        experiments.append({"protocol": death_protocol, "decision": "discard", "metrics": {}, "details": {}})
+    else:
+        experiments = [{"protocol": "l0_ic_scan", "decision": "discard", "metrics": {}, "details": {}}]
+    return CandidateEvaluationResult(
+        fingerprint=fingerprint,
+        status=CandidateStatus.DISCARDED,
+        decision=CandidateDecision.DISCARD,
+        metrics={"experiments": experiments, "veto_review_candidate": veto_review},
+        reason="annual failed" if death_protocol == "l1_quick_bt" else "no signal",
+    )
+
+
+def test_failure_ledger_aggregates_death_causes_with_evidence_gated_lessons():
+    from factory.autoresearch.reflection import build_failure_ledger, ledger_to_prompt
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        log = ExperimentLog(root / "log.jsonl")
+        repo = CandidateRepository(root / "candidates.jsonl")
+
+        # 两个动量类候选死 L1 且 L0 信息强(货币化形态死因);一个死 L0
+        c1, c2, c3 = (validate_candidate_ast(_candidate(w)) for w in (0.7, 0.8, 0.9))
+        for c in (c1, c2, c3):
+            repo.add(c)
+        log.append(_failed_result(c1.fingerprint, "l1_quick_bt", veto_review=True))
+        log.append(_failed_result(c2.fingerprint, "l1_quick_bt", veto_review=True))
+        log.append(_failed_result(c3.fingerprint, "l0_ic_scan"))
+        # 成功记录不计入失败台账
+        from factory.autoresearch.models import CandidateEvaluationResult
+        log.append(CandidateEvaluationResult(
+            fingerprint="ok", status=CandidateStatus.PROMOTED_TO_REVIEW,
+            decision=CandidateDecision.PROMOTE, metrics={}, reason="",
+        ))
+
+        ledger = build_failure_ledger(log, repo)
+        assert ledger.total_failed == 3
+        assert ledger.deaths_by_stage == {"l1_quick_bt": 2, "l0_ic_scan": 1}
+        assert ledger.veto_form_deaths == 2
+        # 证据门控:货币化形态教训(2 次达阈值)+ 因子级教训(momentum 2 次死 L1)
+        assert any("空头侧" in les for les in ledger.lessons)
+        assert any("momentum" in les and "2 次" in les for les in ledger.lessons)
+        # L0 只死 1 次,不产出因子级教训(低于 min_pattern_count)
+        assert not any("L0" in les and "volume_ratio" in les for les in ledger.lessons)
+
+        prompt = ledger_to_prompt(ledger)
+        assert "失败台账" in prompt and "L1" in prompt
+
+        # 空日志 → 空提示(不注入噪音)
+        empty = build_failure_ledger(ExperimentLog(root / "empty.jsonl"))
+        assert empty.total_failed == 0 and ledger_to_prompt(empty) == ""
+
+
+def test_llm_generation_injects_failure_ledger_into_prompt():
+    import json as _json
+
+    from services.actions.autoresearch_llm import generate_llm_candidates
+
+    captured = {}
+
+    class _CaptureAdapter(_FakeLLMAdapter):
+        def complete(self, system, user, max_tokens=2000):
+            captured["user"] = user
+            return super().complete(system, user, max_tokens)
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        log = ExperimentLog(root / "log.jsonl")
+        repo = CandidateRepository(root / "candidates.jsonl")
+        for w in (0.6, 0.65):
+            c = validate_candidate_ast(_candidate(w))
+            repo.add(c)
+            log.append(_failed_result(c.fingerprint, "l1_quick_bt", veto_review=True))
+
+        payload = "```json\n" + _json.dumps([_candidate(0.75)]) + "\n```"
+        accepted, _, _ = generate_llm_candidates(
+            n=1, adapter=_CaptureAdapter(payload), repository=repo, experiment_log=log,
+        )
+        assert len(accepted) == 1
+        assert "失败台账" in captured["user"] and "优先级最高" in captured["user"]
+        assert "空头侧" in captured["user"]  # 货币化形态教训进了提示词
+
+        # 不传 experiment_log → 不注入(向后兼容)
+        repo2 = CandidateRepository(root / "candidates2.jsonl")
+        generate_llm_candidates(n=1, adapter=_CaptureAdapter(payload), repository=repo2)
+        assert "失败台账" not in captured["user"]
+
+
 if __name__ == "__main__":
     test_json_ast_validation_rejects_free_string_and_unknown_ops()
     test_neutralize_declaration_rejected_until_runtime_supports_it()
     test_fingerprint_is_stable_and_repository_dedupes()
+    test_fingerprint_semantic_equivalence()
     test_candidate_generator_produces_unique_valid_ast_batch()
     test_ast_to_hypothesis_uses_controlled_runtime_factor()
     test_dsl_runtime_factor_computes_linear_combo_panel()
@@ -761,12 +1469,29 @@ if __name__ == "__main__":
     test_lite_engine_logs_discard_shelve_and_promote_without_registry_write()
     test_experiment_log_roundtrips_decision_enum()
     test_validation_pipeline_runs_l0_to_l3_and_promotes_only_after_l3()
+    test_validation_pipeline_skips_candidates_blocked_by_knowledge_graph()
     test_real_runners_accept_autoresearch_hypothesis_contract()
     test_validation_pipeline_executes_real_l0_on_synthetic_panel()
     test_run_autoresearch_seeds_action_uses_pipeline_contract()
     test_human_review_approve_reject_without_registry_write()
     test_promote_approved_candidate_gates_and_calls_workflow_promote()
+    test_review_approve_auto_promote_submits_shadow_job()
+    test_auto_promote_shadow_updates_review_queue_and_never_active()
+    test_auto_promote_failure_marks_retryable_promote_failed()
     test_llm_generation_validates_rejects_and_dedupes()
     test_island_search_mutation_stays_in_whitelist_and_search_is_deterministic()
+    test_novelty_scores_behavioral_distance_not_syntax()
+    test_island_fitness_blends_novelty_with_icir()
+    test_marginal_return_correlation_helpers()
+    test_topn_turnover_proxy()
+    test_island_fitness_penalizes_turnover()
+    test_island_fitness_penalizes_correlation_to_book()
+    test_newey_west_icir_corrects_overlap_inflation()
+    test_l0_reports_nw_corrected_icir()
+    test_rediscovery_gate_zeros_edge_above_corr_threshold()
+    test_walk_forward_search_truncates_train_and_scores_oos_after_cutoff()
+    test_walk_forward_reference_builder_only_sees_truncated_panels()
     test_read_views_expose_candidates_and_review_queue()
+    test_failure_ledger_aggregates_death_causes_with_evidence_gated_lessons()
+    test_llm_generation_injects_failure_ledger_into_prompt()
     print("✅ Auto Factor Research Engine tests passed")

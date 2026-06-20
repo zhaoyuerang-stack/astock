@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
+import Card from "@/components/ui/Card";
+import DataTable from "@/components/ui/DataTable";
 import { api, pct } from "@/lib/api";
-import type { SystemConfigView, AuditView, LLMConfigView, LLMTestResult } from "@/lib/types";
+import type { SystemConfigView, AuditView, AuditEntry, LLMConfigView, LLMTestResult } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 
@@ -82,30 +84,26 @@ export default function SettingsPage() {
       {c && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* 回测默认参数 / 成本铁律(只读)*/}
-          <div className="card">
-            <div className="text-sm font-medium mb-2">回测默认参数 · 成本(铁律锁定)</div>
+          <Card title="回测默认参数 · 成本(铁律锁定)">
             <Row k="买入成本" v={pct(Number(c.cost.buy_cost), 3)} locked />
             <Row k="卖出成本" v={pct(Number(c.cost.sell_cost), 3)} locked />
             <Row k="融资利率(年)" v={pct(Number(c.cost.financing_rate), 1)} locked />
             <div className="text-[11px] text-warn mt-2">🔒 成本与口径为铁律固化,UI 不可调低(防止在前端放宽以美化曲线)。</div>
-          </div>
+          </Card>
 
           {/* 策略 */}
-          <div className="card">
-            <div className="text-sm font-medium mb-2">当前策略</div>
+          <Card title="当前策略">
             {Object.entries(c.strategy).map(([k, v]) => <Row key={k} k={k} v={String(v)} />)}
-          </div>
+          </Card>
 
           {/* 风控规则 */}
-          <div className="card">
-            <div className="text-sm font-medium mb-2">风控规则(risk_policy)</div>
+          <Card title="风控规则(risk_policy)">
             {Object.entries(c.risk_policy).map(([k, v]) => <Row key={k} k={k} v={String(v)} />)}
             <div className="text-[11px] text-subink mt-2">行业/市值集中度待 industry_map 入湖。</div>
-          </div>
+          </Card>
 
           {/* AI 模型 + 服务状态 */}
-          <div className="card">
-            <div className="text-sm font-medium mb-2">AI 模型 & 服务状态</div>
+          <Card title="AI 模型 & 服务状态">
             <Row k="Agent 模式" v={c.ai_model.mode} />
             <Row k="Provider" v={c.ai_model.provider || "none"} />
             {c.ai_model.model && <Row k="模型" v={c.ai_model.model} />}
@@ -120,20 +118,22 @@ export default function SettingsPage() {
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
 
           {/* LLM 模型配置(可填 Key / 接入点)*/}
-          <div className="card md:col-span-2">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium">AI 模型配置(填 Provider / 接入点 / API Key)</span>
-              <span className="text-[11px] px-1.5 py-0.5 rounded border border-cardline text-subink">
+          <Card
+            className="md:col-span-2"
+            title="AI 模型配置(填 Provider / 接入点 / API Key)"
+            right={
+              <span className="px-1.5 py-0.5 rounded border border-cardline">
                 {llm?.llm_ready ? "已接入 LLM" : "规则式"}
               </span>
-            </div>
+            }
+          >
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <label className="text-[12px] text-subink">Provider
                 <select value={form.provider} onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value }))}
-                  className="mt-1 w-full text-sm border border-cardline rounded-lg px-2 py-1.5 outline-none focus:border-brand bg-white">
+                  className="mt-1 w-full text-sm border border-cardline rounded-lg px-2 py-1.5 outline-none focus:border-brand bg-qilin/60 text-gaoyu">
                   <option value="none">none(规则式)</option>
                   <option value="openai_compatible">openai_compatible(DeepSeek/Qwen/Kimi/GLM/Ollama/OpenAI)</option>
                   <option value="anthropic">anthropic(Claude)</option>
@@ -159,35 +159,23 @@ export default function SettingsPage() {
               {test && <span className={`text-[12px] ${test.ok ? "text-ok" : "text-danger"}`}>{test.ok ? "✓ " : "✗ "}{test.message}</span>}
             </div>
             <div className="text-[11px] text-subink mt-2">Key 存本地 gitignored 文件(不进 git、不回传明文);LLM 只做路由/解读,永不执行下单(不越权门照常)。</div>
-          </div>
+          </Card>
 
           {/* 审计日志 */}
-          <div className="card md:col-span-2">
-            <div className="text-sm font-medium mb-2">审计日志(关键动作 · {audit?.total ?? 0} 条)</div>
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr className="text-subink text-left border-b border-cardline">
-                  <th className="py-1 font-medium">类型</th>
-                  <th className="py-1 font-medium">动作</th>
-                  <th className="py-1 font-medium">详情</th>
-                  <th className="py-1 font-medium">执行方</th>
-                  <th className="py-1 font-medium">状态</th>
-                </tr>
-              </thead>
-              <tbody>
-                {audit?.entries.map((e, i) => (
-                  <tr key={i} className="border-b border-cardline/60">
-                    <td className="py-1"><span className="text-[11px] px-1.5 py-0.5 rounded bg-bg border border-cardline text-subink">{e.kind}</span></td>
-                    <td className="py-1 text-ink">{e.summary}</td>
-                    <td className="py-1 text-subink truncate max-w-[260px]">{e.detail}</td>
-                    <td className="py-1 text-subink">{e.actor}</td>
-                    <td className="py-1 text-subink">{e.status}</td>
-                  </tr>
-                ))}
-                {!audit?.entries.length && <tr><td colSpan={5} className="py-2 text-subink">暂无审计记录</td></tr>}
-              </tbody>
-            </table>
-          </div>
+          <Card title={`审计日志(关键动作 · ${audit?.total ?? 0} 条)`} className="md:col-span-2">
+            <DataTable<AuditEntry>
+              rows={audit?.entries ?? []}
+              getRowKey={(e, i) => i}
+              empty="暂无审计记录"
+              columns={[
+                { key: "kind", header: "类型", render: (e) => <span className="text-[11px] px-1.5 py-0.5 rounded bg-bg border border-cardline text-subink">{e.kind}</span> },
+                { key: "summary", header: "动作", className: "text-ink", render: (e) => e.summary },
+                { key: "detail", header: "详情", className: "text-subink truncate max-w-[260px]", render: (e) => e.detail },
+                { key: "actor", header: "执行方", className: "text-subink", render: (e) => e.actor },
+                { key: "status", header: "状态", className: "text-subink", render: (e) => e.status },
+              ]}
+            />
+          </Card>
         </div>
       )}
     </div>

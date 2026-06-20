@@ -16,8 +16,8 @@ from strategies.small_cap import load_price_panels
 from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
 from factors.small_cap import small_cap_factor, small_cap_timing
 from strategies.small_cap import build_rebalance_weights
-from engine.regime import RegimeEngine, RegimeConfig
-from engine.strategy_composer import StrategyComposer, LegSpec, StrategyDefinition
+from factory.regime import RegimeEngine, RegimeConfig
+from factory.strategy_composer import StrategyComposer, LegSpec, StrategyDefinition
 
 def main():
     print("=" * 80)

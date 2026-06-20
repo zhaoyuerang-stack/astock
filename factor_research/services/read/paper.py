@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 
 from contracts.views import (
     BondInstructionView,
+    CandidateStockRow,
     NavCurveView,
     NavPoint,
     PaperBlockedRow,
@@ -92,6 +93,8 @@ def trade_plan() -> TradePlanView:
     executed = [t for t in _read_trades() if t.date == acc.get("last_date")]
     blocked = []
     last_exec = acc.get("last_exec") or {}
+    account_date = str(acc.get("last_date", ""))
+    last_exec_signal_date = str(last_exec.get("from_signal") or "")
     if last_exec.get("exec_date") == acc.get("last_date"):
         blocked = [PaperBlockedRow(side=b[0], code=b[1], name=b[2], reason=b[3])
                    for b in last_exec.get("blocked", []) if len(b) >= 4]
@@ -151,8 +154,17 @@ def trade_plan() -> TradePlanView:
 
     latest_td = _latest_trading_day()
     stale = bool(latest_td and date and date < latest_td)
+
+    # 提取选股候选股票池
+    sig_candidates = sig.get("candidates") or []
+    if not sig_candidates and sig.get("holdings"):
+        sig_candidates = sig.get("holdings")
+    candidates = [CandidateStockRow(code=c, name=names.get(c, c)) for c in sig_candidates]
+
     return TradePlanView(
         signal_date=date,
+        account_date=account_date,
+        last_exec_signal_date=last_exec_signal_date,
         generated_at=datetime.now(CHINA_TZ).isoformat(timespec="seconds"),
         stale=stale,
         stale_reason=f"信号日 {date} 早于最近交易日 {latest_td},等待数据更新" if stale else "",
@@ -161,6 +173,9 @@ def trade_plan() -> TradePlanView:
         in_market=bool(sig.get("in_market")),
         band_exposure=float(sig.get("band_exposure") or 0.0),
         action=str(sig.get("action", "")),
+        small_index_vs_ma16=float(sig.get("small_index_vs_ma16") or 0.0),
+        binary_in_market_shadow=bool(sig.get("binary_in_market_shadow")),
+        base_in_market=bool(sig.get("base_in_market")),
         executed=executed,
         blocked=blocked,
         plan=plan,
@@ -169,6 +184,7 @@ def trade_plan() -> TradePlanView:
             code=d["code"], name=d.get("name") or names.get(d["code"], d["code"]),
             shares=d["shares"], cost=d["cost"], price=d["price"],
             mv=d["mv"], pnl=d["pnl"], asset=d.get("asset", "stock")) for d in detail],
+        candidates=candidates,
         nav=round(nav, 2),
         cash=round(acc.get("cash", 0.0), 2),
         position_value=round(pos_value, 2),
@@ -205,6 +221,7 @@ def nav_curve() -> NavCurveView:
         points=points,
         inception=str(acc.get("inception") or ""),
         init_capital=float(acc.get("init_capital") or 0.0),
+        latest_nav_date=points[-1].date if points else str(acc.get("last_date") or ""),
         latest_nav=points[-1].nav if points else float(acc.get("cash") or 0.0),
         total_return=points[-1].total_return if points else 0.0,
         max_drawdown=round(max_dd, 6),

@@ -24,6 +24,8 @@ for i, fp in enumerate(files):
         print(f"  校验 {i+1}/{len(files)}", flush=True)
 
 report = v.quality_report(results, save_path="data_lake/quality_report.json")
+triage = v.issue_triage_report(results, save_path="reports/data/data_issue_triage.json")
 print(f"\n=== 真实质量(修复停牌误报后) ===", flush=True)
 print(f"干净 {report['clean']}/{report['total']} ({report['clean_ratio']:.1%})", flush=True)
 print(f"真问题分布: {report['issue_breakdown']}", flush=True)
+print(f"数据分诊: {triage['summary']['counts_by_category']}", flush=True)
