@@ -72,8 +72,10 @@ def get_trade_readiness() -> TradeReadinessView:
                 regime_status = sig.get("regime", "bull")
                 # Scale confidence slightly depending on regime/distance
                 regime_confidence = 0.95 if regime_status == "bear" else 0.85
-    except Exception:
-        pass
+    except Exception as _e:
+        import logging
+        logging.getLogger("trade_readiness").debug(
+            "regime confidence read failed, using default: %s: %s", type(_e).__name__, _e)
 
     # 7. Kill switch status
     kill_switch_status = "armed"

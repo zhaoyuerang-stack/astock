@@ -14,6 +14,7 @@ Gate 8: Live Monitoring (Live IC bounds, style drift, decay monitoring parameter
 from __future__ import annotations
 
 import json
+import logging
 import time
 from dataclasses import dataclass, field
 from datetime import date
@@ -25,6 +26,8 @@ from scipy import stats
 
 from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel, BacktestResult
 from core.analysis.walk_forward import deflated_sharpe, walk_forward_windows, wf_metrics
+
+logger = logging.getLogger("nine_gates")  # Task 17:控制路径异常须可见,不得静默 except:pass
 
 
 # ---------------------------------------------------------------------------
@@ -319,8 +322,8 @@ class NineGatesEvaluator:
                 bin_rets = r_row.groupby(bins).mean()
                 if len(bin_rets) == 5:
                     quantile_returns.append(bin_rets.values)
-            except Exception:
-                pass
+            except Exception as _e:
+                logger.debug("gate per-item computation skipped: %s: %s", type(_e).__name__, _e)
                 
         if len(quantile_returns) > 20:
             mean_q_rets = np.mean(quantile_returns, axis=0)
@@ -430,8 +433,8 @@ class NineGatesEvaluator:
                 b, _, _, _ = np.linalg.lstsq(X_clean, y_clean, rcond=None)
                 residuals = y_clean - X_clean @ b
                 neutral_factor.loc[dt, common] = residuals
-            except Exception:
-                pass
+            except Exception as _e:
+                logger.debug("gate per-item computation skipped: %s: %s", type(_e).__name__, _e)
                 
         # Fill non-sampled dates with forward fill for simplified comparison
         neutral_factor = neutral_factor.reindex(dates).ffill().bfill()
@@ -755,8 +758,8 @@ class NineGatesEvaluator:
                 if len(test_weights) > 10:
                     res = engine._run_weight_backtest(test_weights, signal.timing, signal)
                     oos_rets_list.append(res.returns)
-            except Exception:
-                pass
+            except Exception as _e:
+                logger.debug("gate per-item computation skipped: %s: %s", type(_e).__name__, _e)
                 
         if oos_rets_list:
             wfm = wf_metrics(oos_rets_list)
@@ -831,8 +834,8 @@ class NineGatesEvaluator:
                 reasons.append(f"Extreme regime dependency: Bear market return is severely negative: {metrics['bear_annual']:.2%}")
                 if verdict != "FAIL":
                     verdict = "WARN"
-        except Exception:
-            pass
+        except Exception as _e:
+            logger.warning("Gate7 regime-dependency block skipped: %s: %s", type(_e).__name__, _e)
 
         passed = (verdict != "FAIL")
         details = (
@@ -896,8 +899,8 @@ class NineGatesEvaluator:
                 if len(test_weights) > 10:
                     res = engine._run_weight_backtest(test_weights, signal.timing, signal)
                     oos_rets_list.append(res.returns)
-            except Exception:
-                pass
+            except Exception as _e:
+                logger.debug("gate per-item computation skipped: %s: %s", type(_e).__name__, _e)
                 
         if oos_rets_list:
             wfm = wf_metrics(oos_rets_list)
