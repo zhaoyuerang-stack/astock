@@ -78,16 +78,9 @@ def latest_expected_trade_date(root: Path = ROOT, today=None) -> tuple[str, str]
 
 
 def _nine_gate_audit_state(nine_gate: dict) -> dict:
-    ng = nine_gate or {}
-    if ng.get("status") == "FAILED_TO_RUN":
-        return {"code": "RUN_FAILED", "audited": False, "passed": False}
-
-    dsr_p = ng.get("dsr_p")
-    if dsr_p is None:
-        return {"code": "PENDING", "audited": False, "passed": None}
-
-    passed = (ng.get("gate4_verdict") == "PASS") if ng.get("gate4_verdict") else (dsr_p < 0.05)
-    return {"code": "PASSED" if passed else "FAILED", "audited": True, "passed": bool(passed)}
+    """委托唯一裁决策略(Task 9):production readiness 与 governance/registry 同源裁决。"""
+    from core.analysis.nine_gate_policy import decide_nine_gate
+    return decide_nine_gate(nine_gate).as_state()
 
 
 def current_governance_status() -> str:

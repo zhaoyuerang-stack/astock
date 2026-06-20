@@ -65,10 +65,10 @@ def test_nine_gates_framework_executes_successfully():
     
     reports = evaluator.evaluate_all(signal, start=str(prices.close.index[20].date()))
     
-    # Verify all 9 gates are present
-    assert len(reports) == 9
-    for i, r in enumerate(reports):
-        assert r.gate_id == i
+    # Verify the complete required gate set is present (含 7A 子门 → 共 10 份报告)。
+    # 断言 gate ID 集合而非固定计数/连续整数,避免新增子门时这里陈旧失败(Task 9/16)。
+    assert {r.gate_id for r in reports} == {0, 1, 2, 3, 4, 5, 6, 7, "7A", 8}
+    for r in reports:
         assert isinstance(r.passed, bool)
         assert r.verdict in ("PASS", "WARN", "FAIL")
         assert isinstance(r.metrics, dict)

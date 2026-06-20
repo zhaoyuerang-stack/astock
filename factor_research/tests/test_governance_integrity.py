@@ -261,22 +261,27 @@ def test_model_card_sync_persists_real_cards():
 def test_strategy_gate_status_consumes_dsr():
     import strategy_registry as R
     from services.read.governance import get_strategy_gate_status
-    tmp = Path(tempfile.mkdtemp()) / "tv.json"
-    R.REGISTRY = tmp
-    R.register_family("gfam", "闸门族")
-    # 在册 standalone,带 DSR 失败的 nine_gate
-    R.register("gfam", "v1", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册")
-    R.attach_nine_gate("gfam", "v1", {"dsr_p": 0.40, "gate4_verdict": "FAIL"})
-    g = get_strategy_gate_status("gfam", "v1")
-    assert g["registered"] and g["dsr_audited"] and g["dsr_passed"] is False, "DSR 失败未被闸门识别"
-    # 未审计版本:dsr_audited=False、dsr_passed=None(不应误判失败)
-    R.register("gfam", "v2", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册")
-    g2 = get_strategy_gate_status("gfam", "v2")
-    assert g2["registered"] and g2["dsr_audited"] is False and g2["dsr_passed"] is None
-    # DSR 通过
-    R.register("gfam", "v3", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册")
-    R.attach_nine_gate("gfam", "v3", {"dsr_p": 0.01, "gate4_verdict": "PASS"})
-    assert get_strategy_gate_status("gfam", "v3")["dsr_passed"] is True
+    old_registry = R.REGISTRY  # hermetic:跑完恢复,避免污染后续测试(全量 pytest 发现下必要)
+    try:
+        tmp = Path(tempfile.mkdtemp()) / "tv.json"
+        R.REGISTRY = tmp
+        R.register_family("gfam", "闸门族")
+        # 在册 standalone,带 DSR 失败的 nine_gate
+        R.register("gfam", "v1", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册")
+        # Task 9: 审批只认 passed_all。完整门未过 → 闸门识别为未通过(不再靠 DSR-only/gate4 推断)
+        R.attach_nine_gate("gfam", "v1", {"passed_all": False, "dsr_p": 0.40, "dsr_significant": False})
+        g = get_strategy_gate_status("gfam", "v1")
+        assert g["registered"] and g["dsr_audited"] and g["dsr_passed"] is False, "完整门失败未被闸门识别"
+        # 未审计版本:dsr_audited=False、dsr_passed=None(不应误判失败)
+        R.register("gfam", "v2", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册")
+        g2 = get_strategy_gate_status("gfam", "v2")
+        assert g2["registered"] and g2["dsr_audited"] is False and g2["dsr_passed"] is None
+        # DSR 通过
+        R.register("gfam", "v3", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册")
+        R.attach_nine_gate("gfam", "v3", {"passed_all": True, "dsr_p": 0.01, "dsr_significant": True})
+        assert get_strategy_gate_status("gfam", "v3")["dsr_passed"] is True
+    finally:
+        R.REGISTRY = old_registry
     print("✅ test_strategy_gate_status_consumes_dsr")
 
 
@@ -314,7 +319,7 @@ def test_trade_readiness_requires_nine_gate_pass():
         assert failed.model_version == "nine_gate_failed"
         assert failed.allowed_to_trade is False
 
-        R.attach_nine_gate("readyfam", "v1", {"dsr_p": 0.01, "gate4_verdict": "PASS"})
+        R.attach_nine_gate("readyfam", "v1", {"passed_all": True, "dsr_p": 0.01, "dsr_significant": True})
         passed = TR.get_trade_readiness()
         assert passed.model_version == "approved"
         assert passed.allowed_to_trade is True

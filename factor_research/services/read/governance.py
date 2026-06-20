@@ -24,32 +24,9 @@ def _approval_from_status(status: str) -> str:
 
 
 def _nine_gate_audit_state(nine_gate: dict) -> dict:
-    """Normalize registry nine_gate payload into the four governance states."""
-    ng = nine_gate or {}
-    if ng.get("status") == "FAILED_TO_RUN":
-        return {
-            "code": "RUN_FAILED",
-            "label": "审计失败",
-            "audited": False,
-            "passed": False,
-        }
-
-    dsr_p = ng.get("dsr_p")
-    if dsr_p is None:
-        return {
-            "code": "PENDING",
-            "label": "待多重检验审计",
-            "audited": False,
-            "passed": None,
-        }
-
-    passed = (ng.get("gate4_verdict") == "PASS") if ng.get("gate4_verdict") else (dsr_p < 0.05)
-    return {
-        "code": "PASSED" if passed else "FAILED",
-        "label": "审计通过" if passed else "审计未通过",
-        "audited": True,
-        "passed": bool(passed),
-    }
+    """委托唯一裁决策略(Task 9)。不再用 DSR-only 推断——审批只认 passed_all。"""
+    from core.analysis.nine_gate_policy import decide_nine_gate
+    return decide_nine_gate(nine_gate).as_state()
 
 
 def sync_model_cards_from_registry(inventory: ModelInventory | None = None) -> int:
