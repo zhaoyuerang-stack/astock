@@ -103,8 +103,13 @@ def _run_etf_trend(code: str, ma: int = 60, start: str = "2018-01-01") -> pd.Ser
     return (close.pct_change(fill_method=None).fillna(0) * in_mkt).dropna()
 
 
-# ────────────────────────── Public LIVE runners ──────────────────────────
+# ────────────────────────── Research strategy catalog ──────────────────────────
 
+# RESEARCH_STRATEGY_CATALOG (旧名 LIVE_STRATEGIES,保留别名向后兼容)：
+#   这是**研究编排目录**,不是生产事实源。「现在到底在跑什么」由
+#   runtime/deployment.py 的 DeploymentManifest 决定(Task 7),registry 退役会机械停产。
+#   此目录里的 status=ACTIVE/SHADOW 仅供研究组合对比,不等于「已部署」。
+#
 # 2026-06-07 引入 status 字段：
 #   ACTIVE = 进入组合，贡献组合层 alpha
 #   SHADOW = 不进入组合 (paper trade 观察期，等待恢复或正式退役)
@@ -116,7 +121,7 @@ def _run_etf_trend(code: str, ma: int = 60, start: str = "2018-01-01") -> pd.Ser
 #   size-earnings v1.0: marginal -0.277 (拖累最严重)   → SHADOW
 #
 # 组合实测改善：2 ACTIVE risk_parity Sharpe 1.89 vs 4 LIVE 等权 1.60 (+18%)
-LIVE_STRATEGIES = {
+RESEARCH_STRATEGY_CATALOG = {
     "small-cap-size.v2.0": {
         "desc": "size60 + PT-MA16 Band 1.0x (timing_mode=band 2026-06-07)",
         "status": "ACTIVE",
@@ -201,13 +206,17 @@ def run_size_earnings(start: str = "2018-01-01") -> pd.Series:
     return run_strategy(cfg)["returns"].dropna()
 
 
-LIVE_STRATEGIES["size-earnings.v1.0"]["fn"] = run_size_earnings
+RESEARCH_STRATEGY_CATALOG["size-earnings.v1.0"]["fn"] = run_size_earnings
+
+# 向后兼容别名：外部(scratch/metasearch/apps)仍 import LIVE_STRATEGIES。
+# 不再代表生产事实——「在跑什么」看 DeploymentManifest。
+LIVE_STRATEGIES = RESEARCH_STRATEGY_CATALOG
 
 
 def run_all_live(start: str = "2018-01-01") -> dict[str, pd.Series]:
     """跑全部 LIVE 母策略（含 SHADOW），返回 {name: returns}."""
     out = {}
-    for name, spec in LIVE_STRATEGIES.items():
+    for name, spec in RESEARCH_STRATEGY_CATALOG.items():
         out[name] = spec["fn"](start)
     return out
 
@@ -215,23 +224,37 @@ def run_all_live(start: str = "2018-01-01") -> dict[str, pd.Series]:
 def run_active(start: str = "2018-01-01") -> dict[str, pd.Series]:
     """只跑 ACTIVE 状态的策略——组合层应用这个。"""
     out = {}
-    for name, spec in LIVE_STRATEGIES.items():
+    for name, spec in RESEARCH_STRATEGY_CATALOG.items():
         if spec.get("status", "ACTIVE") == "ACTIVE":
             out[name] = spec["fn"](start)
     return out
 
 
 def active_strategies() -> list[str]:
-    """返回 ACTIVE 策略名列表（不跑回测）."""
-    return [n for n, s in LIVE_STRATEGIES.items() if s.get("status", "ACTIVE") == "ACTIVE"]
+    """返回当前部署的策略名列表（不跑回测）。
+
+    生产事实优先来自 DeploymentManifest(Task 7)：清单可加载时,以其 legs 的
+    family/version 为准(映射回目录键 'family.version')。清单未就绪(尚未 spec 化迁移)
+    时回退到研究目录的 ACTIVE 标记,保证研究脚本不被阻断。
+    """
+    try:
+        from runtime.deployment import load_active_deployment
+        dep = load_active_deployment()
+        keys = {f"{leg.family}.{leg.version}" for leg in dep.legs}
+        catalog_keys = [n for n in RESEARCH_STRATEGY_CATALOG if n in keys]
+        if catalog_keys:
+            return catalog_keys
+    except Exception:
+        pass  # 清单未就绪 → 回退研究目录(下行)；fail-closed 的生产门在 run_daily/deployment
+    return [n for n, s in RESEARCH_STRATEGY_CATALOG.items() if s.get("status", "ACTIVE") == "ACTIVE"]
 
 
 def shadow_strategies() -> list[str]:
     """返回 SHADOW 策略名列表."""
-    return [n for n, s in LIVE_STRATEGIES.items() if s.get("status") == "SHADOW"]
+    return [n for n, s in RESEARCH_STRATEGY_CATALOG.items() if s.get("status") == "SHADOW"]
 
 
 def defensive_strategies() -> set[str]:
     """返回 role=defensive 的 ACTIVE 腿(跨资产防御腿),供 compose(method='capped') 封顶权重。"""
-    return {n for n, s in LIVE_STRATEGIES.items()
+    return {n for n, s in RESEARCH_STRATEGY_CATALOG.items()
             if s.get("role") == "defensive" and s.get("status", "ACTIVE") == "ACTIVE"}

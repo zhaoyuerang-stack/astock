@@ -37,9 +37,10 @@ def apply_regime_gate(equity_ret: pd.Series, regime: pd.Series, large_cap_ret: p
 
 def live_returns(start: str = "2018-01-01", *, regime_gated: bool = REGIME_GATED_DEFAULT,
                  cap: float = 0.30):
-    """LIVE 组合日收益。
+    """研究组合(基线)日收益。
 
-    regime_gated=False(默认):capped 30% 组合(equity ACTIVE + 防御腿),= 现行 LIVE。
+    注意:这是研究编排的组合收益,不是生产事实源 ——「现在在跑什么」看 DeploymentManifest。
+    regime_gated=False(默认):capped 30% 组合(研究目录 equity ACTIVE + 防御腿)。
     regime_gated=True:equity 子组合按小盘 regime 在 小盘↔large-cap 间切换,再与防御腿
       按 (1-cap)/cap 混合。仅此模式才跑 large-cap(较慢)。
     返回 (daily_returns, weights_or_meta)。

@@ -1,0 +1,18 @@
+{
+  "deployment_id": "prod-a-share-v1",
+  "environment": "production",
+  "status": "active",
+  "_scaffold": "Task 7 脚手架:由 Task 19 迁移工具从 canonical spec 重生成(含 defensive 腿)。当前仅含可 spec 化的 equity 腿;在 registry 完成 spec 化迁移前,load_active_deployment 会 fail-closed(registry 尚无 executable_spec.spec_hash),这是预期的安全行为而非缺陷。",
+  "portfolio_policy": {
+    "type": "regime_rotation",
+    "defensive_cap": 1.0
+  },
+  "legs": [
+    {
+      "family": "illiquidity",
+      "version": "v3.1",
+      "spec_hash": "4f667d162dc58c5845e92416bce7dadc034dcdcc80b27178b1496e14a24a147b",
+      "role": "equity_alpha"
+    }
+  ]
+}
