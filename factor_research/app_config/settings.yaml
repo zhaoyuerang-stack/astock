@@ -21,6 +21,11 @@ data:
   warmup_start: "2010-01-01"
   default_start: "2018-01-01"
 
+# Holdout 金库(LOOP_ENGINEERING §5.2):date >= start 永不用于搜索,仅晋级前唯一一次校验。
+# 搜索/研究回测必须截到 < start;改此日期 = 改变金库,须谨慎并记 DECISIONS。
+holdout:
+  start: "2025-01-01"
+
 factory:
   top_n_choices: [15, 20, 25, 40, 60, 80, 120]
   leverage_choices: [1.0, 1.25]
