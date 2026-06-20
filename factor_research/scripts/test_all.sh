@@ -8,6 +8,14 @@ echo "=== check_layer_deps.py (分层依赖 + 台账唯一写入口) ==="
 python3 scripts/ci/check_layer_deps.py
 
 echo ""
+echo "=== check_test_discovery.py (全量测试发现:防 test_*.py 被静默排除) ==="
+python3 scripts/ci/check_test_discovery.py
+
+echo ""
+echo "=== check_control_exceptions.py (控制路径禁静默 except:pass) ==="
+python3 scripts/ci/check_control_exceptions.py
+
+echo ""
 echo "=== check_lake_writers.py (数据湖唯一写入口) ==="
 python3 scripts/ci/check_lake_writers.py
 
