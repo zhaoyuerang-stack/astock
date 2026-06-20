@@ -875,6 +875,11 @@ class NineGatesEvaluator:
         metrics["purge_window"] = purge_window
         metrics["embargo_window"] = embargo_window
         metrics["forward_horizon"] = horizon
+        # Task 14 诚实命名:本策略是固定公式(无可训练参数/模型选择),因此这里做的是
+        # rolling-origin 稳定性(每窗口因果重放),而非「净化模型选择 CV」。不得声称后者。
+        # 真正的 purged model-selection CV 仅当提供 fit callback 时适用(见 rolling_origin.py)。
+        metrics["method"] = "rolling_origin_stability"
+        metrics["model_selection_cv"] = False
 
         dates = self.prices.close.index
         total_purge_days = purge_window + embargo_window
