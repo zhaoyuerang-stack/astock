@@ -2213,6 +2213,46 @@
       "failure_boundaries": {}
     },
     {
+      "id": "ontology_industry",
+      "versions": [
+        {
+          "version": "v1.0-shadow",
+          "date": "2026-06-21",
+          "desc": "产业链本体研究的正式观察版本；身份已入台账，但尚无可声明的 Nine-Gate 或正式绩效。",
+          "config": {
+            "mode": "SHADOW",
+            "signal_source": "data_lake/research_signals/ontology_predictions.json",
+            "production_weight": 0.0
+          },
+          "data_scope": {
+            "source": "research_signals + shadow observation",
+            "period": "forward observation",
+            "survivorship_bias": null
+          },
+          "metrics": {},
+          "status": "候选",
+          "notes": "观察版本：不得参与生产组合；未编造收益、回撤、夏普或 Gate 结果。",
+          "evidence": {
+            "artifact_paths": [
+              "data_lake/agent/shadow_incubation_log.json",
+              "data_lake/research_signals/ontology_predictions.json",
+              "reports/islands/shadow_ontology_performance.json"
+            ]
+          },
+          "admission": {},
+          "nine_gate": {}
+        }
+      ],
+      "name": "产业链本体与 BOM 成本传导",
+      "hypothesis": "BOM 成本传导与议价权差异形成行业层面的预期差；当前仅作影子观察，不参与生产权重。",
+      "regime": "产业成本或供需结构发生可验证变化的观察期",
+      "decay_signal": "影子组合持续跑输行业基准，或后续财报方向与传导预测长期相反",
+      "status": "active",
+      "style_betas": {},
+      "capacity_m": 0.0,
+      "failure_boundaries": {}
+    },
+    {
       "id": "size-earnings",
       "versions": [
         {
