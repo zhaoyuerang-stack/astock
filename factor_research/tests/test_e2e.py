@@ -16,7 +16,13 @@ def test_run_daily_no_update():
         text=True,
     )
     assert result.returncode in (0, 2), f"run_daily failed with code {result.returncode}: {result.stderr[:200]}"
-    assert "保存信号" in result.stdout or "空仓观望" in result.stdout
+    # rc=2 是 DeploymentManifest(Task 7)或 readiness(Task 9)的合法 fail-closed 拒绝,
+    # 不是崩溃;三种终态都算"无错误完成"。
+    assert (
+        "保存信号" in result.stdout
+        or "空仓观望" in result.stdout
+        or "拒绝生成正式信号" in result.stdout
+    )
     print("✅ test_run_daily_no_update passed")
 
 

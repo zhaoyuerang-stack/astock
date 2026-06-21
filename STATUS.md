@@ -4,6 +4,11 @@
 
 ## 一句话
 
+**2026-06-20(Quant OS 系统一致性整改 Task 19-20 收尾;`Task.md` Definition of Done 基本核对完)**:`scripts/repair/migrate_strategy_specs.py --apply` 把 `illiquidity/v3.1` 与 `small-cap-size/v2.0` 绑定到不可变 `ExecutableStrategySpec`(spec_hash 见验收报告),其余 11 个在册/已部署版本因无法机械映射公式被诚实标记 `manual_review_required`,未猜测。
+  · **部署迁移在闸门处被正确拒绝(非 bug)**: `migrate_deployment.py --equity illiquidity/v3.1` 在写出新 manifest 前核验 `decide_nine_gate()`,发现该版本台账里持久化的 9-Gate 摘要是 legacy 格式且 `passed_all=False`(`pbo_high`)——historic 准入留下的口子,被 Task 8/9 的原子准入+唯一裁决正确拦下;尝试补跑 Nine-Gate 又被 Task 11 新增的诚实 trial 账本拒绝(`trial_count_unknown`,该 family 的历史搜索发生在账本存在之前,无可追溯记录)。**未做任何变通**(不下调 PBO、不手填 trial 数、不绕 holdout)。
+  · **结果**: `deployments/production.json` 维持旧 scaffold hash,`run_daily.py --no-update` / `scripts/ops/decay_monitor.py` 均一致 fail-closed(打印身份漂移原因,不崩溃不发信号);`tests/test_e2e.py` 已更新以承认这一合法终态。`PYTHONDONTWRITEBYTECODE=1 bash scripts/test_all.sh` 全绿(71 个 test_*.py 全收集),web `npm test`/`tsc`/`lint` 全绿。详见 `factor_research/reports/governance/system_consistency_acceptance.md`。
+  · **遗留**: `illiquidity` 家族需走一次被新 trial 账本覆盖的完整搜索+9-Gate+holdout 才能合规重新部署(可能即 `DECISIONS.md` ADR-018 推进中的 `illiquidity/clean-v1`);`paper_trade.py` 尚未绑定 DeploymentManifest 身份。`TASKS.md`/`DECISIONS.md` 当前有另一 session 关于 ADR-017/018 的未提交编辑,本次有意不碰,避免冲突。
+
 **2026-06-20 (首个大中盘策略正式晋级与登记在册)**: 针对 A 股大中盘流动性风险补偿，正式登记并晋级首个大容量在册单体策略 `illiquidity-large-cap v1.0`。
   · **审计合格**: 顺利通过 9-Gate R2P 完整审计，DSR p-val = 0.0112，显著性与风控指标全部达标。
   · **多阶段绩效落盘**: 计算并补全了 `IS 2018-2022` (年化 59.82%, 回撤 -17.66%, 夏普 2.35)、`OOS 2023-2026` (年化 56.33%, 回撤 -17.32%, 夏普 1.93)、`Stress 2010-2017` (年化 102.88%, 回撤 -18.94%, 夏普 3.63) 细分样本段的年化、最大回撤与夏普指标，解决了前端看板的指标空白问题。
