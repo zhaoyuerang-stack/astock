@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Bulk promote approved review candidates and L3 pool candidates to strategy registry."""
+"""Bulk promote review/L3 candidates —— 硬闸版(LOOP_ENGINEERING / ADR-017 / 根因分析 #1)。
+
+历史教训:本脚本曾用 force=True + run_nine_gate 未开 + run_marginal=False + 无条件批准所有
+pending,把 9-Gate 明确 REJECTED 的 4 个 autoresearch 候选强制入册(DSR p=0.81 等)。
+修复:**force 恒为 False**(phase1/2 防未来 + 图谱门必须过)、**run_nine_gate=True**(必跑 9-Gate
+留证)、**run_marginal=True**(边际残差去冗余)。blanket auto-approve 默认关,须显式
+BULK_AUTO_APPROVE=1 才批准 pending(否则只晋级人已批准项)——绝不再悄悄盖章。
+"""
 import os
 import sys
 from pathlib import Path
@@ -19,26 +26,31 @@ def run_bulk_promotion():
     review_queue = ReviewQueue()
     repository = CandidateRepository()
     
-    # 1. Approve pending items in ReviewQueue
+    # 1. Approve pending items —— 默认**不**盲批(blanket auto-approve 是人审旁路)。
+    #    须显式 BULK_AUTO_APPROVE=1 才批准 pending;否则只晋级人已批准项。
+    auto_approve = os.environ.get("BULK_AUTO_APPROVE") == "1"
     pending_items = [
         item for item in review_queue.all()
         if item.get("status") == CandidateStatus.PROMOTED_TO_REVIEW.value
     ]
-    print(f"Found {len(pending_items)} pending candidates in Review Queue.")
-    for item in pending_items:
-        fp = item["fingerprint"]
-        print(f"Approving pending candidate: {fp}...")
-        try:
-            review_autoresearch_candidate(
-                fingerprint=fp,
-                action="approve",
-                notes="Approved via bulk promotion script",
-                repository=repository,
-                review_queue=review_queue
-            )
-            print(f"  → Approved successfully.")
-        except Exception as e:
-            print(f"  → Error approving {fp}: {e}")
+    if not auto_approve:
+        print(f"Found {len(pending_items)} pending candidates —— 跳过盲批(设 BULK_AUTO_APPROVE=1 才批)。")
+    else:
+        print(f"⚠️ BULK_AUTO_APPROVE=1:批准 {len(pending_items)} 个 pending(仍受下方 9-Gate/边际硬闸)。")
+        for item in pending_items:
+            fp = item["fingerprint"]
+            print(f"Approving pending candidate: {fp}...")
+            try:
+                review_autoresearch_candidate(
+                    fingerprint=fp,
+                    action="approve",
+                    notes="Approved via bulk promotion script (BULK_AUTO_APPROVE)",
+                    repository=repository,
+                    review_queue=review_queue
+                )
+                print(f"  → Approved successfully.")
+            except Exception as e:
+                print(f"  → Error approving {fp}: {e}")
 
     # Reload queue after approvals
     review_queue = ReviewQueue()
@@ -48,9 +60,11 @@ def run_bulk_promotion():
     ]
     print(f"\nFound {len(approved_items)} approved candidates in Review Queue to promote.")
     
-    # Custom promote function wrapper to force-promote (passing force=True)
-    def force_promote_fn(hyp, version="v1.0", run_marginal=False):
-        return promote_hypothesis(hyp, version=version, run_marginal=run_marginal, force=True)
+    # 硬闸 promote:force=False(phase1/2 防未来+图谱门必过)+ run_nine_gate=True(必跑9-Gate留证)
+    # + run_marginal=True(边际残差去冗余)。绝不再 force/skip。
+    def gated_promote_fn(hyp, version="v1.0", run_marginal=True):
+        return promote_hypothesis(hyp, version=version, run_marginal=True,
+                                  force=False, run_nine_gate=True)
 
     # 2. Promote all approved items
     for item in approved_items:
@@ -60,10 +74,10 @@ def run_bulk_promotion():
             res = promote_approved_candidate(
                 fingerprint=fp,
                 version="v1.0",
-                run_marginal=False,
+                run_marginal=True,
                 repository=repository,
                 review_queue=review_queue,
-                promote_fn=force_promote_fn
+                promote_fn=gated_promote_fn
             )
             print(f"  → Promotion result: registered={res.registered}, hypothesis={res.hypothesis_name}, detail={res.detail}")
         except Exception as e:
@@ -72,7 +86,7 @@ def run_bulk_promotion():
     # 3. Promote L3_PASSED pool candidates
     print("\n=== Step 2: Promoting L3 Passed Pool Candidates ===")
     try:
-        reports = promote_pool_l3(version="v1.0", force=True, run_marginal=False)
+        reports = promote_pool_l3(version="v1.0", force=False, run_marginal=True, run_nine_gate=True)
         print(f"Promoted {len(reports)} candidates from Hypothesis Pool.")
         for r in reports:
             if r:
