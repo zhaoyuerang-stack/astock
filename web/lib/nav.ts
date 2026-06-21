@@ -31,7 +31,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/data", label: "数据中心", ready: true, icon: "data", modes: ["rd"] },
       { href: "/factors", label: "因子研究", ready: true, icon: "factors", modes: ["rd"] },
       { href: "/backtest", label: "策略回测", ready: true, icon: "backtest", modes: ["rd"] },
-      { href: "/experiments", label: "研究实验", ready: true, icon: "experiments", modes: ["rd"] },
+      { href: "/experiments", label: "研究实验室", ready: true, icon: "experiments", modes: ["rd"] },
     ],
   },
   {

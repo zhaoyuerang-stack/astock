@@ -41,6 +41,12 @@ export interface StrategyView {
   decay_signal?: string;                        // 家族级失效信号(死因/触发条件)
 }
 
+export interface StrategyDetailView {
+  strategy: StrategyView;
+  research_runs: ResearchRunView[];
+  artifacts: Record<string, any>;
+}
+
 export interface FactorView {
   name: string;
   display_name: string;
@@ -171,6 +177,86 @@ export interface RegisteredExperimentView {
   data_scope: Record<string, unknown>;
 }
 
+export interface ResearchDraftView {
+  draft_id: string;
+  title: string;
+  source: string;
+  mechanism: string;
+  citation: string;
+  factor_fn_name: string;
+  factor_params: Record<string, unknown>;
+  timing_fn_name: string | null;
+  timing_params: Record<string, unknown>;
+  data_dependencies: string[];
+  status: string;
+  linked_work_id: string;
+  revision: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResearchReviewView {
+  review_id: string;
+  kind: string;
+  item_id: string;
+  action: "approve" | "reject" | string;
+  notes: string;
+  reviewer: string;
+  reviewed_at: string;
+  migrated_from: string;
+}
+
+export interface ResearchWorkItemView {
+  work_id: string;
+  kind: "draft" | "hypothesis" | "autoresearch" | string;
+  item_id: string;
+  title: string;
+  source: string;
+  raw_status: string;
+  status: "blocked" | "review" | "ready" | "running" | "completed" | "archived" | string;
+  stage: string;
+  mechanism: string;
+  citation: string;
+  updated_at: string;
+  next_action: string;
+  blocked_reason: string;
+  latest_result: Record<string, any>;
+  review: ResearchReviewView | null;
+}
+
+export interface ResearchWorkItemListView {
+  items: ResearchWorkItemView[];
+  counts: Record<string, number>;
+}
+
+export interface ResearchWorkItemDetailView {
+  item: ResearchWorkItemView;
+  evidence: Record<string, any>;
+  runs: Record<string, any>[];
+  raw: Record<string, any>;
+}
+
+export interface ResearchRunView {
+  run_id: string;
+  script: string;
+  hypothesis: string;
+  source: string;
+  run_at: string;
+  data_vintage: Record<string, any>;
+  metrics: Record<string, any>;
+  verdict: string;
+  next_action: string;
+  decision_state: string;
+  artifact_paths: string[];
+  notes: string;
+}
+
+export interface ResearchRunIndexView {
+  generated_at: string;
+  summary: Record<string, any>;
+  latest_runs: ResearchRunView[];
+}
+
 export interface AutoResearchCandidateView {
   fingerprint: string;
   status: string;
@@ -265,6 +351,7 @@ export interface ActionJobView {
   finished_at: string;
   result: Record<string, unknown> | null;
   error: string;
+  context?: Record<string, unknown>;
 }
 
 // Phase 5 Agent

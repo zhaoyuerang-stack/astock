@@ -4,9 +4,11 @@
 // 设计原则:① 决策信息一律数据化(条形/色阶,可一眼比较)② 去重去噪 ③ 清晰层次。
 // 数据全部来自 toInstitutionalRow(StrategyView);算不出的渲染「未计算」,绝不编造。
 import { pct, num } from "@/lib/api";
+import Link from "next/link";
+import { displayRegistryStatus } from "@/lib/researchWorkspace.mjs";
 import type { InstitutionalRow, FamilyGroup, GateCell, Verdict } from "@/lib/institutional";
 import { GATE_COLUMNS, gateCell } from "@/lib/institutional";
-import type { StrategyView, FactorView } from "@/lib/types";
+import type { StrategyView } from "@/lib/types";
 
 // ── 数据化原子 ─────────────────────────────────────────────────────────────
 const DASH = <span className="text-subink/40">—</span>;
@@ -97,7 +99,7 @@ export function LeaderboardView({ rows, activeId, onSelect }: {
                 className={`border-b border-line/45 cursor-pointer transition-colors ${sel ? "bg-brand/10" : "hover:bg-jilan/10"}`}>
                 <td className="py-2 px-2">
                   <div className="font-quant text-ink font-semibold whitespace-nowrap">{r.id}</div>
-                  <div className="text-[10px] whitespace-nowrap"><span className={sc}>{r.status}</span>{r.track && <span className="text-subink"> · {r.track === "diversifier" ? "分流器" : "单体"}</span>}</div>
+                  <div className="text-[10px] whitespace-nowrap"><span className={sc}>{displayRegistryStatus(r.status)}</span>{r.track && <span className="text-subink"> · {r.track === "diversifier" ? "分流器" : "单体"}</span>}</div>
                 </td>
                 <td className="py-2 px-2 text-center"><VerdictBadge verdict={r.verdict} /></td>
                 <td className={`py-2 px-2 text-right ${GL}`} title={r.is.source}><Sharpe v={r.is.sharpe} /></td>
@@ -132,8 +134,8 @@ export function LeaderboardView({ rows, activeId, onSelect }: {
 }
 
 // ── 2. Family View(lineage 折叠,吸收假设 + 噪音池)──────────────────────────
-export function FamilyView({ groups, noisePool, onSelect }: {
-  groups: FamilyGroup[]; noisePool: FactorView[]; onSelect: (s: StrategyView) => void;
+export function FamilyView({ groups, onSelect }: {
+  groups: FamilyGroup[]; onSelect: (s: StrategyView) => void;
 }) {
   return (
     <div className="space-y-3">
@@ -173,14 +175,6 @@ export function FamilyView({ groups, noisePool, onSelect }: {
           </div>
         );
       })}
-      {noisePool.length > 0 && (
-        <div className="card border border-dashed border-line bg-transparent">
-          <div className="text-[11px] text-subink mb-2">🌫️ 候选/噪音池:{noisePool.length} 个家族无在册版本——未产出经检验的有效 alpha,不计入可用。</div>
-          <div className="flex flex-wrap gap-1.5">
-            {noisePool.map((f) => <span key={f.name} className="text-[10px] px-1.5 py-0.5 rounded border border-line text-subink font-quant">{f.display_name || f.name} ({f.n_versions})</span>)}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -353,6 +347,12 @@ export function DrilldownPanel({ row, onClose }: { row: InstitutionalRow; onClos
             <pre className="text-[10px] font-mono text-brand bg-[#FAF8F5] border border-[#EFECE3] rounded-lg p-3 overflow-x-auto max-h-40 scrollbar-thin">{JSON.stringify(r.s.config, null, 2)}</pre>
           </div>
         </details>
+        <Link
+          href={`/factors/${encodeURIComponent(r.family)}/${encodeURIComponent(r.version)}`}
+          className="block w-full text-center rounded-lg border border-brand/30 text-brand py-2 text-[11px] font-semibold hover:bg-brand/5"
+        >
+          查看完整研究档案
+        </Link>
       </div>
       <div className="border-t border-[#EFECE3] pt-3 mt-4 text-[9.5px] text-[#888888] leading-relaxed">
         {todo.length > 0 && <span>未计算:{todo.join("、")}。</span>} 数值直读自台账(strategy_registry),口径真实不漂移。仅供研究参考,不构成投资建议。

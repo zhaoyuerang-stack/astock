@@ -23,9 +23,15 @@ import type {
   PaperTradesView,
   PortfolioView,
   RegisteredExperimentView,
+  ResearchDraftView,
+  ResearchRunIndexView,
+  ResearchReviewView,
+  ResearchWorkItemDetailView,
+  ResearchWorkItemListView,
   TradePlanView,
   RiskReport,
   StrategyView,
+  StrategyDetailView,
   SystemConfigView,
   TradeReadinessView,
   GovernanceView,
@@ -66,6 +72,17 @@ async function post<T>(path: string, body: unknown, extraHeaders: Record<string,
   return res.json() as Promise<T>;
 }
 
+async function patch<T>(path: string, body: unknown, extraHeaders: Record<string, string> = {}): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...extraHeaders },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`API ${path} → ${res.status} ${res.statusText}`);
+  return res.json() as Promise<T>;
+}
+
 async function actionToken(): Promise<ActionTokenView> {
   if (!actionTokenPromise) {
     actionTokenPromise = get<ActionTokenView>("/settings/action-token").catch((e) => {
@@ -79,6 +96,11 @@ async function actionToken(): Promise<ActionTokenView> {
 async function protectedPost<T>(path: string, body: unknown): Promise<T> {
   const token = await actionToken();
   return post<T>(path, body, { [token.header || "X-Action-Token"]: token.token });
+}
+
+async function protectedPatch<T>(path: string, body: unknown): Promise<T> {
+  const token = await actionToken();
+  return patch<T>(path, body, { [token.header || "X-Action-Token"]: token.token });
 }
 
 function sleep(ms: number): Promise<void> {
@@ -112,6 +134,8 @@ export const api = {
   base: BASE,
   health: () => get<{ status: string; phase: number }>("/health"),
   strategies: () => get<StrategyView[]>("/strategies"),
+  strategyDetail: (family: string, version: string) =>
+    get<StrategyDetailView>(`/strategies/${encodeURIComponent(family)}/${encodeURIComponent(version)}`),
   factors: () => get<FactorView[]>("/factors"),
   dataQuality: () => get<DataQualityView>("/data/quality"),
   strategyHealth: () => get<FactorHealthView[]>("/state/health"),
@@ -125,6 +149,45 @@ export const api = {
   hypotheses: (status?: string, limit = 60) =>
     get<HypothesisView[]>(`/experiments/hypotheses?${new URLSearchParams({ ...(status ? { status } : {}), limit: String(limit) })}`),
   registeredExperiments: () => get<RegisteredExperimentView[]>("/experiments/registered"),
+  researchWorkItems: (params: { status?: string; kind?: string; action?: string; limit?: number } = {}) => {
+    const query = new URLSearchParams(
+      Object.entries(params)
+        .filter(([, value]) => value !== undefined && value !== "")
+        .map(([key, value]) => [key, String(value)]),
+    );
+    return get<ResearchWorkItemListView>(`/experiments/work-items${query.size ? `?${query}` : ""}`);
+  },
+  researchWorkItem: (kind: string, itemId: string) =>
+    get<ResearchWorkItemDetailView>(`/experiments/work-items/${encodeURIComponent(kind)}/${encodeURIComponent(itemId)}`),
+  researchRuns: () => get<ResearchRunIndexView>("/experiments/research-runs"),
+  researchJobs: () => get<ActionJobView[]>("/experiments/jobs"),
+  createResearchDraft: (body: {
+    title: string;
+    source?: string;
+    mechanism?: string;
+    citation?: string;
+    factor_fn_name?: string;
+    factor_params?: Record<string, unknown>;
+    timing_fn_name?: string | null;
+    timing_params?: Record<string, unknown>;
+    data_dependencies?: string[];
+  }) => protectedPost<ResearchDraftView>("/experiments/drafts", body),
+  updateResearchDraft: (draftId: string, body: Record<string, unknown>) =>
+    protectedPatch<ResearchDraftView>(`/experiments/drafts/${encodeURIComponent(draftId)}`, body),
+  reviewResearchWorkItem: (kind: string, itemId: string, action: "approve" | "reject", notes = "") =>
+    protectedPost<ResearchReviewView>(
+      `/experiments/work-items/${encodeURIComponent(kind)}/${encodeURIComponent(itemId)}/reviews`,
+      { action, notes, reviewer: "human" },
+    ),
+  runResearchAction: (
+    kind: string,
+    itemId: string,
+    action: string,
+    body: { start?: string; sample_dates?: number | null; version?: string; target_status?: string } = {},
+  ) => protectedPost<ActionJobView>(
+    `/experiments/work-items/${encodeURIComponent(kind)}/${encodeURIComponent(itemId)}/actions/${encodeURIComponent(action)}`,
+    body,
+  ),
   logicalChains: () => get<any[]>("/experiments/logical-chains"),
   industryKnowledgeGraph: () => get<any>("/experiments/industry-knowledge-graph"),
   autoresearchFunnel: () => get<AutoResearchFunnelView>("/experiments/autoresearch/funnel"),
