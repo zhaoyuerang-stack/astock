@@ -137,5 +137,41 @@ def test_decay_ic_consecutive_negative():
     assert out["decayed"] is True and any("Rank IC" in r for r in out["reasons"])
 
 
+# ---------------- #4 alpha/overlay 分账 ----------------
+from governance import alpha_overlay as AO
+
+
+def _ret(mu, sd, n, seed):
+    idx = pd.date_range("2018-01-01", periods=n, freq="B")
+    return pd.Series(np.random.default_rng(seed).normal(mu, sd, n), index=idx)
+
+
+def test_split_flags_overlay_manufacturing():
+    # 裸因子≈0(负漂移),完整(加 overlay)强正 → 判 overlay 造假
+    bare = _ret(-0.0003, 0.012, 800, 10)   # 夏普<0.3
+    full = _ret(0.0015, 0.008, 800, 11)    # 夏普>0.8
+    out = AO.split_alpha_overlay(bare, full)
+    assert out["overlay_manufactures_alpha"] is True
+    assert "造假" in out["overlay_contribution"]["role"]
+
+
+def test_split_real_alpha_legit_overlay():
+    # 裸因子自身即真 alpha → overlay 记风控(合法)
+    bare = _ret(0.0014, 0.009, 800, 12)    # 夏普>0.8
+    full = _ret(0.0016, 0.007, 800, 13)
+    out = AO.split_alpha_overlay(bare, full)
+    assert out["bare_is_real_alpha"] is True
+    assert "合法" in out["overlay_contribution"]["role"]
+    assert out["overlay_manufactures_alpha"] is False
+
+
+def test_split_separates_accounting():
+    bare = _ret(0.0014, 0.009, 800, 14)
+    full = _ret(0.0016, 0.007, 800, 15)
+    out = AO.split_alpha_overlay(bare, full)
+    # bare_alpha 与 overlay_contribution 是两本账,不混
+    assert "sharpe" in out["bare_alpha"] and "sharpe_delta" in out["overlay_contribution"]
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))

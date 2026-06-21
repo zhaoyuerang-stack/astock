@@ -5,13 +5,18 @@
 """
 from governance.trial_ledger import record_trials, cumulative_trials, honest_n_trials
 from governance.holdout import (
-    boundary, is_holdout, assert_search_clean, validate_on_holdout, holdout_trials, HoldoutBreach,
+    boundary, is_holdout, assert_search_clean, validate_on_holdout, holdout_trials,
+    current_data_fingerprint, candidate_identity,
+    HoldoutBreach, HoldoutAlreadyConsumed, HoldoutIdentityMismatch,
 )
 from governance.marginal import marginal_alpha
 from governance.decay import decay_check, rolling_3y_sharpe
+from governance.alpha_overlay import split_alpha_overlay
 
 __all__ = [
     "record_trials", "cumulative_trials", "honest_n_trials",
-    "boundary", "is_holdout", "assert_search_clean", "validate_on_holdout", "holdout_trials", "HoldoutBreach",
-    "marginal_alpha", "decay_check", "rolling_3y_sharpe",
+    "boundary", "is_holdout", "assert_search_clean", "validate_on_holdout", "holdout_trials",
+    "current_data_fingerprint", "candidate_identity",
+    "HoldoutBreach", "HoldoutAlreadyConsumed", "HoldoutIdentityMismatch",
+    "marginal_alpha", "decay_check", "rolling_3y_sharpe", "split_alpha_overlay",
 ]
