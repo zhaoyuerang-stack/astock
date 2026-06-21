@@ -227,7 +227,12 @@ def run_island_search(
             result = run_validation_pipeline(candidate, max_stage="l0", **pipe_kw)
         evaluated += 1
         exps = result.metrics.get("experiments", [])
-        icir = (exps[0].get("metrics", {}) or {}).get("ICIR") if exps else None
+        _m0 = (exps[0].get("metrics", {}) or {}) if exps else {}
+        icir = _m0.get("ICIR")  # raw,仅供报告(向后兼容,阈值口径按 raw 标定)
+        # fitness edge 用 NW 重叠校正的 ICIR_nw(诚实量级),非 raw(20日前瞻重叠虚高~3.5x)。
+        # 根因#3:raw ICIR 会淹没 fitness 里的 novelty/turnover 项,让搜索只追 IC 无视新颖性;
+        # NW 后三项才平衡。ICIR_nw 缺失时退回 raw(见 l0_ic_scan.py)。
+        edge_icir = _m0.get("ICIR_nw", icir)
 
         # 因子面板算一次,供新颖性(行为距离)与边际(收益相关)共用
         panel = None
@@ -253,7 +258,7 @@ def run_island_search(
         # 重发现硬闸:与在册腿相关 ≥ 阈值 = 该 edge 在册已捕获,**边际为零** →
         # 把 |ICIR| 归零(无论毛 IC 多高都不该霸占冠军席)。corr/turnover 罚仍计入,
         # 使重发现沉到所有真候选之下。WF OOS 发现:0.3 软罚压不住 0.76 IC 的 illiquidity 重发现。
-        edge = abs(float(icir)) if icir is not None else 0.0
+        edge = abs(float(edge_icir)) if edge_icir is not None else 0.0  # NW 诚实量级
         if rediscovery_corr and corr_weight > 0 and ref_returns and corr >= rediscovery_corr:
             edge = 0.0
         priority_adjustment = float(
