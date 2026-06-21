@@ -1,133 +1,342 @@
-# A股全市场因子量化研究
+# CLAUDE.md — A股全市场因子量化研究操作宪法
 
-> 给 AI 的**操作宪法(精简)**。本文件是文档体系的**单一入口**——下表是全部活文档的地图,每份只负责一件事,要找什么按"定位"列定位。
-> **每次接手先读本文件 + [STATUS.md](STATUS.md)**;代码与操作手册在 `factor_research/`,数据基础设施详情 → `factor_research/docs/data_infrastructure.md` + `factor_research/data_lake/README.md`。
+> 本文件是本仓库的**单一入口**。
+> 每次 AI / Agent 接手任务，必须先读本文件，再读 `STATUS.md`。
+> 本文件只定义**不可违反的规则、接手流程、文档路由、架构边界与执行纪律**。
+> 具体命令、运行细节、接口状态、Web 开发规范、数据湖细节、成本数值，不在本文展开，按文档地图(§2)跳转。
 
-### 文档矩阵(地图)
+---
 
-| 层 | 文档 | 定位(只负责这一件事) |
-|---|---|---|
-| 宪法 | **CLAUDE.md**(本文) | 项目操作宪法:数据/策略/架构铁律、成本模型、分层依赖、台账唯一写入口、循环协议 |
-| 宪法 | [AGENTS.md](AGENTS.md) | 跨工具 agent 协作底线(提交纪律等);冲突时让位 CLAUDE.md |
-| 架构 | [SPEC.md](SPEC.md) | 系统/引擎规格:七层架构、单向依赖链、回测唯一权威 |
-| 架构 | [LOOP_ENGINEERING.md](LOOP_ENGINEERING.md) | 自进化机制设计宪法:如何不自欺地持续发现真 alpha |
-| 产品 | [WEB_DESIGN.md](WEB_DESIGN.md) | **canonical** Web 端 UI/UX 规格(研究分析平台·九页三栏) |
-| 产品 | [ROADMAP.md](ROADMAP.md) | 产品路线图:分阶段目标 |
-| 产品 | [Implement.md](Implement.md) | 把研究引擎接成 Web 产品的执行计划(怎么建、按什么顺序) |
-| 流程 | [WORKFLOW.md](WORKFLOW.md) | 端到端流程:每个步骤谁干 + 闸门 + 交接 |
-| 流程 | [MULTI_AGENT.md](MULTI_AGENT.md) | 多 agent 平台分工:哪个平台(DeepSeek/Codex/Antigravity/Claude)干哪类负载 |
-| 流程 | [RUNBOOK.md](RUNBOOK.md) | 每日运行手册:一页跑通 数据→信号→模拟盘→监控 |
-| 决策 | [DECISIONS.md](DECISIONS.md) | 决策框架 + ADR(为什么这么决策,append-only) |
-| 经验 | [LESSONS.md](LESSONS.md) | 踩过的坑(+ 私有 auto-memory 补充) |
-| 状态 | [STATUS.md](STATUS.md) | 当前进度(动态,高频更新) |
-| 状态 | [TASKS.md](TASKS.md) | 开放任务 backlog(动态;单一真相源) |
-| 归档 | [docs/archive/](docs/archive/) | 已完成计划 / 被否决方向(冻结,不再维护,不得作实现依据) |
+## 0. 接手 90 秒协议
 
-> **消歧**:(1) 本仓 `CLAUDE.md` 是**引擎/研究项目**宪法;home 级 `~/CLAUDE.md` 是 **Web 产品**宪法,作用域不同、二者并存,冲突以本仓为准。(2) 本仓 `SPEC.md` 指**引擎架构** spec;`Implement.md`/`~/` 文档里提到的"产品 SPEC"是另一概念,勿混。(3) "谁干什么"分四个角度:CLAUDE.md=三类执行者**职责原则**(强模型/便宜模型/代码)、MULTI_AGENT=**平台**分负载、AGENTS=跨工具**协作底线**、WORKFLOW=**流程步骤**谁干。
+每次开始任务，必须按顺序执行：
 
-## 定位
-全市场、日频因子量化。真正的资产 = **数据基础设施 + 策略工厂 + 有效策略管理**;**任何策略默认会失效**,按**母策略**(独立 alpha 家族)组织,持续 发现 → 证伪 → 替换。
-- **口径**:以 `data_lake` + `core/` 统一回测内核为准,绝不用 `data_full` 旧口径(幸存者偏差水分)凑达标。
-- **门槛**:单母策略入册 年化>15% / 回撤<20%;项目级(组合后)**满意线** 年化≥20% & 夏普≥1.0,**卓越线** 年化≥28% 或 卡玛≥1.6(原 35%/15% 锚定 data_full 水分 40%,已退役)。
+1. 阅读本文件的 `P0 / P1` 规则。
+2. 阅读 `STATUS.md`，确认当前进度、最近失败项、未完成任务。
+3. 运行或要求查看 `git status --short`，确认工作树是否已有他人改动（多 agent 共享工作树）。
+4. 判断任务类型：`data / factor / engine / strategy / workflow / registry / production / web / docs`。
+5. 只修改本任务相关文件；不得顺手重构无关模块。
+6. 修改前说明计划；修改后运行对应检查(§13)。
+7. 提交前只显式 stage 本次文件，必须检查 `git diff --cached --stat` 和 `git diff --cached`。
+8. 没有检查输出，不得报告“完成”。
 
-## 铁律(违反 = 回测结果作废)
-**数据**
-1. **口径**:全市场(含创业板300/科创板688/小盘),警惕幸存者偏差;退市、停牌正确处理。绝不用只含沪市主板的旧缓存。
-2. **防未来函数**:财务按公告日对齐到交易日 ffill;T 日只用 T 日前已披露的财务。
-3. **复权陷阱**:估值(PE/PB)必须用不复权价(后复权价算估值量纲不匹配、虚高数倍)。
-4. **接口封禁**:东财逐只下 40-50 只就封 → 换批量/聚合接口(如 `yjbb_em`),绝不加多线程。
-5. **akshare hang**:唯一可靠超时 = daemon 线程 + join(timeout);ThreadPoolExecutor / socket timeout 都无效。
-6. **联网**:需 `dangerouslyDisableSandbox`;clash 代理(7897)下新浪源可用、东财 push2 被拦。
-7. **质量判定**:区分真问题(OHLC错/负价/跳变>50%)与 A股正常现象(停牌/新股首日/一字板)。
+---
 
-**策略生命周期(默认会失效)**
-8. **先证伪再相信**:漂亮回测先假设是 过拟合 / 幸存者偏差 / 特定行情依赖(如 2025 极端行情不可重复),用 样本外 + 压力测试 + 成本敏感性 去打。
-9. **登记纪律**:每个版本必须 口径透明 + 配置 + 绩效 + 核心假设与失效信号;失效就退役,台账标记退役而非删除。
+## 1. 项目定位
 
-## 交易成本(回测/进化必须按此扣,禁用乐观值)
-| 费用 | 比例 | 收取方式 |
-|------|------|----------|
-| 佣金 | 0.0065%(万0.65) | 买卖双边 |
-| 印花税 | 0.05% | 仅卖出(2023.8 起减半) |
-| 过户费 | 0.001%(万0.1) | 买卖双边 |
-| 冲击/滑点 | 0.2%(小盘审慎,大盘可 0.1%) | 买卖双边 |
-| 融资利率 | 5%/年(1.25x → 拖累 ~1.25%/年) | 持仓日,仅杠杆部分 |
+本项目是一个**A股全市场、日频、因子量化研究系统**。
 
-**单边**:买 0.208% / 卖 0.258% → **往返 ≈ 0.47%**(另加融资)。冲击/滑点 0.2% 维持审慎,不下调。
-当前代码默认在 `core/engine.py::CostModel` 固化真实成本近似:买 0.225% / 卖 0.275% / 融资 6.5%;若调整费率,必须同步台账备注。
+真正资产不是某一个策略，而是：
 
-## 常用命令(均在 `factor_research/` 下)
-```bash
-python3 run_daily.py --no-update   # 出当日信号(不联网);去掉 --no-update 先增量更新
-python3 strategy_lake.py           # 真实口径复测(2018-2026 + 2010-2026 压力测试)
-python3 strategy_registry.py       # 母策略台账对比表
-python3 validate_final.py          # 数据质量校验 → data_lake/quality_report.json
-python3 scripts/research/cost_sensitivity.py  # 成本敏感性
-python3 scripts/research/run_nine_gates_all.py --strategy size_earnings  # 运行 9 道门禁审计
-bash scripts/test_all.sh           # 一键测试器:分层依赖守卫 + 数据湖写入守卫 + 全部 test_*/tests
+1. 数据基础设施；
+2. 因子与策略工厂；
+3. 防自欺研究流程；
+4. 母策略生命周期管理；
+5. 可复测、可审计、可替换的有效策略池。
+
+核心假设：
+
+* 任何单一策略默认会失效。
+* 漂亮回测默认先假设为过拟合、幸存者偏差、未来函数、成本低估或特定行情依赖。
+* 研究目标不是找到一个“神策略”，而是持续完成：发现 → 证伪 → 入册 → 监控 → 退役 → 替换。
+* 策略按**母策略 / alpha 家族**组织，而不是按孤立版本组织。
+
+---
+
+## 2. 文档地图
+
+| 层级      | 文档                                            | 作用                                            |
+| ------- | --------------------------------------------- | --------------------------------------------- |
+| 入口      | `CLAUDE.md`                                   | 本文件。项目操作宪法、P0/P1规则、接手协议、架构边界                  |
+| 状态      | `STATUS.md`                                   | 当前进度、最近变更、当前失败项、高频更新                          |
+| 任务      | `TASKS.md`                                    | 开放任务 backlog，动态维护                             |
+| 架构      | `SPEC.md`                                     | 引擎架构、七层结构、单向依赖链、回测权威                          |
+| 演化      | `LOOP_ENGINEERING.md`                         | 自进化研究机制、9-Gate、如何持续发现真 alpha                  |
+| 流程      | `WORKFLOW.md`                                 | 端到端流程、每一步谁负责、闸门与交接                            |
+| 多 Agent | `MULTI_AGENT.md`                              | DeepSeek / Codex / Claude / Antigravity 平台分负载 |
+| 协作底线    | `AGENTS.md`                                   | 跨工具(Codex/Cursor/Antigravity)共读的提交/协作底线       |
+| 执行      | `RUNBOOK.md`                                  | 日常命令、数据更新、信号生成、复测、监控                          |
+| 数据      | `factor_research/docs/data_infrastructure.md` | 数据源、数据湖、接口、超时、代理、质量判定                         |
+| 数据湖     | `factor_research/data_lake/README.md`         | 数据湖结构、字段、落盘规范                                 |
+| 成本      | `factor_research/docs/cost_model.md`          | 交易成本模型、费率、滑点、融资、变更记录                          |
+| 产品      | `WEB_DESIGN.md`                               | Web 端 UI/UX canonical 规格(研究分析平台·九页三栏)         |
+| 落地      | `Implement.md`                                | 把研究引擎接成 Web 产品的执行计划                           |
+| Web     | `web/CLAUDE.md`                               | Next.js 前端开发纪律、命令、缓存故障处理                      |
+| 决策      | `DECISIONS.md`                                | ADR 决策记录，append-only                          |
+| 经验      | `LESSONS.md`                                  | 踩坑、故障、修复经验、接口血泪铁律细节                           |
+| 归档      | `docs/archive/`                               | 已完成或废弃方案，只作历史参考，不作实现依据                        |
+
+消歧规则：
+
+* 本仓 `CLAUDE.md` 是**研究引擎宪法**；home 级 `~/CLAUDE.md` 是 Web 产品宪法，作用域不同、并存。
+* `web/CLAUDE.md` 是**Web 前端宪法**；根 `SPEC.md` 是**研究引擎架构规格**。
+* 产品侧 PRD / Web 侧 SPEC 不得覆盖本仓引擎规格。
+* 冲突时优先级：`CLAUDE.md` > `SPEC.md` > `STATUS.md` > 其他文档 > archive。
+
+**source-of-truth 约定**(防止重复规则改一处忘多处)：本文 §4/§8/§10 等"摘要"以专章/子文档为唯一真相 —— 成本数值唯一权威 = `core/engine.py::CostModel`(文档面 `cost_model.md`)；9-Gate 细节唯一真相 = `LOOP_ENGINEERING.md`；守卫现状唯一真相 = `scripts/ci/` 实际脚本(§16 表是其索引)。
+
+---
+
+## 3. 规则等级
+
+本仓规则分四级：
+
+| 等级 | 含义         | 处理方式            |
+| -- | ---------- | --------------- |
+| P0 | 违反则研究结果作废  | 必须停止，修正后重跑      |
+| P1 | 违反则架构或流程失效 | CI / 守卫应失败，必须修复 |
+| P2 | 违反则需要人工复核  | 不一定作废，但必须记录     |
+| P3 | 背景信息       | 仅供参考，可迁移到子文档    |
+
+---
+
+## 4. P0 作废级规则
+
+### R-DATA-001：禁止使用旧口径数据
+
+正式研究、入册、汇报、策略对比，必须使用 `data_lake` + `core/` 统一口径。
+禁止使用 `data_full` 旧缓存作为达标依据。历史脚本仍引用 `data_full` 的，只能用于迁移/对照/废弃验证，不得作为有效性证据。
+
+### R-DATA-002：必须全市场口径
+
+正式研究必须覆盖 A 股全市场：沪深主板、创业板 `300*`、科创板 `688*`、中小市值、退市/停牌/上市时间/涨跌停状态。不得用只含沪市主板、只含存活股、只含高流动性股的样本伪造全市场结论。
+
+### R-DATA-003：禁止未来函数
+
+财务/公告/业绩/估值/事件数据必须按**公告日 / 披露日**对齐到交易日。T 日信号只能用 T 日之前已公开的信息。不得用报告期结束日直接 ffill 财务，不得用未来价格/成分/可交易状态生成当期信号。
+
+### R-DATA-004：估值必须使用正确价格口径
+
+PE/PB/PS/PCF 等估值指标必须用不复权价格或与定义一致的口径。禁止用后复权价直接算估值。复权价只能用于收益率/动量/技术指标等价格序列。
+
+### R-COST-001：正式回测必须扣真实成本
+
+正式回测、进化筛选、入册评估、横向比较，必须扣真实交易成本（佣金/印花税/过户费/冲击滑点/融资/买卖双边差异/小盘容量约束）。
+canonical 成本数值 = `core/engine.py::CostModel`；口径文档 = [`cost_model.md`](factor_research/docs/cost_model.md)。
+**禁止为达标临时下调滑点/佣金/冲击。** 改费率必须四处同步（见 `cost_model.md` §4）。
+
+### R-BT-001：回测唯一权威
+
+正式回测唯一权威 = `core.engine.BacktestEngine`。禁止重启/import 已退役回测模块(`core.backtest` 已退场，见 `core/_deprecated_backtest.py.bak`)；禁止每策略各写一套回测；禁止研究脚本绕开统一内核生成正式绩效。
+canonical 路径：`strategies.small_cap` / `factors.small_cap` / `engine.metrics` / `factors.utils`。所有正式绩效必须可由统一引擎复现。
+
+### R-LLM-001：LLM 禁止判断 Alpha 是否有效
+
+LLM 可做：候选因子生成、研报/公告/新闻 NLP 抽取、假设草拟、代码草案、报告解释、错误定位辅助、研究编排建议。
+LLM 禁止做：判断因子是否有效、判断是否入册、替代 Alpha Audit / 回测 / 样本外检验 / DSR 多重测试惩罚 / 成本敏感性 / 风险闸门。
+所有“是否有效”的判断必须由确定性代码、统计检验、统一回测和固定门禁完成。
+
+### R-REG-001：策略入册只能走唯一入口
+
+新母策略先 `register_family(...)`，新版本经 `register(family, version, ...)`。唯一写入口 = `strategy_registry.register_family / strategy_registry.register`。任何代码不得直写 `strategy_versions.json` / `strategy_families.json` / `registry/*.json`。改台账 schema 必须先更 `SPEC.md` 和对应测试。
+
+### R-WF-001：候选到入册必须走 workflow
+
+canonical 通道：`factory/candidates → L0-L3 cheap-first 筛选 → workflow/promote.py 或 apps/factory_cli.py promote → phase1_synthetic 防未来审计 → phase2/phase3 复测压力 → phase4_register 入册`。`phase1_synthetic` 是防未来函数机械审计的唯一执行点。绕过该流程的结果不得进正式台账。
+
+### R-OBJECTIVE-001：收益门槛不是优化目标
+
+收益门槛是入册观察条件，不是候选搜索的唯一目标函数。禁止单纯最大化年化/Sharpe/Calmar。候选排序必须同时考虑：样本外稳定性、压力期表现、成本敏感性、换手与容量、与现有母策略相关性、多重测试惩罚、经济学假设、失效信号清晰度、可执行性。
+
+---
+
+## 5. P1 架构守卫规则
+
+### R-ARCH-001：单向依赖链
+
+```text
+data_lake → factors → core.engine → strategies / factory / workflow → registry → production
 ```
 
-## Web 工作台命令(在 `web/` 下,Next.js 项目 `quant-research-web`)
-```bash
-npm run dev                        # 启动开发服务(默认 :3000);开发期间禁跑 build(见前端纪律)
-npx tsc --noEmit                   # 类型检查(dev 期的首选验证)
-npm run lint                       # ESLint(next lint)
-npm run test                       # node --test lib/*.test.mjs components/**/*.test.mjs(非 vitest)
-npm run build                      # 仅在 dev 已关闭时跑;CI/部署用
+下层不得 import 上层；生产层不得 import 研究层；回测核心不得依赖具体策略；registry 不得依赖 production；data 层不得依赖 factors/strategies/workflow。守卫：`scripts/ci/check_layer_deps.py`。
+
+### R-ARCH-002：生产层禁止依赖研究层
+
+`run_daily.py` / production 目录 / 实盘信号模块，不得 import `factory.* / workflow.* / scripts.research.* / notebooks.* / experimental.*`。生产层只用：已入册策略、canonical 数据/因子/回测/信号接口、registry 正式读取接口。
+
+### R-ARCH-003：配置必须走统一入口
+
+配置走 `app_config/settings.yaml` + `get_settings()`。禁止把模型名/路径/费率/数据源/API 开关/代理端口硬编码在业务逻辑里。例外：测试 fixture 可用局部临时配置，但不得污染正式路径。
+
+### R-ARCH-004：数据湖写入必须可审计
+
+落盘必须 schema 明确、字段含义明确、交易日对齐明确、增量可重复、异常有质量报告、重跑不产生静默口径变化。写 `data_lake` 核心区必须走 canonical writer 并更新 manifest。守卫：`scripts/ci/check_lake_writers.py`；质量校验：`validate_final.py` → `data_lake/quality_report.json`。
+
+### R-ARCH-005：废弃模块不得复活
+
+废弃模块必须路径标记 deprecated/archive/bak、不被正式代码 import、不作新功能参考。恢复需新增 ADR 到 `DECISIONS.md` 说明原因/风险/迁移计划。
+
+---
+
+## 6. 9-Gate R2P 门禁摘要
+
+所有候选策略入册前必须通过 9-Gate R2P 流水线。**唯一真相 = [`LOOP_ENGINEERING.md`](LOOP_ENGINEERING.md)**，本表只作速查：
+
+| Gate | 名称           | 核心问题                     |
+| ---- | ------------ | ------------------------ |
+| G1   | 数据可用性        | 数据是否覆盖完整、字段可信、无口径缺陷      |
+| G2   | 防未来函数        | 信号是否只用当时可知信息             |
+| G3   | 成本扣除         | 是否扣真实交易与冲击成本             |
+| G4   | 样本外检验        | 样本外是否仍稳定                 |
+| G5   | 压力期检验        | 极端/熊市/风格逆风期是否可承受         |
+| G6   | 换手与容量        | 换手、冲击、成交容量是否现实           |
+| G7   | 中性化与相关性      | 是否只是暴露于已知风格或现有策略         |
+| G8   | DSR / 多重测试惩罚 | 是否经得起大规模搜索后的统计惩罚         |
+| G9   | 入册材料完整性      | thesis/配置/绩效/风险/失效信号是否齐全 |
+
+代码入口：`workflow/` 与 `scripts/research/run_nine_gates_all.py`。
+
+---
+
+## 7. 策略生命周期
+
+### 7.1 母策略 family 必填字段
+
+family id、策略名称、核心经济学假设、alpha 来源、适用市场状态、不适用市场状态、预期失效信号、主要风险、与现有母策略关系、研究负责人/生成来源、创建时间。
+
+### 7.2 策略 version 必填字段
+
+version id、所属 family、因子定义、参数配置、股票池、调仓频率、持仓数量、成本模型、样本内绩效、样本外绩效、压力测试绩效、换手、容量评估、相关性评估、9-Gate 结果、入册结论、退役条件。
+
+### 7.3 入册门槛
+
+单母策略最低观察条件：年化 > 15%、最大回撤 < 20%、样本外不塌陷、压力期可解释、成本敏感性不过度脆弱、失效信号明确、与现有策略不高度重复。
+项目级组合目标：满意线 年化 ≥ 20% & Sharpe ≥ 1.0；卓越线 年化 ≥ 28% 或 Calmar ≥ 1.6。
+注意：上述目标不是搜索程序的唯一目标函数(违反 `R-OBJECTIVE-001` 作废)。
+
+### 7.4 退役纪律
+
+策略失效不得删历史。必须：registry 标记 retired/deprecated、记录失效时间、记录触发的失效信号、记录失效归因（市场状态变化/拥挤/数据问题/成本上升/容量约束/过拟合暴露）、保留历史绩效与配置、禁止用新参数覆盖旧版本历史。
+
+---
+
+## 8. LLM 分工铁律
+
+```text
+强模型：研究编排 / 推理 / 复杂代码修改 / 风险识别
+便宜模型：批量候选生成 / NLP 抽取 / 标签生成 / 初筛辅助
+确定性代码：所有有效性判断 / 回测 / 审计 / 入册 / 风控
 ```
 
-## 工作约定
-- 新母策略先 `register_family(...)` 声明假设/失效信号，再 `register(family, version, ...)` 登记版本（两层 schema 见 SPEC）。
-- 新因子或策略入册前必须通过 9-Gate R2P 流水线进行中性化与 DSR 多重测试惩罚审计，确保无数据泄露和交易成本超限风险。
-- 回测交付三段：样本内(2018-2026)/ 样本外(2023-2026)/ 压力测试(2010-2026)。
-- 实盘折扣:费率见上表;另评估 小盘容量、停牌/涨跌停、组合换手。
-- 已 git 化:重要阶段改动用提交固定;数据湖和大体量运行产物不入库。
-- **提交纪律(多 agent 共享工作树,违反 = 卷走别人改动/无法 revert)**:
-  1. **一个 commit = 一个完整、可独立 revert 的意图**。宁可拆成几个小而自洽的 commit,不要一个"什么都做了"的大杂烩。
-  2. **绝不 `git add -A` / `git add .`** —— 本仓库多 agent 并发,一锅端会把别人半成品改动卷进你的 commit。**只用显式路径** `git add <file>...`,且只 stage 你 trace 得清、属于本次意图的文件。
-  3. **提交前必 `git diff --cached --stat` + `git diff --cached` 核对范围**:每个文件、每一行都要 trace 到本次目的;别人的改动留在工作树,不碰。
-  4. **不擅自切分支 / reset / rebase 共享分支**;动 git 历史前先看 `git status` 有无他人正在改的文件。
-  5. **message 讲"为什么"**:`type(scope): 标题` + 正文写根因(diff 看不出的)和验证证据(守卫绿/测试 N/N);提交前先跑守卫+测试,绿了再提。
-  6. 尾注固定加 `Co-Authored-By:` 与 `Claude-Session:`(claude)。
-- **搜索/回测默认思维**: 先问能否 `预计算 / 复用 / 并行 / 拆分`，再问能否改变实现顺序；只能加速计算，不能改样本、公式、成本、`shift(1)`、T+1 或任何真实口径。
-- **前端开发纪律**: 严禁在开发服务运行（`npm run dev`）时跑生产打包（`npm run build`），防止 Webpack 缓存污染导致全站 404/500 崩溃。`build` 不可作为 dev 运行时的常规验证步骤；先看 `npx tsc --noEmit` 和 `npm run lint`。若出现缓存损坏（ENOENT/Cannot find module 等），须强制关闭 dev 任务、用 `lsof -ti :3000 | xargs kill -9` 释放端口、运行 `rm -rf web/.next web/node_modules/.cache` 清空双重缓存、再重启并指引浏览器硬刷新（⌘+Shift+R）。
-- 改了架构/进度,顺手更新 SPEC.md / STATUS.md;踩了坑记 LESSONS.md。
+* **强模型**可分析架构/设计实验/写代码/修 bug/解释测试失败/审查流程/生成报告/提风险假设；不得直接宣布策略有效、绕过回测门禁、用语言代替统计检验、为达标改成本/样本/shift/T+1/退市处理/股票池。
+* **便宜模型**默认干批量候选/NLP/标签/初步 thesis；统一入口 `services/agent/llm_adapter.py::get_adapter()` + `app_config/settings.yaml::ai_model`(现 `deepseek-v4-flash`)，无 key 退规则式；输出必须进确定性筛选，不得直接入册。
+* **确定性代码**负责：数据质量校验、防未来审计、因子计算、中性化、回测、成本扣除、Alpha Audit、RidgeCV/Newey-West/置换、DSR/多重测试惩罚、L0-L3 筛选、9-Gate、入册判断、生产信号。把这些判断交给 LLM = 研究流程失效。
 
-## 机器与并行
-本机 = **Apple M5(10 核:4 性能 + 6 能效)/ 24GB**。**凡可并行的都并行**,别串行干等(本节=并行**规则**;4 个 agent 平台间的分工见 [MULTI_AGENT.md](MULTI_AGENT.md)):
-- **跨独立单元并发**:不同 tushare 接口(限速按接口,实测 9 并发零退避)、多因子回测、多策略复测、多 agent 审计(Workflow 编排)——各跑各的,用 `&`+`wait`(启动器守着才不变孤儿/能收完成通知)或 run_in_background,墙钟从 N×T 压到 ≈T。
-- **不与现有铁律冲突**:封禁类单一来源(东财)仍**绝不并发抓**(铁律4);**同 token 同一接口顺序**(共享限速);akshare 超时仍 daemon+join(铁律5)。并行只用于**本质独立**的工作。
-- **先判瓶颈再定并行维度**:抓取是 API/限速 bound(只有跨接口并发才有效,堆核无用);计算(回测/审计/截面回归)才是 CPU bound(吃多核 + pandas 向量化)。
-- **内存是高并发真约束**:大数据回填把累积 DataFrame 全程留内存(单接口可达数 GB),并发前看 `memory_pressure`,吃紧(free<15%)就降并发或改增量 append。
+---
 
-## LLM 分工铁律(违反 = 防自欺失效)
-- **苦力归便宜模型,判断归代码**:候选生成 / 批量抽取(研报-NLP)/ 打标 等大批量低风险活,默认走配置的便宜模型(`app_config/settings.yaml::ai_model`,现 DeepSeek v4-flash;统一入口 `services/agent/llm_adapter.py::get_adapter()`,无 key 退规则式)。
-- **防自欺判断恒为确定性代码,禁交 LLM**:Alpha Audit(NW+RidgeCV+置换)、L0-L3 筛选、回测、入册门槛——一律代码。任何时候**不得让 LLM 代替这些判断**(便宜或强模型都不行)。LLM 只提议候选,代码处置去留。
-- **LLM 不越权**(承既有):只做路由/解读/生成候选,永不执行工具/下单(不越权门在 planner)。
-- **三者不串**:强模型(Claude)做研究编排/推理;便宜模型干苦力;确定性代码做判断。把判断塞给 LLM = 毁掉整个证伪体系。
+## 9. 数据纪律
 
-## 架构铁律(模块解耦,违反 = CI 报错)
-单向依赖链:`data(lake) → factors → core.engine → {strategies, factory/workflow} → registry → production`。
-- **回测唯一权威 = `core.engine.BacktestEngine`**。`core.backtest` 已退场(`core/_deprecated_backtest.py.bak`),禁止再 import;用 `strategies.small_cap` / `factors.small_cap` / `engine.metrics` / `factors.utils` 的 canonical 路径。
-- **配置走 `app_config/settings.yaml`**(`get_settings()`),勿散落硬编码。
-- **台账唯一写入口 = `strategy_registry.register_family/register`**(即 `workflow/phase4_register`);任何代码不得直写 `strategy_versions.json`。
-- **候选→登记唯一通道 = `workflow` phase1~4**。factory(`factory/lines`)负责生成+L0~L3 廉价筛选;L3_PASSED 经 `workflow/promote.py`(或 `python3 apps/factory_cli.py promote`)走 phase1 合成防未来审计 → phase2/3 → phase4 登记。`phase1_synthetic` 是防未来铁律的唯一机械执行点。
-- **生产层(run_daily 等)禁止 import `factory.*`/`scripts.research.*`/`workflow.*`**。
-- 守卫:`python3 scripts/ci/check_layer_deps.py`(已接入 `scripts/test_all.sh`)。
+细节见 [`data_infrastructure.md`](factor_research/docs/data_infrastructure.md) + [`data_lake/README.md`](factor_research/data_lake/README.md)；**接口反封禁/超时血泪铁律细节见** [`LESSONS.md`](LESSONS.md)。本文保留不可违反原则 + 最关键操作铁律：
 
-## 任务执行循环协议
+原则：① 全市场优先，不用幸存者样本；② point-in-time 优先，不未来泄露；③ 统一数据湖优先，不临时拼私有口径；④ 质量报告优先，不忽略 OHLC 错误/负价/异常跳变；⑤ A股正常现象（停牌/新股首日/一字板/涨跌停）不得误判为脏数据；⑥ 接口异常不得通过改变研究口径绕过；⑦ 数据更新失败必须显式记录，不得静默使用半截数据。
 
-每个任务作为循环运行，不是直线：
-1. 写变更。
-2. 运行检查：测试 + linter + 类型检查。
-3. 有失败？读错误，找原因，修它，回到第 2 步。
-4. 最多循环 5 次。
+操作铁律（违反极易触发封禁/挂死）：
+* **东财逐只下 40-50 只就封** → 换批量/聚合接口（如按报告期 `yjbb_em`），**绝不加多线程**（更快触发封禁）。
+* **akshare 唯一可靠超时 = daemon 线程 + join(timeout)**；`ThreadPoolExecutor` / socket timeout 都无效。
+* **联网需 `dangerouslyDisableSandbox`**；clash 代理(7897)下新浪源可用、东财 push2 被拦。
 
-**停止条件：**
-* 所有检查通过 → 报告“完成”，并附上通过的输出作为证明。
-* 5 次用完 → 停下来，报告还剩什么没过。
-* 同一个错误连续出现两次 → 立刻停。你在猜，不是在修。
+---
 
-**禁止行为：**
-* 禁止：在没有检查输出的情况下报告“完成”。
-* 禁止：通过删断言、弱化测试来让测试通过。修代码，不修记分牌。
+## 10. 交易成本纪律
+
+数值与变更记录见 [`cost_model.md`](factor_research/docs/cost_model.md) + `core/engine.py::CostModel`(唯一权威)。本文只保留原则：① 正式回测用审慎成本；② 小盘必显式计冲击/滑点；③ 高换手必做成本敏感性；④ 杠杆必计融资；⑤ 成本参数变化必进 `DECISIONS.md`；⑥ 不得为入册临时降成本；⑦ 所有报告说明成本口径。
+
+---
+
+## 11. Git 与多 Agent 提交纪律
+
+多 agent 共享工作树，提交纪律是 P1。跨工具协作底线另见 [`AGENTS.md`](AGENTS.md)。
+
+* **11.1 禁止一锅端**：禁 `git add -A` / `git add .`；必须显式 `git add <file>...`，只 stage trace 得清、属于本次意图的文件。
+* **11.2 一个 commit 一个意图**：一个完整、可独立 revert 的意图；禁止把数据修复/策略变更/Web UI/文档/测试/重构/格式化混在一个 commit。宁可多个小 commit。
+* **11.3 提交前必核对 diff**：`git diff --cached --stat` + `git diff --cached`；每个文件属本任务、每行可解释、没卷入他人半成品、没误删测试、没弱化断言、没改无关配置、没把大数据产物入库。
+* **11.4 禁止擅自改 Git 历史**：共享分支上禁 `reset --hard` / `rebase` / `push --force` / `clean -fd`，除非任务明确要求且确认无他人工作树风险。
+* **11.5 Commit message**：`type(scope): 标题` + 正文写"为什么改"（diff 看不出的根因）+ "验证"（命令与结果）；尾注固定 `Co-Authored-By:` 与 `Claude-Session:`。
+
+---
+
+## 12. 任务执行循环协议
+
+每个任务按循环执行，不按直线。
+
+**12.1 标准循环**：理解任务 → 定位文件 → 写变更 → 运行检查 → 失败则读错误 → 找根因 → 修复 → 回到运行检查。最多 5 次。
+**12.2 停止条件**（任一即停并报告）：所有检查通过 / 5 次用完 / 同一错误连续两次 / 发现规则冲突 / 发现疑似数据口径污染 / 发现可能卷入他人改动 / 发现需改 P0/P1 规则。
+**12.3 禁止行为**：没检查输出就报完成；删测试/弱化断言让结果变绿；改样本/成本/shift/T+1/公告日对齐让策略达标；把失败甩锅"可能环境问题"却无证据；测试失败后盲目反复改。
+
+---
+
+## 13. 常用检查入口
+
+具体命令见 [`RUNBOOK.md`](RUNBOOK.md)，本文只保留检查类别。每次任务至少选相关检查：
+
+| 任务类型       | 必查                               |
+| ---------- | -------------------------------- |
+| 数据         | 数据质量校验、schema 校验、样本覆盖、异常报告       |
+| 因子         | 单元测试、防未来检查、截面 sanity check       |
+| 回测引擎       | engine tests、成本测试、边界条件测试         |
+| 策略         | 样本内、样本外、压力测试、成本敏感性               |
+| workflow   | phase1-4 流程测试、入册测试、失败路径测试        |
+| registry   | schema 测试、唯一写入口测试、历史兼容测试         |
+| production | 生产信号 smoke test、禁止研究层 import     |
+| web        | 类型检查、lint、组件测试；开发期不得用 build 代替检查 |
+| docs       | 链接、规则编号、状态同步                     |
+
+一键入口：`bash scripts/test_all.sh`（含分层守卫 + 数据湖写入守卫 + 全量测试发现），具体以 `RUNBOOK.md` 为准。
+
+---
+
+## 14. Web 作用域规则
+
+Web 不是本文件主要作用域。涉及 Web 必须先读 [`web/CLAUDE.md`](web/CLAUDE.md) + [`WEB_DESIGN.md`](WEB_DESIGN.md) + [`Implement.md`](Implement.md)。
+
+根规则：① 非 Web 任务不得顺手改 `web/`；② Web 开发期优先类型检查/lint/组件测试；③ 开发服务运行时不得随意跑生产 build；④ Web 缓存损坏/端口占用/`.next` 问题按 `web/CLAUDE.md` 处理；⑤ Web 展示层不得改变研究/回测/成本口径或入册规则。
+
+---
+
+## 15. 并行与机器纪律
+
+机器：本机 = **Apple M5(10 核:4 性能 + 6 能效)/ 24GB**。运行环境细节见 [`RUNBOOK.md`](RUNBOOK.md) + [`data_infrastructure.md`](factor_research/docs/data_infrastructure.md)。原则：
+
+① 可并行的独立计算应并行（多因子回测/多策略复测/跨接口抓取/多 agent 审计），用 `&`+`wait` 或后台任务；② API 限速/封禁风险优先于并行速度；③ 东财等易封接口不得加多线程硬冲（见 §9）；④ akshare 等易 hang 必须用 daemon+join 超时模式；⑤ 内存是高并发硬约束（并发前看 `memory_pressure`，吃紧降并发）；⑥ 并行只能加速计算，不能改样本/公式/成本/shift/T+1/真实口径；⑦ 后台任务必须可追踪、可停止、可报告，不得变孤儿进程。
+
+---
+
+## 16. 规则守卫表
+
+下表是 `scripts/ci/` 实际守卫的索引（**唯一真相 = 脚本本身**，均由 `scripts/test_all.sh` 调用）：
+
+| 规则 / 关注点              | 等级 | 守卫脚本(`scripts/ci/`)        | 说明                                   |
+| --------------------- | -- | ------------------------- | ------------------------------------ |
+| R-ARCH-001 单向依赖       | P1 | `check_layer_deps.py`     | AST 静态分析 FORBIDDEN_EDGES，禁下层/生产层反向 import |
+| R-ARCH-004 数据湖写入可审计  | P1 | `check_lake_writers.py`   | 写 data_lake 核心区必须走 canonical writer + 更新 manifest |
+| R-WF-001 候选入册通道       | P0 | `check_no_force_promote.py`| 禁自动晋级脚本 `force=True` 跳过 phase1/2 防未来门 |
+| R-REG-001 台账证据完整(G9)  | P0 | `check_registry_evidence.py`| 禁跨家族 IC 证据照抄等机械违规                    |
+| G8 防自欺 / holdout      | P0 | `check_holdout_compliance.py`| 自动环 load 全样本据此择优必须截到 <boundary，禁偷看金库 |
+| 防自欺 / 控制路径可观测         | P0 | `check_control_exceptions.py`| 准入/裁决/信号/执行路径禁 `except: pass` 静默吞异常 |
+| 测试发现完整                | P1 | `check_test_discovery.py` | 全量收集 `test_*.py`，杜绝漏跑的手工清单           |
+| R-DATA-001 禁用旧口径      | P0 | **(缺，待建)**                | data_full 旧口径目前无机械守卫 → 见 `TASKS.md`  |
+| R-ARCH-002 生产层隔离      | P1 | `check_layer_deps.py`(覆盖) | production 禁 import research 在依赖图内强制 |
+| Git 禁止一锅端             | P1 | 人工 diff                   | 多 agent 共享工作树必守，无脚本可代替               |
+
+凡“缺/待建”的守卫，应在 `TASKS.md` 立项。
+
+---
+
+## 17. 修改文档的规则
+
+修改本文件属架构级变更。允许情形：发现 P0/P1 规则缺失、文档冲突、新增已验证架构边界、成本/数据/入册/回测权威正式决策变化、多 agent 协作协议变化。
+修改时必须：① 同步 `STATUS.md`；② 必要时同步 `SPEC.md`；③ 涉及决策追加 `DECISIONS.md`；④ 涉及踩坑追加 `LESSONS.md`；⑤ 不得把临时命令/临时环境/一次性排障细节塞回本文。
+
+---
+
+## 18. 最终原则
+
+```text
+宁可少发现策略，也不要相信假 alpha。
+宁可慢一点，也不要污染数据口径。
+宁可不入册，也不要绕过防未来函数。
+宁可让 LLM 干苦力，也不要让 LLM 做判断。
+宁可多写守卫，也不要靠人或 AI 自觉。
+```
+
+如果任务目标与上述原则冲突，必须停止并报告冲突，不得继续执行。
