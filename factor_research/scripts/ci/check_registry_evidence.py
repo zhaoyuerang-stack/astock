@@ -26,14 +26,14 @@ REQUIRED_GATES = ["dsr_p", "pbo"]  # passed_all=true 时必须实算(非 None)
 # 已知病灶基线(2026-06 回扫发现,grandfather 待 workflow 处置;**修复后须从此处移除**)。
 # 守卫只对「新」违规 exit 1;下列项仅打印为待处置警告,不阻塞。处置清单见
 # scratch/illiq_largecap_governance_DRAFT.md(退役/补审/降级)。
-PENDING_REMEDIATION = {
-    # G1 跨家族 IC 照抄:illiquidity-large-cap 盖了小盘 illiquidity 家族的 IC 章(独立重算 IC=−0.084)
-    "G1:illiquidity,illiquidity-large-cap": "illiq-large-cap 退役/重分类后,其 IC 块不再跨家族",
-    # G2 illiquidity-large-cap passed_all=true 却 pbo 未算
-    "G2-skip:illiquidity-large-cap/v1.0:pbo": "同上,退役后消失",
-    # G2 industry-neglect v1.3 证据全空绕过 9-Gate
-    "G2-empty:industry-neglect-rotation/v1.3": "补独立 9-Gate(L2 复合 DSR/PBO)+ admission 标注后消失",
-}
+PENDING_REMEDIATION: dict[str, str] = {}
+# 已修复并移除(ADR-017 处置,2026-06):
+#   G1:illiquidity,illiquidity-large-cap —— illiq-large-cap/v1.0 已退役 + nine_gate 重写为
+#       INVALIDATED_EVIDENCE_PLAGIARIZED,原照抄 IC 块归档于 evidence.archived_invalid_nine_gate。
+#   G2-skip:illiquidity-large-cap/v1.0:pbo —— 同上,passed_all 已改 False,不再「跳门标通过」。
+#   G2-empty:industry-neglect-rotation/v1.3 —— 补 L0/L1/L2 归因 nine_gate(passed_all=False,
+#       DSR/PBO 因 trial_count_unknown 明确标 None,非伪造)+ evidence.admission_caveat 标注
+#       standalone 资格实际靠 MA16 择时覆盖,裸因子不达标。
 
 
 def extract_versions(ledger: dict) -> list[dict]:

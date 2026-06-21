@@ -295,6 +295,51 @@ def attach_executable_spec(
     return f"{family}/{version}"
 
 
+def retire_version(family, version, *, reason, evidence_refs=(), actor="workflow",
+                   control_event_path=None):
+    """唯一的版本退役通道(ADR-017 处置 + Task 15 状态机接线)。
+
+    经状态机校验合法转换(非 REGISTERED/DEPLOYED/SUSPENDED 源状态拒绝,不落盘)、追加
+    control_events 链式审计、把退役原因与证据指针写入 evidence.retirement(不删除历史字段)。
+    """
+    import uuid
+    from datetime import datetime, timezone
+
+    from governance.control_events import append_event, DEFAULT_LOG as CE_DEFAULT_LOG
+    from governance.state_machine import CN_TO_STATE
+
+    data = _load()
+    fam = next((f for f in data["families"] if f["id"] == family), None)
+    if fam is None:
+        raise ValueError(f"母策略 '{family}' 未登记")
+    item = next((v for v in fam["versions"] if v["version"] == version), None)
+    if item is None:
+        raise ValueError(f"版本 '{family}/{version}' 不存在")
+
+    from_state = CN_TO_STATE.get(item.get("status"), item.get("status"))
+    spec_hash = ((item.get("executable_spec") or {}).get("spec_hash")) or ""
+
+    append_event(
+        event_id=str(uuid.uuid4()), timestamp=datetime.now(timezone.utc).isoformat(),
+        actor=actor, family=family, version=version, spec_hash=spec_hash,
+        from_state=from_state, to_state="RETIRED", reason_code=reason,
+        evidence_refs=tuple(evidence_refs),
+        path=control_event_path or CE_DEFAULT_LOG,
+    )  # 非法转换在此抛 IllegalTransition,不落盘注册表
+
+    evidence = dict(item.get("evidence") or {})
+    evidence["retirement"] = {
+        "reason": reason,
+        "evidence_refs": list(evidence_refs),
+        "retired_at": datetime.now(timezone.utc).isoformat(),
+        "actor": actor,
+    }
+    item["evidence"] = evidence
+    item["status"] = "退役"
+    _save(data)
+    return f"{family}/{version}"
+
+
 def show():
     """按母策略分组打印台账"""
     data = _load()
