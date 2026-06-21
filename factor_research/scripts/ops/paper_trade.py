@@ -1,7 +1,7 @@
-"""illiquidity v1.0 模拟盘(真实盘成交逻辑):T+1 开盘价成交 + pending order + 停牌/涨跌停约束。
+"""illiquidity 模拟盘(真实盘成交逻辑):T+1 close 成交 + pending order + 停牌/涨跌停约束。
 
 真实盘口径(你要求"所有模拟按真实盘"):
-  · T 日盘后出信号 → 记 pending → **T+1 开盘按不复权开盘价成交**(收盘后才看到信号,只能次日买)
+  · T 日盘后出信号 → 记 pending → **T+1 close 按不复权收盘价成交**
   · 停牌(当天无开盘价)不可买卖;一字涨停(开盘=涨停价)买不进、一字跌停卖不出
   · 等权 1/top_n,A股 100 股整数倍;成交/估值全用不复权价(daily_raw 的 raw_open/raw_close)
   · 本金 100 万,1.0x;成本 买 0.225% / 卖 0.275%
@@ -266,8 +266,20 @@ def main():
             if trades:
                 append_trades(trades)
         # 记录本次执行摘要(web 操作卡展示受阻明细用;blocked 不进 trades.csv)
-        acc["last_exec"] = {"exec_date": date, "from_signal": exec_from,
-                            "blocked": [list(b) for b in blocked]}
+        last_exec = {
+            "exec_date": date,
+            "from_signal": exec_from,
+            "blocked": [list(b) for b in blocked],
+        }
+        if pend:
+            last_exec.update({
+                key: pend.get(key, "")
+                for key in (
+                    "deployment_id", "family", "version", "spec_hash",
+                    "data_fingerprint",
+                )
+            })
+        acc["last_exec"] = last_exec
         # 2. 记录新 pending:本信号 → 下个交易日开盘执行
         # leverage = band_exposure (动态),空仓时 0;fallback 旧字段或常量
         target = signal["holdings"] if signal["in_market"] else []
@@ -278,8 +290,17 @@ def main():
         pend_bond = {"enabled": bool(rot.get("recommend_bond")),
                      "code": rot.get("bond_code", "511010"),
                      "name": rot.get("bond_name", "国债ETF")}
-        acc["pending"] = {"signal_date": date, "target": target, "leverage": pend_leverage,
-                          "bond": pend_bond}
+        acc["pending"] = {
+            "signal_date": date,
+            "target": target,
+            "leverage": pend_leverage,
+            "bond": pend_bond,
+            "deployment_id": signal.get("deployment_id", ""),
+            "family": signal.get("family") or signal.get("strategy", ""),
+            "version": signal.get("version") or signal.get("strategy_version", ""),
+            "spec_hash": signal.get("spec_hash", ""),
+            "data_fingerprint": signal.get("data_fingerprint", ""),
+        }
         acc["last_date"] = date
 
     nav, pos_value, detail = valuation(acc, date)
