@@ -14,7 +14,7 @@
 4. **有效策略管理** ✅台账 / ○监控 — 母策略两层台账,跟踪 有效/衰减/退役。
 5. **中央调度层** ✅/⏳ — launchd 四件套已建:daily-update / weekly-maintenance / api(:8011) / web(:3000) 常驻;event-driven 编排仍待建:数据就绪 / 市场状态切换 / 失效信号触发 → 启动或停用对应母策略/组合。
 6. **组合层** ⏳ — 已有 paper_engine 自动模拟盘、债券 ETF 轮动和基础组合展示;多母策略低相关加权 / 轮换机制仍待建。
-7. **展示层** ✅/⏳ — FastAPI + Next.js 看板已建(overview/data/risk/portfolio/paper/experiments/settings);仍需把多母策略组合管理与衰减监控展示打磨成完整闭环。
+7. **展示层** ✅/⏳ — FastAPI + Next.js 看板已建。研究域按生命周期拆分：`/experiments` 只处理登记前的素材/草案/候选/L0-L3/复核，`/factors` 只展示已进入台账的版本、血缘和 Nine-Gate；专项验证按 `family/version` 聚合进版本详情。仍需把多母策略组合管理与衰减监控展示打磨成完整闭环。
 
 - 核心循环:工厂产出 → 管理层汰换 → **只有「有效」策略才进组合与展示**。
 - ⚠ 依赖顺序:组合/展示的收益必须建在 `core/` 真实成本口径上;旧 `data_full/data` 已清理,不得恢复为主线。
@@ -50,6 +50,15 @@ data(lake) → factors → core.engine → {strategies(生产), factory/workflow
 - **策略漏斗(候选→登记唯一通道)**:`factory/lines` 负责广度(变异生成 + L0 IC/L1 BT/L2 regime/L3 WF 廉价筛选,候选以 `factory.ontology.Hypothesis` 存于 `factory.pool`);L3_PASSED 经 `workflow/from_factory.py` 适配 → `workflow` phase1 合成防未来审计 → phase2/3 → `phase4_register` 登记 → `line3_marginal` 边际评级定 ACTIVE/SHADOW。驱动:`workflow/promote.py` 或 `python3 apps/factory_cli.py promote`。
 - **台账唯一写入口** = `strategy_registry.register_family/register`(经 `phase4_register`);禁止任何代码直写 `strategy_versions.json`。
 - `phase1_synthetic` 是**全系统唯一**机械执行「防未来函数」铁律的闸门。
+
+### Web 研究域边界（2026-06-21）
+
+- 统一只读模型 `ResearchWorkItem` 聚合 draft / Hypothesis / AutoResearch Candidate，但不合并底层 append-only 存储；身份使用 `draft:{id}`、`hypothesis:{id}`、`autoresearch:{fingerprint}`。
+- 统一状态为 `review / blocked / ready / running / completed / archived`，默认按人工动作优先排序；同一工作项同一动作只允许一个运行中 Job。
+- 研报逻辑链只能生成待补全的研究草案；具备经济机制、可执行因子函数和数据依赖后才可进入 L0。
+- 人工与 AutoResearch 共用 append-only 复核记录；L3 未批准时 API 必须拒绝晋级。
+- `/factors` 的对象是台账版本，不是未登记候选；台账 `候选/SHADOW` 在 UI 中称“观察版本”。
+- 专项 JSON 产物通过 research ledger 的 `hypothesis=family/version` 绑定到版本详情，前端不硬编码业务文件路径。
 
 ## 数据层设计
 - **口径**:全市场+全历史+含退市股(`data_lake`);估值用不复权价、财务按公告日对齐(防未来函数)。

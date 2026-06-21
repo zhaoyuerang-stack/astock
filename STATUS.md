@@ -4,6 +4,13 @@
 
 ## 一句话
 
+**2026-06-21(Web 研究域按生命周期重构)**：研究实验室从“多个无关 Tab + 双漏斗 + 已登记排行榜”改为可执行工作队列，因子研究收紧为正式台账资产目录。
+  · **实验室职责**：新增 `/experiments/evidence`、`/runs`、`/reviews` 与工作项详情；统一聚合 draft/Hypothesis/AutoResearch，按待复核→阻塞→可执行→运行中排序，支持草案补全、单项 L0-L3、统一复核和晋级。
+  · **治理门禁**：人工和 AutoResearch 候选都必须有 append-only 批准记录才能进入 `workflow.promote`；重复运行返回冲突，Web 不直接写台账。
+  · **因子页职责**：删除未登记噪音池和候选池入口；台账 `候选/SHADOW` 显示为“观察版本”，新增 `/factors/[family]/[version]` 汇总 Nine-Gate、血缘、绩效成本、影子/衰减和研究记录。
+  · **专项归位**：成交额择时敏感度绑定 `amount-timing/v1.0`；产业本体影子产物绑定新登记的 `ontology_industry/v1.0-shadow`，其 metrics/nine_gate 均保持空值，未编造绩效或审计结果。旧 AutoResearch API 保留兼容。
+  · **验证**：新增状态映射/排序、草案转换、复核迁移幂等、未批准晋级拒绝、Job 冲突、专项关联与前端职责测试；`bash factor_research/scripts/test_all.sh`、Web `npm test`（20/20）、`npx tsc --noEmit`、`npm run lint` 全部通过，并完成全部新路由浏览器验收。
+
 **2026-06-21(文档体系整理 + 宪法升级为规则编号治理系统)**:根目录 16 份扁平文档收敛为 14 份职责唯一活文档 + `docs/archive/` 冻结区,`CLAUDE.md` 重写为带规则 ID(R-DATA-001 等)、P0-P3 分级、接手90秒协议、§16 守卫映射表的治理宪法。
   · **消除混乱**: 命名碰撞(`Task.md`/`TASKS.md`、`WEB_DESIGN.md`/`(2)`)归档消歧;孤儿文档接入索引并加定位头。提交: `58edd00c4`(文档矩阵)、`a44fda5c3`(修 3 处指向退场代码的陈旧引用: `core/backtest.py::CostModel`→`core/engine.py`、web test 命令、`factory/evolve_incubation.py`→`mutate_existing.py`)。
   · **宪法升级**: 命令/成本/Web 纪律下沉到 `RUNBOOK.md`/[`cost_model.md`](factor_research/docs/cost_model.md)/[`web/CLAUDE.md`](web/CLAUDE.md)(新建,承接硬细节);§16 守卫表逐个读 `scripts/ci/` docstring 对齐**真实 7 守卫**;保留 canonical 路径/接口血泪铁律/M5 等会被抽象蒸发的硬细节。提交: `17fb92082`(建两份子文档)、`053950d3a`(重写 CLAUDE.md)。
