@@ -66,6 +66,17 @@ def test_research_run_index_contract_exists():
     assert _schema_ref(spec["paths"]["/experiments/research-runs"]["get"]) == "#/components/schemas/ResearchRunIndexView"
 
 
+def test_research_workspace_and_strategy_detail_contracts_exist():
+    spec = app.openapi()
+    assert _schema_ref(spec["paths"]["/experiments/work-items"]["get"]) == "#/components/schemas/ResearchWorkItemListView"
+    assert _schema_ref(spec["paths"]["/experiments/work-items/{kind}/{item_id}"]["get"]) == "#/components/schemas/ResearchWorkItemDetailView"
+    assert _schema_ref(spec["paths"]["/strategies/{family}/{version}"]["get"]) == "#/components/schemas/StrategyDetailView"
+    assert _schema_ref(spec["paths"]["/experiments/drafts"]["post"]) == "#/components/schemas/ResearchDraftView"
+    assert _schema_ref(spec["paths"]["/experiments/drafts/{draft_id}"]["patch"]) == "#/components/schemas/ResearchDraftView"
+    assert _schema_ref(spec["paths"]["/experiments/work-items/{kind}/{item_id}/reviews"]["post"]) == "#/components/schemas/ResearchReviewView"
+    assert _schema_ref(spec["paths"]["/experiments/work-items/{kind}/{item_id}/actions/{action}"]["post"]) == "#/components/schemas/ActionJobView"
+
+
 if __name__ == "__main__":
     print("Running API contract tests...\n")
     test_backtest_contract_exposes_dynamic_band_not_fixed_leverage()
@@ -78,4 +89,6 @@ if __name__ == "__main__":
     print("✅ Paper contracts expose settlement dates")
     test_research_run_index_contract_exists()
     print("✅ Research run index contract exists")
+    test_research_workspace_and_strategy_detail_contracts_exist()
+    print("✅ Research workspace and strategy detail contracts exist")
     print("\n🎉 API contract tests passed!")

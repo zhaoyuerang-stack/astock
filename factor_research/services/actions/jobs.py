@@ -46,9 +46,21 @@ def _prune_locked() -> None:
             _JOBS.pop(job_id, None)
 
 
-def submit_action_job(kind: str, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> ActionJobView:
+def submit_action_job(
+    kind: str,
+    fn: Callable[..., Any],
+    *args: Any,
+    job_context: dict | None = None,
+    **kwargs: Any,
+) -> ActionJobView:
     job_id = f"{kind.replace('.', '-')}-{uuid.uuid4().hex[:12]}"
-    job = ActionJobView(job_id=job_id, kind=kind, status="queued", created_at=_now())
+    job = ActionJobView(
+        job_id=job_id,
+        kind=kind,
+        status="queued",
+        created_at=_now(),
+        context=dict(job_context or {}),
+    )
     with _LOCK:
         _JOBS[job_id] = job
         _prune_locked()
@@ -62,6 +74,14 @@ def get_action_job(job_id: str) -> ActionJobView:
         if job is None:
             raise KeyError(job_id)
         return _snapshot(job)
+
+
+def list_action_jobs() -> list[ActionJobView]:
+    with _LOCK:
+        return [
+            _snapshot(job)
+            for job in sorted(_JOBS.values(), key=lambda item: item.created_at, reverse=True)
+        ]
 
 
 def _run_job(job_id: str, fn: Callable[..., Any], args: tuple[Any, ...], kwargs: dict[str, Any]) -> None:

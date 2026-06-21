@@ -16,23 +16,40 @@ from contracts.views import (
     FunnelView,
     HypothesisView,
     RegisteredExperimentView,
+    ResearchDraftCreateRequest,
+    ResearchDraftUpdateRequest,
+    ResearchDraftView,
+    ResearchReviewRequest,
+    ResearchReviewView,
+    ResearchWorkItemActionRequest,
+    ResearchWorkItemDetailView,
+    ResearchWorkItemListView,
     ResearchRunIndexView,
 )
 from services.actions.action_guard import ACTION_HEADER, audit_action, verify_action_token
 from services.actions.autoresearch import (
     promote_approved_candidate,
-    review_autoresearch_candidate,
     run_autoresearch_seeds,
 )
 from services.actions.autoresearch_llm import run_autoresearch_llm
 from services.actions.autoresearch_search import run_autoresearch_island_search
-from services.actions.jobs import get_action_job, submit_action_job
+from services.actions.jobs import get_action_job, list_action_jobs, submit_action_job
+from services.actions.research_workspace import (
+    InvalidTransition,
+    WorkItemConflict,
+    create_draft,
+    review_legacy_autoresearch_candidate,
+    review_work_item,
+    submit_work_item_action,
+    update_draft,
+)
 from services.read.autoresearch import (
     autoresearch_candidates,
     autoresearch_funnel,
     autoresearch_review_queue,
 )
 from services.read.experiments import funnel, hypotheses, registered_experiments, research_run_index
+from services.read.research_work_items import get_work_item, list_work_items
 
 router = APIRouter(prefix="/experiments", tags=["experiments"])
 
@@ -152,6 +169,91 @@ def get_research_runs() -> ResearchRunIndexView:
     return research_run_index()
 
 
+@router.get("/work-items", response_model=ResearchWorkItemListView)
+def get_research_work_items(
+    status: str = "",
+    kind: str = "",
+    action: str = "",
+    limit: int = 200,
+) -> ResearchWorkItemListView:
+    return list_work_items(
+        status=status,
+        kind=kind,
+        action=action,
+        limit=max(0, min(limit, 2000)),
+        job_views=list_action_jobs(),
+    )
+
+
+@router.get("/work-items/{kind}/{item_id}", response_model=ResearchWorkItemDetailView)
+def get_research_work_item(kind: str, item_id: str) -> ResearchWorkItemDetailView:
+    try:
+        return get_work_item(kind, item_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"work item not found: {kind}:{item_id}") from exc
+
+
+@router.post("/drafts", response_model=ResearchDraftView)
+def post_research_draft(
+    body: ResearchDraftCreateRequest,
+    _confirmed: None = Depends(require_action_token),
+) -> ResearchDraftView:
+    return create_draft(**body.model_dump())
+
+
+@router.patch("/drafts/{draft_id}", response_model=ResearchDraftView)
+def patch_research_draft(
+    draft_id: str,
+    body: ResearchDraftUpdateRequest,
+    _confirmed: None = Depends(require_action_token),
+) -> ResearchDraftView:
+    try:
+        return update_draft(draft_id, **body.model_dump(exclude_none=True))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"draft not found: {draft_id}") from exc
+
+
+@router.post("/work-items/{kind}/{item_id}/reviews", response_model=ResearchReviewView)
+def post_research_review(
+    kind: str,
+    item_id: str,
+    body: ResearchReviewRequest,
+    _confirmed: None = Depends(require_action_token),
+) -> ResearchReviewView:
+    try:
+        return review_work_item(
+            kind, item_id, action=body.action, notes=body.notes, reviewer=body.reviewer,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"work item not found: {kind}:{item_id}") from exc
+    except WorkItemConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except InvalidTransition as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/work-items/{kind}/{item_id}/actions/{action}", response_model=ActionJobView)
+def post_research_action(
+    kind: str,
+    item_id: str,
+    action: str,
+    body: ResearchWorkItemActionRequest,
+    _confirmed: None = Depends(require_action_token),
+) -> ActionJobView:
+    try:
+        return submit_work_item_action(
+            kind, item_id, action,
+            start=body.start, sample_dates=body.sample_dates,
+            version=body.version, target_status=body.target_status,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"work item not found: {kind}:{item_id}") from exc
+    except WorkItemConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except InvalidTransition as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @router.get("/autoresearch/funnel", response_model=AutoResearchFunnelView)
 def get_autoresearch_funnel() -> AutoResearchFunnelView:
     return autoresearch_funnel()
@@ -175,7 +277,11 @@ def post_autoresearch_review(
 ) -> AutoResearchReviewItemView:
     """人工复核 approve/reject。approve 不写 LIVE 台账,入册仍走 workflow/promote。"""
     try:
-        return review_autoresearch_candidate(fingerprint=fingerprint, action=body.action, notes=body.notes)
+        return review_legacy_autoresearch_candidate(
+            fingerprint=fingerprint,
+            action=body.action,
+            notes=body.notes,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -186,6 +292,11 @@ def get_experiment_job(job_id: str) -> ActionJobView:
         return get_action_job(job_id)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=f"job not found: {job_id}") from e
+
+
+@router.get("/jobs", response_model=list[ActionJobView])
+def get_experiment_jobs() -> list[ActionJobView]:
+    return list_action_jobs()
 
 
 @router.post("/autoresearch/run-seeds", response_model=ActionJobView)

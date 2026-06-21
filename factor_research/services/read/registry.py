@@ -4,7 +4,10 @@
 """
 from __future__ import annotations
 
-from contracts.views import StrategyView
+import json
+from pathlib import Path
+
+from contracts.views import StrategyDetailView, StrategyView
 
 
 def list_strategies() -> list[StrategyView]:
@@ -36,3 +39,40 @@ def list_strategies() -> list[StrategyView]:
                 decay_signal=fam.get("decay_signal", "") or "",
             ))
     return out
+
+
+def get_strategy(family: str, version: str) -> StrategyView:
+    strategy_id = f"{family}/{version}"
+    item = next((row for row in list_strategies() if row.strategy_id == strategy_id), None)
+    if item is None:
+        raise KeyError(strategy_id)
+    return item
+
+
+def get_strategy_detail(family: str, version: str) -> StrategyDetailView:
+    from research_ledger.ledger import load_research_run_index
+
+    strategy = get_strategy(family, version)
+    runs = [
+        row for row in load_research_run_index().get("latest_runs", [])
+        if row.get("hypothesis") == strategy.strategy_id
+    ]
+    root = Path(__file__).resolve().parents[2]
+    artifacts: dict[str, object] = {}
+    for run in runs:
+        for raw_path in run.get("artifact_paths", []) or []:
+            path = Path(raw_path)
+            if not path.is_absolute():
+                path = root / path
+            try:
+                resolved = path.resolve()
+                resolved.relative_to(root.resolve())
+            except (OSError, ValueError):
+                continue
+            if not resolved.exists() or resolved.suffix.lower() != ".json":
+                continue
+            try:
+                artifacts[resolved.stem] = json.loads(resolved.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+    return StrategyDetailView(strategy=strategy, research_runs=runs, artifacts=artifacts)

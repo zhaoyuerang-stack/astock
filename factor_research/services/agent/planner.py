@@ -195,7 +195,7 @@ def _navigation_for(tool_name: str | None, context: dict) -> list[str]:
     if tool_name == "experiments":
         return ["/experiments"]
     if tool_name in {"factors", "strategies"}:
-        return ["/experiments"]
+        return ["/factors"]
     if tool_name == "run_backtest":
         return ["/experiments"]
     if tool_name == "rebalance":

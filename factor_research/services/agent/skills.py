@@ -488,7 +488,7 @@ class SystemStatusSkill:
             nav = ["/portfolio"]
         elif tool_name == "factors":
             out = _factors_output(data)
-            nav = ["/experiments"]
+            nav = ["/factors"]
         elif tool_name == "experiments":
             out = _experiments_output(data)
             nav = ["/experiments"]

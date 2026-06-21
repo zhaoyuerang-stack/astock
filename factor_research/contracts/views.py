@@ -57,6 +57,13 @@ class StrategyView(BaseModel):
     decay_signal: str = ""                                  # 家族级失效信号(死因/下一步触发条件)
 
 
+class StrategyDetailView(BaseModel):
+    """台账版本详情 + 以 family/version 关联的研究运行和专项产物。"""
+    strategy: StrategyView
+    research_runs: list[dict] = Field(default_factory=list)
+    artifacts: dict = Field(default_factory=dict)
+
+
 class FactorView(BaseModel):
     """alpha 家族(因子)的只读视图(registry 家族级派生)。"""
     name: str                 # family id
@@ -213,6 +220,104 @@ class ResearchRunIndexView(BaseModel):
     latest_runs: list[ResearchRunView] = Field(default_factory=list)
 
 
+class ResearchDraftView(BaseModel):
+    draft_id: str
+    title: str = ""
+    source: str = ""
+    mechanism: str = ""
+    citation: str = ""
+    factor_fn_name: str = ""
+    factor_params: dict = Field(default_factory=dict)
+    timing_fn_name: str | None = None
+    timing_params: dict = Field(default_factory=dict)
+    data_dependencies: list[str] = Field(default_factory=list)
+    status: str = "active"
+    linked_work_id: str = ""
+    revision: int = 1
+    created_at: str = ""
+    updated_at: str = ""
+
+
+class ResearchDraftCreateRequest(BaseModel):
+    title: str
+    source: str = "manual"
+    mechanism: str = ""
+    citation: str = ""
+    factor_fn_name: str = ""
+    factor_params: dict = Field(default_factory=dict)
+    timing_fn_name: str | None = None
+    timing_params: dict = Field(default_factory=dict)
+    data_dependencies: list[str] = Field(default_factory=list)
+
+
+class ResearchDraftUpdateRequest(BaseModel):
+    title: str | None = None
+    source: str | None = None
+    mechanism: str | None = None
+    citation: str | None = None
+    factor_fn_name: str | None = None
+    factor_params: dict | None = None
+    timing_fn_name: str | None = None
+    timing_params: dict | None = None
+    data_dependencies: list[str] | None = None
+    status: str | None = None
+    linked_work_id: str | None = None
+
+
+class ResearchReviewView(BaseModel):
+    review_id: str
+    kind: str
+    item_id: str
+    action: str
+    notes: str = ""
+    reviewer: str = "human"
+    reviewed_at: str = ""
+    migrated_from: str = ""
+
+
+class ResearchReviewRequest(BaseModel):
+    action: str
+    notes: str = ""
+    reviewer: str = "human"
+
+
+class ResearchWorkItemView(BaseModel):
+    work_id: str
+    kind: str
+    item_id: str
+    title: str = ""
+    source: str = ""
+    raw_status: str = ""
+    status: str = ""          # blocked | review | ready | running | completed | archived
+    stage: str = ""
+    mechanism: str = ""
+    citation: str = ""
+    updated_at: str = ""
+    next_action: str = ""
+    blocked_reason: str = ""
+    latest_result: dict = Field(default_factory=dict)
+    review: ResearchReviewView | None = None
+
+
+class ResearchWorkItemListView(BaseModel):
+    items: list[ResearchWorkItemView] = Field(default_factory=list)
+    counts: dict[str, int] = Field(default_factory=dict)
+
+
+class ResearchWorkItemDetailView(BaseModel):
+    item: ResearchWorkItemView
+    evidence: dict = Field(default_factory=dict)
+    runs: list[dict] = Field(default_factory=list)
+    raw: dict = Field(default_factory=dict)
+
+
+class ResearchWorkItemActionRequest(BaseModel):
+    start: str = "2018-01-01"
+    sample_dates: int | None = 120
+    version: str = "v1.0"
+    target_status: str = ""
+
+
 class AutoResearchCandidateView(BaseModel):
     """Auto Factor Research candidate submitted as controlled JSON AST."""
     fingerprint: str
@@ -332,6 +437,7 @@ class ActionJobView(BaseModel):
     finished_at: str = ""
     result: dict | None = None
     error: str = ""
+    context: dict = Field(default_factory=dict)
 
 
 class AutoResearchOOSChampionView(BaseModel):
