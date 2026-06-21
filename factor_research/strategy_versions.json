@@ -1418,7 +1418,26 @@
           },
           "status": "在册",
           "notes": "当前 LIVE 生产版本。引入 30% 凸显性一票否决风控层后，相较 v3.0 实现了年化收益微增（+0.7%）、最大回撤缩减（从-12.5%降至-11.9%）与卡玛比率上升（从 2.96 升至 3.16）。\n\n【血缘审计 2026-06-19】v3.1 = v3.0 + Salience Veto。对真实父版本 v3.0 收益相关 ρ=0.95、正交增量 alpha 仅 +1.89% → 实为 v3.0 换皮版,Veto 几乎不动收益结构。真正的 alpha 跃迁在 v1.3→v3.0(ρ0.77、+12.87%,加 PureTrend Band 择时 + 511010 国债轮动)。家族版本池 PBO=0.76(high)=版本选择过拟合显著。注:参考版 v3.0 DSR_p=0.016 比在册 v3.1(0.034)更显著、夏普 2.08 vs 2.12 相近、回撤相近——在册版未必是血缘里统计最干净者,可考虑以 v3.0 为主、v3.1 留作 veto 实验。",
-          "evidence": {},
+          "evidence": {
+            "data_incidents": [
+              {
+                "code": "INVALIDATED_BY_DATA_UNIT_INCIDENT",
+                "incident_id": "price-units-20260620",
+                "resolved": false,
+                "reasons": [
+                  "top25_overlap_below_0.80",
+                  "factor_spearman_below_0.95",
+                  "annual_delta_above_2pct",
+                  "sharpe_delta_above_0.10"
+                ]
+              }
+            ],
+            "production_blocked": true,
+            "spec_migration": {
+              "spec_hash": "c9b0269146171f87a58a27359e748d7e6b3f063af0f921820201bf4c30ca457f",
+              "requires_revalidation": true
+            }
+          },
           "admission": {
             "track": "standalone",
             "rationale": "单体达标（年化>15% 且 回撤<20%）"
@@ -1470,6 +1489,44 @@
             "corr_to_parent": 0.9477,
             "corr_parent_version": "v3.0",
             "incremental_alpha": 0.0189
+          },
+          "executable_spec": {
+            "spec": {
+              "family": "illiquidity",
+              "version": "v3.1",
+              "universe": {
+                "market": "A_SHARE",
+                "exclude_star": false
+              },
+              "data": {
+                "price_units": "shares_yuan",
+                "warmup_start": "2010-01-01"
+              },
+              "factor": {
+                "type": "amihud_illiquidity",
+                "window": 20,
+                "shift": 1,
+                "mad_clip": 5.0
+              },
+              "selection": {
+                "top_n": 25,
+                "rebalance_days": 20
+              },
+              "timing": {
+                "type": "pure_trend_band",
+                "ma": 16,
+                "cap": 1.5
+              },
+              "policy": {
+                "veto": "salience_covariance",
+                "veto_q": 0.3
+              },
+              "execution": {
+                "fill": "T_PLUS_1_CLOSE",
+                "cost_model": "A_SHARE_STANDARD_V1"
+              }
+            },
+            "spec_hash": "c9b0269146171f87a58a27359e748d7e6b3f063af0f921820201bf4c30ca457f"
           }
         }
       ],
@@ -1531,7 +1588,21 @@
             "hypothesis_id": "large_cap_illiquidity_9_gates_report",
             "experiment_ids": [
               "task-493"
-            ]
+            ],
+            "data_incidents": [
+              {
+                "code": "INVALIDATED_BY_DATA_UNIT_INCIDENT",
+                "incident_id": "price-units-20260620",
+                "resolved": false,
+                "reasons": [
+                  "top25_overlap_below_0.80",
+                  "factor_spearman_below_0.95",
+                  "annual_delta_above_2pct",
+                  "sharpe_delta_above_0.10"
+                ]
+              }
+            ],
+            "production_blocked": true
           },
           "admission": {
             "track": "standalone",
@@ -2419,7 +2490,27 @@
           },
           "status": "在册",
           "notes": "✅2026-06-14 重测:旧值 22.2%/夏普1.38 陈旧,早于引擎迁移(5b4e2a90b)+start窗口语义(053d93441);同口径(2010切2018)重测=25.9%/1.69(+3.7pp,maxdd-19.4%≈旧-20%)。688 amount bug 修复后显式排除科创板(exclude_star;纳入不增alpha还降夏普1.85→1.65)。容量~2千万小资金可实盘。OOS 29.7%/1.90、压力(含15年股灾)27.4%/-30.5%。",
-          "evidence": {},
+          "evidence": {
+            "data_incidents": [
+              {
+                "code": "INVALIDATED_BY_DATA_UNIT_INCIDENT",
+                "incident_id": "price-units-20260620",
+                "resolved": false,
+                "reasons": [
+                  "top25_overlap_below_0.80",
+                  "factor_spearman_below_0.95",
+                  "annual_delta_above_2pct",
+                  "sharpe_delta_above_0.10",
+                  "maxdd_delta_above_2pct"
+                ]
+              }
+            ],
+            "production_blocked": true,
+            "spec_migration": {
+              "spec_hash": "ddf1b0c1c7bb55e74518f87b009e0e6de9bf52149852df6e79b79392d24af5df",
+              "requires_revalidation": true
+            }
+          },
           "nine_gate": {
             "run_date": "2026-06-19",
             "passed_all": false,
@@ -2466,6 +2557,41 @@
           "admission": {
             "track": "standalone",
             "rationale": "单体达标（年化>15% 且 回撤<20%）"
+          },
+          "executable_spec": {
+            "spec": {
+              "family": "small-cap-size",
+              "version": "v2.0",
+              "universe": {
+                "market": "A_SHARE",
+                "exclude_star": true
+              },
+              "data": {
+                "price_units": "shares_yuan",
+                "warmup_start": "2010-01-01"
+              },
+              "factor": {
+                "type": "small_cap_amount",
+                "window": 60,
+                "shift": 1
+              },
+              "selection": {
+                "top_n": 25,
+                "rebalance_days": 20
+              },
+              "timing": {
+                "type": "ma_trend",
+                "ma": 16
+              },
+              "policy": {
+                "veto": "none"
+              },
+              "execution": {
+                "fill": "T_PLUS_1_CLOSE",
+                "cost_model": "A_SHARE_STANDARD_V1"
+              }
+            },
+            "spec_hash": "ddf1b0c1c7bb55e74518f87b009e0e6de9bf52149852df6e79b79392d24af5df"
           }
         },
         {
