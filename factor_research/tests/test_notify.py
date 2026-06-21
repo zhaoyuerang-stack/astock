@@ -76,6 +76,23 @@ def _failed_report(status="failed"):
     }
 
 
+def test_price_unit_alert_body_includes_category():
+    from scripts.ops import scheduled_daily_update as sdu
+
+    body = sdu._alert_body(
+        {
+            "status": "failed",
+            "price_update": {
+                "ok": False,
+                "error": "bad units",
+                "error_category": "price_unit_contract",
+            },
+        }
+    )
+
+    assert "price_unit_contract" in body
+
+
 def test_daily_alert_dedup():
     """同一天同一 failed 只推一次(launchd 盘后重试 4 次不刷屏)。"""
     from scripts.ops import scheduled_daily_update as sdu

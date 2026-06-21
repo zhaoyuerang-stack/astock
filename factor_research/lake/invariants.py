@@ -18,6 +18,112 @@ class LakeInvariantError(RuntimeError):
     """写路径不变量被破坏;调用方必须放弃本次落盘,保留旧文件。"""
 
 
+class PriceAmountInvariantError(LakeInvariantError):
+    """价量物理单位不一致;volume/amount 不得进入 canonical 数据湖。"""
+
+    category = "price_unit_contract"
+
+
+def _price_board(code: str) -> str:
+    code = str(code)
+    if code.startswith(("688", "689")):
+        return "star"
+    if code.startswith(("300", "301")):
+        return "chinext"
+    return "main"
+
+
+def validate_price_amount_units(
+    long_df: pd.DataFrame,
+    *,
+    min_rows: int = 100,
+    median_bounds: tuple[float, float] = (0.90, 1.10),
+    max_p95_relative_error: float = 0.20,
+) -> dict:
+    """验证 ``amount ≈ volume(shares) × raw_close(CNY/share)`` 的物理量纲。
+
+    成交额使用成交均价而非收盘价，故不要求逐行相等；以板块截面的中位比率和
+    P95 相对误差判定系统性 100 倍量纲错误。停牌、零成交和缺失行不参与统计。
+    样本不足时明确返回 ``insufficient_sample``，不得伪报通过。
+    """
+    required = {"date", "code", "raw_close", "volume", "amount"}
+    missing = sorted(required - set(long_df.columns))
+    if missing:
+        raise ValueError(f"价量单位校验缺字段: {missing}")
+
+    clean = long_df[list(required)].copy()
+    for col in ("raw_close", "volume", "amount"):
+        clean[col] = pd.to_numeric(clean[col], errors="coerce")
+    clean = clean.dropna(subset=["date", "code", "raw_close", "volume", "amount"])
+    clean = clean[
+        (clean["raw_close"] > 0)
+        & (clean["volume"] > 0)
+        & (clean["amount"] > 0)
+    ].copy()
+    clean["board"] = clean["code"].map(_price_board)
+    clean["ratio"] = clean["amount"] / (clean["volume"] * clean["raw_close"])
+    clean = clean[clean["ratio"].notna() & (clean["ratio"] > 0)]
+
+    boards: dict[str, dict] = {}
+    breaches: list[str] = []
+    evaluated = 0
+    for board in ("main", "chinext", "star"):
+        ratio = clean.loc[clean["board"] == board, "ratio"]
+        n = int(len(ratio))
+        if n < min_rows:
+            boards[board] = {
+                "status": "insufficient_sample",
+                "n": n,
+                "median_ratio": None,
+                "p95_relative_error": None,
+            }
+            continue
+        evaluated += 1
+        median_ratio = float(ratio.median())
+        p95_error = float((ratio - 1.0).abs().quantile(0.95))
+        passed = (
+            median_bounds[0] <= median_ratio <= median_bounds[1]
+            and p95_error <= max_p95_relative_error
+        )
+        boards[board] = {
+            "status": "passed" if passed else "failed",
+            "n": n,
+            "median_ratio": median_ratio,
+            "p95_relative_error": p95_error,
+        }
+        if not passed:
+            breaches.append(
+                f"{board}: median_ratio={median_ratio:.6g}, "
+                f"p95_relative_error={p95_error:.2%}, n={n}"
+            )
+
+    n = int(len(clean))
+    median_ratio = float(clean["ratio"].median()) if n else None
+    if breaches:
+        date_min = pd.to_datetime(clean["date"]).min()
+        date_max = pd.to_datetime(clean["date"]).max()
+        raise PriceAmountInvariantError(
+            "价量单位不变量被破坏,拒绝落盘: "
+            f"date={date_min.date()}~{date_max.date()}; "
+            + "; ".join(breaches)
+        )
+    if evaluated == 0:
+        return {
+            "passed": False,
+            "status": "insufficient_sample",
+            "n": n,
+            "median_ratio": median_ratio,
+            "boards": boards,
+        }
+    return {
+        "passed": True,
+        "status": "passed",
+        "n": n,
+        "median_ratio": median_ratio,
+        "boards": boards,
+    }
+
+
 def check_cross_section_sanity(
     long_df: pd.DataFrame,
     *,

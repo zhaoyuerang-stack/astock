@@ -125,6 +125,13 @@ def _alert_body(report: dict) -> str:
     ]
     if failed_steps:
         parts.append("失败步骤:" + ",".join(failed_steps))
+        categories = sorted({
+            str(report[step].get("error_category"))
+            for step in failed_steps
+            if report[step].get("error_category")
+        })
+        if categories:
+            parts.append("错误类别:" + ",".join(categories))
     sig = report.get("signal")
     if isinstance(sig, dict) and not sig.get("generated"):
         reason = sig.get("reason") or (sig.get("error") or "")[:80]
@@ -277,7 +284,11 @@ def run_updates(report, dry_run=False):
         manifest.update(result)
         report["price_update"] = {"ok": True, **result.get("price_daily", {})}
     except Exception as exc:
-        report["price_update"] = {"ok": False, "error": str(exc)}
+        report["price_update"] = {
+            "ok": False,
+            "error": str(exc),
+            "error_category": getattr(exc, "category", type(exc).__name__),
+        }
         print(f"[update] price failed: {exc}")
         traceback.print_exc()
 

@@ -28,7 +28,7 @@ def fetch_new_day(
 ) -> pd.DataFrame:
     """
     拉取 trade_date 的全市场 hfq 价量行，返回 DataFrame：
-      columns: date, open, close, high, low, volume, amount
+      columns: date, open, close, high, low, volume, amount, raw_close
       index: 整数（调用方合并到 per-stock parquet）
 
     数据湖 canonical 单位：volume=股、amount=元；所有板块使用相同口径。
@@ -93,6 +93,7 @@ def fetch_new_day(
             "low":    round(float(r.get("low")  or raw_close) * hfq_factor, 4),
             "volume": volume,
             "amount": amount,
+            "raw_close": raw_close,
         })
 
     if skipped_no_prev or skipped_bad_price:

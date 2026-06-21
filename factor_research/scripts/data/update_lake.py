@@ -62,14 +62,33 @@ def stamp_data_vintage(prev=None):
             "last_date": last, "shape": list(close.shape), "fingerprint": fp}
 
 
+def _require_price_unit_report(report: dict) -> None:
+    """Fail closed when the pre-write physical-unit sample is inconclusive."""
+    if report.get("passed") is True:
+        return
+    from lake.invariants import PriceAmountInvariantError
+
+    raise PriceAmountInvariantError(
+        "价量单位预写校验未通过: "
+        f"status={report.get('status', 'unknown')}, n={report.get('n', 0)}"
+    )
+
+
 # ── 价量增量 ──
 def update_prices():
     from lake.sources.tushare_price import fetch_new_day
     from lake.compact import compact_prices
-    from lake.invariants import LakeInvariantError
+    from lake.invariants import (
+        LakeInvariantError,
+        PriceAmountInvariantError,
+        validate_price_amount_units,
+    )
 
     daily = LAKE / "price/daily"
     today = pd.Timestamp(_china_today())
+    rebuild_lock = LAKE / ".price_unit_rebuild.lock"
+    if rebuild_lock.exists():
+        raise RuntimeError(f"历史价量重建进行中,日更拒绝启动: {rebuild_lock}")
 
     # ── 新上市/缺失代码：用 Tencent 下载完整历史（逐只，量少不触发 WAF）──
     f = resolve_source("price_hfq")
@@ -171,10 +190,21 @@ def update_prices():
     # ── 把新行写入 per-stock parquet ──
     combined = pd.concat(all_new_rows, ignore_index=True)
     combined["date"] = pd.to_datetime(combined["date"])
+    try:
+        unit_report = validate_price_amount_units(combined)
+    except PriceAmountInvariantError as exc:
+        print(f"  🚨 价量单位不变量拒绝写入: {exc}", flush=True)
+        raise
+    _require_price_unit_report(unit_report)
+    print(
+        "  [价量单位] canonical 股/元校验通过: "
+        f"n={unit_report['n']}, median_ratio={unit_report['median_ratio']:.4f}",
+        flush=True,
+    )
     updated = 0
     for code, grp in combined.groupby("code"):
         fp = daily / f"{code}.parquet"
-        new_rows = grp.drop(columns=["code"]).reset_index(drop=True)
+        new_rows = grp.drop(columns=["code", "raw_close"]).reset_index(drop=True)
         if fp.exists():
             old = pd.read_parquet(fp)
             old["date"] = pd.to_datetime(old["date"])
