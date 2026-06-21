@@ -134,6 +134,16 @@ LLM 禁止做：判断因子是否有效、判断是否入册、替代 Alpha Aud
 
 canonical 通道：`factory/candidates → L0-L3 cheap-first 筛选 → workflow/promote.py 或 apps/factory_cli.py promote → phase1_synthetic 防未来审计 → phase2/phase3 复测压力 → phase4_register 入册`。`phase1_synthetic` 是防未来函数机械审计的唯一执行点。绕过该流程的结果不得进正式台账。
 
+### R-EVIDENCE-001：9-Gate 证据自证铁律
+
+门禁证据必须由**本策略、本宇宙的一次可复现运行机械产出**（源 ADR-017，三策略造假证否）：
+① **禁跨家族照抄**——不同 family 共享逐位相同的 IC/9-Gate 证据块 = 判失败（同 family 多版本共享合法）；
+② **config 须能机械复现**台账绩效；
+③ 任何 `gate=None` / `nine_gate={}`（门未实算）**禁 standalone 准入**；
+④ `n_trials ≥` 含宇宙/veto/择时/网格的**全部搜索自由度**（不得低报以骗过 DSR 惩罚）；
+⑤ 候选**生成码须在 canonical 层**（可追溯、可复现）。
+守卫：`scripts/ci/check_registry_evidence.py`（机械强制 ①）。违反即该 standalone 准入作废。
+
 ### R-OBJECTIVE-001：收益门槛不是优化目标
 
 收益门槛是入册观察条件，不是候选搜索的唯一目标函数。禁止单纯最大化年化/Sharpe/Calmar。候选排序必须同时考虑：样本外稳定性、压力期表现、成本敏感性、换手与容量、与现有母策略相关性、多重测试惩罚、经济学假设、失效信号清晰度、可执行性。
@@ -310,7 +320,7 @@ Web 不是本文件主要作用域。涉及 Web 必须先读 [`web/CLAUDE.md`](w
 | R-ARCH-001 单向依赖       | P1 | `check_layer_deps.py`     | AST 静态分析 FORBIDDEN_EDGES，禁下层/生产层反向 import |
 | R-ARCH-004 数据湖写入可审计  | P1 | `check_lake_writers.py`   | 写 data_lake 核心区必须走 canonical writer + 更新 manifest |
 | R-WF-001 候选入册通道       | P0 | `check_no_force_promote.py`| 禁自动晋级脚本 `force=True` 跳过 phase1/2 防未来门 |
-| R-REG-001 台账证据完整(G9)  | P0 | `check_registry_evidence.py`| 禁跨家族 IC 证据照抄等机械违规                    |
+| R-REG-001 / R-EVIDENCE-001 证据自证 | P0 | `check_registry_evidence.py`| 禁跨家族 IC 证据照抄等机械违规(强制 R-EVIDENCE-001 ①)     |
 | G8 防自欺 / holdout      | P0 | `check_holdout_compliance.py`| 自动环 load 全样本据此择优必须截到 <boundary，禁偷看金库 |
 | 防自欺 / 控制路径可观测         | P0 | `check_control_exceptions.py`| 准入/裁决/信号/执行路径禁 `except: pass` 静默吞异常 |
 | 测试发现完整                | P1 | `check_test_discovery.py` | 全量收集 `test_*.py`，杜绝漏跑的手工清单           |

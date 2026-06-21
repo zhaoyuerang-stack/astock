@@ -148,6 +148,15 @@
 - **诚实披露 / 失效边界**: 压力 2010–2026 回撤 **−22.8% 略超 20% 单体线**(2015/2018 小盘崩),不藏窗规避,写入登记;decay_signal=Rank IC 连续 4 季<0 / 滚动 3 年夏普<0.5 / 全市场成交额持续放大;金库段偏短(~1.4 年)须接续复测。
 - **待办**: 经 `workflow` phase1 防未来审计 → phase2/3 正式 9-Gate **补跑 PBO**(草稿缺)→ phase4 register;`passed_all` 由 workflow 判定,**禁手填**。草稿 `scratch/illiquidity_clean_registration_DRAFT.md`。
 
+### ADR-019 文档体系整理 + 宪法升级为规则编号治理系统
+- **上下文**: 根目录 16 份扁平文档混杂(命名碰撞 `Task.md`/`TASKS.md`、`WEB_DESIGN.md`/`(2)`;孤儿文档不在索引;3 处指向退场代码的陈旧引用),致系统设计认知混乱。
+- **决策**:
+  1. 16→14 份职责唯一活文档 + `docs/archive/` 冻结区;`CLAUDE.md` 重写为带规则编号(`R-xxx`)+ P0-P3 分级 + 接手90秒协议 + §16 守卫映射表的**单一入口宪法**。
+  2. 命令/成本/Web 纪律下沉到 `RUNBOOK.md` / `factor_research/docs/cost_model.md` / `web/CLAUDE.md`;**成本数值唯一权威 = `core/engine.py::CostModel`**。
+  3. 纳入 ADR-017「9-Gate 证据自证」5 条为 P0 规则 **`R-EVIDENCE-001`**,接 `check_registry_evidence.py` 守卫。
+- **理由**: 多 agent 治理需**可引用**(`R-xxx`)+**可强制**(§16 守卫表来自 `scripts/ci/` 实测,逐个读 docstring 对齐真实 7 守卫,全绿);指针只指**已存在且已验证**的目标(先建 cost_model/web 再切,避免悬空引用)。
+- **验证**: 全仓 md 链接零断链;§16 七守卫单独跑 GREEN;`bash scripts/test_all.sh` 全套 `All tests passed!`。提交 `58edd00c4`/`a44fda5c3`/`17fb92082`/`053950d3a`/`f0b4aa01e` + 本次。
+
 ---
 
 ## ③ 投资/交易决策记录
