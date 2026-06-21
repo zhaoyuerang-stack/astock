@@ -23,7 +23,7 @@ from .generator import generate_seed_candidates
 from .models import Candidate
 from .novelty import (
     candidate_factor_panel,
-    max_return_correlation,
+    partial_correlation_to_book,
     novelty_score,
     sample_behavior_dates,
     topn_long_return,
@@ -212,8 +212,11 @@ def run_island_search(
     archive: dict[str, object] = {}
     # 在册腿的 top-N 收益代理(一次性预算;corr_weight>0 才需要)
     ref_returns: list = []
+    market_ret: object = None
     if corr_weight > 0 and forward_ret is not None:
         ref_returns = [topn_long_return(r, forward_ret, top_n) for r in refs]
+        # 根因#2:市场代理 = 全市场等权前向收益,供 partial_correlation_to_book 扣共同暴露
+        market_ret = forward_ret.mean(axis=1)
 
     pre_evaluated_results: dict[str, object] = {}
 
@@ -249,7 +252,9 @@ def run_island_search(
 
         corr = 0.0
         if corr_weight > 0 and panel is not None and ref_returns:
-            corr = max_return_correlation(topn_long_return(panel, forward_ret, top_n), ref_returns)
+            corr = partial_correlation_to_book(
+                topn_long_return(panel, forward_ret, top_n), ref_returns, market_ret,
+            )
 
         turn = 0.0
         if turnover_weight > 0 and panel is not None:

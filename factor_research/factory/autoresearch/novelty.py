@@ -169,3 +169,50 @@ def max_return_correlation(cand_ret: pd.Series, ref_returns: list[pd.Series]) ->
         if c == c:  # not NaN
             best = c if best is None else max(best, c)
     return best if best is not None else 0.0
+
+
+def _partial_corr(cxy: float, cxm: float, cym: float) -> float | None:
+    """偏相关 corr(X,Y|M) = (cxy − cxm·cym) / sqrt((1−cxm²)(1−cym²))。退化(分母≤0/NaN)→ None。"""
+    denom = (1.0 - cxm * cxm) * (1.0 - cym * cym)
+    if not (denom == denom) or denom <= 1e-12:
+        return None
+    val = (cxy - cxm * cym) / (denom ** 0.5)
+    if val != val:
+        return None
+    return max(-1.0, min(1.0, val))
+
+
+def partial_correlation_to_book(
+    cand_ret: pd.Series, ref_returns: list[pd.Series], market_ret: pd.Series,
+) -> float:
+    """根因#2:扣市场偏相关 —— 候选与在册腿"控制市场共同暴露后"的有符号最大相关。
+
+    raw 相关把"两腿都只是在跟大盘"误判成冗余,也会让"靠抵消市场暴露藏共同赌注"的一对
+    漏判(各自对市场 beta 相反,raw corr 被漂白成低值,但策略层赌的是同一个东西)。
+    先算 corr(候选,市场)、corr(在册腿,市场),再用偏相关公式扣掉市场共同分量。
+
+    market_ret 方差退化(如未传市场代理)→ 退回 raw 相关(向后兼容,不返回 None)。
+    取 max(同 max_return_correlation,对应 novelty 最近邻语义);无可比参考 → 0.0。
+    """
+    best = None
+    for rr in ref_returns:
+        df = pd.concat(
+            {"x": cand_ret, "y": rr, "m": market_ret}, axis=1, join="inner",
+        ).dropna()
+        if len(df) < 5:
+            continue
+        x, y, m = df["x"], df["y"], df["m"]
+        if x.std() == 0 or y.std() == 0:
+            continue
+        cxy = float(x.corr(y))
+        if cxy != cxy:
+            continue
+        c = cxy
+        if m.std() > 0:
+            cxm, cym = float(x.corr(m)), float(y.corr(m))
+            if cxm == cxm and cym == cym:
+                partial = _partial_corr(cxy, cxm, cym)
+                if partial is not None:
+                    c = partial
+        best = c if best is None else max(best, c)
+    return best if best is not None else 0.0
