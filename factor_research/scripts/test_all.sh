@@ -16,6 +16,22 @@ echo "=== check_control_exceptions.py (控制路径禁静默 except:pass) ==="
 python3 scripts/ci/check_control_exceptions.py
 
 echo ""
+echo "=== check_registry_evidence.py (台账9-Gate证据完整性:防照抄/跳门) ==="
+python3 scripts/ci/check_registry_evidence.py
+
+echo ""
+echo "=== check_holdout_compliance.py (自动选择路径必须 holdout 截断:§5.2 缝③) ==="
+python3 scripts/ci/check_holdout_compliance.py
+
+echo ""
+echo "=== check_no_force_promote.py (自动晋级禁 force=True/run_marginal=False:根因#1) ==="
+python3 scripts/ci/check_no_force_promote.py
+
+echo ""
+echo "=== test_loop_foundations.py (防自欺地基:trial账本 + holdout金库) ==="
+python3 tests/test_loop_foundations.py
+
+echo ""
 echo "=== check_lake_writers.py (数据湖唯一写入口) ==="
 python3 scripts/ci/check_lake_writers.py
 
