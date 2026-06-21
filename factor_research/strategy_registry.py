@@ -233,6 +233,68 @@ def attach_nine_gate(family, version, summary, evidence=None):
     return f"{family}/{version}"
 
 
+def attach_data_incident(family, version, incident):
+    """Append a data incident to version evidence without changing lifecycle status."""
+    data = _load()
+    fam = next((f for f in data["families"] if f["id"] == family), None)
+    if fam is None:
+        raise ValueError(f"母策略 '{family}' 未登记")
+    item = next((v for v in fam["versions"] if v["version"] == version), None)
+    if item is None:
+        raise ValueError(f"版本 '{family}/{version}' 不存在")
+    evidence = dict(item.get("evidence") or {})
+    incidents = list(evidence.get("data_incidents") or [])
+    incident = dict(incident or {})
+    incident_id = incident.get("incident_id")
+    incidents = [
+        existing for existing in incidents
+        if not incident_id or existing.get("incident_id") != incident_id
+    ]
+    incidents.append(incident)
+    evidence["data_incidents"] = incidents
+    evidence["production_blocked"] = any(not row.get("resolved") for row in incidents)
+    item["evidence"] = evidence
+    _save(data)
+    return f"{family}/{version}"
+
+
+def attach_executable_spec(
+    family,
+    version,
+    spec,
+    spec_hash,
+    *,
+    require_revalidation=True,
+):
+    """Attach a validated executable identity without copying old evidence to it."""
+    from core.strategy_spec import ExecutableStrategySpec
+
+    parsed = ExecutableStrategySpec.from_dict(spec)
+    parsed.validate()
+    if parsed.family != family or parsed.version != version:
+        raise ValueError("strategy identity mismatch")
+    if parsed.spec_hash != spec_hash:
+        raise ValueError("strategy spec hash mismatch")
+    data = _load()
+    fam = next((f for f in data["families"] if f["id"] == family), None)
+    if fam is None:
+        raise ValueError(f"母策略 '{family}' 未登记")
+    item = next((v for v in fam["versions"] if v["version"] == version), None)
+    if item is None:
+        raise ValueError(f"版本 '{family}/{version}' 不存在")
+    item["executable_spec"] = {"spec": parsed.to_dict(), "spec_hash": parsed.spec_hash}
+    evidence = dict(item.get("evidence") or {})
+    evidence["spec_migration"] = {
+        "spec_hash": parsed.spec_hash,
+        "requires_revalidation": bool(require_revalidation),
+    }
+    if require_revalidation:
+        evidence["production_blocked"] = True
+    item["evidence"] = evidence
+    _save(data)
+    return f"{family}/{version}"
+
+
 def show():
     """按母策略分组打印台账"""
     data = _load()
