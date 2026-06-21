@@ -112,6 +112,7 @@
 - **理由**: 实现了完整的 Ops Desk 工作流闭环，并在视觉上彻底收敛了交易台面噪音，将复杂的底层数据核算与高密度股票池合理划分到专属页面，确保交易员在开盘决策时能有极低认知负载与极高确定性。
 
 ### ADR-016 大中盘非流动性溢价策略 (illiquidity-large-cap v1.0) 晋级登记在册
+> ⚠️ **已被 [ADR-017](#adr-017-9-gate-证据自证铁律--三策略归因证否与机械守卫) 修订**:本 ADR 的 9-Gate 证据(DSR p=0.0112 等)经查为**跨策略照抄小盘 illiquidity 家族**,Top800 自有宇宙独立重算 IC=−0.084(反向);58% 头条 100% 来自 MA16 择时非因子。standalone 准入不成立,待退役/重分类。
 - **上下文**: 大中盘（Top 800 ADV）中由于套利不充分，流动性短暂枯竭时的非流动性溢价仍然极强。我们设计了 Amihud Illiquidity 因子配合 30% 凸显性风控否决 (Salience Veto) 及 MA16 趋势择时的大容量策略。
 - **决策**: 晋级该策略为首个 `"在册"` (APPROVED) 的大中盘单体策略。
 - **理由**:
@@ -119,6 +120,33 @@
   2. 回测满足 `"standalone"` 准入要求：2018-2026 年化收益 58.26%，最大回撤 -17.66%，夏普比率 2.16。
   3. 估计容量达 5.0 亿人民币以上（波动率平方根冲击成本下 5亿 AUM 的净夏普比率仍有 1.74）。
 - **失效边界**: 滚动 12 个月夏普比率低于 0.8 / 最大回撤超 -25%。
+
+---
+
+### ADR-017 9-Gate 证据自证铁律 + 三策略归因证否与机械守卫
+- **上下文**: 复审 active 在册策略时发现 `illiquidity-large-cap/v1.0` 台账条目是**拼装**的——净值来自一个无 veto 的 Top800 scratch 脚本,9-Gate 的 IC/DSR/中性化证据**逐位照抄**小盘 `illiquidity` 家族,config 又**虚标**了生成码没实现的 Salience Veto。由此回扫全台账(23 family/41 version)与逐策略归因分层,暴露**系统性防自欺漏洞**:门禁证据可跨策略照抄、config 可虚标、PBO 可跳过却 `passed_all=true`、整套 9-Gate 可全空仍 standalone 准入。
+- **决策**:
+  1. **修订 ADR-016**:`illiquidity-large-cap/v1.0` standalone 资格不成立,待退役/重分类(独立重算 IC=−0.084 反向;58% 全来自 MA16 择时)。
+  2. **确立「9-Gate 证据自证」铁律**(拟扩写进 CLAUDE.md 铁律9/登记纪律):门禁证据必须由**本策略本宇宙的一次可复现运行机械产出**——① 禁跨家族照抄(IC 块逐位相同=判失败);② config 须能机械复现台账绩效;③ 任何 gate=None/`nine_gate={}` 禁 standalone 准入;④ `n_trials ≥` 含宇宙/veto/择时/网格的全部自由度;⑤ 生成码须在 canonical 层。
+  3. **落地机械守卫**:`scripts/ci/check_registry_evidence.py`(G1 跨家族 IC 照抄 + G2 证据全空/跳门)+ `tests/test_registry_evidence_guard.py`,已接入 `scripts/test_all.sh`;3 个已知病灶进 `PENDING_REMEDIATION` 基线(只拦新违规、不阻塞、修复自动提示移除)。
+  4. **三策略归因处置**:`illiquidity-large-cap` 退役;`industry-neglect-rotation/v1.3`(裸因子年化13.8%/回撤−60%/hit=False,靠 MA16 救达标且 9-Gate 全空)补独立 9-Gate + admission 标注;`ai-compute-toc/v1.0` 机制三重证否(见 [[toc-cpo-mechanism-falsified]]),logic chain 降级。
+- **理由**: 9-Gate 是防自欺的机械执行点,一旦证据能照抄/手填/跳过,整个证伪体系失效,比单个坏策略危险得多。三策略共性母题 = **用 MA16 大盘择时的回撤控制冒充因子 alpha**,靠头条 metrics 准入——审任何带择时/轮动 overlay 的策略必做**归因分层 L0 裸因子**看其单独是否达标。证据产物:`scripts/research/{illiq_largecap_audit,industry_neglect_v13_audit,toc_*}.py` + `scratch/illiq_largecap_governance_DRAFT.md`。
+- **失效边界 / 待办**: 三策略处置须经 `workflow`(台账唯一写入口),处置后从 `PENDING_REMEDIATION` 移除对应 key;铁律9 扩写待并入 CLAUDE.md。
+
+---
+
+### ADR-018 首个干净登记范本:illiquidity clean-v1(真 alpha + 诚实 overlay)
+- **上下文**: 用验真机(去 overlay L0 归因 + 本宇宙独立 IC + 容量 + holdout 金库,见 LOOP_ENGINEERING.md)系统性扫候选。价量池 + 基本面池 + value 救活**三轮搜索均未找到 long-only 低相关第二腿**——证实**结构事实:A股小盘只有一个异象簇(小/不流动/冷落/便宜),long-only 因子腿天生 ~0.5 beta 相关,分散只能靠 regime overlay 不能靠堆 alpha**。唯一通过全套验真的真 alpha = 小盘 Amihud 非流动性溢价。
+- **决策**:
+  1. 将 `illiquidity/clean-v1` 整理为**首个用全套防自欺纪律支撑的登记候选**(证据包 `scripts/research/illiquidity_evidence_pack.py`),作为「真 alpha + 诚实 overlay」的**正确范本**,以后新候选对标它而非已证伪的 illiq-large-cap/v1.3/TOC(ADR-017)。
+  2. 北极星从「堆多源 alpha」**重定位**为「一个真 alpha + 诚实 regime 风控 + 容量纪律」——这是 long-only A股小盘的结构上限,非退而求其次。
+- **理由**(本宇宙独立机械产出,非照抄):
+  1. **真 alpha**:L0 裸因子(去 MA16 overlay)搜索窗夏普 1.05 / 年化 25%,独立 IC t=5.94(主显著性;DSR 肥尾偏弱非主证)。
+  2. **金库样本外证伪通过**:2025–2026(从未参与搜索,偷看 1 次)年化 +27.1%/夏普 2.08/回撤 −8.1%。
+  3. 搜索窗 hit=True(年化 24.9%/回撤 −17.2%);overlay 仅贡献 31% 夏普 = **风控非 alpha**(与 ADR-017 造假明确区分)。
+  4. 容量 ~0.23 亿(个人级;容量小正是未被套利抹平之因)。
+- **诚实披露 / 失效边界**: 压力 2010–2026 回撤 **−22.8% 略超 20% 单体线**(2015/2018 小盘崩),不藏窗规避,写入登记;decay_signal=Rank IC 连续 4 季<0 / 滚动 3 年夏普<0.5 / 全市场成交额持续放大;金库段偏短(~1.4 年)须接续复测。
+- **待办**: 经 `workflow` phase1 防未来审计 → phase2/3 正式 9-Gate **补跑 PBO**(草稿缺)→ phase4 register;`passed_all` 由 workflow 判定,**禁手填**。草稿 `scratch/illiquidity_clean_registration_DRAFT.md`。
 
 ---
 
@@ -130,6 +158,8 @@
 |---|---|---|---|---|
 | 2026-06-12 | 🔴 BEAR | 空仓观望,闲钱配 511010 | Band exposure=0(小盘指数 -3.18% vs MA16) | — |
 | 2026-06-14 | — | regime 门控(小盘↔large-cap)落地为可配置项,默认关闭(`regime_gated=False`) | 全样本支持开启但局部窗口肥尾,回撤优先于收益(ADR-011) | — |
-| 2026-06-19 | — | 策略正式晋级与登记在册：`illiquidity-large-cap v1.0` | 通过 9-Gate 完整审计，满足 standalone 准入，高容量 alpha 储备 | — |
+| 2026-06-19 | — | 策略正式晋级与登记在册：`illiquidity-large-cap v1.0` | 通过 9-Gate 完整审计，满足 standalone 准入，高容量 alpha 储备 | ⚠️ 见下行:9-Gate 证据经查为照抄,已 ADR-017 修订 |
+| 2026-06-19 | — | **修订**:`illiquidity-large-cap v1.0` standalone 资格不成立,待退役/重分类(ADR-017) | 独立审计:Top800 自有宇宙 IC=−0.084 反向,58% 全来自 MA16 择时;9-Gate 证据照抄小盘家族 | 待 workflow 处置 |
+| 2026-06-20 | — | 整理 `illiquidity/clean-v1` 为首个干净登记范本(ADR-018) | 三轮搜索证实小盘仅一异象簇;唯一通过全套验真:L0 夏普1.05/IC t=5.94/金库样本外夏普2.08 | 待 workflow phase1~4(补 PBO) |
 
 > 复盘要点(填):切换是否过频(regime 无滞回)、成本损耗是否超预期、事后是否印证。损耗超预期 → 立新假设走研究流程,不私改口径。
