@@ -55,6 +55,9 @@ ILLIQ_SPECS = {
     "v1.3": {"factor": "blend",  "veto": False, "timing": "plain", "top_n": 25},
     "v3.0": {"factor": "amihud", "veto": False, "timing": "band",  "top_n": 25},  # = v3.1 去 Salience Veto(Amihud+Band+Bond)
     "v3.1": {"factor": "amihud", "veto": True,  "timing": "band",  "top_n": 25},
+    # clean-v1:同 v1.0 真实配置(amihud/无veto/二值MA16/top25),lev=1.0;
+    # 区别仅在登记纪律(全套防自欺证据,见 scratch/illiquidity_clean_registration_DRAFT.md),非因子本身。
+    "clean-v1": {"factor": "amihud", "veto": False, "timing": "plain", "top_n": 25},
 }
 
 
