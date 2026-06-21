@@ -26,6 +26,10 @@ _ISLAND_THEMES = [
     "价值与基本面质量",
     "流动性与微观结构(Amihud 类)",
     "波动率与风险溢价",
+    # LOOP_ENGINEERING.md #5 独立数据族隔离岛:股东行为(holder_count_chg/holdertrade_net)
+    # + 资金流(large_order_net_ratio)。i % len(_ISLAND_THEMES) 轮询——islands<5 时不会
+    # 轮到此主题(不影响既有 4 个主题的分配),需 islands>=5 才生效。
+    "股东行为与资金流(独立数据族)",
 ]
 
 

@@ -26,6 +26,10 @@ _FACTOR_CALLS = {
     "revenue_yoy": ("factors.fundamental", "revenue_yoy", {}),
     "bp_proxy": ("factors.fundamental", "bp_proxy", {}),
     "ep_proxy": ("factors.fundamental", "ep_proxy", {}),
+    # 独立数据族隔离岛(LOOP_ENGINEERING.md #5):股东行为 + 资金流,与价量簇正交
+    "holder_count_chg": ("factors.shareholder", "holder_count_chg", {"window": "window"}),
+    "holdertrade_net": ("factors.shareholder", "holdertrade_net", {"window": "window"}),
+    "large_order_net_ratio": ("factors.capital_flow", "large_order_net_ratio", {"window": "window"}),
     "alpha_001": ("factors.alpha101", "alpha_001", {}),
     "alpha_002": ("factors.alpha101", "alpha_002", {}),
     "alpha_003": ("factors.alpha101", "alpha_003", {}),

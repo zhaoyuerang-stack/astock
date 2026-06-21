@@ -54,6 +54,10 @@ ALLOWED_FACTORS: dict[str, FactorSpec] = {
     "alpha_049": FactorSpec("alpha_049", {}, ("price/close",)),
     "alpha_050": FactorSpec("alpha_050", {}, ("price/close", "price/volume")),
     "alpha_055": FactorSpec("alpha_055", {}, ("price/close", "price/volume")),
+    # 独立数据族隔离岛(LOOP_ENGINEERING.md #5):股东行为 + 资金流,与价量簇正交
+    "holder_count_chg": FactorSpec("holder_count_chg", {"window": (40, 240)}, ("holder/holdernumber",)),
+    "holdertrade_net": FactorSpec("holdertrade_net", {"window": (40, 250)}, ("holder/holdertrade",)),
+    "large_order_net_ratio": FactorSpec("large_order_net_ratio", {"window": (3, 60)}, ("moneyflow",)),
 }
 
 ALLOWED_TRANSFORMS = {

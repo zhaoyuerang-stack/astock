@@ -60,12 +60,14 @@ def main():
             f"holdout≥{HOLDOUT.date()} 保留",
             flush=True,
         )
-        # We run 3 islands, 3 generations, population of 6
+        # We run 5 islands, 3 generations, population of 6
         # Set use_llm=True so it uses AI if keys are present, otherwise falls back
+        # islands=5(原3)让 _ISLAND_THEMES 第5个主题"股东行为与资金流"轮得到
+        # (i % len(_ISLAND_THEMES) 轮询,<5 个岛永远摸不到第5个主题)
         search_res = run_autoresearch_walk_forward(
             cutoff=str(meta_cutoff.date()),
             oos_end=str(meta_oos_end.date()),
-            islands=3,
+            islands=5,
             generations=3,
             population=6,
             final_stage="l3",
