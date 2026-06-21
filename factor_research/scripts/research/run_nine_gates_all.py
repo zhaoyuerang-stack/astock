@@ -119,22 +119,18 @@ def _taibook_start(family, version):
     return None
 
 
-def _family_n_trials(family: str, floor: int = 3) -> int:
-    """多重检验试验数 N = 该母策略在台账登记的迭代版本数（家族搜索广度），地板 3。
+class TrialCountUnknown(RuntimeError):
+    """DSR 的真实搜索次数缺失，不能降级成固定地板。"""
 
-    DSR 的 N 应反映「为挑出它,我们在这条 alpha 上试了多少迭代」——逐家族、而非全库。
-    用全库(~695)对手搓母策略过罚;用 1(单版本)又退化成零惩罚。取家族台账版本数 + 地板 3:
-    一致、家族特异、可得。注:只数保留版本(被弃参数未计),故为诚实下界。
-    """
-    try:
-        import strategy_registry
-        data = strategy_registry._load()
-        fam = next((f for f in data.get("families", []) if f["id"] == family), None)
-        if fam:
-            return max(len(fam.get("versions", [])), floor)
-    except Exception:
-        pass
-    return floor
+
+def _family_n_trials(family: str, *, path=None) -> int:
+    """从 append-only 实验账本读取真实尝试数；无记录即阻断。"""
+    from governance.trial_ledger import honest_n_trials
+
+    count = honest_n_trials(family, path=path)
+    if count < 1:
+        raise TrialCountUnknown(f"trial_count_unknown: family={family!r}")
+    return count
 
 
 def _apply_version_overrides(config, strategy_name, version, start):

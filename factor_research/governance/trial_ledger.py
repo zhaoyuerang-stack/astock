@@ -61,9 +61,10 @@ def cumulative_trials(scope: str | None = None, path: Path | None = None) -> int
 
 
 def honest_n_trials(scope: str | None = None, path: Path | None = None) -> int:
-    """喂给 DSR 的诚实 n_trials = max(1, 累计搜索数)。
+    """喂给 DSR 的诚实 n_trials = 实验账本累计搜索数。
 
     用法:deflated_sharpe(..., n_trials=honest_n_trials(family_id)),
-    替代手填——这是 loop 不自欺的命根(见 LOOP_ENGINEERING §5.1)。
+    替代手填。返回 0 表示 trial_count_unknown；调用方必须阻断审批，
+    不得用地板值伪装已知的多重检验负担。
     """
-    return max(1, cumulative_trials(scope, path=path))
+    return cumulative_trials(scope, path=path)

@@ -9,6 +9,7 @@ boundary() / assert_search_clean / validate_on_holdout 之一。
 ② 把文件加进 REQUIRED。纯监控/报表/实盘信号(decay_monitor/tradability/dashboard/
 paper_trade/live_readiness)合法使用全/近期数据,**不是选择**,不在此列。
 """
+import ast
 import re
 import sys
 from pathlib import Path
@@ -33,6 +34,43 @@ def main() -> int:
             continue
         if not BOUND.search(p.read_text(encoding="utf-8")):
             violations.append((rel, f"自动选择路径({why})未引用 holdout 截断 → §5.2 缝③ 泄露"))
+    scheduled = (ROOT / "scripts/ops/scheduled_factor_search.py").read_text(encoding="utf-8")
+    if "review_queue.all()" in scheduled:
+        violations.append((
+            "scripts/ops/scheduled_factor_search.py",
+            "自动审计不得遍历 ReviewQueue.all();只能处理本轮新增 pending",
+        ))
+    for path in ROOT.rglob("*.py"):
+        if any(part in {"data_lake", "scratch", "__pycache__"} for part in path.parts):
+            continue
+        if "tests" in path.parts or path.name.startswith("test_"):
+            continue
+        text = path.read_text(encoding="utf-8")
+        if "validate_on_holdout(" not in text or path.name in {"holdout.py", "check_holdout_compliance.py"}:
+            continue
+        try:
+            tree = ast.parse(text)
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            name = (
+                node.func.attr
+                if isinstance(node.func, ast.Attribute)
+                else node.func.id
+                if isinstance(node.func, ast.Name)
+                else ""
+            )
+            if name != "validate_on_holdout":
+                continue
+            keywords = {kw.arg for kw in node.keywords}
+            if "spec_hash" not in keywords or "data_fingerprint" not in keywords:
+                violations.append((
+                    str(path.relative_to(ROOT)),
+                    "validate_on_holdout 调用缺 spec_hash/data_fingerprint 身份",
+                ))
+                break
     if violations:
         print("🚨 Holdout 合规违规(自动选择路径必须截到 <boundary,见 LOOP_ENGINEERING §5.2):")
         for rel, msg in violations:

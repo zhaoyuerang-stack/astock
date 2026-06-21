@@ -20,11 +20,17 @@ import pandas as pd
 
 from core.engine import PricePanel, Signal
 from core.analysis.nine_gates import NineGatesEvaluator, NineGatesReport
-from services.actions.autoresearch_search import run_island_search, run_autoresearch_island_search
+from services.actions.autoresearch_search import run_autoresearch_walk_forward
 from factory.autoresearch.repositories import CandidateRepository, ReviewQueue, ExperimentLog
 from strategies.small_cap import load_price_panels
 from governance.trial_ledger import honest_n_trials  # LOOP_ENGINEERING §5.1(record 下沉到 orchestrator)
-from governance.holdout import boundary, assert_search_clean, validate_on_holdout  # §5.2
+from governance.holdout import (
+    boundary,
+    assert_search_clean,
+    candidate_identity,
+    current_data_fingerprint,
+    validate_on_holdout,
+)
 
 
 def main():
@@ -36,21 +42,29 @@ def main():
     repository = CandidateRepository()
     review_queue = ReviewQueue()
     experiment_log = ExperimentLog()
+    pending_before = {item["fingerprint"] for item in review_queue.pending()}
 
     # 2. Run Island Search to evolve factors
     print("\n[Step 1] Running Multi-Island Evolutionary Search...", flush=True)
     try:
-        # Holdout 合规(§5.2):演化只见 <boundary,绝不触金库。载面板截断后传入。
+        # True meta-WF:演化只见训练截止日,冠军在 2024 OOS 一次评分;
+        # 2025+ holdout 金库仍完全保留给晋级前唯一一次消费。
         HOLDOUT = boundary()
         _c, _v, _a = load_price_panels("2018-01-01")
-        _mask = _c.index < HOLDOUT
-        _c, _v, _a = _c[_mask], _v[_mask], _a[_mask]
-        assert_search_clean(_c.index, label="周度岛屿搜索")  # 自查门:数据越界即 fail-fast
-        _fwd = _c.shift(-20) / _c - 1.0  # 前向收益(搜索窗内,边界前 fwd 天 NaN,不越金库)
-        print(f"  [holdout] 搜索窗截到 <{HOLDOUT.date()}({_c.shape[0]}日),金库段不参与演化", flush=True)
+        meta_oos_end = _c.index[_c.index < HOLDOUT][-1]
+        meta_cutoff = meta_oos_end - pd.DateOffset(years=1)
+        assert_search_clean(meta_oos_end, label="周度元级WF OOS")
+        print(
+            f"  [meta-WF] train≤{meta_cutoff.date()} / "
+            f"OOS=({meta_cutoff.date()},{meta_oos_end.date()}] / "
+            f"holdout≥{HOLDOUT.date()} 保留",
+            flush=True,
+        )
         # We run 3 islands, 3 generations, population of 6
         # Set use_llm=True so it uses AI if keys are present, otherwise falls back
-        search_res = run_autoresearch_island_search(
+        search_res = run_autoresearch_walk_forward(
+            cutoff=str(meta_cutoff.date()),
+            oos_end=str(meta_oos_end.date()),
             islands=3,
             generations=3,
             population=6,
@@ -61,9 +75,16 @@ def main():
             repository=repository,
             experiment_log=experiment_log,
             review_queue=review_queue,
-            close=_c, volume=_v, amount=_a, forward_ret=_fwd,  # 截断面板 → holdout 合规
+            close=_c,
+            volume=_v,
+            amount=_a,
         )
         print(f"  Evolved factors complete. Evaluated: {search_res.evaluated}.")
+        oos_promoted = {
+            champion.fingerprint
+            for champion in search_res.champions
+            if champion.oos_decision == "promote"
+        }
         # trial 记账已下沉到 run_autoresearch_island_search(§5.1 chokepoint),此处不再重复,
         # 避免双计。honest_n_trials("autoresearch") 仍由 9-Gate 在下方读取。
         
@@ -105,7 +126,11 @@ def main():
 
     # 3. Fetch promoted candidates that passed L3
     # Check the review queue for any candidates waiting for human review
-    promoted = review_queue.all()
+    promoted = [
+        item for item in review_queue.pending()
+        if item["fingerprint"] not in pending_before
+        and item["fingerprint"] in oos_promoted
+    ]
     if not promoted:
         print("\n[Step 2] No candidates passed L3 validation in this run. No reports to audit.")
         sys.exit(0)
@@ -214,21 +239,31 @@ def main():
                     prices=PricePanel(close=close_full, volume=volume_full, amount=amount_full),
                     config=BacktestConfig(start="2018-01-01", cost=ho_cost, leverage=1.0),
                 ).run(Signal(weights=weights_full)).returns
-                ho = validate_on_holdout(f"autoresearch_{fp[:8]}", ret_full)
+                data_fp = current_data_fingerprint()
+                holdout_id = candidate_identity(f"autoresearch_{fp[:8]}", fp, data_fp)
+                ho = validate_on_holdout(
+                    holdout_id,
+                    ret_full,
+                    spec_hash=fp,
+                    data_fingerprint=data_fp,
+                )
                 ho_sharpe_ok = isinstance(ho.get("sharpe"), (int, float)) and ho["sharpe"] >= 0.6
                 # §5.2 缝②:金库 DSR 算得动则必须显著(跨候选多重检验);短段算不动退回夏普门兜底
                 ho_ok = ho_sharpe_ok and ho.get("holdout_dsr_sig") is not False
                 print(f"  [holdout] 段夏普 {ho.get('sharpe', 0):.2f} (n={ho.get('n')}, "
                       f"金库试过{ho.get('holdout_trials')}候选/DSR_p={ho.get('holdout_dsr_p')}, "
                       f"偷看{ho.get('peek_count')}次) → {'通过' if ho_ok else 'holdout_failed'}", flush=True)
-                try:
-                    review_queue.record_fields(
-                        fp, holdout_sharpe=round(float(ho.get("sharpe", 0) or 0), 3),
-                        holdout_ok=bool(ho_ok), holdout_peek=int(ho.get("peek_count", 1)),
-                        holdout_dsr_p=ho.get("holdout_dsr_p"), holdout_trials=ho.get("holdout_trials"),
-                    )
-                except Exception:
-                    pass
+                review_queue.record_fields(
+                    fp,
+                    holdout_id=holdout_id,
+                    holdout_spec_hash=fp,
+                    holdout_data_fingerprint=data_fp,
+                    holdout_sharpe=round(float(ho.get("sharpe", 0) or 0), 3),
+                    holdout_ok=bool(ho_ok),
+                    holdout_peek=int(ho.get("peek_count", 1)),
+                    holdout_dsr_p=ho.get("holdout_dsr_p"),
+                    holdout_trials=ho.get("holdout_trials"),
+                )
             except Exception as ho_err:
                 ho, ho_ok = {"note": f"{type(ho_err).__name__}: {str(ho_err)[:80]}"}, False
                 print(f"  [holdout] 校验异常(跳过,不影响 9-Gate 报告): {ho_err}", flush=True)
@@ -241,14 +276,12 @@ def main():
                     mg = marginal_alpha(ret_full[ret_full.index < HOLDOUT], book_search)
                     print(f"  [marginal] {mg.get('marginal_verdict')} "
                           f"(corr={mg.get('corr_to_book')}, 残差夏普={mg.get('residual_sharpe')})", flush=True)
-                    try:
-                        review_queue.record_fields(
-                            fp, marginal_verdict=mg.get("marginal_verdict"),
-                            marginal_resid_sharpe=mg.get("residual_sharpe"),
-                            marginal_corr=mg.get("corr_to_book"),
-                        )
-                    except Exception:
-                        pass
+                    review_queue.record_fields(
+                        fp,
+                        marginal_verdict=mg.get("marginal_verdict"),
+                        marginal_resid_sharpe=mg.get("residual_sharpe"),
+                        marginal_corr=mg.get("corr_to_book"),
+                    )
                 except Exception as mg_err:
                     mg = {"marginal_verdict": f"未能计算: {type(mg_err).__name__}"}
 

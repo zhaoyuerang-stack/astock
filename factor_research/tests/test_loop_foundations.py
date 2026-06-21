@@ -24,9 +24,9 @@ def test_cumulative_grows_and_penalizes(tmp_path):
     assert TL.honest_n_trials("famX", path=p) == 54
 
 
-def test_honest_n_trials_floor(tmp_path):
+def test_honest_n_trials_unknown_is_zero(tmp_path):
     p = tmp_path / "tl.jsonl"
-    assert TL.honest_n_trials("none", path=p) == 1        # 从未搜过也 ≥1
+    assert TL.honest_n_trials("none", path=p) == 0
 
 
 def test_record_rejects_zero(tmp_path):
@@ -68,14 +68,15 @@ def test_assert_search_clean_blocks_holdout_touch():
         HO.assert_search_clean(dirty, label="search")
 
 
-def test_validate_on_holdout_records_and_flags_peeking(tmp_path):
+def test_validate_on_holdout_retry_is_idempotent(tmp_path):
     p = tmp_path / "ho.jsonl"
     r = _series("2018-01-01", "2026-01-01")
-    v1 = HO.validate_on_holdout("cand-1", r, path=p)
+    kwargs = {"spec_hash": "spec-1", "data_fingerprint": "data-1", "path": p}
+    v1 = HO.validate_on_holdout("cand-1", r, **kwargs)
     assert v1["peek_count"] == 1 and "warning" not in v1
     assert v1["n"] > 0                                     # holdout 段确有数据
-    v2 = HO.validate_on_holdout("cand-1", r, path=p)
-    assert v2["peek_count"] == 2 and "warning" in v2       # 重复偷看被标记
+    v2 = HO.validate_on_holdout("cand-1", r, **kwargs)
+    assert v2["peek_count"] == 1 and v2["idempotent_retry"] is True
 
 
 # ---------------- §5.3 边际 alpha ----------------

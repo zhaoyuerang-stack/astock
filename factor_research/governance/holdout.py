@@ -9,6 +9,7 @@ boundary 来自 app_config/settings.yaml::holdout.start(缺省 2025-01-01)。
 from __future__ import annotations
 
 import json
+import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -23,7 +24,16 @@ class HoldoutBreach(Exception):
     """搜索/研究回测触碰了 holdout 金库(date >= boundary)。"""
 
 
+class HoldoutAlreadyConsumed(RuntimeError):
+    """同一候选/spec/data/boundary 身份已主动消费过金库。"""
+
+
+class HoldoutIdentityMismatch(RuntimeError):
+    """同一 candidate_id 被复用于不同 spec 或数据 vintage。"""
+
+
 _SETTINGS_YAML = Path(__file__).resolve().parents[1] / "app_config" / "settings.yaml"
+_ROOT = Path(__file__).resolve().parents[1]
 
 
 def boundary() -> pd.Timestamp:
@@ -44,6 +54,22 @@ def boundary() -> pd.Timestamp:
 
 def is_holdout(date) -> bool:
     return pd.Timestamp(date) >= boundary()
+
+
+def current_data_fingerprint(root: Path | None = None) -> str:
+    manifest = (root or _ROOT) / "data_lake" / "_manifest.json"
+    try:
+        fingerprint = (json.loads(manifest.read_text()).get("data_vintage") or {}).get("fingerprint")
+    except Exception as exc:
+        raise RuntimeError(f"data_fingerprint_unavailable: {manifest}: {exc}") from exc
+    if not fingerprint:
+        raise RuntimeError(f"data_fingerprint_unavailable: {manifest}")
+    return str(fingerprint)
+
+
+def candidate_identity(base_id: str, spec_hash: str, data_fingerprint: str) -> str:
+    """Create a new candidate identity whenever spec or data vintage changes."""
+    return f"{base_id}::{str(spec_hash)[:12]}::{str(data_fingerprint)[:12]}"
 
 
 def assert_search_clean(dates, *, label: str = "") -> None:
@@ -81,16 +107,46 @@ def holdout_trials(path: Path | None = None) -> int:
         if not line.strip():
             continue
         try:
-            cid = json.loads(line).get("candidate_id")
+            rec = json.loads(line)
         except json.JSONDecodeError:
             continue
+        cid = rec.get("candidate_id")
         if cid:
-            ids.add(cid)
+            ids.add((
+                cid,
+                rec.get("spec_hash", ""),
+                rec.get("data_fingerprint", ""),
+                rec.get("holdout_boundary") or rec.get("boundary", ""),
+            ))
     return len(ids)
 
 
-def validate_on_holdout(candidate_id: str, returns: pd.Series, *,
-                        ts: str | None = None, path: Path | None = None) -> dict:
+def _return_hash(returns: pd.Series) -> str:
+    series = pd.Series(returns).dropna().sort_index()
+    payload = pd.util.hash_pandas_object(series, index=True).values.tobytes()
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _result_from_record(rec: dict, *, idempotent_retry: bool = False) -> dict:
+    out = dict(rec.get("holdout_metrics") or {})
+    for key in ("peek_count", "holdout_trials", "holdout_dsr_p", "holdout_dsr_sig"):
+        out[key] = rec.get(key)
+    if idempotent_retry:
+        out["idempotent_retry"] = True
+    return out
+
+
+def validate_on_holdout(
+    candidate_id: str,
+    returns: pd.Series,
+    *,
+    spec_hash: str,
+    data_fingerprint: str,
+    holdout_boundary: str | pd.Timestamp | None = None,
+    idempotent_retry: bool = True,
+    ts: str | None = None,
+    path: Path | None = None,
+) -> dict:
     """晋级前**唯一一次**在金库上校验(date >= boundary 段)。记账防重复偷看。
 
     返回 holdout 段绩效 + peek_count(同候选重复偷看)+ holdout_trials(跨候选多重检验数)
@@ -98,15 +154,24 @@ def validate_on_holdout(candidate_id: str, returns: pd.Series, *,
     扛过"已有 N 个不同候选在同段金库上试过"的多重检验,否则金库退化成第二个样本内(§5.2 缝②)。
     """
     from engine.metrics import metrics
-    b = boundary()
+    if not str(spec_hash).strip() or not str(data_fingerprint).strip():
+        raise ValueError("holdout identity requires spec_hash and data_fingerprint")
+    b = pd.Timestamp(holdout_boundary) if holdout_boundary is not None else boundary()
     r = pd.Series(returns).dropna()
     r_ho = r[r.index >= b]
     m = metrics(r_ho) if len(r_ho) else {"n": 0, "note": "holdout 段无数据"}
+    return_hash = _return_hash(r_ho)
 
     p = path or _VALIDATIONS
     p.parent.mkdir(parents=True, exist_ok=True)
-    prior = 0
-    seen_ids: set[str] = set()
+    identity = (
+        candidate_id,
+        str(spec_hash),
+        str(data_fingerprint),
+        str(b.date()),
+    )
+    seen_identities: set[tuple[str, str, str, str]] = set()
+    same_candidate: list[dict] = []
     if p.exists():
         for line in p.read_text().splitlines():
             if not line.strip():
@@ -117,11 +182,43 @@ def validate_on_holdout(candidate_id: str, returns: pd.Series, *,
                 continue
             cid = d.get("candidate_id")
             if cid:
-                seen_ids.add(cid)
+                rec_identity = (
+                    cid,
+                    str(d.get("spec_hash", "")),
+                    str(d.get("data_fingerprint", "")),
+                    str(d.get("holdout_boundary") or d.get("boundary", "")),
+                )
+                seen_identities.add(rec_identity)
             if cid == candidate_id:
-                prior += 1
-    peek = prior + 1
-    n_trials = len(seen_ids | {candidate_id})  # 含本候选的跨候选多重检验数
+                same_candidate.append(d)
+
+    exact = next((
+        rec for rec in same_candidate
+        if (
+            rec.get("candidate_id"),
+            str(rec.get("spec_hash", "")),
+            str(rec.get("data_fingerprint", "")),
+            str(rec.get("holdout_boundary") or rec.get("boundary", "")),
+        ) == identity
+    ), None)
+    if exact is not None:
+        if exact.get("return_hash") != return_hash:
+            raise HoldoutAlreadyConsumed(
+                f"holdout identity {candidate_id} 已消费且本次 return_hash 不同"
+            )
+        if not idempotent_retry:
+            raise HoldoutAlreadyConsumed(
+                f"holdout identity {candidate_id} 已消费;禁止第二次主动评估"
+            )
+        return _result_from_record(exact, idempotent_retry=True)
+    if same_candidate:
+        raise HoldoutIdentityMismatch(
+            f"candidate_id={candidate_id!r} 已绑定其他 spec/data/boundary;"
+            "语义或数据变化必须创建新 candidate identity"
+        )
+
+    peek = 1
+    n_trials = len(seen_identities | {identity})
 
     # 按累计验证数惩罚的 holdout DSR(短段算不动留 None,退回 sharpe 门兜底)
     dsr_p, dsr_sig = None, None
@@ -134,8 +231,13 @@ def validate_on_holdout(candidate_id: str, returns: pd.Series, *,
 
     rec = {
         "ts": ts or datetime.now(timezone.utc).isoformat(),
+        "consumed_at": ts or datetime.now(timezone.utc).isoformat(),
         "candidate_id": candidate_id,
+        "spec_hash": str(spec_hash),
+        "data_fingerprint": str(data_fingerprint),
+        "holdout_boundary": str(b.date()),
         "boundary": str(b.date()),
+        "return_hash": return_hash,
         "peek_count": peek,
         "holdout_trials": n_trials,
         "holdout_dsr_p": dsr_p,
@@ -145,11 +247,4 @@ def validate_on_holdout(candidate_id: str, returns: pd.Series, *,
     }
     with open(p, "a") as f:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    out = dict(rec["holdout_metrics"])
-    out["peek_count"] = peek
-    out["holdout_trials"] = n_trials
-    out["holdout_dsr_p"] = dsr_p
-    out["holdout_dsr_sig"] = dsr_sig
-    if peek > 1:
-        out["warning"] = f"⚠️ candidate {candidate_id} 已第 {peek} 次偷看 holdout — 多次偷看=隐性过拟合,采信存疑"
-    return out
+    return _result_from_record(rec)

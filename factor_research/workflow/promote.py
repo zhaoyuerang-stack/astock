@@ -39,7 +39,7 @@ NINE_GATE_STRATEGY_TO_FAMILY = {
 def promote_spec(spec, version="v1.0", warmup_start="2010-01-01",
                  force=False, run_marginal=False, regime="", decay_signal="", hyp=None,
                  run_nine_gate=False, nine_gate_strategy=None, nine_gate_runner=None,
-                 nine_gate_trials=15, nine_gate_start=None, target_status=""):
+                 nine_gate_trials=15, nine_gate_start=None, target_status="", holdout_id=""):
     """把一个 workflow FactorSpec 走完整 phase1~4,返回 RegistrationReport。
 
     spec 可来自 from_factory.hypothesis_to_spec(hyp) 或 explore.make_candidates()。
@@ -97,7 +97,7 @@ def promote_spec(spec, version="v1.0", warmup_start="2010-01-01",
         hypothesis=getattr(spec, "hypothesis", ""),
         regime=regime, decay_signal=decay_signal, force=force,
         hypothesis_id=hyp_id, evidence_experiment_ids=evidence_ids,
-        target_status=target_status,
+        target_status=target_status, holdout_id=holdout_id,
     )
     if report is not None:
         report.phase_summary = _phase_summary(p1, p2, p3, report)
@@ -273,8 +273,12 @@ def _run_marginal(spec, report):
         from strategies.small_cap import load_price_panels
 
         print("[marginal] 对 ACTIVE 组合算边际贡献...", flush=True)
-        live = run_active(start="2018-01-01")
+        # §5.2 缝③:边际 ACTIVE/SHADOW 定级是选择,只用 <boundary,金库不参与定级。
+        from governance.holdout import boundary
+        _hb = boundary()
+        live = {k: v[v.index < _hb] for k, v in run_active(start="2018-01-01").items()}
         close, volume, amount = load_price_panels("2018-01-01")
+        close, volume, amount = close[close.index < _hb], volume[volume.index < _hb], amount[amount.index < _hb]
         # 用 spec 反推一个最小 Hypothesis(marginal 需要 factor_fn_name);
         # 若 spec 来自 from_factory,其 config 不含 fn_name,这里 best-effort 跳过。
         fn_name = spec.config.get("factor_fn_name")
@@ -290,6 +294,17 @@ def _run_marginal(spec, report):
                                         vintage_id="promote")
         if mreport is not None:
             print(f"  grade={mreport.grade} → {'ACTIVE' if mreport.grade != 'SHELVE' else 'SHADOW'}", flush=True)
+        # §5.3 残差边际硬闸:用 governance.marginal_alpha(残差法)复核 line3 的 raw-corr 定级,
+        # 补根因#2 的洞(long-only raw 相关把市场 beta 误当 alpha 冗余)。裸因子对 book 残差化。
+        from governance.marginal import marginal_alpha
+        from factory.lines.line3_marginal.marginal_eval import run_candidate_returns, StrategyConfig
+        cand_bare = run_candidate_returns(hyp, 1, close, volume, amount,
+                                          config=StrategyConfig(timing_kind="none"))
+        mres = marginal_alpha(cand_bare, live)
+        print(f"  [marginal-residual] corr(book)={mres.get('corr_to_book')} "
+              f"残差夏普={mres.get('residual_sharpe')} → {mres['marginal_verdict']}", flush=True)
+        if "冗余" in mres.get("marginal_verdict", ""):
+            print("  ⚠️ 残差判定冗余:与在册组合同质,建议 SHADOW 不并实盘权重(governance 据此降级)。", flush=True)
     except Exception as e:
         print(f"  marginal 跳过(non-fatal): {type(e).__name__}: {str(e)[:80]}", flush=True)
 
