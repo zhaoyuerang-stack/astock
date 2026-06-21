@@ -1,8 +1,13 @@
 # STATUS — 当前进度
 
-> 更新:2026-06-20。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
+> 更新:2026-06-21。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
+
+**2026-06-21(文档体系整理 + 宪法升级为规则编号治理系统)**:根目录 16 份扁平文档收敛为 14 份职责唯一活文档 + `docs/archive/` 冻结区,`CLAUDE.md` 重写为带规则 ID(R-DATA-001 等)、P0-P3 分级、接手90秒协议、§16 守卫映射表的治理宪法。
+  · **消除混乱**: 命名碰撞(`Task.md`/`TASKS.md`、`WEB_DESIGN.md`/`(2)`)归档消歧;孤儿文档接入索引并加定位头。提交: `58edd00c4`(文档矩阵)、`a44fda5c3`(修 3 处指向退场代码的陈旧引用: `core/backtest.py::CostModel`→`core/engine.py`、web test 命令、`factory/evolve_incubation.py`→`mutate_existing.py`)。
+  · **宪法升级**: 命令/成本/Web 纪律下沉到 `RUNBOOK.md`/[`cost_model.md`](factor_research/docs/cost_model.md)/[`web/CLAUDE.md`](web/CLAUDE.md)(新建,承接硬细节);§16 守卫表逐个读 `scripts/ci/` docstring 对齐**真实 7 守卫**;保留 canonical 路径/接口血泪铁律/M5 等会被抽象蒸发的硬细节。提交: `17fb92082`(建两份子文档)、`053950d3a`(重写 CLAUDE.md)。
+  · **验证**: 全仓 md 链接零断链;§16 七个守卫单独跑全 GREEN;`bash scripts/test_all.sh` 全套 `All tests passed!`。纯文档,未触代码;他人 session 在途改动(8 个已暂存代码 + `DECISIONS.md`/`TASKS.md` 等)全程 `--only` 显式路径旁路、未碰。
 
 **2026-06-20(Quant OS 系统一致性整改 Task 19-20 收尾;Definition of Done 基本核对完,整改计划已归档 [`docs/archive/PLAN_system_consistency_remediation_DONE.md`](docs/archive/PLAN_system_consistency_remediation_DONE.md))**:`scripts/repair/migrate_strategy_specs.py --apply` 把 `illiquidity/v3.1` 与 `small-cap-size/v2.0` 绑定到不可变 `ExecutableStrategySpec`(spec_hash 见验收报告),其余 11 个在册/已部署版本因无法机械映射公式被诚实标记 `manual_review_required`,未猜测。
   · **部署迁移在闸门处被正确拒绝(非 bug)**: `migrate_deployment.py --equity illiquidity/v3.1` 在写出新 manifest 前核验 `decide_nine_gate()`,发现该版本台账里持久化的 9-Gate 摘要是 legacy 格式且 `passed_all=False`(`pbo_high`)——historic 准入留下的口子,被 Task 8/9 的原子准入+唯一裁决正确拦下;尝试补跑 Nine-Gate 又被 Task 11 新增的诚实 trial 账本拒绝(`trial_count_unknown`,该 family 的历史搜索发生在账本存在之前,无可追溯记录)。**未做任何变通**(不下调 PBO、不手填 trial 数、不绕 holdout)。
