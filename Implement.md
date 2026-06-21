@@ -1,5 +1,9 @@
 # Implement.md — 产品级 AI-native 量化研究平台实施路线(v2.0)
 
+> **定位**:把研究引擎接成 Web 产品的**执行计划**(怎么建、按什么顺序建)。
+> **何时读**:推进 Web 产品落地、排期、决定下一步建什么时。
+> **不归这管**:产品**长什么样** → [WEB_DESIGN.md](WEB_DESIGN.md)(canonical,研究分析平台);**阶段目标** → [ROADMAP.md](ROADMAP.md);引擎架构 → [SPEC.md](SPEC.md)。
+>
 > 把现有 `factor_research` **研究引擎**(已 ~80%)接成 [SPEC(产品)] + [WEB_DESIGN.md](WEB_DESIGN.md) 所定义的**产品级 Web 平台**的执行计划。
 > 三份文档分工:**SPEC = WHAT/WHY**(七层 / 8 数据模型 / 控制回路);**WEB_DESIGN = 长什么样**(三栏九页 / 组件 / UX,§15 即 Next.js 栈);**本文 = 怎么建、按什么顺序建**。
 > 进度看 [STATUS.md](STATUS.md);引擎内部架构看 [SPEC.md](SPEC.md)(引擎架构 spec,与产品 SPEC 不是同一份)。

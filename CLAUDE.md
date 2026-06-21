@@ -1,7 +1,29 @@
 # A股全市场因子量化研究
 
-> 给 AI 的**操作宪法(精简)**。系统设计/架构 → [SPEC.md](SPEC.md);分阶段路线 → [ROADMAP.md](ROADMAP.md);当前进度 → [STATUS.md](STATUS.md);开放任务 → [TASKS.md](TASKS.md);踩过的坑 → [LESSONS.md](LESSONS.md)(+ auto-memory);多 agent 系统级分工 → [MULTI_AGENT.md](MULTI_AGENT.md);决策框架/记录(为什么这么决策)→ [DECISIONS.md](DECISIONS.md);端到端流程(谁干每步)→ [WORKFLOW.md](WORKFLOW.md)。代码与操作手册在 `factor_research/`。数据基础设施详情 → `factor_research/docs/data_infrastructure.md` + `factor_research/data_lake/README.md`。
-> 每次接手先读本文件 + `STATUS.md`。
+> 给 AI 的**操作宪法(精简)**。本文件是文档体系的**单一入口**——下表是全部活文档的地图,每份只负责一件事,要找什么按"定位"列定位。
+> **每次接手先读本文件 + [STATUS.md](STATUS.md)**;代码与操作手册在 `factor_research/`,数据基础设施详情 → `factor_research/docs/data_infrastructure.md` + `factor_research/data_lake/README.md`。
+
+### 文档矩阵(地图)
+
+| 层 | 文档 | 定位(只负责这一件事) |
+|---|---|---|
+| 宪法 | **CLAUDE.md**(本文) | 项目操作宪法:数据/策略/架构铁律、成本模型、分层依赖、台账唯一写入口、循环协议 |
+| 宪法 | [AGENTS.md](AGENTS.md) | 跨工具 agent 协作底线(提交纪律等);冲突时让位 CLAUDE.md |
+| 架构 | [SPEC.md](SPEC.md) | 系统/引擎规格:七层架构、单向依赖链、回测唯一权威 |
+| 架构 | [LOOP_ENGINEERING.md](LOOP_ENGINEERING.md) | 自进化机制设计宪法:如何不自欺地持续发现真 alpha |
+| 产品 | [WEB_DESIGN.md](WEB_DESIGN.md) | **canonical** Web 端 UI/UX 规格(研究分析平台·九页三栏) |
+| 产品 | [ROADMAP.md](ROADMAP.md) | 产品路线图:分阶段目标 |
+| 产品 | [Implement.md](Implement.md) | 把研究引擎接成 Web 产品的执行计划(怎么建、按什么顺序) |
+| 流程 | [WORKFLOW.md](WORKFLOW.md) | 端到端流程:每个步骤谁干 + 闸门 + 交接 |
+| 流程 | [MULTI_AGENT.md](MULTI_AGENT.md) | 多 agent 平台分工:哪个平台(DeepSeek/Codex/Antigravity/Claude)干哪类负载 |
+| 流程 | [RUNBOOK.md](RUNBOOK.md) | 每日运行手册:一页跑通 数据→信号→模拟盘→监控 |
+| 决策 | [DECISIONS.md](DECISIONS.md) | 决策框架 + ADR(为什么这么决策,append-only) |
+| 经验 | [LESSONS.md](LESSONS.md) | 踩过的坑(+ 私有 auto-memory 补充) |
+| 状态 | [STATUS.md](STATUS.md) | 当前进度(动态,高频更新) |
+| 状态 | [TASKS.md](TASKS.md) | 开放任务 backlog(动态;单一真相源) |
+| 归档 | [docs/archive/](docs/archive/) | 已完成计划 / 被否决方向(冻结,不再维护,不得作实现依据) |
+
+> **消歧**:(1) 本仓 `CLAUDE.md` 是**引擎/研究项目**宪法;home 级 `~/CLAUDE.md` 是 **Web 产品**宪法,作用域不同、二者并存,冲突以本仓为准。(2) 本仓 `SPEC.md` 指**引擎架构** spec;`Implement.md`/`~/` 文档里提到的"产品 SPEC"是另一概念,勿混。(3) "谁干什么"分四个角度:CLAUDE.md=三类执行者**职责原则**(强模型/便宜模型/代码)、MULTI_AGENT=**平台**分负载、AGENTS=跨工具**协作底线**、WORKFLOW=**流程步骤**谁干。
 
 ## 定位
 全市场、日频因子量化。真正的资产 = **数据基础设施 + 策略工厂 + 有效策略管理**;**任何策略默认会失效**,按**母策略**(独立 alpha 家族)组织,持续 发现 → 证伪 → 替换。

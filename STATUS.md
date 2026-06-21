@@ -4,7 +4,7 @@
 
 ## 一句话
 
-**2026-06-20(Quant OS 系统一致性整改 Task 19-20 收尾;`Task.md` Definition of Done 基本核对完)**:`scripts/repair/migrate_strategy_specs.py --apply` 把 `illiquidity/v3.1` 与 `small-cap-size/v2.0` 绑定到不可变 `ExecutableStrategySpec`(spec_hash 见验收报告),其余 11 个在册/已部署版本因无法机械映射公式被诚实标记 `manual_review_required`,未猜测。
+**2026-06-20(Quant OS 系统一致性整改 Task 19-20 收尾;Definition of Done 基本核对完,整改计划已归档 [`docs/archive/PLAN_system_consistency_remediation_DONE.md`](docs/archive/PLAN_system_consistency_remediation_DONE.md))**:`scripts/repair/migrate_strategy_specs.py --apply` 把 `illiquidity/v3.1` 与 `small-cap-size/v2.0` 绑定到不可变 `ExecutableStrategySpec`(spec_hash 见验收报告),其余 11 个在册/已部署版本因无法机械映射公式被诚实标记 `manual_review_required`,未猜测。
   · **部署迁移在闸门处被正确拒绝(非 bug)**: `migrate_deployment.py --equity illiquidity/v3.1` 在写出新 manifest 前核验 `decide_nine_gate()`,发现该版本台账里持久化的 9-Gate 摘要是 legacy 格式且 `passed_all=False`(`pbo_high`)——historic 准入留下的口子,被 Task 8/9 的原子准入+唯一裁决正确拦下;尝试补跑 Nine-Gate 又被 Task 11 新增的诚实 trial 账本拒绝(`trial_count_unknown`,该 family 的历史搜索发生在账本存在之前,无可追溯记录)。**未做任何变通**(不下调 PBO、不手填 trial 数、不绕 holdout)。
   · **结果**: `deployments/production.json` 维持旧 scaffold hash,`run_daily.py --no-update` / `scripts/ops/decay_monitor.py` 均一致 fail-closed(打印身份漂移原因,不崩溃不发信号);`tests/test_e2e.py` 已更新以承认这一合法终态。`PYTHONDONTWRITEBYTECODE=1 bash scripts/test_all.sh` 全绿(71 个 test_*.py 全收集),web `npm test`/`tsc`/`lint` 全绿。详见 `factor_research/reports/governance/system_consistency_acceptance.md`。
   · **遗留**: `illiquidity` 家族需走一次被新 trial 账本覆盖的完整搜索+9-Gate+holdout 才能合规重新部署(可能即 `DECISIONS.md` ADR-018 推进中的 `illiquidity/clean-v1`);`paper_trade.py` 尚未绑定 DeploymentManifest 身份。`TASKS.md`/`DECISIONS.md` 当前有另一 session 关于 ADR-017/018 的未提交编辑,本次有意不碰,避免冲突。
