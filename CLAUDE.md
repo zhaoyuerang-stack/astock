@@ -54,7 +54,7 @@
 | 融资利率 | 5%/年(1.25x → 拖累 ~1.25%/年) | 持仓日,仅杠杆部分 |
 
 **单边**:买 0.208% / 卖 0.258% → **往返 ≈ 0.47%**(另加融资)。冲击/滑点 0.2% 维持审慎,不下调。
-当前代码默认在 `core/backtest.py::CostModel` 固化真实成本近似:买 0.225% / 卖 0.275% / 融资 6.5%;若调整费率,必须同步台账备注。
+当前代码默认在 `core/engine.py::CostModel` 固化真实成本近似:买 0.225% / 卖 0.275% / 融资 6.5%;若调整费率,必须同步台账备注。
 
 ## 常用命令(均在 `factor_research/` 下)
 ```bash
@@ -72,7 +72,7 @@ bash scripts/test_all.sh           # 一键测试器:分层依赖守卫 + 数据
 npm run dev                        # 启动开发服务(默认 :3000);开发期间禁跑 build(见前端纪律)
 npx tsc --noEmit                   # 类型检查(dev 期的首选验证)
 npm run lint                       # ESLint(next lint)
-npm run test                       # node --test lib/*.test.mjs(非 vitest)
+npm run test                       # node --test lib/*.test.mjs components/**/*.test.mjs(非 vitest)
 npm run build                      # 仅在 dev 已关闭时跑;CI/部署用
 ```
 

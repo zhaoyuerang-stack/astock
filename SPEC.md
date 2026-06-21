@@ -77,7 +77,7 @@ data(lake) → factors → core.engine → {strategies(生产), factory/workflow
 - **岛屿隔离**(过程层):各母策略独立种群 / 输出目录 / 可选 git worktree,互不污染。**生态位差异化**(不同数据源/因子族/regime)是低相关的根 —— 隔离本身只防污染,不保证结果低相关。岛间不迁因子基因,只共享方法。
 - **NSGA 多目标**(岛内层):多头 NDCG@k + 时序稳定 + 真实绩效,不退化成单目标。
 - **review audit**(候选层):`*_review.json` 入围后必须过 2018/2023/2010 三段复测 + 成本上浮敏感性,再进入台账预审;未过预审但低相关/有逻辑/局部有效的候选进入孵化池,不得直接入册。
-- **incubation evolution**(孵化层):`factory/evolve_incubation.py` 从孵化池候选出发,本地规则化变异参数/因子/权重,每代都重新走 review audit,只把 `registry_precheck=true` 输出到候选批。该程序不调用 LLM/OpenAI API,避免把本地长跑与模型限流混淆。
+- **incubation evolution**(孵化层):本地规则化变异参数/因子/权重 = `factory/lines/line1_generation/mutate_existing.py`(按 `FACTOR_MUTATION_SPECS` 的 `param_grid` 扰动现有因子,纯规则、不调 LLM/OpenAI API,避免把本地长跑与模型限流混淆);每代变异体重新走 `factory/lines/line2_validation`(gates + walk-forward)复验,未过预审者留孵化池、不得直接入册。(老 `factory/evolve_incubation.py` 已随老工厂在 `917b1edc6` 删除,能力迁入 Line1/2/3 新产线。)
 - **VIF + 逻辑闸**(入册层):跨策略收益 VIF 低相关 + `hypothesis` 逻辑独立。
 
 ## AutoResearch 搜索目标函数(四项适应度,`factory/autoresearch/islands.py`)
