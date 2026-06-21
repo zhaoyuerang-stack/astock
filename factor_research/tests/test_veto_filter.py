@@ -73,12 +73,11 @@ def test_veto_filter_excludes_death_bucket_before_top_n_and_refills():
         veto_factor=veto_factor,
         veto_q=0.20,
     )
-    first_effective = close.index[1]
-    assert list(plain[first_effective].index) == ["A", "B", "C"]
-    assert list(vetoed[first_effective].index) == ["B", "C", "D"]
-    assert abs(vetoed[first_effective].sum() - 1.0) < 1e-12
-    assert len(vetoed[first_effective]) == 3
-    assert first_effective > host_factor.index[0]  # T signal, T+1 effective
+    first_decision = close.index[0]
+    assert list(plain[first_decision].index) == ["A", "B", "C"]
+    assert list(vetoed[first_decision].index) == ["B", "C", "D"]
+    assert abs(vetoed[first_decision].sum() - 1.0) < 1e-12
+    assert len(vetoed[first_decision]) == 3
     print("✅ veto excludes death bucket before top_n and refills")
 
 

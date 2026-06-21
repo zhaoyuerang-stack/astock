@@ -110,3 +110,23 @@ def load_active_deployment(
         portfolio_policy=manifest.get("portfolio_policy") or {},
         legs=tuple(legs),
     )
+
+
+def load_deployed_strategy_spec(leg: DeploymentLeg):
+    """Load the immutable spec referenced by one already-validated deployment leg."""
+    from core.strategy_spec import ExecutableStrategySpec
+
+    record = _default_registry_lookup(leg.family, leg.version)
+    executable = (record or {}).get("executable_spec") or {}
+    spec_data = executable.get("spec")
+    if not spec_data:
+        raise DeploymentNotReady(
+            f"{leg.family}/{leg.version} registry executable spec body missing"
+        )
+    spec = ExecutableStrategySpec.from_dict(spec_data)
+    spec.validate()
+    if spec.spec_hash != leg.spec_hash:
+        raise DeploymentNotReady(
+            f"{leg.family}/{leg.version} executable spec body hash mismatch"
+        )
+    return spec

@@ -222,11 +222,35 @@ def run_all_live(start: str = "2018-01-01") -> dict[str, pd.Series]:
 
 
 def run_active(start: str = "2018-01-01") -> dict[str, pd.Series]:
-    """只跑 ACTIVE 状态的策略——组合层应用这个。"""
+    """Run only legs from the validated DeploymentManifest."""
+    from runtime.deployment import load_active_deployment, load_deployed_strategy_spec
+
+    deployment = load_active_deployment()
     out = {}
-    for name, spec in RESEARCH_STRATEGY_CATALOG.items():
-        if spec.get("status", "ACTIVE") == "ACTIVE":
-            out[name] = spec["fn"](start)
+    for leg in deployment.legs:
+        name = f"{leg.family}.{leg.version}"
+        catalog = RESEARCH_STRATEGY_CATALOG.get(name)
+        if catalog and catalog.get("fn"):
+            out[name] = catalog["fn"](start)
+            continue
+        if leg.role == "equity_alpha":
+            from core.engine import BacktestConfig, BacktestEngine, PricePanel
+            from strategies.executable import build_executable_strategy
+            from strategies.small_cap import load_price_panels
+
+            strategy_spec = load_deployed_strategy_spec(leg)
+            close, volume, amount = load_price_panels(start)
+            prices = PricePanel(close=close, volume=volume, amount=amount)
+            built = build_executable_strategy(strategy_spec, prices)
+            out[name] = BacktestEngine(
+                prices,
+                BacktestConfig(start=start, leverage=1.0),
+            ).run(built.signal).returns
+            continue
+        if leg.role == "defensive" and leg.family == "gov-bond-etf":
+            out[name] = _run_etf_trend("511010", ma=60, start=start)
+            continue
+        raise RuntimeError(f"deployment leg has no canonical runner: {name}")
     return out
 
 
@@ -237,16 +261,10 @@ def active_strategies() -> list[str]:
     family/version 为准(映射回目录键 'family.version')。清单未就绪(尚未 spec 化迁移)
     时回退到研究目录的 ACTIVE 标记,保证研究脚本不被阻断。
     """
-    try:
-        from runtime.deployment import load_active_deployment
-        dep = load_active_deployment()
-        keys = {f"{leg.family}.{leg.version}" for leg in dep.legs}
-        catalog_keys = [n for n in RESEARCH_STRATEGY_CATALOG if n in keys]
-        if catalog_keys:
-            return catalog_keys
-    except Exception:
-        pass  # 清单未就绪 → 回退研究目录(下行)；fail-closed 的生产门在 run_daily/deployment
-    return [n for n, s in RESEARCH_STRATEGY_CATALOG.items() if s.get("status", "ACTIVE") == "ACTIVE"]
+    from runtime.deployment import load_active_deployment
+
+    dep = load_active_deployment()
+    return [f"{leg.family}.{leg.version}" for leg in dep.legs]
 
 
 def shadow_strategies() -> list[str]:
@@ -256,5 +274,11 @@ def shadow_strategies() -> list[str]:
 
 def defensive_strategies() -> set[str]:
     """返回 role=defensive 的 ACTIVE 腿(跨资产防御腿),供 compose(method='capped') 封顶权重。"""
-    return {n for n, s in RESEARCH_STRATEGY_CATALOG.items()
-            if s.get("role") == "defensive" and s.get("status", "ACTIVE") == "ACTIVE"}
+    from runtime.deployment import load_active_deployment
+
+    dep = load_active_deployment()
+    return {
+        f"{leg.family}.{leg.version}"
+        for leg in dep.legs
+        if leg.role == "defensive"
+    }

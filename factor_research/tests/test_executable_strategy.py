@@ -2,6 +2,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+from pathlib import Path
 
 from core.engine import PricePanel
 from core.strategy_spec import ExecutableStrategySpec
@@ -75,6 +76,14 @@ def test_unknown_component_raises_not_silent():
     bad = _spec().replace(factor={"type": "nonexistent", "shift": 1})
     with pytest.raises(UnsupportedStrategyComponent):
         build_executable_strategy(bad, _panel())
+
+
+def test_run_daily_uses_canonical_builder_not_formula_copies():
+    source = (Path(__file__).resolve().parents[1] / "run_daily.py").read_text()
+    assert "build_executable_strategy" in source
+    assert "from factors.alpha.builtins.illiq import" not in source
+    assert "from factors.veto import" not in source
+    assert "from factors.small_cap import small_cap_timing" not in source
 
 
 if __name__ == "__main__":

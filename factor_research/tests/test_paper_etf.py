@@ -32,6 +32,10 @@ def _patch():
     pe.get_close = lambda code, date: STOCK_PX
 
 
+def setup_function():
+    _patch()
+
+
 def _acc(cash=1_000_000.0, positions=None, bond=None):
     return {"init_capital": 1_000_000.0, "inception": "2026-01-01", "cash": cash,
             "positions": positions or {}, "pending": None, "last_date": None, "bond": bond}

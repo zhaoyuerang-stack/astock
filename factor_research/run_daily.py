@@ -21,16 +21,19 @@ CHINA_TZ = ZoneInfo("Asia/Shanghai")
 import numpy as np
 import pandas as pd
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from strategies.small_cap import load_price_panels, build_rebalance_weights
-from factors.small_cap import small_cap_timing
+from core.engine import PricePanel
+from strategies.small_cap import load_price_panels
+from strategies.executable import build_executable_strategy
+from lake.load_lake import load_raw_close
 from lake.validator import DataValidator
-from factors.alpha import transforms  # register zscore/mad_clip/shift
-from factors.alpha.base import FactorData
-from factors.alpha.builtins.illiq import AmihudIlliq
-from factors.veto import salience_covariance_veto
 from app_config.settings import get_settings
 from runtime.production_readiness import get_production_readiness
+from runtime.deployment import (
+    DeploymentNotReady,
+    load_active_deployment,
+    load_deployed_strategy_spec,
+)
+from governance.holdout import current_data_fingerprint
 
 _cfg = get_settings().strategy
 
@@ -102,7 +105,7 @@ def persist_signal_with_readiness(signal, new_state, readiness):
     }
 
 
-def decide_action(trade_dates, last_date, in_market, state):
+def decide_action(trade_dates, last_date, in_market, state, *, rebalance_days=REBAL_DAYS):
     position = state.get("current_position", "cash")
     if not in_market:
         if position == "invested":
@@ -115,9 +118,9 @@ def decide_action(trade_dates, last_date, in_market, state):
         return True, "持仓状态缺少上次调仓日，重新调仓", "调仓买入"
     last_rebal = pd.Timestamp(last_rebal_raw)
     gap = int(((trade_dates > last_rebal) & (trade_dates <= last_date)).sum())
-    if gap >= REBAL_DAYS:
-        return True, f"距上次调仓 {gap} 交易日 (≥{REBAL_DAYS})", "调仓买入"
-    return False, f"距上次调仓 {gap} 交易日 (<{REBAL_DAYS})，维持原仓位", "维持原仓位"
+    if gap >= rebalance_days:
+        return True, f"距上次调仓 {gap} 交易日 (≥{rebalance_days})", "调仓买入"
+    return False, f"距上次调仓 {gap} 交易日 (<{rebalance_days})，维持原仓位", "维持原仓位"
 
 
 def main():
@@ -125,8 +128,21 @@ def main():
     ap.add_argument("--no-update", action="store_true")
     args = ap.parse_args()
 
+    try:
+        deployment = load_active_deployment()
+        equity_leg = next(
+            leg for leg in deployment.legs if leg.role == "equity_alpha"
+        )
+        spec = load_deployed_strategy_spec(equity_leg)
+    except (DeploymentNotReady, StopIteration) as exc:
+        print(f"❌ 生产部署未就绪，拒绝生成正式信号: {exc}")
+        return 2
+
     print("=" * 60)
-    print(f"  每日运行  {datetime.now(CHINA_TZ).strftime('%Y-%m-%d %H:%M')} CST  —  illiquidity v3.1")
+    print(
+        f"  每日运行  {datetime.now(CHINA_TZ).strftime('%Y-%m-%d %H:%M')} CST"
+        f"  —  {spec.family} {spec.version}"
+    )
     print("=" * 60)
 
     # ① 增量更新数据
@@ -142,7 +158,21 @@ def main():
 
     # ② 加载 + 质量校验
     print("\n[2/6] 加载数据 + 质量校验...")
-    close, volume, amount = load_price_panels(START)
+    warmup_start = spec.data.get("warmup_start", START)
+    close, volume, amount = load_price_panels(warmup_start)
+    raw_close = load_raw_close(start=warmup_start).reindex(
+        index=close.index,
+        columns=close.columns,
+    )
+    executable = build_executable_strategy(
+        spec,
+        PricePanel(
+            close=close,
+            volume=volume,
+            amount=amount,
+            raw_close=raw_close,
+        ),
+    )
     last = close.index[-1]
     cal = pd.read_parquet("data_lake/meta/trade_calendar.parquet")["date"]
     v = DataValidator(calendar=cal)
@@ -151,28 +181,15 @@ def main():
            and not v.validate(c, pd.read_parquet(f"data_lake/price/daily/{c}.parquet"))["ok"]]
     print(f"  最新交易日: {last.date()} | 抽样校验: {'✅全部通过' if not bad else f'⚠️{bad}异常'}")
 
-    # ③ 择时信号 + illiquidity 因子
-    print("\n[3/6] 生成择时信号 (illiquidity + PureTrend MA16)...")
-    # AmihudIlliq: |ret|/amount 20d, zscore, MAD clip, shift(1) 防未来函数
-    data = FactorData(close=close, volume=volume, amount=amount)
-    factor_expr = AmihudIlliq(window=20).mad_clip(5).zscore().shift(1)
-    factor = factor_expr.compute(data)
-
-    # Salience Veto factor: faded Salience Covariance (-ST_cov), shift(1) 防未来函数
-    faded_st_cov = salience_covariance_veto(close).shift(1)
-
-    # PureTrend MA16 timing (shared with v2.0, proven)
-    timing_raw, small_nav, timing_dist = small_cap_timing(close, amount, TIMING_MA)
+    # ③ canonical spec 驱动的 factor / timing / policy
+    print(f"\n[3/6] 生成策略信号 ({spec.family}/{spec.version})...")
+    factor = executable.factor
+    timing_dist = executable.diagnostics["timing"]["distance"]
+    timing_raw = executable.diagnostics["timing"]["binary"]
+    faded_st_cov = executable.diagnostics["veto_factor"]
     dist = float(timing_dist.loc[last]) if last in timing_dist.index else 0.0
     base_in_market = bool(timing_raw.loc[last])
-
-    # Band timing (LIVE 主决策 since 2026-06-07): dynamic exposure 0~1.5 driven by dist
-    # exposure = clip(1 + dist*8, 0, 1.5) × I(dist > 0)
-    # Band 用 leverage = exposure (dynamic), 取代 Binary 的固定 leverage 1.25
-    # 已验证: Calmar 2.14 → 2.42 (+13%), Sharpe 1.89 → 1.86 (微降但 mdd 改善 1.9pp)
-    _dc = max(min(dist, 0.5), -0.5)
-    _raw = max(0.0, min(1.5, 1.0 + _dc * 8.0))
-    band_exposure = float(_raw if _dc > 0 else 0.0)
+    band_exposure = float(executable.timing.loc[last])
     band_in_market = band_exposure > 0
 
     # LIVE 决策 = Band timing (主), Binary 保留作 SHADOW 对比
@@ -184,14 +201,19 @@ def main():
     regime_dist = float(timing_dist.shift(1).loc[last]) if last in timing_dist.index else 0.0
     regime = "bull" if regime_dist > 0 else "bear"
 
-    print(f"  小盘指数 vs MA{TIMING_MA}: {dist:+.2%}")
+    timing_ma = int(spec.timing.get("ma", TIMING_MA))
+    print(f"  小盘指数 vs MA{timing_ma}: {dist:+.2%}")
     print(f"  Regime (shifted):         {'🟢 BULL' if regime == 'bull' else '🔴 BEAR'}")
     print(f"  Binary timing (SHADOW):    {'🟢持仓' if binary_in_market else '🔴空仓'}")
     print(f"  Band timing   (LIVE 主决策): exposure={band_exposure:.2f}x → "
           f"{'🟢持仓' if in_market else '🔴空仓观望'}")
 
     # 轮动信号
-    if regime == "bear":
+    defensive_leg = next(
+        (leg for leg in deployment.legs if leg.role == "defensive"),
+        None,
+    )
+    if regime == "bear" and defensive_leg is not None:
         print(f"  ⚠️ BEAR regime → 建议: 空仓资金配置 511010 国债ETF")
     else:
         print(f"  ℹ️ BULL regime → 按 Band exposure 配置 illiq 股票")
@@ -202,19 +224,30 @@ def main():
     active = close.loc[last].dropna().index
 
     # Apply Salience Veto Filter: veto bottom 30% of faded_st_cov (highest salience / bubble stocks)
-    veto_factor = faded_st_cov.loc[last].reindex(active).dropna()
+    if faded_st_cov is not None and last in faded_st_cov.index:
+        veto_factor = faded_st_cov.loc[last].reindex(active).dropna()
+    else:
+        veto_factor = pd.Series(dtype=float)
     if len(veto_factor):
         threshold = veto_factor.quantile(0.30)
         non_veto_stocks = veto_factor[veto_factor > threshold].index
         f = f.reindex(non_veto_stocks).dropna()
         print(f"  [Veto] Candidate pool filtered from {len(active)} to {len(non_veto_stocks)} stocks (vetoed {len(active)-len(non_veto_stocks)} stocks)")
 
-    holdings = f.nlargest(TOP_N).index.tolist()
+    top_n = int(spec.selection["top_n"])
+    rebalance_days = int(spec.selection["rebalance_days"])
+    holdings = f.nlargest(top_n).index.tolist()
 
     # ⑤ 调仓判断
     print("\n[5/6] 调仓判断...")
     state = load_state()
-    is_rebal, reason, action = decide_action(close.index, last, in_market, state)
+    is_rebal, reason, action = decide_action(
+        close.index,
+        last,
+        in_market,
+        state,
+        rebalance_days=rebalance_days,
+    )
     print(f"  {'🔄 今日执行' if is_rebal else '⏸ 不执行'} — {reason}")
 
     # ⑥ 保存 signals
@@ -236,9 +269,9 @@ def main():
         "rotation": {
             "current_regime": regime,
             "recommend_stocks": regime == "bull",           # bull→按 band_exposure 配置 illiq
-            "recommend_bond": regime == "bear",             # bear→换债券(511010)
-            "bond_code": "511010",
-            "bond_name": "国债ETF",
+            "recommend_bond": regime == "bear" and defensive_leg is not None,
+            "bond_code": "511010" if defensive_leg is not None else "",
+            "bond_name": "国债ETF" if defensive_leg is not None else "",
             "bond_allocation": "全部闲置资金",               # bear=100%现金→债券
             "note": "BEAR时全部现金买511010; BULL时卖光511010并按Band exposure买回股票",
         },
@@ -252,8 +285,14 @@ def main():
         "rebalance_reason": reason,
         "action": action,
         "holdings": holdings if in_market else [],
-        "top_n": TOP_N,
-        "strategy": "illiquidity", "strategy_version": "v3.1",
+        "top_n": top_n,
+        "strategy": spec.family,
+        "strategy_version": spec.version,
+        "family": spec.family,
+        "version": spec.version,
+        "spec_hash": spec.spec_hash,
+        "deployment_id": deployment.deployment_id,
+        "data_fingerprint": current_data_fingerprint(),
         # ── 向后兼容: 旧 shadow_band_* 字段保留 ──
         "shadow_band_exposure": round(band_exposure, 4),
         "shadow_band_in_market": band_in_market,
@@ -277,7 +316,7 @@ def main():
 
     # ── 终端总结 ──
     print("\n" + "=" * 60)
-    print(f"  策略      : illiquidity v3.1 (Amihud 非流动性 + Salience Veto 30%)")
+    print(f"  策略      : {spec.family} {spec.version} ({spec.spec_hash[:12]})")
     print(f"  日期      : {last.date()}")
     print(f"  Regime    : {'🟢 BULL' if regime == 'bull' else '🔴 BEAR'} (shifted)")
     print(f"  择时      : {signal['timing']}  (小盘指数{dist:+.2%} vs MA{TIMING_MA})")
@@ -285,7 +324,7 @@ def main():
     print(f"  操作      : {signal['action']}")
     if in_market:
         print(f"  持仓({len(holdings)}只): {', '.join(holdings[:12])}{' ...' if len(holdings)>12 else ''}")
-    if regime == "bear":
+    if regime == "bear" and defensive_leg is not None:
         print(f"  💡 建议   : 空仓资金配置 511010 国债ETF")
     if persist_result["published"]:
         print(f"  Readiness : 已放行")

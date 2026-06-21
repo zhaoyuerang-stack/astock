@@ -93,10 +93,6 @@ def build_rebalance_weights(factor, close, top_n, rebalance_days, *, veto_factor
 
     weights = {}
     for rd in list(fdates[::rebalance_days]):
-        pos = close.index.get_loc(rd)
-        if pos + 1 >= len(close.index):
-            continue
-        effective = close.index[pos + 1]
         f = factor.loc[rd].dropna()
         active = close.loc[rd].dropna().index
         f = f.reindex(active).dropna()
@@ -109,7 +105,7 @@ def build_rebalance_weights(factor, close, top_n, rebalance_days, *, veto_factor
                 else pd.Series(dtype="float64")
             )
         if len(selected) == top_n:
-            weights[effective] = selected
+            weights[rd] = selected
     return weights
 
 

@@ -88,7 +88,10 @@ class Signal:
     2. **factor**  – raw factor values; engine converts to top-n weights internally.
     3. **factor_builder** – callable ``(prices, config) -> factor DataFrame``.
     """
-    # Mode A: direct weights
+    # Mode A: decision-date target weights. The engine applies execution_timing.
+    decision_weights: Optional[pd.DataFrame] = None
+
+    # Legacy alias. New code must use decision_weights.
     weights: Optional[pd.DataFrame] = None
 
     # Mode B: factor → top-n weights
@@ -109,9 +112,12 @@ class Signal:
     # Metadata
     family: str = ""
     version: str = ""
+    execution_timing: str = "T_PLUS_1_CLOSE"
 
     def _resolve_weights(self, prices: PricePanel) -> pd.DataFrame:
         """Convert factor / factor_builder to target weights."""
+        if self.decision_weights is not None:
+            return self.decision_weights
         if self.weights is not None:
             return self.weights
         factor = self.factor
@@ -126,6 +132,41 @@ class Signal:
             rebalance_freq=self.rebalance_freq,
             close=prices.close,
         )
+
+
+def _map_decisions_to_fill_dates(
+    decisions: pd.DataFrame,
+    trading_dates: pd.DatetimeIndex,
+    execution_timing: str,
+) -> pd.DataFrame:
+    if execution_timing != "T_PLUS_1_CLOSE":
+        raise ValueError(f"unsupported execution_timing={execution_timing!r}")
+    rows = []
+    for decision_date, row in decisions.sort_index().iterrows():
+        pos = trading_dates.searchsorted(pd.Timestamp(decision_date), side="right")
+        if pos >= len(trading_dates):
+            continue
+        rows.append((trading_dates[pos], row))
+    if not rows:
+        return pd.DataFrame(index=pd.DatetimeIndex([], dtype="datetime64[ns]"))
+    out = pd.DataFrame(
+        [row for _, row in rows],
+        index=pd.DatetimeIndex([date for date, _ in rows]),
+    )
+    return out.groupby(level=0).last()
+
+
+def _map_timing_to_fill_dates(
+    timing: pd.Series,
+    trading_dates: pd.DatetimeIndex,
+    execution_timing: str,
+) -> pd.Series:
+    frame = _map_decisions_to_fill_dates(
+        pd.Series(timing).to_frame("exposure"),
+        trading_dates,
+        execution_timing,
+    )
+    return frame["exposure"] if "exposure" in frame else pd.Series(dtype=float)
 
 
 # ---------------------------------------------------------------------------
@@ -332,6 +373,22 @@ class BacktestEngine:
         # Normalise dict-of-Series to DataFrame if necessary
         if isinstance(scheduled_weights, dict):
             scheduled_weights = _dict_weights_to_df(scheduled_weights, close.index)
+        execution_timing = getattr(signal_meta, "execution_timing", "T_PLUS_1_CLOSE")
+        scheduled_weights = _map_decisions_to_fill_dates(
+            scheduled_weights,
+            close.index,
+            execution_timing,
+        )
+        fill_timing = (
+            _map_timing_to_fill_dates(timing_signal, close.index, execution_timing)
+            if timing_signal is not None
+            else None
+        )
+        fill_timing_daily = (
+            fill_timing.reindex(close.index).ffill().fillna(0.0)
+            if fill_timing is not None
+            else None
+        )
 
         daily_ret = (
             close.pct_change(fill_method=None)
@@ -349,15 +406,31 @@ class BacktestEngine:
         cost_paid = np.zeros(len(dates))
 
         for i, dt in enumerate(dates):
-            if i == 0:
-                continue
-            if dt in scheduled_weights.index:
-                current_selected = scheduled_weights.loc[dt].dropna()
+            day_ret = np.array(daily_ret.iloc[i].values, dtype="float64", copy=True)
+            day_ret[~np.isfinite(day_ret)] = 0.0
+            day_ret = np.clip(day_ret, -1.0, 10.0)
+            held = current_weight != 0
+            gross_ret = (
+                float((day_ret[held] * current_weight[held]).sum()) * config.leverage
+                if i > 0
+                else 0.0
+            )
+            financing = 0.0
+            if current_weight.sum() > 0 and config.leverage > 1:
+                financing = (config.leverage - 1.0) * config.cost.financing_rate / 252.0
 
-            # Timing exposure multiplier [0, exposure_cap]
+            if dt in scheduled_weights.index:
+                selected = scheduled_weights.loc[dt]
+                if isinstance(selected, pd.DataFrame):
+                    selected = selected.iloc[-1]
+                current_selected = selected.dropna()
+
+            # Target exposure executes at today's close and earns from next close.
             exposure = 1.0
-            if timing_signal is not None:
-                exposure = float(timing_signal.reindex([dt]).fillna(0.0).iloc[0])
+            if fill_timing_daily is not None:
+                exposure = float(fill_timing_daily.iloc[i])
+                if not np.isfinite(exposure):
+                    exposure = 0.0
                 exp_cap = signal_meta.exposure_cap if signal_meta is not None else 1.0
                 exposure = min(max(exposure, 0.0), exp_cap)
 
@@ -376,17 +449,7 @@ class BacktestEngine:
                 + sell_turnover * config.cost.sell_cost
             ) * config.leverage
 
-            day_ret = np.array(daily_ret.iloc[i].values, dtype="float64", copy=True)
-            day_ret[~np.isfinite(day_ret)] = 0.0
-            day_ret = np.clip(day_ret, -1.0, 10.0)
-            held = target_weight != 0
-            gross_ret = float((day_ret[held] * target_weight[held]).sum()) * config.leverage
-
-            financing = 0.0
-            if target_weight.sum() > 0 and config.leverage > 1:
-                financing = (config.leverage - 1.0) * config.cost.financing_rate / 252.0
-
-            out[i] = gross_ret - trade_cost - financing
+            out[i] = np.nan if i == 0 else gross_ret - trade_cost - financing
             turnover[i] = buy_turnover + sell_turnover
             cost_paid[i] = trade_cost + financing
             current_weight = target_weight
@@ -429,9 +492,9 @@ def _factor_to_weights(
 ) -> pd.DataFrame:
     """Convert factor panel to scheduled target weights.
 
-    Logic matches ``core.backtest.build_rebalance_weights`` for consistency:
+    Logic matches ``strategies.small_cap.build_rebalance_weights``:
     - rebalance every *rebalance_days* (parsed from ``rebalance_freq``)
-    - effective date = next trading day (pos + 1)
+    - index is the decision date; engine applies T+1 execution
     - top_n equal weights
 
     Parameters
@@ -458,28 +521,23 @@ def _factor_to_weights(
     rows = []
     for rd in list(fdates[::rebalance_days]):
         if close is not None:
-            pos = close.index.get_loc(rd)
-            if pos + 1 >= len(close.index):
-                continue
-            effective = close.index[pos + 1]
             active = close.loc[rd].dropna().index
         else:
-            effective = rd
             active = factor.columns
 
         f = factor.loc[rd].dropna()
         f = f.reindex(active).dropna()
         if len(f) < top_n:
             if len(f) == 0:
-                w = pd.Series(0.0, index=[active[0]], name=effective)
+                w = pd.Series(0.0, index=[active[0]], name=rd)
                 rows.append(w)
             continue
         if f.std() <= 1e-8:
-            w = pd.Series(0.0, index=[active[0]], name=effective)
+            w = pd.Series(0.0, index=[active[0]], name=rd)
             rows.append(w)
             continue
         top = f.nlargest(top_n).index
-        w = pd.Series(1.0 / top_n, index=top, name=effective)
+        w = pd.Series(1.0 / top_n, index=top, name=rd)
         rows.append(w)
 
     if not rows:

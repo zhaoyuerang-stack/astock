@@ -51,11 +51,12 @@ def build_executable_strategy(spec: ExecutableStrategySpec, prices: PricePanel) 
     )
 
     signal = Signal(
-        weights=weights,
+        decision_weights=weights,
         timing=timing,
         family=spec.family,
         version=spec.version,
         exposure_cap=float(spec.timing.get("cap", 1.0)),
+        execution_timing=spec.execution["fill"],
     )
 
     return ExecutableStrategy(
@@ -64,5 +65,9 @@ def build_executable_strategy(spec: ExecutableStrategySpec, prices: PricePanel) 
         scheduled_weights=weights,
         signal=signal,
         spec_hash=spec.spec_hash,
-        diagnostics={"timing": timing_diag, "veto_q": veto_q},
+        diagnostics={
+            "timing": timing_diag,
+            "veto_factor": veto_factor,
+            "veto_q": veto_q,
+        },
     )

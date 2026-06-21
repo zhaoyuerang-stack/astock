@@ -64,7 +64,14 @@ def build_pure_trend_band(prices: PricePanel, params: dict):
     dc = dist.clip(-0.5, 0.5)
     band = (1.0 + dc * 8.0).clip(0.0, cap)
     exposure = band.where(dc > 0, 0.0).shift(1).fillna(0.0)
-    return exposure, {"type": "pure_trend_band", "ma": ma, "cap": cap}
+    binary = (dc > 0).astype(float)
+    return exposure, {
+        "type": "pure_trend_band",
+        "ma": ma,
+        "cap": cap,
+        "distance": dist,
+        "binary": binary,
+    }
 
 
 def build_ma_trend(prices: PricePanel, params: dict):
