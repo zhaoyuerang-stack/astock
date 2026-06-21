@@ -21,6 +21,7 @@ GOVERNANCE_ALLOWED = {"approved", "audit_passed", "passed", "ok"}
 PAPER_ALLOWED = {"ok", "ready", "normal"}
 PAPER_WARN = {"", "unknown", "missing"}
 TRADING_ALLOWED = {"", "trading_day", "expected_closed_day", "ok"}
+DECAY_TTL_DAYS = 8
 
 
 def _today_for_expected() -> pd.Timestamp:
@@ -44,6 +45,49 @@ def _parse_date(value):
         return pd.Timestamp(value)
     except Exception:
         return None
+
+
+def current_deployment_identity() -> dict:
+    from runtime.deployment import load_active_deployment
+
+    deployment = load_active_deployment()
+    equity = next((leg for leg in deployment.legs if leg.role == "equity_alpha"), None)
+    if equity is None:
+        raise RuntimeError("deployment has no equity_alpha leg")
+    return {
+        "deployment_id": deployment.deployment_id,
+        "family": equity.family,
+        "version": equity.version,
+        "spec_hash": equity.spec_hash,
+    }
+
+
+def validate_feedback_envelope(
+    payload: dict,
+    *,
+    expected: dict,
+    ttl_days: int,
+    now: datetime | None = None,
+) -> dict:
+    reasons: list[str] = []
+    for field in ("deployment_id", "family", "version", "spec_hash"):
+        if str(payload.get(field) or "") != str(expected.get(field) or ""):
+            reasons.append(f"{field}_mismatch")
+    if not payload.get("data_fingerprint"):
+        reasons.append("data_fingerprint_missing")
+    generated = payload.get("generated_at")
+    try:
+        generated_at = pd.Timestamp(generated)
+        current = pd.Timestamp(now or datetime.now(CHINA_TZ))
+        if generated_at.tzinfo is None:
+            generated_at = generated_at.tz_localize(CHINA_TZ)
+        if current.tzinfo is None:
+            current = current.tz_localize(CHINA_TZ)
+        if current - generated_at > pd.Timedelta(days=ttl_days):
+            reasons.append("feedback_stale")
+    except Exception:
+        reasons.append("generated_at_invalid")
+    return {"valid": not reasons, "blocking_reasons": reasons}
 
 
 def actual_latest_price_date(root: Path = ROOT) -> str:
@@ -86,17 +130,24 @@ def _nine_gate_audit_state(nine_gate: dict) -> dict:
 def current_governance_status() -> str:
     try:
         import strategy_registry
-        from app_config.settings import get_settings
 
-        sc = get_settings().strategy
+        identity = current_deployment_identity()
         data = strategy_registry._load()
-        fam = next((f for f in data.get("families", []) if f.get("id") == sc.family), None)
+        fam = next((
+            f for f in data.get("families", [])
+            if f.get("id") == identity["family"]
+        ), None)
         version = next(
-            (v for v in (fam or {}).get("versions", []) if v.get("version") == sc.version),
+            (
+                v for v in (fam or {}).get("versions", [])
+                if v.get("version") == identity["version"]
+            ),
             None,
         )
         if version is None or version.get("status") != "在册":
             return "not_registered"
+        if (version.get("evidence") or {}).get("production_blocked"):
+            return "evidence_invalidated"
         audit = _nine_gate_audit_state(version.get("nine_gate") or {})
         if audit["code"] == "RUN_FAILED":
             return "nine_gate_failed"
@@ -109,17 +160,26 @@ def current_governance_status() -> str:
         return "governance_unknown"
 
 
-def current_decay_status(root: Path = ROOT) -> str:
+def current_decay_status(root: Path = ROOT, *, expected: dict | None = None) -> str:
     fp = root / "reports/decay_status.json"
     if not fp.exists():
         return "unknown"
     try:
-        return str(json.loads(fp.read_text(encoding="utf-8")).get("status") or "unknown")
+        payload = json.loads(fp.read_text(encoding="utf-8"))
     except Exception:
         return "unreadable"
+    if expected is not None:
+        validation = validate_feedback_envelope(
+            payload,
+            expected=expected,
+            ttl_days=DECAY_TTL_DAYS,
+        )
+        if not validation["valid"]:
+            return "identity_or_stale"
+    return str(payload.get("status") or "unknown")
 
 
-def current_paper_status(root: Path = ROOT) -> str:
+def current_paper_status(root: Path = ROOT, *, expected: dict | None = None) -> str:
     fp = root / "paper/account.json"
     if not fp.exists():
         return "missing"
@@ -131,17 +191,28 @@ def current_paper_status(root: Path = ROOT) -> str:
         return "blocked"
     if account.get("last_error"):
         return "error"
+    last_exec = account.get("last_exec") or {}
+    if last_exec.get("blocked"):
+        return "blocked"
+    if expected is not None:
+        if not last_exec:
+            return "unknown"
+        if any(
+            str(last_exec.get(field) or "") != str(expected.get(field) or "")
+            for field in ("deployment_id", "family", "version", "spec_hash")
+        ):
+            return "identity_mismatch"
     return "ok"
 
 
 def current_data_issue_status(root: Path = ROOT) -> dict:
     fp = root / "reports/data/data_issue_triage.json"
     if not fp.exists():
-        return {"status": "unknown", "production_blocked": False, "categories": []}
+        return {"status": "unknown", "production_blocked": True, "categories": []}
     try:
         payload = json.loads(fp.read_text(encoding="utf-8"))
     except Exception:
-        return {"status": "unreadable", "production_blocked": False, "categories": []}
+        return {"status": "unreadable", "production_blocked": True, "categories": []}
     summary = payload.get("summary") or {}
     categories = sorted((summary.get("counts_by_category") or {}).keys())
     blocked = bool(summary.get("production_blocked"))
@@ -186,12 +257,12 @@ def build_production_readiness(
         blocking_reasons.append("decay:red")
     elif decay.startswith("🟡") or "观察" in decay or decay.lower() in {"yellow", "watch", "warn", "warning"}:
         warnings.append("decay:watch")
-    elif decay.lower() in {"", "unknown", "unreadable"}:
-        warnings.append(f"decay:{decay or 'unknown'}")
+    elif decay.lower() in {"", "unknown", "unreadable", "identity_or_stale"}:
+        blocking_reasons.append(f"decay:{decay or 'unknown'}")
 
     paper = (paper_status or "unknown").strip()
     if paper in PAPER_WARN:
-        warnings.append(f"paper:{paper or 'unknown'}")
+        blocking_reasons.append(f"paper:{paper or 'unknown'}")
     elif paper not in PAPER_ALLOWED:
         blocking_reasons.append(f"paper:{paper}")
 
@@ -204,6 +275,8 @@ def build_production_readiness(
         issue_categories = [str(c) for c in data_issue_status.get("categories", [])]
         if data_issue_status.get("production_blocked"):
             blocking_reasons.append("data_issue:block_production")
+        if issue_status in {"unknown", "unreadable", "stale"}:
+            blocking_reasons.append(f"data_issue:{issue_status}")
     else:
         issue_status = str(data_issue_status or "unknown")
         issue_categories = []
@@ -245,10 +318,14 @@ def get_production_readiness(
         expected_trade_date, expected_source = latest_expected_trade_date(root)
     if governance_status is None:
         governance_status = current_governance_status()
+    try:
+        expected_identity = current_deployment_identity()
+    except Exception:
+        expected_identity = None
     if decay_status is None:
-        decay_status = current_decay_status(root)
+        decay_status = current_decay_status(root, expected=expected_identity)
     if paper_status is None:
-        paper_status = current_paper_status(root)
+        paper_status = current_paper_status(root, expected=expected_identity)
     if trading_day_status is None:
         trading_day_status = "trading_day" if expected_trade_date else (expected_source or "unknown")
     if data_issue_status is None:
