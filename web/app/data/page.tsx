@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import MetricCard from "@/components/ui/MetricCard";
 import Card from "@/components/ui/Card";
+import StatusBanner from "@/components/ui/StatusBanner";
 import DataTable from "@/components/ui/DataTable";
 import { api, pct } from "@/lib/api";
 import { latestDateFromRange } from "@/lib/freshness";
@@ -160,6 +161,27 @@ export default function DataPage() {
 
       {dq && (
         <>
+          {/* 数据中心态势头条:一眼回答「数据能不能流向生产/回测」——rd 流水线第一道闸门 */}
+          <div className="mb-5">
+            <StatusBanner
+              status={dq.production_blocked ? "blocked" : dq.backtest_blocked ? "attention" : "ready"}
+              title={
+                dq.production_blocked
+                  ? "数据中心:生产信号已阻断"
+                  : dq.backtest_blocked
+                  ? "数据中心:因子回测已阻断"
+                  : "数据中心:生产与回测通路双绿灯"
+              }
+              detail={
+                dq.production_blocked
+                  ? `数据时效或质量触发防线,今日正式调仓信号已降级为草稿 · 质量判定【${dq.verdict}】· 真问题 ${dq.severe_count} 只`
+                  : dq.backtest_blocked
+                  ? `数据质量降至临界线以下,回测引擎禁止运行以防前瞻/过拟合 · 质量判定【${dq.verdict}】`
+                  : `生产日更与回测引擎通路双绿灯 · 质量判定【${dq.verdict}】`
+              }
+            />
+          </div>
+
           {/* 状态徽章网格 */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-5">
             <MetricCard label="全市场标的" value={String(dq.total)} sub="data_lake 全口径" />
@@ -167,25 +189,6 @@ export default function DataPage() {
             <MetricCard label="真问题标的" value={String(dq.severe_count)} tone={dq.severe_count > 0 ? "danger" : "ok"} sub="负价/OHLC错" />
             <MetricCard label="最新数据日" value={latestDataDate} tone="ok" sub={dq.duckdb?.available ? "daily_all.parquet" : "等待 DuckDB 复核"} />
             <MetricCard label="可用判定" value={dq.verdict} tone={tone as any} sub="根据严重度分诊" />
-          </div>
-
-          {/* 生产/回测阻断状态栏 */}
-          <div className="flex flex-col gap-3 mb-5">
-            {dq.production_blocked && (
-              <div className="card text-sm text-danger border-danger/40 bg-danger/5">
-                🔴 <strong>生产信号已阻断</strong>: 数据源时效或质量触发系统防线，今日正式调仓信号（signals/state.json）未被覆盖（已定向为草稿）。
-              </div>
-            )}
-            {dq.backtest_blocked && (
-              <div className="card text-sm text-warn border-warn/40 bg-warn/5">
-                🟡 <strong>因子回测已阻断</strong>: 数据质量降至临界线以下，回测引擎禁止运行以防止前瞻未来或过拟合。
-              </div>
-            )}
-            {!dq.production_blocked && !dq.backtest_blocked && (
-              <div className="card text-sm text-ok border-ok/40 bg-ok/5">
-                ✅ <strong>数据基础设施运行正常</strong>: 生产日更数据与回测引擎通路状态双绿灯。
-              </div>
-            )}
           </div>
 
           {/* 故障分诊推荐修复 */}
