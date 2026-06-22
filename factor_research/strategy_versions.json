@@ -929,6 +929,16 @@
             "track": "diversifier",
             "rationale": "✅高质量动量对冲样本外（2023-2026）表现良好：超额为正，年化回报 10.86%，夏普比率达到 0.70，展现出在震荡下行市中极强的抗风险与选股阿尔法能力。",
             "note": "迁移自动归类：对冲母策略，单体低收益+负相关，靠组合层增量入册"
+          },
+          "decay_check": {
+            "n_days": 835,
+            "rolling_3y_sharpe_latest": 0.363,
+            "decayed": true,
+            "reasons": [
+              "滚动3年夏普 0.36 < 0.5"
+            ],
+            "action": "触发退役复核(workflow 标退役,非删除)",
+            "checked_at": "2026-06-22T02:17:04.041769+00:00"
           }
         },
         {
@@ -1010,6 +1020,16 @@
             "track": "diversifier",
             "rationale": "全历史压力测试（2012-2026）：经历多次动量崩塌（Momentum Crash），由于质量和路径平滑度过滤，全历史年化保持为正（+5.33%，夏普 0.39），显著优于原始动量（-13.90%，夏普 -0.67）。",
             "note": "迁移自动归类：对冲母策略，单体低收益+负相关，靠组合层增量入册"
+          },
+          "decay_check": {
+            "n_days": 3507,
+            "rolling_3y_sharpe_latest": 0.363,
+            "decayed": true,
+            "reasons": [
+              "滚动3年夏普 0.36 < 0.5"
+            ],
+            "action": "触发退役复核(workflow 标退役,非删除)",
+            "checked_at": "2026-06-22T02:17:04.045420+00:00"
           }
         }
       ],
@@ -1137,6 +1157,14 @@
               "n_trials=1": 0.0285,
               "n_trials=7": 0.3028
             }
+          },
+          "decay_check": {
+            "n_days": 3994,
+            "rolling_3y_sharpe_latest": 1.84,
+            "decayed": false,
+            "reasons": [],
+            "action": "健康,继续持有",
+            "checked_at": "2026-06-21T17:16:14.818911+00:00"
           }
         },
         {
@@ -1173,7 +1201,7 @@
             "maxdd_2010": -0.305,
             "sharpe_2010": 1.35
           },
-          "status": "在册",
+          "status": "参考",
           "notes": "生产基线. WF+35.6%/-27.6%/10/12正. 真实盘+20.0%/-13.4%. 17年仅3年负.",
           "evidence": {},
           "nine_gate": {
@@ -1227,9 +1255,22 @@
             "corr_parent_version": "clean-v1",
             "incremental_alpha": -0.0
           },
-          "admission": {
-            "track": "standalone",
-            "rationale": "单体达标（年化>15% 且 回撤<20%）"
+          "admission": {},
+          "decay_check": {
+            "n_days": 3994,
+            "rolling_3y_sharpe_latest": 1.84,
+            "decayed": false,
+            "reasons": [],
+            "action": "健康,继续持有",
+            "checked_at": "2026-06-22T02:17:04.048883+00:00"
+          },
+          "dsr_demotion": {
+            "from_status": "在册",
+            "from_track": "standalone",
+            "dsr_p": 0.3408210349272085,
+            "threshold": 0.05,
+            "rule": "R-OBJECTIVE-001 / 9-Gate G8（DSR 多重测试惩罚下不显著）",
+            "date": "2026-06-22"
           }
         },
         {
@@ -1258,7 +1299,7 @@
             "calmar": 1.67,
             "hit": true
           },
-          "status": "在册",
+          "status": "参考",
           "notes": "Top50分散变体.WF+36.7%/-32.3%/1.62夏普最高. 更多分散=更低单票风险.",
           "evidence": {},
           "nine_gate": {
@@ -1312,9 +1353,22 @@
             "corr_parent_version": "v1.0",
             "incremental_alpha": 0.0287
           },
-          "admission": {
-            "track": "standalone",
-            "rationale": "单体达标（年化>15% 且 回撤<20%）"
+          "admission": {},
+          "decay_check": {
+            "n_days": 3994,
+            "rolling_3y_sharpe_latest": 1.574,
+            "decayed": false,
+            "reasons": [],
+            "action": "健康,继续持有",
+            "checked_at": "2026-06-22T02:17:04.052154+00:00"
+          },
+          "dsr_demotion": {
+            "from_status": "在册",
+            "from_track": "standalone",
+            "dsr_p": 0.27335541861086987,
+            "threshold": 0.05,
+            "rule": "R-OBJECTIVE-001 / 9-Gate G8（DSR 多重测试惩罚下不显著）",
+            "date": "2026-06-22"
           }
         },
         {
@@ -1375,7 +1429,7 @@
             "calmar": 1.75,
             "hit": true
           },
-          "status": "在册",
+          "status": "参考",
           "notes": "双因子变体.比纯illiquidity DD更小(-16%). smoother ride.",
           "evidence": {},
           "nine_gate": {
@@ -1429,9 +1483,22 @@
             "corr_parent_version": "v1.1",
             "incremental_alpha": 0.0095
           },
-          "admission": {
-            "track": "standalone",
-            "rationale": "单体达标（年化>15% 且 回撤<20%）"
+          "admission": {},
+          "decay_check": {
+            "n_days": 3994,
+            "rolling_3y_sharpe_latest": 1.181,
+            "decayed": false,
+            "reasons": [],
+            "action": "健康,继续持有",
+            "checked_at": "2026-06-22T02:17:04.055676+00:00"
+          },
+          "dsr_demotion": {
+            "from_status": "在册",
+            "from_track": "standalone",
+            "dsr_p": 0.33524469374993315,
+            "threshold": 0.05,
+            "rule": "R-OBJECTIVE-001 / 9-Gate G8（DSR 多重测试惩罚下不显著）",
+            "date": "2026-06-22"
           }
         },
         {
@@ -1511,7 +1578,15 @@
             "corr_parent_version": "v1.3",
             "incremental_alpha": 0.0878
           },
-          "admission": {}
+          "admission": {},
+          "decay_check": {
+            "n_days": 2051,
+            "rolling_3y_sharpe_latest": 1.84,
+            "decayed": false,
+            "reasons": [],
+            "action": "健康,继续持有",
+            "checked_at": "2026-06-21T17:16:14.812942+00:00"
+          }
         },
         {
           "version": "v3.1",
@@ -1537,7 +1612,7 @@
             "calmar": 3.16,
             "hit": true
           },
-          "status": "在册",
+          "status": "参考",
           "notes": "当前 LIVE 生产版本。引入 30% 凸显性一票否决风控层后，相较 v3.0 实现了年化收益微增（+0.7%）、最大回撤缩减（从-12.5%降至-11.9%）与卡玛比率上升（从 2.96 升至 3.16）。\n\n【血缘审计 2026-06-19】v3.1 = v3.0 + Salience Veto。对真实父版本 v3.0 收益相关 ρ=0.95、正交增量 alpha 仅 +1.89% → 实为 v3.0 换皮版,Veto 几乎不动收益结构。真正的 alpha 跃迁在 v1.3→v3.0(ρ0.77、+12.87%,加 PureTrend Band 择时 + 511010 国债轮动)。家族版本池 PBO=0.76(high)=版本选择过拟合显著。注:参考版 v3.0 DSR_p=0.016 比在册 v3.1(0.034)更显著、夏普 2.08 vs 2.12 相近、回撤相近——在册版未必是血缘里统计最干净者,可考虑以 v3.0 为主、v3.1 留作 veto 实验。",
           "evidence": {
             "data_incidents": [
@@ -1559,10 +1634,7 @@
               "requires_revalidation": true
             }
           },
-          "admission": {
-            "track": "standalone",
-            "rationale": "单体达标（年化>15% 且 回撤<20%）"
-          },
+          "admission": {},
           "nine_gate": {
             "run_date": "2026-06-21",
             "passed_all": false,
@@ -1651,6 +1723,22 @@
               }
             },
             "spec_hash": "c9b0269146171f87a58a27359e748d7e6b3f063af0f921820201bf4c30ca457f"
+          },
+          "decay_check": {
+            "n_days": 2051,
+            "rolling_3y_sharpe_latest": 2.2,
+            "decayed": false,
+            "reasons": [],
+            "action": "健康,继续持有",
+            "checked_at": "2026-06-22T02:17:04.058471+00:00"
+          },
+          "dsr_demotion": {
+            "from_status": "在册",
+            "from_track": "standalone",
+            "dsr_p": 0.17616589968290963,
+            "threshold": 0.05,
+            "rule": "R-OBJECTIVE-001 / 9-Gate G8（DSR 多重测试惩罚下不显著）",
+            "date": "2026-06-22"
           }
         }
       ],
@@ -1945,7 +2033,7 @@
             "calmar": 1.21,
             "hit": true
           },
-          "status": "在册",
+          "status": "参考",
           "notes": "✅华西量价ETF轮动版：合成华西证券11个月频行业量价因子进行截面轮动，并引入小盘指数MA16均线择时与511010国债ETF轮动。全历史年化 +21.27%，最大回撤仅 -17.54%，夏普比率 1.28。样本外（2023-2026）年化 +15.58%，最大回撤仅 -11.48%，表现极度稳健。",
           "evidence": {
             "experiment_ids": [
@@ -1984,9 +2072,14 @@
               "台账登记的 metrics(年化21.27%/回撤-17.54%)是 L2 复合,非裸因子单体表现"
             ]
           },
-          "admission": {
-            "track": "standalone",
-            "rationale": "单体达标（年化>15% 且 回撤<20%）"
+          "admission": {},
+          "dsr_demotion": {
+            "from_status": "在册",
+            "from_track": "standalone",
+            "dsr_p": null,
+            "threshold": 0.05,
+            "rule": "R-OBJECTIVE-001 / 9-Gate G8（DSR 多重测试惩罚下不显著）",
+            "date": "2026-06-22"
           }
         },
         {
@@ -2123,6 +2216,14 @@
             "track": "diversifier",
             "rationale": "✅样本外测试（2023-2026）表现良好：超额为正，最大回撤 11.3% 控制在 15% 以内，年化调仓降至 3.6 次，与小盘策略相关性 -0.096 负相关，符合第二母策略分流要求。",
             "note": "迁移自动归类：对冲母策略，单体低收益+负相关，靠组合层增量入册"
+          },
+          "decay_check": {
+            "n_days": 835,
+            "rolling_3y_sharpe_latest": 0.645,
+            "decayed": false,
+            "reasons": [],
+            "action": "健康,继续持有",
+            "checked_at": "2026-06-22T02:17:04.060770+00:00"
           }
         },
         {
@@ -2239,6 +2340,16 @@
             "track": "diversifier",
             "rationale": "✅自适应 CPV 惩罚版：样本外（2023-2026）年化提升至 5.66%（超越 Baseline 3.97%），最大回撤控制在 10.53%，成功避开了 2023-2026 年高股息红利央国企的拥挤抱团误伤。",
             "note": "迁移自动归类：对冲母策略，单体低收益+负相关，靠组合层增量入册"
+          },
+          "decay_check": {
+            "n_days": 835,
+            "rolling_3y_sharpe_latest": 0.315,
+            "decayed": true,
+            "reasons": [
+              "滚动3年夏普 0.32 < 0.5"
+            ],
+            "action": "触发退役复核(workflow 标退役,非删除)",
+            "checked_at": "2026-06-22T02:17:04.063007+00:00"
           }
         },
         {
@@ -2322,6 +2433,16 @@
             "track": "diversifier",
             "rationale": "全历史压力测试：将全历史收益从 -3.03% 扭转为 +1.38%（夏普 0.19），且最大回撤由 -48.69% 压缩至 -26.98%，相比 baseline 有巨大的绝对与相对优化。",
             "note": "迁移自动归类：对冲母策略，单体低收益+负相关，靠组合层增量入册"
+          },
+          "decay_check": {
+            "n_days": 3507,
+            "rolling_3y_sharpe_latest": 0.315,
+            "decayed": true,
+            "reasons": [
+              "滚动3年夏普 0.32 < 0.5"
+            ],
+            "action": "触发退役复核(workflow 标退役,非删除)",
+            "checked_at": "2026-06-22T02:17:04.065982+00:00"
           }
         }
       ],
@@ -2490,7 +2611,7 @@
             "maxdd_2010": -0.237,
             "sharpe_2010": 1.08
           },
-          "status": "在册",
+          "status": "参考",
           "notes": "✅WF存活(+19.0%/-19.5%/夏普1.16,3/4年正)。NPY熊市缓冲(2022 λ=0.7→+23%)，size牛市弹性(2024-25 λ=1.0→+37/+46%)。VolTarget压IS回撤-18.3%。OOS回撤仅-11.1%。压力回撤-23.7%主因2015(+146%后崩)。换手~30x。",
           "evidence": {},
           "nine_gate": {
@@ -2539,9 +2660,22 @@
             "strategy": "size_earnings",
             "version": "v1.0"
           },
-          "admission": {
-            "track": "standalone",
-            "rationale": "单体达标（年化>15% 且 回撤<20%）"
+          "admission": {},
+          "decay_check": {
+            "n_days": 2050,
+            "rolling_3y_sharpe_latest": 1.019,
+            "decayed": false,
+            "reasons": [],
+            "action": "健康,继续持有",
+            "checked_at": "2026-06-22T02:17:04.068678+00:00"
+          },
+          "dsr_demotion": {
+            "from_status": "在册",
+            "from_track": "standalone",
+            "dsr_p": 0.39597259266799845,
+            "threshold": 0.05,
+            "rule": "R-OBJECTIVE-001 / 9-Gate G8（DSR 多重测试惩罚下不显著）",
+            "date": "2026-06-22"
           }
         }
       ],
@@ -2716,7 +2850,7 @@
             "maxdd_2010": -0.3052,
             "sharpe_2010": 1.46
           },
-          "status": "在册",
+          "status": "参考",
           "notes": "✅2026-06-14 重测:旧值 22.2%/夏普1.38 陈旧,早于引擎迁移(5b4e2a90b)+start窗口语义(053d93441);同口径(2010切2018)重测=25.9%/1.69(+3.7pp,maxdd-19.4%≈旧-20%)。688 amount bug 修复后显式排除科创板(exclude_star;纳入不增alpha还降夏普1.85→1.65)。容量~2千万小资金可实盘。OOS 29.7%/1.90、压力(含15年股灾)27.4%/-30.5%。",
           "evidence": {
             "data_incidents": [
@@ -2785,10 +2919,7 @@
             "strategy": "small_cap",
             "version": "v2.0"
           },
-          "admission": {
-            "track": "standalone",
-            "rationale": "单体达标（年化>15% 且 回撤<20%）"
-          },
+          "admission": {},
           "executable_spec": {
             "spec": {
               "family": "small-cap-size",
@@ -2823,6 +2954,22 @@
               }
             },
             "spec_hash": "ddf1b0c1c7bb55e74518f87b009e0e6de9bf52149852df6e79b79392d24af5df"
+          },
+          "decay_check": {
+            "n_days": 2050,
+            "rolling_3y_sharpe_latest": 1.727,
+            "decayed": false,
+            "reasons": [],
+            "action": "健康,继续持有",
+            "checked_at": "2026-06-22T02:17:04.071630+00:00"
+          },
+          "dsr_demotion": {
+            "from_status": "在册",
+            "from_track": "standalone",
+            "dsr_p": 0.0862683849620205,
+            "threshold": 0.05,
+            "rule": "R-OBJECTIVE-001 / 9-Gate G8（DSR 多重测试惩罚下不显著）",
+            "date": "2026-06-22"
           }
         },
         {
