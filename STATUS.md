@@ -4,6 +4,11 @@
 
 ## 一句话
 
+**2026-06-22(small-cap-size/v2.0 纸面前向实验启动,ADR-024)**:全池唯一像样的候选(回测21.6%/夏普1.38/净化CV过,但 DSR=0.086 过不了门)。所有者决定**明知风险纸面前向**收证据,**不绕过 DSR 门**。
+  · **绝不洗成达标**:v2.0 仍「参考」、DSR 仍 0.086、不登记在册、不改 register/台账(那是自欺)。只是人明知不达标的旁路纸面观察。
+  · **隔离机制**:`scripts/research/paper_forward_smallcap.py`(canonical 引擎 point-in-time,取 06-22 起前向段作 OOS,快照入 `reports/experiments/`),**不改 settings.strategy/production.json**(非可部署策略信号会被 readiness 正确分流 draft,故走独立旁路不污染生产)。零真金,靠 MA16 自带防守,主仓继续防守。
+  · **复核**:日更后跑跟踪器,约 2026-09 底(~3 月前向)复核——兑现则证据增强再议小额真仓,塌陷则证否停。基线已立(前向1日;全历史确认 21.6%/1.38/-17.66%)。
+
 **2026-06-22(数据管线解卡 + trade_readiness 去硬编码 + 全池重审确认「目前无可实战 alpha」)**:用户从运行中页面发现「数据不更新/在册 5/因子健康非实时」,实测定位并修复机制问题。
   · **#1 日更解卡**:日更卡在 06-18 —— 根因 ① 陈旧锁(死 PID 520 持有 `.scheduled_daily_update.lock`)② T-1 NLP 子步 `report_nlp_pipeline.py` 的 `dict|None` 在旧解释器崩。删锁 + 加 `from __future__ import annotations` + 联网重跑 → **数据补到 06-22**。但信号/paper 仍停 06-18,是**正确 fail-closed**:部署清单指向 `illiquidity/v3.1`,ADR-020 已把它降「参考」不可部署 → 需人定换腿(TASKS 待决项坐实)。
   · **#2 去硬编码**:`trade_readiness.py` 的 `factor_health`/`cost_forecast`/`liquidity_status`/`data_clean_ratio` 全写死。改 `factor_health` 读真实 `decay_status.json`(现=**degraded**,4 策略衰减,正确拉低 allowed_to_trade);cost/liquidity 诚实标 `unknown` 不假绿;data_clean_ratio 用真实 dq。前端 trade-readiness 页删假的「98.5%(PASS)」与 expected_slippage_bps。
