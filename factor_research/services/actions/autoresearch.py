@@ -214,6 +214,9 @@ def promote_approved_candidate(
 
     hyp = ast_to_hypothesis(candidate)
     promote_kwargs = {"run_marginal": run_marginal}
+    # ADR-022:把候选种子溯源透传给 phase4,落进 registry evidence(LLM 起源触发 semantic_seed_review)。
+    if candidate.provenance:
+        promote_kwargs["seed_provenance"] = dict(candidate.provenance)
     if target_status:
         promote_kwargs["target_status"] = target_status
     # §5.2:把候选的 holdout 校验 id 透传给 phase4 金库闸(scheduled_factor_search 已写记录)

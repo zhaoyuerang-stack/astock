@@ -187,6 +187,18 @@
 
 ---
 
+### ADR-022 种子溯源:autoresearch 候选记录种子来源,LLM 起源晋级时触发人工语义审视
+- **上下文**: holdout 审计 #7「种子候选可能含金库知识」——autoresearch 两条种子来源:① 确定性种子(`generator._SEEDS` 17 个教科书因子对,无金库语义);② LLM 种子(按 `_ISLAND_THEMES` 主题,LLM 先验**可能含 2025+ 行情认知**=语义泄露,不可机械证否)。问题:provenance 在生成时**本就存在**(`generate_llm_candidates` 返回 model)但被 `_llm_seeds` 的 `accepted, _, _` **丢弃**;`seeded_by` 只到搜索响应层、不下沉候选、不进 registry——晋级策略**查不到**是否源自 LLM 种子。
+- **决策**(接住并传播,非发明新追踪):
+  1. `Candidate` 加 `provenance: dict` 字段;确定性种子标 `{origin:deterministic_seed,...}`,LLM 种子标 `{origin:llm_seed, theme, model, generated_at}`(`_llm_seeds` 停止丢弃 model)。
+  2. **血缘继承**:islands 变异/交叉子代经 `_merge_provenance` 继承祖先 origin(`origin:derived` + `ancestor_origins` + 保留 `llm_ancestors`),溯源不因多代进化断链。
+  3. **持久化**:`CandidateRepository._deserialize` 补读 provenance(原 load 时丢失);冠军 `ChampionRecord`/`AutoResearchChampionView` 透出 provenance,人工 review 时即可见。
+  4. **晋级证据**:`promote_approved_candidate → promote_spec → phase4 _build_evidence` 把 `seed_provenance` 写进 registry evidence;**任一祖先是 llm_seed → 打 `semantic_seed_review` 标记**(LLM 先验不可机械证否,须人工审视搜索空间是否含金库语义)。
+- **理由**: 种子语义泄露不可机械证否(LLM 知道 2025-26 发生了什么),只能**记录 + 人工审视**——这正是审计判定的「🔶 部分可」。确定性种子(默认路径)是教科书因子,无此风险,不打标。全链路传播保证晋级后仍可追溯,断链的 provenance 对「晋级策略能否追溯」无意义。
+- **验证**: 9 例溯源单测(种子标注/血缘合并/孙代继承/纯确定性无 LLM/仓库往返/evidence 语义标记四态)全绿;58 个 autoresearch 相关既有测试无回归;`bash scripts/test_all.sh` 全套「All tests passed!」。提交见下。
+
+---
+
 ## ③ 投资/交易决策记录
 
 > 实盘/模拟盘的逐日决策**已自动落盘**:`factor_research/signals/<date>.json`(信号)+ Obsidian `30.output/A股v2.0模拟盘/`(操作卡)。本节只记**需人工复盘的关键决策**(regime 切换、风控动作、异常),不重复日常信号。

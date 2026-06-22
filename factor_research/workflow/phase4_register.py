@@ -326,6 +326,7 @@ class Phase4Register:
         evidence_experiment_ids: Optional[list] = None,
         target_status: str = "",
         holdout_id: str = "",
+        seed_provenance: Optional[dict] = None,
     ) -> RegistrationReport:
         """Register strategy. Saves lessons regardless; registers only if all clear or forced."""
 
@@ -420,10 +421,7 @@ class Phase4Register:
                     f"{phase3_data.get('aggregate',{}).get('maxdd',0):+.1%} dd."
                     f"{' Target=SHADOW, auto-held as 候选.' if shadow_target else ''}"
                 ),
-                evidence={
-                    "hypothesis_id": hypothesis_id,
-                    "experiment_ids": list(evidence_experiment_ids or []),
-                },
+                evidence=self._build_evidence(hypothesis_id, evidence_experiment_ids, seed_provenance),
                 nine_gate=ng_summary,
             )
             print(f"  Registered: {self.family}/{self.version}", flush=True)
@@ -439,6 +437,32 @@ class Phase4Register:
                 registered=False, repro_meta=repro, lessons_saved=n_lessons,
                 detail=str(e), status="error",
             )
+
+    @staticmethod
+    def _build_evidence(hypothesis_id, evidence_experiment_ids, seed_provenance) -> dict:
+        """组装 evidence 块,把种子溯源(ADR-022)落进台账。
+
+        LLM 种子起源(origin==llm_seed,或 derived 的 ancestor_origins 含 llm_seed)→ LLM 先验
+        可能含金库期(2025+)行情认知,不可机械证否 → 打 semantic_seed_review 标记供人工额外审视。
+        """
+        evidence = {
+            "hypothesis_id": hypothesis_id,
+            "experiment_ids": list(evidence_experiment_ids or []),
+        }
+        prov = dict(seed_provenance or {})
+        if prov:
+            evidence["seed_provenance"] = prov
+            origin = prov.get("origin")
+            ancestors = prov.get("ancestor_origins", [])
+            if origin == "llm_seed" or "llm_seed" in ancestors:
+                evidence["semantic_seed_review"] = {
+                    "required": True,
+                    "reason": "种子源自 LLM(先验可能含金库期行情认知),需人工审视搜索空间是否含语义泄露",
+                    "llm_ancestors": prov.get("llm_ancestors") or (
+                        [{k: prov.get(k) for k in ("theme", "model") if prov.get(k)}] if origin == "llm_seed" else []
+                    ),
+                }
+        return evidence
 
     def _check_blocked(self, p1, p2, p3) -> Optional[str]:
         """Return reason if registration should be blocked, or None."""

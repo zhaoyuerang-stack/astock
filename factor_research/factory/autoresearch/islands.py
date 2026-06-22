@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import copy
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from .generator import generate_seed_candidates
 from .models import Candidate
@@ -118,8 +118,38 @@ def crossover_ast(a: dict, b: dict, rng: random.Random) -> dict:
     }
 
 
-def _spawn_valid(base_asts: list[dict], rng: random.Random, *, crossover: bool, retries: int = 8) -> Candidate | None:
-    """变异/杂交直到产出一个能过白名单校验的候选;超过重试次数放弃。"""
+def _merge_provenance(parents: list[Candidate]) -> dict:
+    """子代(变异/交叉)继承父代种子来源(ADR-022):汇总祖先 origin + 保留 LLM 种子细节。
+
+    任一祖先是 llm_seed → ancestor_origins 含 'llm_seed' → 晋级时触发 semantic_seed_review。
+    """
+    origins: set[str] = set()
+    llm_ancestors: list[dict] = []
+    for p in parents:
+        prov = p.provenance or {}
+        o = prov.get("origin")
+        if o == "derived":
+            origins.update(prov.get("ancestor_origins", []))
+            llm_ancestors.extend(prov.get("llm_ancestors", []))
+        elif o == "llm_seed":
+            origins.add(o)
+            llm_ancestors.append({k: prov.get(k) for k in ("theme", "model") if prov.get(k)})
+        elif o:
+            origins.add(o)
+    out: dict = {"origin": "derived", "ancestor_origins": sorted(origins)}
+    dedup = [m for i, m in enumerate(llm_ancestors) if m and m not in llm_ancestors[:i]]
+    if dedup:
+        out["llm_ancestors"] = dedup
+    return out
+
+
+def _spawn_valid(parents: list[Candidate], rng: random.Random, *, crossover: bool, retries: int = 8) -> Candidate | None:
+    """变异/杂交直到产出一个能过白名单校验的候选;超过重试次数放弃。
+
+    子代 provenance 从父代血缘继承(_merge_provenance):种子来源溯源不因进化而断链。
+    """
+    base_asts = [p.ast for p in parents]
+    prov = _merge_provenance(parents)
     for _ in range(retries):
         try:
             if crossover and len(base_asts) >= 2:
@@ -127,7 +157,7 @@ def _spawn_valid(base_asts: list[dict], rng: random.Random, *, crossover: bool, 
                 ast = crossover_ast(pa, pb, rng)
             else:
                 ast = mutate_ast(rng.choice(base_asts), rng)
-            return validate_candidate_ast(ast)
+            return replace(validate_candidate_ast(ast), provenance=prov)
         except DSLValidationError:
             continue
     return None
@@ -147,6 +177,7 @@ class ChampionRecord:
     fitness: float = 0.0
     corr_to_book: float = 0.0
     turnover: float = 0.0
+    provenance: dict = field(default_factory=dict)  # ADR-022 种子溯源(随冠军透出供审视/晋级)
 
 
 @dataclass
@@ -286,7 +317,7 @@ def run_island_search(
             pop.setdefault(c.fingerprint, c)
         stall = 0
         while len(pop) < population and stall < population * 4:
-            child = _spawn_valid([c.ast for c in pop.values()], rng, crossover=False)
+            child = _spawn_valid(list(pop.values()), rng, crossover=False)
             if child is None or child.fingerprint in pop:
                 stall += 1
                 continue
@@ -323,10 +354,9 @@ def run_island_search(
             elites = ranked[: max(1, elite)]
             # 下一代 = 精英 + 精英变异/杂交后代
             nxt: dict[str, Candidate] = {c.fingerprint: c for c in elites}
-            base_asts = [c.ast for c in elites]
             stall = 0
             while len(nxt) < population and stall < population * 4:
-                child = _spawn_valid(base_asts, rngs[i], crossover=rngs[i].random() < 0.3)
+                child = _spawn_valid(elites, rngs[i], crossover=rngs[i].random() < 0.3)
                 if child is None or child.fingerprint in nxt:
                     stall += 1
                     continue
@@ -368,5 +398,6 @@ def run_island_search(
             expr=ast_expr(candidate.ast),
             status=result.status.value, decision=result.decision.value, reason=result.reason,
             novelty=nov, fitness=fit, corr_to_book=corr, turnover=turn,
+            provenance=dict(candidate.provenance or {}),
         ))
     return IslandSearchResult(evaluated=evaluated, champions=champions)

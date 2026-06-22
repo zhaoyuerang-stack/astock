@@ -54,7 +54,8 @@ class StrategyView(BaseModel):
     nine_gate: dict = Field(default_factory=dict)   # Nine-Gate 审计摘要 {dsr_p, gate4_verdict, n_trials, ...}
     style_betas: dict = Field(default_factory=dict)        # 家族级风格暴露 {size, value, momentum, ...} —— 判断是否风格伪装
     failure_boundaries: dict = Field(default_factory=dict)  # 家族级失效边界 {max_drawdown, max_drawdown_days, ...}
-    decay_signal: str = ""                                  # 家族级失效信号(死因/下一步触发条件)
+    decay_signal: str = ""                                  # 家族级失效信号(死因/下一步触发条件,注册时写的静态文字)
+    decay_check: dict = Field(default_factory=dict)         # 版本级实测衰减结果 {decayed, rolling_3y_sharpe_latest, reasons, checked_at}
 
 
 class StrategyDetailView(BaseModel):
@@ -408,6 +409,9 @@ class AutoResearchChampionView(BaseModel):
     corr_to_book: float = 0.0  # 对在册 ACTIVE 组合的有符号收益相关(负=防御腿,边际价值高)
     turnover: float = 0.0    # top-N 成员相邻期流失率 [0,1](高=换手快=成本高)
     fitness: float = 0.0     # |ICIR| + novelty_w×novelty − corr_w×corr_to_book − turnover_w×turnover
+    # ADR-022 种子溯源:该冠军的种子起源(deterministic_seed / llm_seed / derived+ancestor_origins)。
+    # 含 llm_seed 起源 → 搜索空间可能含金库语义,人工审视/晋级时额外审视。
+    provenance: dict = Field(default_factory=dict)
 
 
 class AutoResearchIslandSearchResponse(BaseModel):

@@ -42,6 +42,12 @@ class Candidate:
     source: str = "agent"
     created_at: str = ""
     notes: str = ""
+    # 种子来源溯源(ADR-022):记该候选的种子起源,用于审视「搜索空间是否含金库语义」。
+    #   确定性种子: {"origin": "deterministic_seed", "catalog": ...}
+    #   LLM 种子:   {"origin": "llm_seed", "theme": ..., "model": ..., "generated_at": ...}
+    #   变异/交叉子代: {"origin": "derived", "ancestors": [<父代 origin>...], ...}
+    # LLM 起源不可机械证否(其先验可能含 2025+ 行情认知)→ 晋级时进 evidence,供人工额外审视。
+    provenance: dict[str, Any] = field(default_factory=dict)
 
     def with_status(self, status: CandidateStatus, notes: str = "") -> "Candidate":
         return replace(self, status=status, notes=notes or self.notes)

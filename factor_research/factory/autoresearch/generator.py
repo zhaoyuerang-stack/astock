@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from dataclasses import replace
 
 from .models import Candidate
 from .validator import validate_candidate_ast
@@ -64,6 +65,11 @@ def generate_seed_candidates(limit: int = 10) -> Iterator[Candidate]:
             if candidate.fingerprint in seen:
                 continue
             seen.add(candidate.fingerprint)
-            yield candidate
+            # ADR-022 种子溯源:确定性种子源自教科书因子(generator._SEEDS),无金库语义。
+            yield replace(candidate, provenance={
+                "origin": "deterministic_seed",
+                "catalog": "factory.autoresearch.generator._SEEDS",
+                "pair": f"{seed[0]}×{seed[2]}",
+            })
             if len(seen) >= limit:
                 return

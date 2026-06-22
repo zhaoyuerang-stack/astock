@@ -77,6 +77,7 @@ class CandidateRepository:
             source=rec.get("source", "agent"),
             created_at=rec.get("created_at", ""),
             notes=rec.get("notes", ""),
+            provenance=rec.get("provenance", {}),  # ADR-022:种子溯源不在 load 时丢失
         )
 
 

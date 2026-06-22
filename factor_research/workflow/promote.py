@@ -39,7 +39,8 @@ NINE_GATE_STRATEGY_TO_FAMILY = {
 def promote_spec(spec, version="v1.0", warmup_start="2010-01-01",
                  force=False, run_marginal=False, regime="", decay_signal="", hyp=None,
                  run_nine_gate=False, nine_gate_strategy=None, nine_gate_runner=None,
-                 nine_gate_trials=15, nine_gate_start=None, target_status="", holdout_id=""):
+                 nine_gate_trials=15, nine_gate_start=None, target_status="", holdout_id="",
+                 seed_provenance=None):
     """把一个 workflow FactorSpec 走完整 phase1~4,返回 RegistrationReport。
 
     spec 可来自 from_factory.hypothesis_to_spec(hyp) 或 explore.make_candidates()。
@@ -98,6 +99,7 @@ def promote_spec(spec, version="v1.0", warmup_start="2010-01-01",
         regime=regime, decay_signal=decay_signal, force=force,
         hypothesis_id=hyp_id, evidence_experiment_ids=evidence_ids,
         target_status=target_status, holdout_id=holdout_id,
+        seed_provenance=seed_provenance,
     )
     if report is not None:
         report.phase_summary = _phase_summary(p1, p2, p3, report)

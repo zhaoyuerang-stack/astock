@@ -4,6 +4,12 @@
 
 ## 一句话
 
+**2026-06-22(autoresearch 种子溯源 + LLM 起源语义审视,ADR-022)**:堵 holdout 审计 #7「种子可能含金库知识」的可行动部分。
+  · **根因**:LLM 种子先验可能含 2025+ 行情认知(语义泄露,不可机械证否),而 provenance 生成时本就有(`generate_llm_candidates` 返回 model)却被 `_llm_seeds` 丢弃,`seeded_by` 只到响应层不下沉、不进台账。
+  · **修复(接住并传播)**:`Candidate` 加 `provenance` 字段(确定性种子/LLM 种子如实标注 theme/model)→ islands 变异/交叉子代 `_merge_provenance` 继承祖先来源(不断链)→ 仓库 `_deserialize` 补读 → 冠军 view 透出 → 晋级 `promote_spec→phase4 _build_evidence` 写进 registry evidence;**任一祖先是 LLM 种子 → 打 `semantic_seed_review` 标记**供人工额外审视。
+  · **边界**:确定性种子(教科书因子,默认路径)无金库语义、不打标;LLM 语义泄露只能记录+人工审，不可机械证否。验证:9 例溯源单测 + 58 个既有 autoresearch 测试无回归 + `test_all.sh` 全绿。详见 ADR-022。
+  · **审计 8 项最终状态**:1/2/4/5 已修；#7 本轮处理(记录种子来源+人工审标记)；#3 物理无解已披露；#6 仅协议草案；#8 滚动窗口统计不独立属固有。
+
 **2026-06-22(promote 验证栈截到 holdout boundary + 边界配置锁 + 因子归一化误诊证否,ADR-021)**:堵住「整条 promote 验证栈吃金库」的工作流泄露。
   · **泄露根因**:`phase2_backtest`(OOS 硬编码 2023-2026、成本/相关性/decay 用 2018-2026)+ `phase3_wf`(WF 测试窗到 2026)都跨过 holdout.start=2025-01-01,金库期绩效经机械门(`annual>0`/`OOS/IS decay>0.3`/WF 正窗比)+ 人眼报告参与晋级,破坏「唯一一次校验」。
   · **修复(P0)**:两文件 `run()` 在 load 后**单点截到 `<boundary()`**,因子/三段/成本/相关性/WF 窗全部派生自被裁面板;OOS 终点由 boundary 动态裁定;加 `assert_search_clean` 自查门 + 纳入 `check_holdout_compliance.py` REQUIRED。
