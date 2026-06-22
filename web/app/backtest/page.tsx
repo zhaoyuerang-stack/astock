@@ -4,6 +4,7 @@ import { useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import MetricCard from "@/components/ui/MetricCard";
 import Card from "@/components/ui/Card";
+import StatusBanner from "@/components/ui/StatusBanner";
 import { api, pct, signedPct, num } from "@/lib/api";
 import type { BacktestResult } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
@@ -127,6 +128,15 @@ ${Object.entries(res.yearly_returns).map(([y, r]) => `- ${y}: ${signedPct(r)}`).
 
       {res && (
         <>
+          {/* 回测裁决头条:直接给后端 hit 裁决(前端不重算口径),detail 给 KPI 没有的样本/换手/成本 realism */}
+          <div className="mb-5">
+            <StatusBanner
+              status={res.hit ? "ready" : "attention"}
+              title={`回测裁决:${res.hit ? "达到入册观察门槛 ✅" : "未达入册观察门槛 ❌"}`}
+              detail={`样本 ${res.n_stocks} 只 × ${res.n_days} 日(${res.start}~${res.end}) · 年均换手 ${num(res.turnover_annual, 1)}x · 成本拖累 ${pct(res.cost_annual)}`}
+            />
+          </div>
+
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-5">
             <MetricCard label="年化收益" value={signedPct(res.annual)} tone={res.annual > 0 ? "ok" : "danger"} />
             <MetricCard label="夏普比率" value={num(res.sharpe)} tone={res.sharpe >= 1 ? "ok" : "warn"} />
