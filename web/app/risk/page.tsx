@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import MetricCard from "@/components/ui/MetricCard";
 import Card from "@/components/ui/Card";
+import StatusBanner from "@/components/ui/StatusBanner";
 import DataTable from "@/components/ui/DataTable";
 import { api } from "@/lib/api";
 import type { RiskReport, RiskRuleCheck } from "@/lib/types";
@@ -57,6 +58,29 @@ export default function RiskPage() {
 
       {r && (
         <>
+          {/* 风控态势头条:一眼回答「组合有没有触发风控、要不要我处理」 */}
+          {(() => {
+            const breach = r.checks.filter((c) => c.status === "breach").length;
+            const warn = r.checks.filter((c) => c.status === "warn").length;
+            const na = r.checks.filter((c) => c.status === "na").length;
+            return (
+              <div className="mb-5">
+                <StatusBanner
+                  status={r.verdict === "正常" ? "ready" : r.verdict === "预警" ? "attention" : "blocked"}
+                  title={`风控态势:${r.verdict}`}
+                  detail={[
+                    breach ? `${breach} 条超限` : null,
+                    warn ? `${warn} 条预警` : null,
+                    r.control_actions.length ? `${r.control_actions.length} 项控制动作待人工确认` : "无待确认控制动作",
+                    na ? `${na} 条规则待补数据(未臆造)` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                />
+              </div>
+            );
+          })()}
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
             <MetricCard label="风控判定" value={r.verdict} tone={tone as any} sub={`评估对象:${r.evaluated_on}`} />
             <MetricCard label="规则数" value={String(r.checks.length)} sub="声明式 risk_policy" />
