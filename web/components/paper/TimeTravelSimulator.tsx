@@ -3,10 +3,9 @@
 import { useEffect, useState, useMemo } from "react";
 import type { NavCurveView, PaperTradesView } from "@/lib/types";
 import { pct, num } from "@/lib/api";
-import SimulationModeBanner from "@/components/paper/SimulationModeBanner";
 
-// 演示回测模拟盘的高密度 30 日样本数据(对应 innovative_design_proposal.md 演示模式)
-interface DemoPoint {
+// 真实模拟盘时序点(从 nav/trades 派生;只有真实数据,无合成演示)。
+interface SimPoint {
   date: string;
   nav: number;
   cash: number;
@@ -17,153 +16,6 @@ interface DemoPoint {
   exposures: { momentum: number; volatility: number; value: number; quality: number; growth: number };
 }
 
-const DEMO_DATA: DemoPoint[] = [
-  {
-    date: "2026-05-01", nav: 1000000, cash: 1000000, posValue: 0, regime: "BEAR",
-    holdings: [],
-    aiLog: "系统处于 BEAR (熊市) 模式。仓位清空，现金 100% 闲置，配往低波动理财进行防守。",
-    exposures: { momentum: 0, volatility: 0, value: 0, quality: 0, growth: 0 }
-  },
-  {
-    date: "2026-05-04", nav: 1000500, cash: 1000500, posValue: 0, regime: "BEAR",
-    holdings: [],
-    aiLog: "择时信号处于防守带。因子池内「小盘反转」出现衰退迹象，继续保持全现金观望。",
-    exposures: { momentum: 0, volatility: 0, value: 0, quality: 0, growth: 0 }
-  },
-  {
-    date: "2026-05-07", nav: 1002300, cash: 320000, posValue: 682300, regime: "VOL",
-    holdings: [
-      { ticker: "511010", company: "国债ETF", weight: 68.2, price: 141.1, pnl: 0.1 }
-    ],
-    aiLog: "市场状态转入 VOL (高波动)。触发底线防守买入：买入 511010 国债ETF，权重 68%，平抑组合贝塔。",
-    exposures: { momentum: 10, volatility: 5, value: 85, quality: 90, growth: 5 }
-  },
-  {
-    date: "2026-05-10", nav: 1010500, cash: 110000, posValue: 900500, regime: "BULL",
-    holdings: [
-      { ticker: "AAPL", company: "苹果公司", weight: 35.2, price: 172.5, pnl: 1.2 },
-      { ticker: "NVDA", company: "英伟达", weight: 34.8, price: 420.2, pnl: 4.8 },
-      { ticker: "511010", company: "国债ETF", weight: 20.0, price: 141.2, pnl: 0.2 }
-    ],
-    aiLog: "择时确认：市场转入 BULL (牛市)！大幅增仓进攻。买入高贝塔科技股 AAPL (35%) 与 NVDA (34.8%)。",
-    exposures: { momentum: 78, volatility: 45, value: 30, quality: 75, growth: 80 }
-  },
-  {
-    date: "2026-05-13", nav: 1024300, cash: 110000, posValue: 914300, regime: "BULL",
-    holdings: [
-      { ticker: "AAPL", company: "苹果公司", weight: 34.1, price: 175.1, pnl: 2.7 },
-      { ticker: "NVDA", company: "英伟达", weight: 36.3, price: 435.5, pnl: 8.5 },
-      { ticker: "511010", company: "国债ETF", weight: 20.0, price: 141.2, pnl: 0.2 }
-    ],
-    aiLog: "组合利润奔跑中。NVDA 上涨 3.6% 带来显著超额收益。未触及调仓阈值，保持当前头寸。",
-    exposures: { momentum: 84, volatility: 48, value: 28, quality: 74, growth: 82 }
-  },
-  {
-    date: "2026-05-16", nav: 1038500, cash: 110000, posValue: 928500, regime: "BULL",
-    holdings: [
-      { ticker: "AAPL", company: "苹果公司", weight: 33.5, price: 178.2, pnl: 4.5 },
-      { ticker: "NVDA", company: "英伟达", weight: 37.5, price: 450.8, pnl: 12.3 },
-      { ticker: "511010", company: "国债ETF", weight: 19.8, price: 141.3, pnl: 0.3 }
-    ],
-    aiLog: "持仓跟踪。NVDA 连阳，动量因子处于加速阶段。AI 判定无需人工锁利介入。",
-    exposures: { momentum: 90, volatility: 52, value: 25, quality: 73, growth: 85 }
-  },
-  {
-    date: "2026-05-19", nav: 1052100, cash: 50000, posValue: 1002100, regime: "BULL",
-    holdings: [
-      { ticker: "AAPL", company: "苹果公司", weight: 28.5, price: 180.1, pnl: 5.6 },
-      { ticker: "NVDA", company: "英伟达", weight: 35.2, price: 465.3, pnl: 15.9 },
-      { ticker: "TSLA", company: "特斯拉", weight: 26.5, price: 210.5, pnl: 0.5 },
-      { ticker: "511010", company: "国债ETF", weight: 10.0, price: 141.3, pnl: 0.3 }
-    ],
-    aiLog: "调仓触发 (T+20)：减仓部分国债，买入特斯拉 (TSLA, 26.5%) 填充动量池。总持仓比例升至 95%。",
-    exposures: { momentum: 95, volatility: 68, value: 20, quality: 65, growth: 90 }
-  },
-  {
-    date: "2026-05-22", nav: 1045200, cash: 50000, posValue: 995200, regime: "VOL",
-    holdings: [
-      { ticker: "AAPL", company: "苹果公司", weight: 28.1, price: 177.5, pnl: 4.1 },
-      { ticker: "NVDA", company: "英伟达", weight: 34.2, price: 452.1, pnl: 12.6 },
-      { ticker: "TSLA", company: "特斯拉", weight: 25.1, price: 199.5, pnl: -4.7 },
-      { ticker: "511010", company: "国债ETF", weight: 10.1, price: 141.4, pnl: 0.4 }
-    ],
-    aiLog: "警报：市场进入 VOL 高波动。特斯拉 (TSLA) 受阻回调 4.7%。风控判定尚未达到止损线，继续观察。",
-    exposures: { momentum: 91, volatility: 72, value: 22, quality: 66, growth: 88 }
-  },
-  {
-    date: "2026-05-25", nav: 1021300, cash: 650000, posValue: 371300, regime: "BEAR",
-    holdings: [
-      { ticker: "511010", company: "国债ETF", weight: 36.3, price: 141.5, pnl: 0.5 }
-    ],
-    aiLog: "系统熔断！择时信号跌破 BEAR 闸门。立刻清空所有高贝塔股票 (AAPL, NVDA, TSLA)，回笼现金并配买国债避险！",
-    exposures: { momentum: 12, volatility: 4, value: 88, quality: 92, growth: 4 }
-  },
-  {
-    date: "2026-05-28", nav: 1022100, cash: 650000, posValue: 372100, regime: "BEAR",
-    holdings: [
-      { ticker: "511010", company: "国债ETF", weight: 36.4, price: 141.6, pnl: 0.6 }
-    ],
-    aiLog: "避险状态持续。组合回撤被成功锁定在 3.5% 左右，显著跑赢大盘（大盘同期下跌 8.2%）。",
-    exposures: { momentum: 10, volatility: 3, value: 89, quality: 93, growth: 3 }
-  },
-  {
-    date: "2026-06-01", nav: 1025200, cash: 150000, posValue: 875200, regime: "BULL",
-    holdings: [
-      { ticker: "AAPL", company: "苹果公司", weight: 42.5, price: 182.2, pnl: 1.1 },
-      { ticker: "MSFT", company: "微软公司", weight: 45.0, price: 325.5, pnl: 0.8 }
-    ],
-    aiLog: "熊市结束，BULL 信号重现。买入高股息稳健大盘股 AAPL (42.5%) 与 MSFT (45%) 进行反弹布局。",
-    exposures: { momentum: 62, volatility: 32, value: 48, quality: 88, growth: 60 }
-  },
-  {
-    date: "2026-06-04", nav: 1041800, cash: 150000, posValue: 891800, regime: "BULL",
-    holdings: [
-      { ticker: "AAPL", company: "苹果公司", weight: 43.1, price: 185.5, pnl: 2.9 },
-      { ticker: "MSFT", company: "微软公司", weight: 46.1, price: 334.2, pnl: 3.5 }
-    ],
-    aiLog: "反弹确立。微软与苹果业绩强劲，组合净值上升至 104.1 万。因子表现良好。",
-    exposures: { momentum: 65, volatility: 34, value: 45, quality: 89, growth: 62 }
-  },
-  {
-    date: "2026-06-07", nav: 1058200, cash: 150000, posValue: 908200, regime: "BULL",
-    holdings: [
-      { ticker: "AAPL", company: "苹果公司", weight: 44.2, price: 189.9, pnl: 5.3 },
-      { ticker: "MSFT", company: "微软公司", weight: 46.6, price: 338.8, pnl: 4.9 }
-    ],
-    aiLog: "持仓跟踪。继续维持科技蓝筹双子星持仓。当前组合夏普比率回升至 1.85 满意线之上。",
-    exposures: { momentum: 70, volatility: 35, value: 43, quality: 90, growth: 65 }
-  },
-  {
-    date: "2026-06-10", nav: 1079500, cash: 50000, posValue: 1029500, regime: "BULL",
-    holdings: [
-      { ticker: "AAPL", company: "苹果公司", weight: 35.1, price: 194.2, pnl: 7.7 },
-      { ticker: "MSFT", company: "微软公司", weight: 36.8, price: 345.5, pnl: 6.9 },
-      { ticker: "NVDA", company: "英伟达", weight: 28.1, price: 485.5, pnl: 3.2 }
-    ],
-    aiLog: "调仓决策：市场强劲，增仓英伟达 (NVDA, 28%)。总杠杆与仓位配置达 95%。",
-    exposures: { momentum: 82, volatility: 48, value: 30, quality: 84, growth: 78 }
-  },
-  {
-    date: "2026-06-13", nav: 1102500, cash: 50000, posValue: 1052500, regime: "BULL",
-    holdings: [
-      { ticker: "AAPL", company: "苹果公司", weight: 34.2, price: 198.8, pnl: 10.2 },
-      { ticker: "MSFT", company: "微软公司", weight: 35.9, price: 349.9, pnl: 8.3 },
-      { ticker: "NVDA", company: "英伟达", weight: 29.9, price: 512.4, pnl: 8.9 }
-    ],
-    aiLog: "净值突破 110 万！年化超额达标。AI 助手提示：距离下一个调仓窗口还有 12 天。",
-    exposures: { momentum: 88, volatility: 50, value: 28, quality: 83, growth: 82 }
-  },
-  {
-    date: "2026-06-16", nav: 1124800, cash: 50000, posValue: 1074800, regime: "BULL",
-    holdings: [
-      { ticker: "AAPL", company: "苹果公司", weight: 33.5, price: 202.1, pnl: 12.1 },
-      { ticker: "MSFT", company: "微软公司", weight: 35.0, price: 354.1, pnl: 9.6 },
-      { ticker: "NVDA", company: "英伟达", weight: 31.5, price: 535.5, pnl: 13.8 }
-    ],
-    aiLog: "回测重放结束。累计收益 +12.48%，夏普 2.15。组合在新颖性及容量方面均表现极佳。",
-    exposures: { momentum: 92, volatility: 52, value: 26, quality: 82, growth: 85 }
-  }
-];
 
 // 雷达图中心配置
 const cx = 90;
@@ -177,14 +29,13 @@ export default function TimeTravelSimulator({
   nav: NavCurveView | null;
   trades: PaperTradesView | null;
 }) {
-  // Task 18: 默认 real(真实模拟盘)。demo 是显式选择的教学沙盒,绝不默认渲染美股合成数据。
-  const [mode, setMode] = useState<"real" | "demo">("real");
+  // 只渲染真实模拟盘数据(合成演示沙盒已移除)。
   const [index, setIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState<1 | 2 | 4>(2);
 
   // 1. 构建真实模拟盘的每日时序数据
-  const realPoints: DemoPoint[] = useMemo(() => {
+  const realPoints: SimPoint[] = useMemo(() => {
     if (!nav || nav.points.length === 0) return [];
     const pts = nav.points;
     const trds = trades?.trades || [];
@@ -255,15 +106,14 @@ export default function TimeTravelSimulator({
     });
   }, [nav, trades]);
 
-  // 获取当前活跃的数据集
-  const activeData = mode === "real" ? realPoints : DEMO_DATA;
+  const activeData = realPoints;
   const maxIdx = activeData.length - 1;
 
-  // 重置 index
+  // 数据刷新时重置回放
   useEffect(() => {
     setIndex(0);
     setIsPlaying(false);
-  }, [mode]);
+  }, [realPoints.length]);
 
   // 播放器 effect
   useEffect(() => {
@@ -280,13 +130,10 @@ export default function TimeTravelSimulator({
     return () => clearInterval(interval);
   }, [isPlaying, speed, maxIdx]);
 
-  if (mode === "real" && realPoints.length === 0) {
+  if (realPoints.length === 0) {
     return (
-      <div className="card text-sm text-[#547689] py-8 text-center space-y-3">
-        <div>模拟盘历史点数不足，无法运行真实穿梭重放。建议切换到下方演示回测模式体验：</div>
-        <button onClick={() => setMode("demo")} className="bg-[#88ABDA] text-[#12264F] px-4 py-1.5 rounded-lg text-xs font-medium">
-          切换至演示回测飞行 (Demo)
-        </button>
+      <div className="card text-sm text-[#547689] py-8 text-center">
+        模拟盘历史点数不足，无法运行穿梭重放（需先有真实模拟盘 NAV/成交记录落盘）。
       </div>
     );
   }
@@ -326,37 +173,15 @@ export default function TimeTravelSimulator({
 
   return (
     <div className="space-y-4">
-      {mode === "demo" && <SimulationModeBanner />}
-      {/* 头部控制栏 */}
+      {/* 头部 */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#0E172B]/60 p-4 border border-[#3C4654]/25 rounded-card">
         <div>
           <h2 className="text-sm font-normal text-[#EFEFEF] font-quant">
-            回测与模拟盘时空飞行模拟器 (Time-Travel Flight Simulator)
+            模拟盘时空飞行模拟器 (Time-Travel Flight Simulator)
           </h2>
           <div className="text-[11px] text-[#547689] mt-0.5">
-            时空同步重放：折线净值、动态持仓、AI 审计日志、因子暴露雷达图
+            真实模拟盘时空同步重放：折线净值、动态持仓、AI 审计日志、因子暴露雷达图
           </div>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setMode("real")}
-            disabled={realPoints.length === 0}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              mode === "real"
-                ? "bg-[#88ABDA] text-[#12264F]"
-                : "bg-jilan/30 text-[#547689] hover:text-[#EFEFEF] disabled:opacity-30 disabled:cursor-not-allowed"
-            }`}
-          >
-            真实模拟盘数据
-          </button>
-          <button
-            onClick={() => setMode("demo")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              mode === "demo" ? "bg-[#88ABDA] text-[#12264F]" : "bg-jilan/30 text-[#547689] hover:text-[#EFEFEF]"
-            }`}
-          >
-            演示回测飞行 (Demo)
-          </button>
         </div>
       </div>
 
@@ -365,9 +190,7 @@ export default function TimeTravelSimulator({
         <div className="flex items-center justify-between text-xs border-b border-[#3C4654]/20 pb-2">
           <div className="flex items-center gap-2">
             <span className="text-[#547689] font-quant">STRATEGY:</span>
-            <span className="text-[#EFEFEF] font-quant">
-              {mode === "real" ? "Paper_Live_v3.1" : "ALPHA_EDGE_4.0"}
-            </span>
+            <span className="text-[#EFEFEF] font-quant">Paper_Live_v3.1</span>
             <span className={`px-1.5 py-0.5 rounded text-[10px] font-quant border ${
               current.regime === "BULL"
                 ? "bg-[#88ABDA]/10 text-[#88ABDA] border-[#88ABDA]/20"
