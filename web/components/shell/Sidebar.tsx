@@ -187,6 +187,7 @@ export default function Sidebar() {
         <div className="bg-bg/85 p-1 rounded-lg border border-line/45 flex gap-1 text-[11px] font-semibold">
           <button
             onClick={() => handleModeChange("ops")}
+            title="行动桌面:用已登记策略产出信号并执行(信号 → 选股 → 签发 → 风控)"
             className={`flex-1 py-1.5 rounded-md flex items-center justify-center gap-1 transition-all duration-200 ${
               mode === "ops"
                 ? "bg-songshi/10 text-songshi border border-songshi/30 font-semibold shadow-sm"
@@ -197,6 +198,7 @@ export default function Sidebar() {
           </button>
           <button
             onClick={() => handleModeChange("rd")}
+            title="研发实验室:发现并验证新的 alpha(数据 → 候选 → 回测 → 登记)"
             className={`flex-1 py-1.5 rounded-md flex items-center justify-center gap-1 transition-all duration-200 ${
               mode === "rd"
                 ? "bg-brand/10 text-brand border border-brand/35 font-semibold shadow-sm"
@@ -222,7 +224,9 @@ export default function Sidebar() {
                   <Link
                     key={item.href}
                     href={item.ready ? item.href : "#"}
-                    className={`flex items-center gap-2.5 px-3 py-1.5 rounded transition-all duration-200 text-[12px] group ${
+                    title={item.desc}
+                    aria-current={active ? "page" : undefined}
+                    className={`flex items-start gap-2.5 px-3 py-1.5 rounded transition-all duration-200 text-[12px] group ${
                       active
                         ? "bg-brand/10 text-brand font-bold border-l-2 border-brand rounded-l-none"
                         : item.ready
@@ -230,15 +234,25 @@ export default function Sidebar() {
                         : "text-subink/45 cursor-not-allowed"
                     }`}
                   >
-                    <span className={active ? "text-brand" : "text-subink group-hover:text-ink/80"}>
+                    <span className={`mt-[1px] shrink-0 ${active ? "text-brand" : "text-subink group-hover:text-ink/80"}`}>
                       <SidebarIcon name={item.icon} />
                     </span>
-                    <span className="flex-1 truncate">{item.label}</span>
-                    {!item.ready && (
-                      <span className="text-[8px] text-subink/50 border border-line/20 rounded px-1 scale-90 tracking-tighter">
-                        建设
+                    <span className="flex-1 min-w-0">
+                      <span className="flex items-center gap-1.5">
+                        <span className="truncate">{item.label}</span>
+                        {!item.ready && (
+                          <span className="text-[8px] text-subink/50 border border-line/20 rounded px-1 scale-90 tracking-tighter">
+                            建设
+                          </span>
+                        )}
                       </span>
-                    )}
+                      {/* 当前页自解释:仅活跃项展开一行职责说明,避免给其它项增加噪音 */}
+                      {active && (
+                        <span className="block text-[10px] leading-snug font-normal text-brand/70 mt-0.5">
+                          {item.desc}
+                        </span>
+                      )}
+                    </span>
                   </Link>
                 );
               })}
