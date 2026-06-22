@@ -350,23 +350,53 @@ export default function OverviewPage() {
   const families = new Set(strategies.map((s) => s.family));
   const live = strategies.filter((s) => s.status === "在册").length;
   const cand = strategies.filter((s) => s.status === "候选").length;
+  const decaying = health.filter((h) => h.trend !== "加速").length;
+
+  // 研发态势综合判定:纯聚合 dq/台账/因子健康,不引入新判断口径(镜像 ops 门禁横幅)
+  const rdStatus: "ready" | "attention" | "blocked" | "neutral" = !dq
+    ? "neutral"
+    : dq.verdict === "异常"
+    ? "blocked"
+    : dq.verdict === "可用" && dq.severe_count === 0
+    ? "ready"
+    : "attention";
 
   return (
-    <div>
+    <div className="space-y-5">
       <PageHeader title="研发实验室中心" desc="全天候因子流水线健康度与在册策略母表台账 (R&D Laboratory)" />
 
-      <div className="card mb-5 flex items-center gap-2 overflow-x-auto">
-        {FLOW.map((n, i) => (
-          <div key={n} className="flex items-center gap-2 shrink-0">
-            <span className="text-[12px] text-ink px-2 py-1 rounded bg-bg border border-cardline">{n}</span>
-            {i < FLOW.length - 1 && <span className="text-subink">→</span>}
-          </div>
-        ))}
+      {/* 研发态势头条:让 rd 入口和 ops 一样,一眼回答「实验室是否健康、什么要我关注」 */}
+      <StatusBanner
+        status={rdStatus}
+        title={dq ? `研发实验室态势:数据质量【${dq.verdict}】` : "研发实验室态势:加载中…"}
+        detail={
+          // 只放卡片没有的「综合判断 + 待关注项」,不重复下方 KPI 的原始计数
+          [
+            dq?.severe_count ? `数据真问题 ${dq.severe_count} 只待修复` : "数据流水线无真问题",
+            health.length ? `因子减速 ${decaying}/${health.length}` : null,
+            cand ? `候选 ${cand} 个待复核晋级` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        }
+      />
+
+      {/* 研究生命周期参考图(非进度条):标注这是系统的概念地图,不是实时进度 */}
+      <div className="card">
+        <div className="text-[11px] text-subink mb-2">研究生命周期 · 概念参考</div>
+        <div className="flex items-center gap-2 overflow-x-auto">
+          {FLOW.map((n, i) => (
+            <div key={n} className="flex items-center gap-2 shrink-0">
+              <span className="text-[12px] text-ink px-2 py-1 rounded bg-bg border border-cardline">{n}</span>
+              {i < FLOW.length - 1 && <span className="text-subink">→</span>}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {err && <div className="card text-sm text-danger mb-4">API 错误:{err}<br />请确认后端已启动(uvicorn :8011)。</div>}
+      {err && <div className="card text-sm text-danger">API 错误:{err}<br />请确认后端已启动(uvicorn :8011)。</div>}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <MetricCard label="母策略家族" value={String(families.size)} sub="独立 alpha 家族" />
         <MetricCard label="在册版本" value={String(live)} tone="ok" sub="入册门槛达标" />
         <MetricCard label="候选版本" value={String(cand)} tone="warn" sub="待证伪/晋级" />
@@ -378,10 +408,9 @@ export default function OverviewPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-        {/* 市场/持仓状态 */}
-        <div className="card">
-          <div className="text-sm font-medium mb-2">当前状态识别</div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* 市场/持仓状态:统一用 Card 组件,与右侧因子健康度同属一套形状家族 */}
+        <Card title="当前状态识别">
           {market ? (
             <>
               <div className="text-2xl font-semibold text-ink">
@@ -395,7 +424,7 @@ export default function OverviewPage() {
           ) : (
             <div className="text-sm text-subink">—</div>
           )}
-        </div>
+        </Card>
 
         {/* 策略健康度 */}
         <div className="md:col-span-2">
