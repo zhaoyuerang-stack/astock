@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
+import StatusBanner from "@/components/ui/StatusBanner";
 import { api } from "@/lib/api";
 import type { GovernanceView } from "@/lib/types";
 
@@ -59,9 +60,32 @@ export default function GovernancePage() {
     );
   }
 
+  const cards = data.model_cards;
+  const reports = data.validation_reports;
+  const approved = cards.filter((c) => c.approval_status === "APPROVED").length;
+  const pending = cards.filter((c) => c.approval_status === "PENDING").length;
+  const audited = reports.filter((r) => r.audited).length;
+  const dsrPass = reports.filter((r) => r.audited && r.metrics.dsr_p != null && r.metrics.dsr_p < 0.05).length;
+  const govStatus: "ready" | "attention" | "neutral" =
+    cards.length === 0 ? "neutral" : pending > 0 || audited < reports.length ? "attention" : "ready";
+
   return (
     <div className="space-y-6">
       <PageHeader title="模型风险治理" desc="基于美联储 SR 11-7 等机构框架设计的模型生命周期审查与多重假设追踪" />
+
+      {/* 模型治理态势头条:SR 11-7 合规姿态——批准覆盖 + 独立验证 DSR 审计覆盖一眼可见 */}
+      <StatusBanner
+        status={govStatus}
+        title={`模型治理态势:${approved}/${cards.length} 模型卡已批准`}
+        detail={[
+          `独立验证审计 ${audited}/${reports.length} 已做 DSR`,
+          `扛过多重检验 ${dsrPass}`,
+          pending ? `${pending} 张待批` : null,
+          `实验台账 ${data.experiments_ledger.length} 笔`,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+      />
 
       {/* Tabs */}
       <div className="flex gap-1 mb-4 border-b border-cardline">
