@@ -208,9 +208,9 @@ export default function TradePlansPage() {
                           </span>
                         ),
                       },
-                      { key: "code", header: "标的代码", className: "font-mono font-medium text-[#EFEFEF]", render: (o) => o.code },
-                      { key: "name", header: "名称", className: "text-[#EFEFEF] font-bold", render: (o) => o.name },
-                      { key: "price", header: "参考价格", align: "right", className: "font-mono text-[#EFEFEF]", render: (o) => o.price.toFixed(3) },
+                      { key: "code", header: "标的代码", className: "font-mono font-medium text-ink", render: (o) => o.code },
+                      { key: "name", header: "名称", className: "text-ink font-bold", render: (o) => o.name },
+                      { key: "price", header: "参考价格", align: "right", className: "font-mono text-ink", render: (o) => o.price.toFixed(3) },
                       { key: "shares", header: "拟委托数量", align: "right", className: "font-mono text-subink", render: (o) => o.side === "HOLD" ? `— (持仓 ${o.shares})` : o.shares.toLocaleString() },
                       { key: "notional", header: "拟委托名义额", align: "right", className: "font-mono text-subink", render: (o) => o.side === "HOLD" ? "— (维持仓位)" : num(o.notional, 0) },
                       { key: "type", header: "类别", align: "right", className: "text-[11px] text-subink", render: (o) => o.type },
@@ -223,9 +223,9 @@ export default function TradePlansPage() {
             {/* Right Column: Sign-off control and slippage audit */}
             <div className="space-y-6">
               {/* Sign-off Console */}
-              <div className="card bg-[#0E172B]/60 border border-[#88ABDA]/20">
+              <div className="card">
                 <div className="text-sm font-semibold mb-3 flex items-center gap-1.5 text-ink">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#88ABDA] animate-pulse" />
+                  <span className={`inline-block w-2.5 h-2.5 rounded-full ${signed ? "bg-ok" : "bg-taishi"}`} />
                   交易员签名授权控制台
                 </div>
 
@@ -292,11 +292,11 @@ export default function TradePlansPage() {
                   </div>
                   <div className="flex justify-between items-center py-1 border-b border-cardline/30">
                     <span className="text-subink">平均换手占全天量 (ADV)</span>
-                    <span className="font-semibold text-[#EFEFEF]">&lt; 0.05%</span>
+                    <span className="font-semibold text-ink">&lt; 0.05%</span>
                   </div>
                   <div className="flex justify-between items-center py-1 border-b border-cardline/30">
                     <span className="text-subink">执行路线 (Execution Route)</span>
-                    <span className="font-semibold text-[#EFEFEF]">VWAP / 收盘成交 (FILL CLOSE)</span>
+                    <span className="font-semibold text-ink">VWAP / 收盘成交 (FILL CLOSE)</span>
                   </div>
                   <div className="flex justify-between items-center py-1">
                     <span className="text-subink">科创板手数对齐 (Lot Rounding)</span>

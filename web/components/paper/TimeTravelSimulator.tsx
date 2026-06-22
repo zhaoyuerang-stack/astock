@@ -174,12 +174,12 @@ export default function TimeTravelSimulator({
   return (
     <div className="space-y-4">
       {/* 头部 */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#0E172B]/60 p-4 border border-[#3C4654]/25 rounded-card">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 border border-line/30 rounded-lg">
         <div>
-          <h2 className="text-sm font-normal text-[#EFEFEF] font-quant">
+          <h2 className="text-sm font-semibold text-ink font-quant">
             模拟盘时空飞行模拟器 (Time-Travel Flight Simulator)
           </h2>
-          <div className="text-[11px] text-[#547689] mt-0.5">
+          <div className="text-[11px] text-subink mt-0.5">
             真实模拟盘时空同步重放：折线净值、动态持仓、AI 审计日志、因子暴露雷达图
           </div>
         </div>
@@ -187,22 +187,22 @@ export default function TimeTravelSimulator({
 
       {/* 主面板一：多轨同步折线时间轴 */}
       <div className="card space-y-3">
-        <div className="flex items-center justify-between text-xs border-b border-[#3C4654]/20 pb-2">
+        <div className="flex items-center justify-between text-xs border-b border-line/30 pb-2">
           <div className="flex items-center gap-2">
-            <span className="text-[#547689] font-quant">STRATEGY:</span>
-            <span className="text-[#EFEFEF] font-quant">Paper_Live_v3.1</span>
+            <span className="text-subink font-quant">STRATEGY:</span>
+            <span className="text-ink font-quant">Paper_Live_v3.1</span>
             <span className={`px-1.5 py-0.5 rounded text-[10px] font-quant border ${
               current.regime === "BULL"
-                ? "bg-[#88ABDA]/10 text-[#88ABDA] border-[#88ABDA]/20"
+                ? "bg-songshi/10 text-songshi border-songshi/20"
                 : current.regime === "BEAR"
-                ? "bg-[#D12920]/10 text-[#D12920] border-[#D12920]/20"
-                : "bg-[#FAC03D]/10 text-[#FAC03D] border-[#FAC03D]/20"
+                ? "bg-danger/10 text-danger border-danger/20"
+                : "bg-warn/10 text-warn border-warn/20"
             }`}>
               {current.regime} 状态
             </span>
           </div>
-          <div className="font-quant text-[#EFEFEF]">
-            日期: <span className="text-[#88ABDA]">{current.date}</span>
+          <div className="font-quant text-ink">
+            日期: <span className="text-brand font-semibold">{current.date}</span>
           </div>
         </div>
 
@@ -212,12 +212,12 @@ export default function TimeTravelSimulator({
             const isSelected = i === index;
             const wPct = (1 / activeData.length) * 100;
             const bgClass =
-              d.regime === "BULL" ? "bg-[#88ABDA]" : d.regime === "BEAR" ? "bg-[#D12920]" : "bg-[#FAC03D]";
+              d.regime === "BULL" ? "bg-songshi" : d.regime === "BEAR" ? "bg-danger" : "bg-warn";
             return (
               <div
                 key={i}
                 style={{ width: `${wPct}%` }}
-                className={`${bgClass} h-full opacity-${isSelected ? "100 border-2 border-[#EFEFEF]" : "65"} hover:opacity-100 transition-opacity`}
+                className={`${bgClass} h-full ${isSelected ? "opacity-100 border-2 border-brand" : "opacity-50"} hover:opacity-100 transition-opacity`}
                 title={`${d.date} (${d.regime})`}
               />
             );
@@ -248,7 +248,7 @@ export default function TimeTravelSimulator({
             <polyline
               points={polylinePts}
               fill="none"
-              stroke="#88ABDA"
+              stroke="#CC5D20"
               strokeWidth="2"
               strokeLinejoin="round"
               strokeLinecap="round"
@@ -260,7 +260,7 @@ export default function TimeTravelSimulator({
               y1={PAD.t}
               x2={getX(index).toFixed(1)}
               y2={H - PAD.b}
-              stroke="#EFEFEF"
+              stroke="#12264F"
               strokeWidth="1.5"
               strokeDasharray="2 2"
             />
@@ -271,19 +271,19 @@ export default function TimeTravelSimulator({
               cy={getY(current.nav).toFixed(1)}
               r="4.5"
               fill="#EFEFEF"
-              stroke="#88ABDA"
+              stroke="#CC5D20"
               strokeWidth="2"
             />
 
             {/* 底部首尾标签 */}
-            <text x={PAD.l} y={H - 5} fontSize="9" fill="#547689" className="font-quant">{activeData[0].date}</text>
-            <text x={W - PAD.r} y={H - 5} textAnchor="end" fontSize="9" fill="#547689" className="font-quant">{activeData[maxIdx].date}</text>
+            <text x={PAD.l} y={H - 5} fontSize="9" fill="#555147" className="font-quant">{activeData[0].date}</text>
+            <text x={W - PAD.r} y={H - 5} textAnchor="end" fontSize="9" fill="#555147" className="font-quant">{activeData[maxIdx].date}</text>
           </svg>
         </div>
       </div>
 
       {/* 主面板二：播放与进度控制器 */}
-      <div className="card flex flex-col md:flex-row items-center gap-4 py-3 bg-[#0A1120]/30 border border-[#3C4654]/15">
+      <div className="card flex flex-col md:flex-row items-center gap-4 py-3 bg-gray-50/50 border border-line/30">
         {/* 播放控制纽 */}
         <div className="flex items-center gap-2 shrink-0">
           <button
@@ -308,7 +308,7 @@ export default function TimeTravelSimulator({
               setIsPlaying(false);
               setIndex(0);
             }}
-            className="p-2 text-[#547689] hover:text-[#EFEFEF] rounded hover:bg-[#3C4654]/20 transition-colors"
+            className="p-2 text-subink hover:text-ink rounded hover:bg-line/30 transition-colors"
             title="重置"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -323,7 +323,7 @@ export default function TimeTravelSimulator({
                 key={s}
                 onClick={() => setSpeed(s)}
                 className={`text-[10px] px-2 py-0.5 rounded font-quant font-medium ${
-                  speed === s ? "bg-[#88ABDA] text-[#12264F]" : "text-[#547689] hover:text-[#EFEFEF]"
+                  speed === s ? "bg-brand text-white" : "text-subink hover:text-ink hover:bg-line/30"
                 }`}
               >
                 {s}x
@@ -343,9 +343,9 @@ export default function TimeTravelSimulator({
               setIsPlaying(false);
               setIndex(Number(e.target.value));
             }}
-            className="flex-1 h-1 bg-[#3C4654]/40 rounded-lg appearance-none cursor-pointer accent-[#88ABDA] focus:outline-none"
+            className="flex-1 h-1 bg-line/40 rounded-lg appearance-none cursor-pointer accent-brand"
           />
-          <span className="text-xs font-quant text-[#88ABDA] shrink-0 min-w-[70px] text-right">
+          <span className="text-xs font-quant text-brand font-semibold shrink-0 min-w-[70px] text-right">
             {index + 1} / {activeData.length} 日
           </span>
         </div>
@@ -355,9 +355,9 @@ export default function TimeTravelSimulator({
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         {/* 左栏：当天持仓明细 */}
         <div className="lg:col-span-3 card">
-          <div className="flex items-center justify-between border-b border-[#3C4654]/20 pb-2.5 mb-3">
-            <span className="text-xs font-medium text-[#EFEFEF]">当天持仓 (Holdings): {current.date}</span>
-            <span className="text-[11px] text-[#547689] font-quant">
+          <div className="flex items-center justify-between border-b border-line/30 pb-2.5 mb-3">
+            <span className="text-xs font-medium text-ink">当天持仓 (Holdings): {current.date}</span>
+            <span className="text-[11px] text-subink font-quant">
               现金额: {current.cash.toLocaleString("zh-CN", { maximumFractionDigits: 0 })} 元
             </span>
           </div>
@@ -365,7 +365,7 @@ export default function TimeTravelSimulator({
           <div className="max-h-60 overflow-y-auto">
             <table className="w-full text-[12px]">
               <thead>
-                <tr className="text-[#547689] text-left border-b border-[#3C4654]/30 bg-[#24354D] sticky top-0">
+                <tr className="text-subink text-left border-b border-line/30 bg-gray-50/50 sticky top-0">
                   <th className="py-2 px-2 font-medium">代码</th>
                   <th className="py-2 px-2 font-medium">名称</th>
                   <th className="py-2 px-2 font-medium text-right">权重 %</th>
@@ -375,19 +375,19 @@ export default function TimeTravelSimulator({
               </thead>
               <tbody>
                 {current.holdings.map((h) => (
-                  <tr key={h.ticker} className="border-b border-[#3C4654]/15">
-                    <td className="py-2 px-2 font-quant text-[#EFEFEF]">{h.ticker}</td>
-                    <td className="py-2 px-2 text-[#EFEFEF]/80">{h.company}</td>
-                    <td className="py-2 px-2 text-right font-quant text-[#EFEFEF]">{h.weight}%</td>
-                    <td className="py-2 px-2 text-right font-quant text-[#547689]">{h.price}</td>
-                    <td className={`py-2 px-2 text-right font-quant ${h.pnl >= 0 ? "text-[#D12920]" : "text-[#5AA4AE]"}`}>
+                  <tr key={h.ticker} className="border-b border-cardline/60">
+                    <td className="py-2 px-2 font-quant text-ink">{h.ticker}</td>
+                    <td className="py-2 px-2 text-ink/80">{h.company}</td>
+                    <td className="py-2 px-2 text-right font-quant text-ink">{h.weight}%</td>
+                    <td className="py-2 px-2 text-right font-quant text-subink">{h.price}</td>
+                    <td className={`py-2 px-2 text-right font-quant ${h.pnl >= 0 ? "text-danger" : "text-songshi"}`}>
                       {h.pnl >= 0 ? "+" : ""}{h.pnl}%
                     </td>
                   </tr>
                 ))}
                 {current.holdings.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="py-6 text-center text-[#547689]">
+                    <td colSpan={5} className="py-6 text-center text-subink">
                       当前空仓 (全现金闲置避险)
                     </td>
                   </tr>
@@ -402,13 +402,13 @@ export default function TimeTravelSimulator({
           <div className="space-y-4">
             {/* AI 飞行日志 */}
             <div>
-              <div className="text-[10px] text-[#547689] uppercase tracking-wider font-quant mb-2">AI Flight Log</div>
-              <div className="bg-[#0E172B]/60 p-3 rounded-lg border border-[#3C4654]/20 min-h-[72px]">
+              <div className="text-[10px] text-subink uppercase tracking-wider font-quant mb-2">AI Flight Log</div>
+              <div className="bg-bg/40 p-3 rounded-lg border border-line/30 min-h-[72px]">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#88ABDA] animate-ping" />
-                  <span className="text-[9px] text-[#547689] font-quant">{current.date} 09:30:15 EST</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand" />
+                  <span className="text-[9px] text-subink font-quant">{current.date} 09:30:15 EST</span>
                 </div>
-                <p className="text-[12px] text-[#EFEFEF]/90 leading-relaxed">
+                <p className="text-[12px] text-ink leading-relaxed">
                   {current.aiLog}
                 </p>
               </div>
@@ -416,7 +416,7 @@ export default function TimeTravelSimulator({
 
             {/* 五维因子暴露雷达图 (SVG) */}
             <div>
-              <div className="text-[10px] text-[#547689] uppercase tracking-wider font-quant mb-2">五维因子暴露 (Factor Exposure)</div>
+              <div className="text-[10px] text-subink uppercase tracking-wider font-quant mb-2">五维因子暴露 (Factor Exposure)</div>
               <div className="flex items-center justify-around">
                 {/* 简单的自画 SVG 雷达图 */}
                 <svg width="180" height="180" viewBox="0 0 180 180" className="overflow-visible">
@@ -465,7 +465,7 @@ export default function TimeTravelSimulator({
                           dx={axis.dx}
                           textAnchor={axis.anchor as any}
                           fontSize="9"
-                          fill="#547689"
+                          fill="#555147"
                         >
                           {axis.label}
                         </text>
@@ -478,48 +478,48 @@ export default function TimeTravelSimulator({
                     <g>
                       <polygon
                         points={radarPoints}
-                        fill="rgba(136, 171, 218, 0.2)"
-                        stroke="#88ABDA"
+                        fill="rgba(75, 143, 152, 0.15)"
+                        stroke="#4B8F98"
                         strokeWidth="1.5"
                       />
                       {/* 点微标 */}
                       {[0, 1, 2, 3, 4].map((i) => {
                         const pt = getRadarPt(i, Object.values(current.exposures)[i]);
                         const [px, py] = pt.split(",");
-                        return <circle key={i} cx={px} cy={py} r="2.5" fill="#EFEFEF" stroke="#88ABDA" strokeWidth="1" />;
+                        return <circle key={i} cx={px} cy={py} r="2.5" fill="#EFEFEF" stroke="#4B8F98" strokeWidth="1" />;
                       })}
                     </g>
                   )}
                 </svg>
 
                 {/* 暴露数值面板 */}
-                <div className="text-[10px] space-y-1.5 font-quant text-[#547689]">
+                <div className="text-[10px] space-y-1.5 font-quant text-subink">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#88ABDA]" />
-                    <span>动量 (Mom): <span className="text-[#EFEFEF]">{current.exposures.momentum}</span></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-songshi" />
+                    <span>动量 (Mom): <span className="text-ink">{current.exposures.momentum}</span></span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#88ABDA]" />
-                    <span>价值 (Val): <span className="text-[#EFEFEF]">{current.exposures.value}</span></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-songshi" />
+                    <span>价值 (Val): <span className="text-ink">{current.exposures.value}</span></span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#88ABDA]" />
-                    <span>质量 (Qual): <span className="text-[#EFEFEF]">{current.exposures.quality}</span></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-songshi" />
+                    <span>质量 (Qual): <span className="text-ink">{current.exposures.quality}</span></span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#88ABDA]" />
-                    <span>成长 (Gro): <span className="text-[#EFEFEF]">{current.exposures.growth}</span></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-songshi" />
+                    <span>成长 (Gro): <span className="text-ink">{current.exposures.growth}</span></span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#88ABDA]" />
-                    <span>波动 (Vol): <span className="text-[#EFEFEF]">{current.exposures.volatility}</span></span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-songshi" />
+                    <span>波动 (Vol): <span className="text-ink">{current.exposures.volatility}</span></span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="text-[9px] text-[#547689] border-t border-[#3C4654]/10 pt-2 mt-4 leading-normal">
+          <div className="text-[9px] text-subink border-t border-line/20 pt-2 mt-4 leading-normal">
             * 因子暴露根据当前权重在 Barra 行业风格库中映射计算。
           </div>
         </div>

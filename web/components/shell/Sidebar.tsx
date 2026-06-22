@@ -250,7 +250,7 @@ export default function Sidebar() {
       {/* Footer Status */}
       <div className="px-5 py-3 border-t border-line/30 text-[10px] text-subink bg-jilan/25 font-quant">
         <div className="flex items-center gap-1.5">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-songshi animate-pulse" />
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-songshi" />
           <span>系统就绪 (松石)</span>
         </div>
         <div className="mt-1 text-[9px] opacity-75">本地数据运行 · Phase 1</div>

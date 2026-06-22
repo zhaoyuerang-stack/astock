@@ -109,7 +109,7 @@ export default function SignalsPage() {
                     <tbody>
                       {/* Indicator 1 */}
                       <tr className="border-b border-cardline/60 hover:bg-cardline/10 transition-colors">
-                        <td className="py-3 font-semibold text-[#EFEFEF]">小盘趋势偏离度</td>
+                        <td className="py-3 font-semibold text-ink">小盘趋势偏离度</td>
                         <td className="py-3 text-subink text-[12px]">Small Cap Index vs MA16 Distance</td>
                         <td className={`py-3 text-right font-mono font-medium ${paperPlan.small_index_vs_ma16 < 0 ? "text-danger" : "text-ok"}`}>
                           {(paperPlan.small_index_vs_ma16 * 100).toFixed(2)}%
@@ -126,7 +126,7 @@ export default function SignalsPage() {
 
                       {/* Indicator 2 */}
                       <tr className="border-b border-cardline/60 hover:bg-cardline/10 transition-colors">
-                        <td className="py-3 font-semibold text-[#EFEFEF]">大周期状态极性</td>
+                        <td className="py-3 font-semibold text-ink">大周期状态极性</td>
                         <td className="py-3 text-subink text-[12px]">Shifted Regime Polar Distance</td>
                         <td className={`py-3 text-right font-mono font-medium ${paperPlan.regime_dist < 0 ? "text-danger" : "text-ok"}`}>
                           {(paperPlan.regime_dist * 100).toFixed(2)}%
@@ -143,7 +143,7 @@ export default function SignalsPage() {
 
                       {/* Indicator 3 */}
                       <tr className="border-b border-cardline/60 hover:bg-cardline/10 transition-colors">
-                        <td className="py-3 font-semibold text-[#EFEFEF]">动态杠杆系数</td>
+                        <td className="py-3 font-semibold text-ink">动态杠杆系数</td>
                         <td className="py-3 text-subink text-[12px]">PureTrend Band Exposure (Live)</td>
                         <td className="py-3 text-right font-mono font-medium text-ink">
                           {paperPlan.band_exposure.toFixed(2)}x

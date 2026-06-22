@@ -110,11 +110,11 @@ export default function CandidatesPage() {
                     <div className="absolute right-0 top-0 w-8 h-8 bg-gradient-to-bl from-[#88ABDA]/5 to-transparent rounded-bl-xl opacity-0 group-hover:opacity-100 transition-opacity" />
                     <div className="text-[10px] text-subink font-quant mb-1 flex justify-between items-center">
                       <span className="font-mono tracking-wider">{stock.code}</span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-cardline/40 text-[#88ABDA]">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-line/30 text-subink">
                         #{idx + 1}
                       </span>
                     </div>
-                    <div className="text-[13px] font-bold text-[#EFEFEF] truncate group-hover:text-[#88ABDA] transition-colors mt-0.5">
+                    <div className="text-[13px] font-bold text-ink truncate group-hover:text-brand transition-colors mt-0.5">
                       {stock.name}
                     </div>
                   </div>

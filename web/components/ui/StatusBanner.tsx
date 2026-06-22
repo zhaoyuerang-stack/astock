@@ -13,13 +13,13 @@ export default function StatusBanner({
   const ready = status === "ready";
   return (
     <div
-      className={`rounded-[12px] border px-5 py-4 flex items-start gap-3 ${
+      className={`rounded-lg border px-5 py-4 flex items-start gap-3 ${
         ready ? "border-ok/30 bg-ok/5" : "border-danger/30 bg-danger/5"
       }`}
     >
       <span
         className={`mt-1 inline-block w-2.5 h-2.5 rounded-full shrink-0 ${
-          ready ? "bg-ok animate-pulse" : "bg-danger"
+          ready ? "bg-ok" : "bg-danger"
         }`}
       />
       <div className="min-w-0">
