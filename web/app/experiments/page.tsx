@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import MetricCard from "@/components/ui/MetricCard";
+import StatusBanner from "@/components/ui/StatusBanner";
 import ResearchNav from "@/components/research/ResearchNav";
 import WorkItemBadge from "@/components/research/WorkItemBadge";
 import { api } from "@/lib/api";
@@ -85,12 +86,39 @@ export default function ExperimentsPage() {
     }
   }
 
+  const counts = data?.counts;
+  const review = counts?.review ?? 0;
+  const blocked = counts?.blocked ?? 0;
+  const ready = counts?.ready ?? 0;
+  const running = counts?.running ?? 0;
+  const queueStatus: "ready" | "attention" | "neutral" =
+    review > 0 || blocked > 0 ? "attention" : ready > 0 || running > 0 ? "ready" : "neutral";
+  const queueTitle =
+    review > 0
+      ? `研究队列:${review} 项待人工复核(最高优先)`
+      : blocked > 0
+      ? `研究队列:${blocked} 项阻塞待排查失败原因`
+      : ready > 0
+      ? `研究队列:${ready} 项可执行`
+      : running > 0
+      ? `研究队列:${running} 项运行中`
+      : "研究队列:空闲,无待办";
+
   return (
     <div className="space-y-5">
       <PageHeader title="研究实验室" desc="登记前工作台：研究素材 → 草案/候选 → L0–L3 → 人工复核 → 正式晋级" />
       <ResearchNav />
 
       {error && <div className="card text-sm text-danger">{error}</div>}
+
+      {/* 研究队列态势头条:不复述计数,给优先级裁决 + 工作流纪律(§0.A 顺序 / 晋级须留批准记录) */}
+      {data && (
+        <StatusBanner
+          status={queueStatus}
+          title={queueTitle}
+          detail="处理顺序:待复核 → 阻塞 → 可执行 → 运行中 · 正式晋级须留人工批准记录"
+        />
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <MetricCard label="待人工复核" value={String(data?.counts.review ?? 0)} tone="warn" sub="需要明确批准或拒绝" />
