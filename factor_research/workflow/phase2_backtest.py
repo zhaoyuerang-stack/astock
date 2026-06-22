@@ -29,17 +29,16 @@ import pandas as pd
 
 from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
 from strategies.small_cap import load_price_panels as load_data
+from governance.holdout import boundary, assert_search_clean
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / "reports" / "discovery"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Non-overlapping segments
-SEGMENTS = [
-    ("IS  2018-2022", "2018-01-01", "2022-12-31"),
-    ("OOS 2023-2026", "2023-01-01", "2026-12-31"),
-    ("压力 2010-2017", "2010-01-01", "2017-12-31"),
-]
+# Non-overlapping segments。OOS 终点由 holdout.boundary 动态裁定(见 run() 的 _segments)——
+# date >= boundary 是金库,Phase 2 是搜索/验证栈不得触碰,金库仅 validate_on_holdout 唯一一次。
+IS_SEG = ("IS  2018-2022", "2018-01-01", "2022-12-31")
+STRESS_SEG = ("压力 2010-2017", "2010-01-01", "2017-12-31")
 
 DEFAULT_TOP_N = 25
 DEFAULT_REBALANCE = 20
@@ -132,13 +131,27 @@ class Phase2Runner:
         """Run all Phase 2 checks. Returns dict with segments + checks."""
         print(f"Phase 2: {self.family}", flush=True)
 
-        # Load data once with warmup
+        # Load data once with warmup, then 截到 < holdout boundary(§5.2 缝③):整个验证栈
+        # (三段/成本/相关性/decay)都从这批被裁过的面板派生 → 金库 date>=boundary 永不进入
+        # 因子计算、回测或选择判定。仅 validate_on_holdout 唯一一次校验金库。
         close, volume, amount = load_data(warmup_start)
+        b = boundary()
+        pre = close.index[-1]
+        close = close.loc[close.index < b]
+        volume = volume.loc[volume.index < b]
+        amount = amount.loc[amount.index < b]
         trade_dates = close.index
+        assert_search_clean(trade_dates, label="Phase 2 验证栈")  # 自查门:末日必须 < boundary
         print(f"  Data: {close.shape[1]} stocks × {close.shape[0]} days "
-              f"[{trade_dates[0].date()}~{trade_dates[-1].date()}]", flush=True)
+              f"[{trade_dates[0].date()}~{trade_dates[-1].date()}] "
+              f"(已截金库 boundary={b.date()};原末日 {pre.date()})", flush=True)
 
-        # Build factor + timing on full range
+        # OOS 终点 = 金库前一日(boundary 动态),金库段不属于 OOS,留给 validate_on_holdout。
+        oos_end = min(pd.Timestamp("2026-12-31"), b - pd.Timedelta(days=1))
+        oos_seg = (f"OOS 2023-{oos_end.year}", "2023-01-01", str(oos_end.date()))
+        segment_defs = [IS_SEG, oos_seg, STRESS_SEG]
+
+        # Build factor + timing on (已截) full range
         factor = self.factor_builder(close, volume, amount, trade_dates)
         timing = self.timing_builder(close, amount)
         weights = build_rebalance_weights(factor, close, self.top_n, self.rebalance)
@@ -147,7 +160,7 @@ class Phase2Runner:
 
         # ── Three segments ──
         segments = {}
-        for label, start, end in SEGMENTS:
+        for label, start, end in segment_defs:
             mask = (trade_dates >= pd.Timestamp(start)) & (trade_dates <= pd.Timestamp(end))
             if mask.sum() < 50:
                 print(f"  {label}: ⚠️ too few days ({mask.sum()})", flush=True)
@@ -306,9 +319,9 @@ class Phase2Runner:
         }
 
     def _check_decay(self, segments):
-        """Check OOS/IS annual return decay."""
-        is_seg = segments.get("IS  2018-2022", {})
-        oos_seg = segments.get("OOS 2023-2026", {})
+        """Check OOS/IS annual return decay。按前缀取段(OOS 标签的终点年随 boundary 变)。"""
+        is_seg = next((v for k, v in segments.items() if k.startswith("IS")), {})
+        oos_seg = next((v for k, v in segments.items() if k.startswith("OOS")), {})
 
         if not is_seg or not oos_seg:
             return {"verdict": "SKIP", "detail": "Missing IS or OOS segment."}
@@ -362,7 +375,9 @@ class BacktestReport:
             f"  {'─' * 50}",
             f"  Segments:",
         ]
-        for label in ["IS  2018-2022", "OOS 2023-2026", "压力 2010-2017"]:
+        # 按前缀稳定排序展示(OOS 标签的终点年随 holdout boundary 变)。
+        _order = {"IS": 0, "OOS": 1, "压力": 2}
+        for label in sorted(segs, key=lambda k: next((_order[p] for p in _order if k.startswith(p)), 9)):
             s = segs.get(label, {})
             if s:
                 icon = "✅" if s.get("annual", -1) > 0 else "❌"

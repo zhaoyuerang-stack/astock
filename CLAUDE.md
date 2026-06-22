@@ -322,7 +322,7 @@ Web 不是本文件主要作用域。涉及 Web 必须先读 [`web/CLAUDE.md`](w
 | R-WF-001 候选入册通道       | P0 | `check_no_force_promote.py`| 禁自动晋级脚本 `force=True` 跳过 phase1/2 防未来门 |
 | R-REG-001 / R-EVIDENCE-001 证据自证 | P0 | `check_registry_evidence.py`| 禁跨家族 IC 证据照抄；standalone 在册 DSR 缺算/不显著(≥0.05)亦判失败(G3) |
 | R-OBJECTIVE-001 DSR 强制门 | P0 | `strategy_registry.register()` + `check_registry_evidence.py`(G3) | standalone 准入须 dsr_p<0.05(多重测试惩罚显著)，hit 达标≠通过 |
-| G8 防自欺 / holdout      | P0 | `check_holdout_compliance.py`| 自动环 load 全样本据此择优必须截到 <boundary，禁偷看金库 |
+| G8 防自欺 / holdout      | P0 | `check_holdout_compliance.py`| 自动环+promote 验证栈(phase2/3)load 全样本必须截到 <boundary；并锁 holdout.start 配置值 hash(ADR-021)，禁偷看金库 |
 | 防自欺 / 控制路径可观测         | P0 | `check_control_exceptions.py`| 准入/裁决/信号/执行路径禁 `except: pass` 静默吞异常 |
 | 测试发现完整                | P1 | `check_test_discovery.py` | 全量收集 `test_*.py`，杜绝漏跑的手工清单           |
 | R-DATA-001 禁用旧口径      | P0 | `check_no_legacy_data.py`  | AST 禁代码 import data_full / 从 data_full 目录读盘(放过注释/口径标签/迁移目录) |

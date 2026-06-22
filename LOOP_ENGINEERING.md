@@ -94,6 +94,11 @@
 一段 loop **从未、永不**用于搜索的数据(最近 N 月滚动前推),仅晋级前**唯一一次**校验。这是唯一能戳穿「过拟合到适应度函数」的东西。**loop 自己不得触碰**。
 > ✅ 已实现:`governance/holdout.py`(`boundary` 读 settings.yaml::holdout.start=2025-01-01;`assert_search_clean` 自查门;`validate_on_holdout` 唯一校验+偷看计数)。已接验真机 + island search 搜索窗截断 + **9-Gate 评估同样截 <boundary**(补「评估半边」洞:选择层不得用金库)+ 晋级前 `validate_on_holdout` 写 review 证据 + `phase4_register` `holdout_id` 登记闸(无通过记录则拒登记,向后兼容旧/手动路径)。
 
+> ✅ **补漏(ADR-021,2026-06-22)**:此前 `workflow/phase2_backtest.py`(OOS 段硬编码 2023-2026 + 成本/相关性/decay 全用 2018-2026)与 `workflow/phase3_wf.py`(WF 测试窗到 2026)**整条 promote 验证栈都吃金库**——金库期(2025+)绩效经机械门(`annual>0`/`OOS/IS decay>0.3`/WF 正窗比)与人眼报告参与晋级判定,破坏「唯一一次」语义。已在两文件 `run()` 的 **load 后单点截到 `<boundary`**(因子/三段/成本/相关性/WF 窗全部派生自被裁面板,金库永不进入),OOS 终点改由 boundary 动态裁定;两文件已纳 `check_holdout_compliance.py` REQUIRED + 自查门 `assert_search_clean`。回归测试 `tests/test_holdout_truncation.py`。
+> ✅ **边界配置锁(ADR-021)**:`holdout.start` 是软配置,改它即改金库范围。`check_holdout_compliance.py::check_boundary_lock` 把当前值 hash 钉死,任何改动 exit 1,强制走 DECISIONS(ADR)+ 同步更新 pin。
+> ⚠️ **信度声明(物理限制,不可代码修复)**:金库需时间积累。当前金库 2025-01-01→今≈**1.5 年(~370 交易日)**,做年化/最大回撤/holdout DSR 的统计推断**信赖区间极宽**——真 20% 年化策略 1.5 年内出 −10%~+50% 都在 1σ 内,且这段未必含熊市。`_MIN_HOLDOUT_OBS=20` 是算 DSR 的下限,非充分。**系统对外宣称「holdout 验证通过」时必须附带此信度限制**;金库成熟前,holdout 是「未证伪」而非「已证实」。
+> 📋 **boundary 迁移协议(草案,待定稿)**:到 2027 金库是否后移面临两难——后移则旧金库段(2025-26)变可搜索、既往 `validate_on_holdout` 记录失唯一性(且人眼已看过其结果);不移则旧金库变死数据、新真 OOS(2027+)无保护。**暂定原则**:① boundary **只进不退**(永不前移,避免复活已偷看段);② 新增「滚动金库」用**追加新段**(如 2027+ 设第二金库)而非移动旧段,旧段转为「已消费 OOS」永久留痕;③ 任何 boundary 变更必经 ADR + 更新配置锁 pin + 作废受影响的 holdout 记录(标 `superseded` 不删)。**定稿前 boundary 冻结在 2025-01-01。**
+
 ### 5.3 容量/边际贡献感知的适应度
 若适应度只看单腿夏普,loop 会进化出 50 个同质变体(本 session:illiq+size 相关 0.82,同一「小/不流动」赌注)。适应度必须 = **对当前组合的边际真 alpha × 容量**,否则找的是冗余不是分散。
 > ✅ 已实现:`governance/marginal.py::marginal_alpha`(候选对在册组合残差化;高相关+残差夏普弱=判冗余)。✅ **已接**(缝④):`scheduled_factor_search` 逐候选算边际真 alpha 入 review 证据(判冗余);promote `_run_marginal` 边际定级已 holdout 截断。

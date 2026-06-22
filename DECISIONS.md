@@ -173,6 +173,20 @@
 
 ---
 
+### ADR-021 promote 验证栈全部截到 <holdout boundary + 边界配置锁 + 因子归一化误诊证否
+- **上下文**: 对 holdout/未来函数做红队审计,8 项发现。**核验后**两个「致命」一真一假:
+  - 🔴**真**(工作流泄露):`phase2_backtest.py` OOS 段硬编码 `2023~2026-12-31`、成本/相关性/decay 全用 `2018~2026`;`phase3_wf.py` WF 测试窗到 2026 —— 而 holdout.start=2025-01-01。**整条 promote 验证栈都吃金库**(2025+),且金库绩效经机械门(`annual>0`/`OOS/IS decay>0.3`/WF 正窗比≥2/3)+ 人眼报告参与晋级判定,破坏 §5.2「唯一一次校验」语义。`check_holdout_compliance.py` 原只锁 3 条自动选择路径、不覆盖 phase2/3,也不锁 boundary 配置值。
+  - 🔴**假**(误诊):「因子时间轴归一化泄露」不成立 —— `transforms.py::zscore/rank_transform/mad_clip` 与 `utils.py::safe_zscore` 全是 `axis=1` 横截面(逐日跨股票),`rolling_*` 是 trailing 非 expanding,无全样本/未来统计量。`l3_walk_forward` 先在 full close 上算因子再切片**不泄露**(横截面逐日独立,trailing 还需 boundary 前 warmup,先算后切反而正确)。
+- **决策**:
+  1. **截断验证栈(P0)**: `phase2_backtest.run()` / `phase3_wf.run()` 在 load 后**单点把面板截到 `<boundary()`**——因子/三段/成本/相关性/WF 窗全部派生自被裁面板,金库 date≥boundary 永不进入计算或选择;OOS 终点改由 boundary 动态裁定;两文件加自查门 `assert_search_clean` 并纳入 `check_holdout_compliance.py` REQUIRED。金库仅留给唯一 `validate_on_holdout`。
+  2. **边界配置锁(P0)**: `check_holdout_compliance.py::check_boundary_lock` 把 `holdout.start` 当前值 hash(`2025-01-01`)钉死,任何改动 exit 1,强制 ADR + 同步更新 pin。
+  3. **回归防护**: `tests/test_factor_normalization_axis.py`(断言 transforms 横截面 + 源码无 `expanding()`)把误诊永久钉为非问题;`tests/test_holdout_truncation.py`(合成面板跨 boundary 跑真实 phase2/3,断言无段/窗触金库)。
+  4. **文档(P1)**: LOOP §5.2 补 ① 1.5 年金库**信度有限**声明(对外宣称 holdout 通过须附此限制,金库成熟前是「未证伪」非「已证实」)+ ② **boundary 迁移协议草案**(只进不退、追加新段而非移旧段、变更必经 ADR + 作废受影响记录)。
+- **理由**: §5.2「loop 自己不得触碰金库」必须覆盖**整条选择链**(搜索 + 全部验证 + 晋级判定),而非仅 island search。验证栈吃金库 = 把金库变成第二个样本内,holdout 失去戳穿过拟合的能力。单点截断(load 后裁面板)比逐处加 mask 更难漏。误诊证否同样重要:避免误改安全的横截面管线。
+- **验证**: `check_holdout_compliance.py` 5 路径 + 边界锁 GREEN,模拟改边界 exit 1;phase3 实跑确认数据截至 2024-12-31(原末日 2026-06-19);两组回归测试(横截面 5 例 + 截断 2 例)全绿。本机当前 holdout 仅 1.5 年,**既往在册策略的 phase2/3 数字含金库,需用截断后引擎重算**(另立 TASKS 项)。提交见下。
+
+---
+
 ## ③ 投资/交易决策记录
 
 > 实盘/模拟盘的逐日决策**已自动落盘**:`factor_research/signals/<date>.json`(信号)+ Obsidian `30.output/A股v2.0模拟盘/`(操作卡)。本节只记**需人工复盘的关键决策**(regime 切换、风控动作、异常),不重复日常信号。

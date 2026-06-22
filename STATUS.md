@@ -4,6 +4,14 @@
 
 ## 一句话
 
+**2026-06-22(promote 验证栈截到 holdout boundary + 边界配置锁 + 因子归一化误诊证否,ADR-021)**:堵住「整条 promote 验证栈吃金库」的工作流泄露。
+  · **泄露根因**:`phase2_backtest`(OOS 硬编码 2023-2026、成本/相关性/decay 用 2018-2026)+ `phase3_wf`(WF 测试窗到 2026)都跨过 holdout.start=2025-01-01,金库期绩效经机械门(`annual>0`/`OOS/IS decay>0.3`/WF 正窗比)+ 人眼报告参与晋级,破坏「唯一一次校验」。
+  · **修复(P0)**:两文件 `run()` 在 load 后**单点截到 `<boundary()`**,因子/三段/成本/相关性/WF 窗全部派生自被裁面板;OOS 终点由 boundary 动态裁定;加 `assert_search_clean` 自查门 + 纳入 `check_holdout_compliance.py` REQUIRED。
+  · **边界锁(P0)**:`check_boundary_lock` 把 `holdout.start` 值 hash 钉死,改动即 exit 1,强制 ADR + 更新 pin。
+  · **误诊证否**:审计称「因子时间轴归一化泄露」**不成立**——`transforms`/`safe_zscore` 全 `axis=1` 横截面、rolling 是 trailing 非 expanding;`l3_walk_forward` 先算后切**正确不泄露**。加 `test_factor_normalization_axis.py` 永久钉死。
+  · **信度声明 + 迁移协议(P1)**:LOOP §5.2 补「金库仅 1.5 年信度有限,holdout 通过=未证伪非已证实」+ boundary 只进不退/追加新段的迁移协议草案。
+  · **遗留**:既往在册 phase2/3 数字含金库偏乐观,需截断后引擎重算(已立 TASKS)。验证:守卫 5 路径+边界锁 GREEN、模拟改边界 exit 1、横截面 5 例 + 截断 2 例回归全绿。详见 ADR-021。
+
 **2026-06-22(standalone 准入强制 DSR + 在册 standalone 轨清零 + 补建 R-DATA-001 守卫)**：堵住审查体系三层后门——9-Gate 只报不挡、`register()` standalone 只验 hit 不验 DSR、CI 守卫不抓 DSR 不达标(ADR-020)。
   · **register() DSR 门(P0)**：`status==在册` 的 standalone 轨(含 hit=True 自动补轨路径)强制 `nine_gate.dsr_p<0.05`，否则 `ValueError`；diversifier 轨不受约束(凭组合边际入册)。
   · **存量降级**：`demote_dsr_insignificant_standalone()` 把 7 个 DSR 不显著的在册 standalone(illiquidity v1.0/v1.1/v1.3/v3.1、size-earnings v1.0、small-cap-size v2.0、industry-neglect-rotation v1.3 的 dsr_p=None)降为「参考」，保留 metrics/nine_gate + 写 `dsr_demotion` 审计块。**后果:在册有效池 standalone 清零，仅剩 5 个 diversifier(hq-momentum-hedged×2、large-cap-growth-hedged×3)**。

@@ -31,6 +31,7 @@ import pandas as pd
 
 from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
 from strategies.small_cap import load_price_panels as load_data
+from governance.holdout import boundary, assert_search_clean
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / "reports" / "discovery"
@@ -104,11 +105,20 @@ class WF3Runner:
         """Run Walk-Forward and return results dict."""
         print(f"Phase 3 WF: {self.family}", flush=True)
 
-        # Load all data
+        # Load all data, then 截到 < holdout boundary(§5.2 缝③):walk-forward 的训练/测试窗口
+        # 与每窗因子计算都从被裁面板派生 → 金库年(date>=boundary)不进入任何窗口或选择判定。
+        # 仅 validate_on_holdout 唯一一次校验金库。
         close, volume, amount = load_data(warmup_start)
+        b = boundary()
+        pre = close.index[-1]
+        close = close.loc[close.index < b]
+        volume = volume.loc[volume.index < b]
+        amount = amount.loc[amount.index < b]
         trade_dates = close.index
+        assert_search_clean(trade_dates, label="Phase 3 walk-forward")  # 自查门
         print(f"  Data: {close.shape[1]} stocks, "
-              f"{trade_dates[0].date()}~{trade_dates[-1].date()}", flush=True)
+              f"{trade_dates[0].date()}~{trade_dates[-1].date()} "
+              f"(已截金库 boundary={b.date()};原末日 {pre.date()})", flush=True)
 
         # Build windows
         all_years = sorted(set(d.year for d in trade_dates))
