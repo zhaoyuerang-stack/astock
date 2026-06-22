@@ -199,6 +199,18 @@
 
 ---
 
+### ADR-023 holdout boundary 迁移从草案转为机械强制(只进不退 + 旧金库作废)
+- **上下文**: holdout 审计 #6「boundary 迁移无机制」。ADR-021 已 hash 锁 `holdout.start` 防误改,但「金库后移=复活已偷看段」「迁移后旧记录如何处置」只在 LOOP §5.2 写了**草案原则**,无机械强制。到 2027 金库后移面临两难:后移则旧金库(2025-26)变可搜索、既往 `validate_on_holdout` 记录失唯一性;不移则旧金库变死数据、新真 OOS 无保护。
+- **决策**(草案→代码强制):
+  1. **append-only 边界历史账本** `app_config/holdout_boundary_history.jsonl`(**git 跟踪**——`data_lake/` 被 gitignore,放那 CI 守卫跨机器拿不到;genesis=2025-01-01)。active 金库 = 账本最大值;superseded(已作废)= 所有 < max 的历史边界(派生,不删)。
+  2. **唯一推进入口** `governance.holdout.migrate_holdout_boundary(new, reason)`:强制 new 严格 > 历史最大值,否则抛 `HoldoutBoundaryRegression`(只进不退,后移会复活已偷看金库);append 记账。
+  3. **守卫** `check_holdout_compliance.py::check_boundary_monotonic`:账本严格递增 + `settings.holdout.start == active`(手改前进未经 migrate 记录 / 后退均 exit 1),叠加 ADR-021 hash 锁。
+  4. **多重检验按 active 金库计**:`holdout_trials(boundary_filter=)` 与 `validate_on_holdout` 的 n_trials 只数当前 boundary 的 peek——旧(superseded)金库 peek 不再污染新金库的 DSR 惩罚,且同一候选可对新金库合法重校验(不被旧记录误判 `HoldoutIdentityMismatch`)。
+- **理由**: 「只进不退」是金库唯一性的核心安全属性,必须机械强制而非靠自觉。旧金库 peek 计入新金库惩罚会过度保守(新金库是新数据),但完全不计又可能被「移边界重置 p-hack」滥用——因边界推进需真实时间流逝(2025-26 才变可搜索)+ ADR + 双锁(hash + 单调),不可自由 game,故按 active 金库计是诚实平衡。`superseded` 留痕不删守 R-7.4。
+- **验证**: 6 例迁移单测(只进不退拒后移/相等、记账+作废、按 boundary 计 trials、迁移后重校验不被拦、守卫单调+settings 一致)全绿;守卫现 5 路径 + hash 锁 + 单调锁 GREEN;`bash scripts/test_all.sh` 全套「All tests passed!」。提交见下。
+
+---
+
 ## ③ 投资/交易决策记录
 
 > 实盘/模拟盘的逐日决策**已自动落盘**:`factor_research/signals/<date>.json`(信号)+ Obsidian `30.output/A股v2.0模拟盘/`(操作卡)。本节只记**需人工复盘的关键决策**(regime 切换、风控动作、异常),不重复日常信号。

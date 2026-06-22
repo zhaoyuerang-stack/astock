@@ -56,6 +56,88 @@ def is_holdout(date) -> bool:
     return pd.Timestamp(date) >= boundary()
 
 
+# ── boundary 迁移机制(ADR-023):只进不退 + 旧金库作废 ──
+# 边界历史账本(append-only,**git 跟踪**于 app_config/ —— data_lake/ 被 gitignore,放那 CI 守卫
+# 跨机器拿不到)。每条 = 一次边界设定 {boundary, recorded_at, reason, kind}。强制不变量:
+#   ① 严格递增(只进不退):移早 = 复活已被偷看的金库段 → 禁;
+#   ② settings.holdout.start 必须 == 历史最大值(active);手改前进必须先经 migrate 记录。
+# active 金库 = max(history);superseded(已作废)金库 = 所有 < max 的历史边界。
+_BOUNDARY_HISTORY = Path(__file__).resolve().parents[1] / "app_config" / "holdout_boundary_history.jsonl"
+
+
+class HoldoutBoundaryRegression(RuntimeError):
+    """企图把 holdout 边界后移(复活已偷看金库段),违反只进不退。"""
+
+
+def boundary_history(path: Path | None = None) -> list[dict]:
+    """读边界历史账本(按记录顺序)。文件缺失 → 空列表(由守卫据 settings 兜底)。"""
+    p = path or _BOUNDARY_HISTORY
+    if not p.exists():
+        return []
+    out: list[dict] = []
+    for line in p.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            try:
+                out.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    return out
+
+
+def latest_boundary(path: Path | None = None) -> pd.Timestamp:
+    """历史账本里的 active 金库起点 = 最大边界。账本空 → 退回 settings.boundary()。"""
+    hist = boundary_history(path)
+    if not hist:
+        return boundary()
+    return max(pd.Timestamp(h["boundary"]) for h in hist)
+
+
+def superseded_boundaries(path: Path | None = None) -> set[str]:
+    """已作废金库边界 = 所有 < active(max) 的历史边界(字符串 date)。
+
+    针对这些边界做过的 holdout 校验不再计入 active 金库的多重检验负担(新金库是新数据)。
+    """
+    hist = boundary_history(path)
+    if not hist:
+        return set()
+    active = max(pd.Timestamp(h["boundary"]) for h in hist)
+    return {str(pd.Timestamp(h["boundary"]).date()) for h in hist
+            if pd.Timestamp(h["boundary"]) < active}
+
+
+def migrate_holdout_boundary(new_boundary, *, reason: str, recorded_at: str | None = None,
+                             apply: bool = True, path: Path | None = None) -> dict:
+    """**唯一**合法的边界推进入口(ADR-023):只进不退,记账,旧金库自动作废。
+
+    强制 new_boundary 严格大于历史最大值(后移/相等 → HoldoutBoundaryRegression)。
+    apply=True 追加历史记录(append-only,不删旧)。返回 {new, previous, superseded:[...]}。
+    迁移后须**人工**同步:① settings.yaml::holdout.start;② check_holdout_compliance.py 的
+    EXPECTED_BOUNDARY[_HASH] pin —— 两者由 hash 锁(ADR-021)+ 单调守卫共同强制。
+    """
+    p = path or _BOUNDARY_HISTORY
+    new_ts = pd.Timestamp(new_boundary)
+    hist = boundary_history(p)
+    prev = max((pd.Timestamp(h["boundary"]) for h in hist), default=None)
+    if prev is not None and new_ts <= prev:
+        raise HoldoutBoundaryRegression(
+            f"金库边界只进不退:新 {new_ts.date()} 必须 > 当前 {prev.date()}。"
+            f"后移会复活已被偷看的金库段(2025+ 已进 phase2/3 报告/校验记录)。")
+    superseded = [str(pd.Timestamp(h["boundary"]).date()) for h in hist] if prev is not None else []
+    rec = {
+        "boundary": str(new_ts.date()),
+        "recorded_at": recorded_at or datetime.now(timezone.utc).date().isoformat(),
+        "reason": reason,
+        "kind": "migration",
+        "supersedes": superseded,
+    }
+    if apply:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with open(p, "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    return {"new": rec["boundary"], "previous": str(prev.date()) if prev is not None else None,
+            "superseded": superseded}
+
+
 def current_data_fingerprint(root: Path | None = None) -> str:
     manifest = (root or _ROOT) / "data_lake" / "_manifest.json"
     try:
@@ -93,15 +175,19 @@ def assert_search_clean(dates, *, label: str = "") -> None:
 _MIN_HOLDOUT_OBS = 20  # holdout 段至少这么多观测才算得动 DSR(短段 DSR 不可靠,留 None)
 
 
-def holdout_trials(path: Path | None = None) -> int:
+def holdout_trials(path: Path | None = None, *, boundary_filter=None) -> int:
     """已在金库上验证过的**不同候选**数 = 金库的跨候选多重检验负担(§5.2 缝②)。
 
     每多一个候选在同一段金库上验证,金库就更接近"第二个样本内";holdout_dsr 用此累计数
     惩罚,防止规模化 p-hack 金库(跑够多候选总有几个靠运气过 sharpe 门)。
+
+    boundary_filter(ADR-023):只数针对该 boundary 的校验。新金库迁移后,旧(superseded)金库的
+    peek 不再计入新金库的多重检验负担——新金库是新数据不背旧债。缺省数全部(向后兼容)。
     """
     p = path or _VALIDATIONS
     if not p.exists():
         return 0
+    bf = str(pd.Timestamp(boundary_filter).date()) if boundary_filter is not None else None
     ids = set()
     for line in p.read_text().splitlines():
         if not line.strip():
@@ -111,13 +197,11 @@ def holdout_trials(path: Path | None = None) -> int:
         except json.JSONDecodeError:
             continue
         cid = rec.get("candidate_id")
+        rec_b = rec.get("holdout_boundary") or rec.get("boundary", "")
+        if bf is not None and rec_b != bf:
+            continue
         if cid:
-            ids.add((
-                cid,
-                rec.get("spec_hash", ""),
-                rec.get("data_fingerprint", ""),
-                rec.get("holdout_boundary") or rec.get("boundary", ""),
-            ))
+            ids.add((cid, rec.get("spec_hash", ""), rec.get("data_fingerprint", ""), rec_b))
     return len(ids)
 
 
@@ -170,6 +254,9 @@ def validate_on_holdout(
         str(data_fingerprint),
         str(b.date()),
     )
+    # ADR-023:多重检验与身份检查都**只看 active 金库(本次 b)**的记录。旧(superseded)金库的
+    # peek 既不计入新金库的 n_trials,也不阻挡同一候选对新金库的合法重校验(新金库=新数据)。
+    cur_b = str(b.date())
     seen_identities: set[tuple[str, str, str, str]] = set()
     same_candidate: list[dict] = []
     if p.exists():
@@ -180,15 +267,17 @@ def validate_on_holdout(
                 d = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            rec_b = str(d.get("holdout_boundary") or d.get("boundary", ""))
+            if rec_b != cur_b:
+                continue  # 跨金库(旧/作废)记录不参与 active 金库的检验与计数
             cid = d.get("candidate_id")
             if cid:
-                rec_identity = (
+                seen_identities.add((
                     cid,
                     str(d.get("spec_hash", "")),
                     str(d.get("data_fingerprint", "")),
-                    str(d.get("holdout_boundary") or d.get("boundary", "")),
-                )
-                seen_identities.add(rec_identity)
+                    rec_b,
+                ))
             if cid == candidate_id:
                 same_candidate.append(d)
 

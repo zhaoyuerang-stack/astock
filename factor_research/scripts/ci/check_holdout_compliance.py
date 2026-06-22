@@ -55,9 +55,61 @@ def check_boundary_lock() -> list[tuple[str, str]]:
     return []
 
 
+def check_boundary_monotonic() -> list[tuple[str, str]]:
+    """ADR-023:强制 boundary 只进不退,且 settings.holdout.start == 历史账本最大值。
+
+    边界历史账本(app_config/holdout_boundary_history.jsonl,git 跟踪)是 active 金库的权威:
+      ① 账本必须存在且非空(genesis 基线);
+      ② 严格递增(任一条 <= 前一条 = 后退/重复 = 复活已偷看金库 → 违规);
+      ③ settings.holdout.start 必须 == 账本最大值——手改前进(未经 migrate 记录)或后退都判违规。
+    推进金库的唯一合法路径 = governance.holdout.migrate_holdout_boundary()。
+    """
+    import json
+    from datetime import date as _date
+    hist_path = ROOT / "app_config" / "holdout_boundary_history.jsonl"
+    if not hist_path.exists():
+        return [("app_config/holdout_boundary_history.jsonl",
+                 "边界历史账本缺失:需 genesis 基线(ADR-023 强制)。")]
+    hist = []
+    for line in hist_path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            try:
+                hist.append(json.loads(line))
+            except json.JSONDecodeError:
+                pass
+    if not hist:
+        return [("app_config/holdout_boundary_history.jsonl",
+                 "边界历史账本为空:需 genesis 基线(ADR-023 强制)。")]
+    try:
+        bs = [_date.fromisoformat(str(h["boundary"])) for h in hist]
+    except Exception as exc:  # noqa: BLE001
+        return [("app_config/holdout_boundary_history.jsonl", f"账本解析失败: {exc}")]
+    out = []
+    for prev, cur in zip(bs, bs[1:]):
+        if cur <= prev:
+            out.append(("app_config/holdout_boundary_history.jsonl",
+                        f"边界非严格递增:{cur} <= {prev} —— 后退/重复 = 复活已偷看金库(只进不退)。"))
+    try:
+        import yaml
+        cfg = yaml.safe_load(SETTINGS_YAML.read_text(encoding="utf-8")) or {}
+        settings_b = _date.fromisoformat(str((cfg.get("holdout") or {}).get("start", "")))
+    except Exception as exc:  # noqa: BLE001
+        return out + [("app_config/settings.yaml", f"无法读取/解析 holdout.start: {exc}")]
+    active = max(bs)
+    if settings_b != active:
+        out.append((
+            "app_config/settings.yaml::holdout.start",
+            f"settings.holdout.start={settings_b} ≠ 历史账本 active={active}。"
+            f"推进金库须经 migrate_holdout_boundary()(记账+作废旧金库)后再同步 settings+pin;"
+            f"后退则被只进不退禁止。",
+        ))
+    return out
+
+
 def main() -> int:
     violations = []
     violations.extend(check_boundary_lock())  # P0-B:金库边界配置锁
+    violations.extend(check_boundary_monotonic())  # ADR-023:边界只进不退 + 账本一致
     for rel, why in REQUIRED.items():
         p = ROOT / rel
         if not p.exists():

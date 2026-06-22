@@ -4,6 +4,13 @@
 
 ## 一句话
 
+**2026-06-22(holdout boundary 迁移机制:草案转机械强制,ADR-023)**:补 holdout 审计 #6「boundary 迁移无机制」最后一项可行动缺口。
+  · **只进不退强制**:唯一推进入口 `governance.holdout.migrate_holdout_boundary()`,后移/相等抛 `HoldoutBoundaryRegression`(复活已偷看金库)。
+  · **append-only 历史账本** `app_config/holdout_boundary_history.jsonl`(git 跟踪,genesis=2025-01-01),active=最大值,旧边界自动 superseded 留痕不删。
+  · **守卫** `check_boundary_monotonic`:账本严格递增 + `settings.holdout.start==active`(手改前进未记录/后退 exit 1),叠加 ADR-021 hash 锁。
+  · **多重检验按 active 金库计**:`holdout_trials/validate_on_holdout` 的 n_trials 只数当前 boundary peek,旧金库不污染新金库惩罚,同一候选可对新金库合法重校验。验证:6 例迁移单测 + 守卫 GREEN + 全套绿。详见 ADR-023。
+  · **审计 8 项现状**:1/2/4/5/7 已修，**#6 本轮做成强制机制**；#3(物理 1.5 年)、#8(滚动窗口统计不独立)属固有/物理，已披露，建议保持。
+
 **2026-06-22(autoresearch 种子溯源 + LLM 起源语义审视,ADR-022)**:堵 holdout 审计 #7「种子可能含金库知识」的可行动部分。
   · **根因**:LLM 种子先验可能含 2025+ 行情认知(语义泄露,不可机械证否),而 provenance 生成时本就有(`generate_llm_candidates` 返回 model)却被 `_llm_seeds` 丢弃,`seeded_by` 只到响应层不下沉、不进台账。
   · **修复(接住并传播)**:`Candidate` 加 `provenance` 字段(确定性种子/LLM 种子如实标注 theme/model)→ islands 变异/交叉子代 `_merge_provenance` 继承祖先来源(不断链)→ 仓库 `_deserialize` 补读 → 冠军 view 透出 → 晋级 `promote_spec→phase4 _build_evidence` 写进 registry evidence;**任一祖先是 LLM 种子 → 打 `semantic_seed_review` 标记**供人工额外审视。
