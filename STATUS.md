@@ -1,8 +1,15 @@
 # STATUS — 当前进度
 
-> 更新:2026-06-21。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
+> 更新:2026-06-22。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
+
+**2026-06-22(standalone 准入强制 DSR + 在册 standalone 轨清零 + 补建 R-DATA-001 守卫)**：堵住审查体系三层后门——9-Gate 只报不挡、`register()` standalone 只验 hit 不验 DSR、CI 守卫不抓 DSR 不达标(ADR-020)。
+  · **register() DSR 门(P0)**：`status==在册` 的 standalone 轨(含 hit=True 自动补轨路径)强制 `nine_gate.dsr_p<0.05`，否则 `ValueError`；diversifier 轨不受约束(凭组合边际入册)。
+  · **存量降级**：`demote_dsr_insignificant_standalone()` 把 7 个 DSR 不显著的在册 standalone(illiquidity v1.0/v1.1/v1.3/v3.1、size-earnings v1.0、small-cap-size v2.0、industry-neglect-rotation v1.3 的 dsr_p=None)降为「参考」，保留 metrics/nine_gate + 写 `dsr_demotion` 审计块。**后果:在册有效池 standalone 清零，仅剩 5 个 diversifier(hq-momentum-hedged×2、large-cap-growth-hedged×3)**。
+  · **防御纵深**：`phase4_register` 不再把 hit 候选自动跳「在册 standalone」(DSR 此时未知，由独立 9-Gate 回填)，改先入「候选」，待 DSR<0.05 由人工/workflow 升级；`check_registry_evidence.py` 加 G3(在册 standalone 但 dsr_p 缺算/≥0.05 即 FAIL)。
+  · **R-DATA-001 守卫补建**：`scripts/ci/check_no_legacy_data.py`(AST)禁代码 import data_full / 从 data_full 目录读盘，放过注释/口径标签/迁移目录；§16 守卫表去「缺,待建」。E 回溯补审诚实结论:30 个 nine_gate 空版本全无兼容 runner，0 个可审，但唯一要 DSR 的 status 已清零 ⇒ 无治理缺口(扩展 runner 覆盖已立 TASKS backlog)。
+  · **验证**：register DSR 门 7 路径 + 迁移幂等 + 两守卫正负回归全部新增单测;迁移前台账证据守卫 exit=1(7 条全抓)、迁移后 exit=0;`bash scripts/test_all.sh` 全套 `🎉 All tests passed!`(含两个新/改守卫 GREEN)。详见 DECISIONS ADR-020。
 
 **2026-06-21(Web 研究域按生命周期重构)**：研究实验室从“多个无关 Tab + 双漏斗 + 已登记排行榜”改为可执行工作队列，因子研究收紧为正式台账资产目录。
   · **实验室职责**：新增 `/experiments/evidence`、`/runs`、`/reviews` 与工作项详情；统一聚合 draft/Hypothesis/AutoResearch，按待复核→阻塞→可执行→运行中排序，支持草案补全、单项 L0-L3、统一复核和晋级。

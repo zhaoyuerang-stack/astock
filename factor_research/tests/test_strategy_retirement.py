@@ -19,6 +19,7 @@ def _seed(tmp_path, monkeypatch, status="在册"):
     sr.register(
         "toyfam", "v1.0", "desc", {}, {}, {"annual": 0.3, "maxdd": -0.1},
         status=status, admission={"track": "standalone"},
+        nine_gate={"dsr_p": 0.01},  # ADR-020:在册 standalone 须 DSR 显著;本测试验退役流程与之正交
     )
     return reg, log
 

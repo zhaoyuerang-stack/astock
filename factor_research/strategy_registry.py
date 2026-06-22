@@ -25,9 +25,14 @@ from engine.metrics import compute_hit
 REGISTRY = Path(__file__).parent / "strategy_versions.json"
 
 # 双轨准入：唯一允许长期占用「在册」的两条轨。
-#   standalone  —— 单体达标（hit=True：年化>15% 且 回撤<20%）
+#   standalone  —— 单体达标（hit=True：年化>15% 且 回撤<20%）+ DSR 多重测试惩罚下显著（dsr_p<DSR_ALPHA）
 #   diversifier —— 单体不达标但作为组合分流器（负相关 / 对组合夏普有正增量），须 rationale 佐证
+# DSR 仅卡 standalone：diversifier 凭组合边际而非单体统计显著性入册，不受此门约束。
 ADMISSION_TRACKS = ("standalone", "diversifier")
+
+# standalone 准入的 DSR（Deflated Sharpe Ratio）多重测试惩罚显著性阈值。
+# 来源 R-OBJECTIVE-001 / 9-Gate G8：单体达标(hit)不等于经得起搜索惩罚，dsr_p>=此值即多重测试下不显著。
+DSR_ALPHA = 0.05
 
 # 设计上即为「对冲分流器」的母策略：单体低收益 + 与主力负相关，靠组合层增量入册（diversifier 轨）。
 # 仅这两族的对冲假设里显式写了「等额做空…对冲 Beta」并实测负相关，故迁移时自动归类为 diversifier。
@@ -134,6 +139,22 @@ def register(family, version, desc, config, data_scope, metrics, status="候选"
             raise ValueError(
                 f"{family}/{version} 未知 admission.track={track!r}（应为 {ADMISSION_TRACKS}）。")
 
+        # standalone 轨：hit 之外，必须通过 DSR 多重测试惩罚（R-OBJECTIVE-001 / G8）。
+        # 覆盖「显式声明 standalone」与上面「hit=True 自动补 standalone」两条路径。
+        if adm.get("track") == "standalone":
+            dsr_p = (nine_gate or {}).get("dsr_p")
+            if dsr_p is None:
+                raise ValueError(
+                    f"{family}/{version} standalone 准入必须有 nine_gate.dsr_p——"
+                    f"请先跑 9-Gate 审计（workflow/promote.py 或 run_nine_gates_all.py）。"
+                    f"若靠组合边际入册，请改 admission={{'track':'diversifier','rationale':...}}；"
+                    f"否则降 status='候选'。")
+            if dsr_p >= DSR_ALPHA:
+                raise ValueError(
+                    f"{family}/{version} standalone 准入要求 DSR p<{DSR_ALPHA}，"
+                    f"当前 dsr_p={dsr_p:.4f}——多重测试惩罚下不显著（hit 达标≠搜索后显著）。"
+                    f"可改 diversifier 轨（需 rationale）或降 status='候选'/'参考'。")
+
     existing = next((v for v in fam["versions"] if v["version"] == version), None)
     reg_date = date_str or (existing.get("date") if existing else None) or str(date.today())
     fam["versions"] = [v for v in fam["versions"] if v["version"] != version]   # 同号覆盖
@@ -211,6 +232,46 @@ def migrate_two_track_admission(apply: bool = True):
     return transitions
 
 
+def demote_dsr_insignificant_standalone(threshold: float = DSR_ALPHA, apply: bool = True):
+    """一次性治理迁移（ADR-020 / R-OBJECTIVE-001）：把 DSR 多重测试惩罚下不显著的
+    「在册 standalone」降为「参考」，保留历史绩效/配置/nine_gate，仅移出有效 alpha 池。
+
+    判定：status=='在册' 且 admission.track=='standalone' 且 (dsr_p is None 或 dsr_p>=threshold)。
+      · status → '参考'，admission → {}（不再占用准入轨）
+      · metrics / evidence / nine_gate 原样保留（R-7.4 退役纪律：不得删历史）
+      · 写入 dsr_demotion 审计块，记降级前轨道 / dsr_p / 阈值 / 依据
+
+    幂等：降级后 status 变「参考」，再次运行不再命中。经 _save 走台账唯一写入口。
+    返回逐版本 transition 列表（供 CLI 打印 / 审计）。
+    """
+    data = _load()
+    transitions = []
+    for fam in data["families"]:
+        fid = fam["id"]
+        for v in fam["versions"]:
+            adm = v.get("admission") or {}
+            if v.get("status") != "在册" or adm.get("track") != "standalone":
+                continue
+            dsr_p = (v.get("nine_gate") or {}).get("dsr_p")
+            if dsr_p is not None and dsr_p < threshold:
+                continue  # DSR 达标，留任在册 standalone
+            v["status"] = "参考"
+            v["admission"] = {}
+            v["dsr_demotion"] = {
+                "from_status": "在册", "from_track": "standalone",
+                "dsr_p": dsr_p, "threshold": threshold,
+                "rule": "R-OBJECTIVE-001 / 9-Gate G8（DSR 多重测试惩罚下不显著）",
+                "date": str(date.today()),
+            }
+            transitions.append({
+                "id": f"{fid}/{v['version']}", "dsr_p": dsr_p,
+                "new_status": "参考", "reason": "DSR 不显著（None 或 >=阈值）",
+            })
+    if apply:
+        _save(data)
+    return transitions
+
+
 def attach_nine_gate(family, version, summary, evidence=None):
     """把一次 Nine-Gate 审计摘要（NineGatesReport.summarize()）写入指定版本的 nine_gate 字段。
 
@@ -254,6 +315,61 @@ def attach_data_incident(family, version, incident):
     evidence["data_incidents"] = incidents
     evidence["production_blocked"] = any(not row.get("resolved") for row in incidents)
     item["evidence"] = evidence
+    _save(data)
+    return f"{family}/{version}"
+
+
+def attach_decay_check(family, version, result, *, checked_at=None):
+    """把一次 governance/decay.py::decay_check() 的结果写入指定版本的 decay_check 字段。
+
+    版本级(不是家族级):decay_check 按 run_active() 的每条腿算,与既有家族级静态
+    decay_signal(注册时写的失效条件文字)是两件事,不互相覆盖。只读监控信号,
+    不改 status/admission——是否退役仍走 retire_version() 人工/workflow 决策。
+    经 _save 走台账唯一写入口。
+    """
+    from datetime import datetime, timezone
+    data = _load()
+    fam = next((f for f in data["families"] if f["id"] == family), None)
+    if fam is None:
+        raise ValueError(f"母策略 '{family}' 未登记")
+    v = next((x for x in fam["versions"] if x["version"] == version), None)
+    if v is None:
+        raise ValueError(f"版本 '{family}/{version}' 不存在")
+    v["decay_check"] = {
+        **dict(result or {}),
+        "checked_at": checked_at or datetime.now(timezone.utc).isoformat(),
+    }
+    _save(data)
+    return f"{family}/{version}"
+
+
+def attach_catalog_status(family, version, status, *, marginal=None, changed_at=None):
+    """把一次边际贡献定级(governance/marginal.py::marginal_alpha 的残差法判决)写入
+    指定版本的 catalog_status 字段。
+
+    portfolio/strategy_runners.py::RESEARCH_STRATEGY_CATALOG 模块加载时读这个字段
+    覆盖写死的 status,取代过去"算完只打印,人工去改代码里的字符串"的流程
+    (workflow/promote.py::_run_marginal 调用本函数)。
+
+    status 只表示"是否并入组合权重计算"(ACTIVE/SHADOW),不是准入闸——不改
+    version 的 status/admission(那是 strategy_registry.register() 的事)。
+    经 _save 走台账唯一写入口。
+    """
+    from datetime import datetime, timezone
+    if status not in {"ACTIVE", "SHADOW"}:
+        raise ValueError(f"catalog_status 只能是 ACTIVE/SHADOW,收到 {status!r}")
+    data = _load()
+    fam = next((f for f in data["families"] if f["id"] == family), None)
+    if fam is None:
+        raise ValueError(f"母策略 '{family}' 未登记")
+    v = next((x for x in fam["versions"] if x["version"] == version), None)
+    if v is None:
+        raise ValueError(f"版本 '{family}/{version}' 不存在")
+    v["catalog_status"] = {
+        "status": status,
+        "marginal": dict(marginal or {}),
+        "changed_at": changed_at or datetime.now(timezone.utc).isoformat(),
+    }
     _save(data)
     return f"{family}/{version}"
 

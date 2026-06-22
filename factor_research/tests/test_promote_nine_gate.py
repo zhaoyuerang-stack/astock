@@ -123,6 +123,8 @@ def test_nine_gate_failure_is_attached_to_registry():
 
     try:
         registry.register_family("small-cap-size", "小盘成交额因子")
+        # 本测试验 run_nine_gate_after_registration 把失败态写回台账,与 status 无关;
+        # 登记为「候选」即可(ADR-020:在册 standalone 须 DSR,此处不涉准入轨)。
         registry.register(
             "small-cap-size",
             "v-fail",
@@ -130,7 +132,7 @@ def test_nine_gate_failure_is_attached_to_registry():
             config={},
             data_scope={},
             metrics={"annual": 0.30, "maxdd": -0.10},
-            status="在册",
+            status="候选",
         )
         report = RegistrationReport(
             family="small-cap-size",

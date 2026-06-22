@@ -159,6 +159,20 @@
 
 ---
 
+### ADR-020 standalone 准入强制 DSR 显著性 + 在册 standalone 轨清零 + R-DATA-001 守卫补建
+- **上下文**: 审查体系三层防线各留后门——① 9-Gate 只产报告不阻入册;② `register()` 的 standalone 轨只验 `hit`(年化>15%&回撤<20%)不验 DSR;③ CI 守卫只抓证据照抄/跳门标通过,不抓 DSR 不达标。结果:7 个在册 standalone 全部 DSR 不显著(`illiquidity` v1.0/v1.1/v1.3/v3.1、`size-earnings` v1.0、`small-cap-size` v2.0 的 dsr_p∈[0.086,0.396];`industry-neglect-rotation` v1.3 的 dsr_p=None 根本没算),却凭 hit 长期占用「在册有效池」,违反 `R-OBJECTIVE-001`(收益门槛≠搜索后显著)。另 `R-DATA-001` 自 ADR-019 起一直标「缺,待建」无机械守卫。
+- **决策**:
+  1. **`register()` 加 DSR 门(P0)**: `status=='在册'` 且 standalone 轨(含 hit=True 自动补轨路径)必须 `nine_gate.dsr_p` 存在且 `<DSR_ALPHA(0.05)`,否则 `raise ValueError`。diversifier 轨不受约束(凭组合边际而非单体显著性入册)。
+  2. **存量降级(P0)**: 新增 `demote_dsr_insignificant_standalone()` 迁移,把上述 7 个 DSR 不显著的在册 standalone 降为「参考」,保留 metrics/evidence/nine_gate(`R-7.4` 不删历史),写 `dsr_demotion` 审计块。**后果:在册有效池 standalone 轨清零,仅剩 5 个 diversifier(全对冲族:`hq-momentum-hedged`×2、`large-cap-growth-hedged`×3)**。
+  3. **CI 守卫加 G3(P0)**: `check_registry_evidence.py` 增 active+standalone 但 dsr_p 缺算/≥0.05 即判失败,防降级后回流。
+  3b. **防御纵深·堵工厂自动晋级洞**: `workflow/phase4_register.py` 原把 hit 候选直接自动入「在册 standalone」,而工厂通道 nine_gate 摘要不含 dsr_p(DSR 由独立 9-Gate 回填)——这正是 7 个 standalone 入册的源头。改为 hit 候选仅当摘要里 `dsr_p<0.05` 才自动入在册,否则一律先入「候选」,待 `run_nine_gate_after_registration` 回填 DSR 后由人工/workflow 升级。register() 的 DSR 门是硬墙,phase4 主动避让是纵深。
+  4. **补建 `R-DATA-001` 守卫(P0)**: 新增 `scripts/ci/check_no_legacy_data.py`(AST),禁代码 `import data_full` / 从 `data_full` 目录读盘,放过注释/口径标签/迁移目录;挂入 `test_all.sh`,§16 守卫表去「缺,待建」。
+  5. **E 回溯补审(诚实结论)**: 30 个 nine_gate 空版本经分类**0 个可审**(全是候选/参考/退役且无兼容 runner 或无该版本 config 规格),而唯一要求 DSR 的 status(在册 standalone)已清零、剩余 5 个在册 diversifier 全已有 DSR ⇒ **无治理缺口,无可造假**。扩展 runner 覆盖另立 TASKS backlog。
+- **理由**: 宪法第 18 条「宁可不入册,也不要绕过防未来/相信假 alpha」。hit 达标只是观察条件,经不起多重测试惩罚的 standalone 不配占用有效池。DSR 仅卡 standalone 而放过 diversifier,因后者准入逻辑本就是组合边际(`rationale`)而非单体统计显著性。降级而非删除,守 `R-7.4` 退役纪律。
+- **验证**: register DSR 门 7 路径单测全对(无 dsr/≥0.05 BLOCK、<0.05 PASS、hit 自动补轨无 dsr 亦 BLOCK、diversifier 不受约束);迁移 dry-run/apply 精确命中 7 条,降级后在册 standalone=0;`check_registry_evidence.py` 对迁移前台账 exit=1(7 条全抓)、对迁移后 exit=0;`check_no_legacy_data.py` 现有 5 处合法引用全放过、8 例正负回归全对。提交见下。
+
+---
+
 ## ③ 投资/交易决策记录
 
 > 实盘/模拟盘的逐日决策**已自动落盘**:`factor_research/signals/<date>.json`(信号)+ Obsidian `30.output/A股v2.0模拟盘/`(操作卡)。本节只记**需人工复盘的关键决策**(regime 切换、风控动作、异常),不重复日常信号。

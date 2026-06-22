@@ -22,6 +22,7 @@ IC_KEYS = ["ic_mean", "nw_icir", "neut_nw_icir", "icir_retention",
            "monotonicity_corr", "ic_win_rate", "ic_decay"]
 ACTIVE_STATUS = {"在册", "active", "APPROVED"}
 REQUIRED_GATES = ["dsr_p", "pbo"]  # passed_all=true 时必须实算(非 None)
+DSR_ALPHA = 0.05  # standalone 准入要求 DSR 多重测试惩罚下显著(dsr_p<此值)；与 strategy_registry.DSR_ALPHA 对齐
 
 # 已知病灶基线(2026-06 回扫发现,grandfather 待 workflow 处置;**修复后须从此处移除**)。
 # 守卫只对「新」违规 exit 1;下列项仅打印为待处置警告,不阻塞。处置清单见
@@ -94,7 +95,12 @@ def find_cross_family_ic_copies(rows: list[dict]) -> list[tuple[str, str]]:
 
 
 def find_standalone_evidence_gaps(rows: list[dict]) -> list[tuple[str, str]]:
-    """G2:active standalone 的证据缺失 / 跳门却标通过。返回 [(key, msg)]。"""
+    """active standalone 的证据缺失 / 跳门却标通过 / DSR 不显著。返回 [(key, msg)]。
+
+    G2 证据完整性：nine_gate 与 evidence 皆空 = 绕过准入；passed_all=true 却跳必算门 = 造假。
+    G3 DSR 显著性：dsr_p 缺失(None)或 >=DSR_ALPHA = 多重测试惩罚下不显著的 standalone 在册
+       (源 R-OBJECTIVE-001；与 strategy_registry.register() 的 DSR 门同口径，防降级后回流)。
+    """
     out = []
     for r in rows:
         if r["status"] not in ACTIVE_STATUS or r["track"] != "standalone":
@@ -110,6 +116,15 @@ def find_standalone_evidence_gaps(rows: list[dict]) -> list[tuple[str, str]]:
             if skipped:
                 out.append((f"G2-skip:{tag}:{','.join(skipped)}",
                             f"[G2 跳门标通过] {tag} passed_all=true 但 {','.join(skipped)} 未实算(None)"))
+        dsr_p = ng.get("dsr_p")
+        if dsr_p is None:
+            out.append((f"G3-dsr-none:{tag}",
+                        f"[G3 DSR未实算] {tag} active+standalone 但 nine_gate.dsr_p 缺失(None) — "
+                        f"standalone 须有 DSR 多重测试惩罚证据，降 diversifier 或 status='候选'"))
+        elif dsr_p >= DSR_ALPHA:
+            out.append((f"G3-dsr-fail:{tag}",
+                        f"[G3 DSR不显著] {tag} active+standalone 但 dsr_p={dsr_p:.4f}>={DSR_ALPHA} — "
+                        f"多重测试惩罚下不显著，须降级"))
     return out
 
 

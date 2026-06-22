@@ -371,12 +371,21 @@ class Phase4Register:
             from strategy_registry import register_family, register
             from engine.metrics import compute_hit
 
-            # 自动入册只走 standalone 轨：单体达标(hit=True)才入「在册」，否则入「候选」。
+            # 自动入册只走 standalone 轨：单体达标(hit=True)才考虑「在册」，否则入「候选」。
             # diversifier 轨需人工判断组合契合度，不在工厂自动通道里授予。
+            # ADR-020：standalone 入「在册」除 hit 外还须 DSR 多重测试惩罚下显著(dsr_p<0.05)。
+            # 但工厂通道的 nine_gate 摘要不含 dsr_p(DSR 由独立 9-Gate 回填，见 _extract_nine_gate_summary)，
+            # 故 hit 候选先入「候选」；待 run_nine_gate_after_registration 回填 DSR 后，由人工/workflow
+            # 据 dsr_p<0.05 升「在册」。这既堵住「DSR 未知就自动入册 standalone」的洞，也避免触 register() 的 DSR 门。
             auto_hit = compute_hit(metrics.get("annual"), metrics.get("maxdd"))
             shadow_target = str(target_status or "").upper() == "SHADOW"
-            reg_status = "候选" if shadow_target else ("在册" if (not blocked and auto_hit) else "候选")
-            reg_admission = ({"track": "standalone", "rationale": "Workflow Phase1-3 验证 + 单体达标"}
+            ng_summary = _extract_nine_gate_summary(phase2_data, phase3_data)
+            _dsr_p = ng_summary.get("dsr_p")
+            dsr_ok = isinstance(_dsr_p, (int, float)) and not isinstance(_dsr_p, bool) and _dsr_p < 0.05
+            reg_status = "候选" if shadow_target else (
+                "在册" if (not blocked and auto_hit and dsr_ok) else "候选")
+            reg_admission = ({"track": "standalone",
+                              "rationale": "Workflow Phase1-3 验证 + 单体达标 + DSR 显著"}
                              if reg_status == "在册" else {})
 
             register_family(
@@ -415,7 +424,7 @@ class Phase4Register:
                     "hypothesis_id": hypothesis_id,
                     "experiment_ids": list(evidence_experiment_ids or []),
                 },
-                nine_gate=_extract_nine_gate_summary(phase2_data, phase3_data),
+                nine_gate=ng_summary,
             )
             print(f"  Registered: {self.family}/{self.version}", flush=True)
             return RegistrationReport(

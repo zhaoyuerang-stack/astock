@@ -60,6 +60,38 @@ def test_passed_all_with_skipped_gate_flagged():
     assert len(v) == 1 and "pbo" in v[0][1]
 
 
+def test_dsr_insignificant_standalone_flagged():
+    # active+standalone 但 dsr_p>=0.05 → G3 违规(ADR-020:DSR 多重测试惩罚下不显著)
+    led = _ledger([
+        {"id": "famG", "status": "在册", "versions": [
+            {"version": "v1.0", "admission": {"track": "standalone"},
+             "nine_gate": dict(IC_B, dsr_p=0.34)}]},
+    ])
+    v = find_standalone_evidence_gaps(extract_versions(led))
+    assert len(v) == 1 and "DSR不显著" in v[0][1] and v[0][0].startswith("G3-dsr-fail")
+
+
+def test_dsr_none_standalone_flagged():
+    # active+standalone,nine_gate 非空(非 G2-empty)但 dsr_p 缺算 → G3 违规(industry-neglect v1.3 型)
+    led = _ledger([
+        {"id": "famH", "status": "在册", "versions": [
+            {"version": "v1.3", "admission": {"track": "standalone"},
+             "nine_gate": dict(IC_B)}]},  # 无 dsr_p
+    ])
+    v = find_standalone_evidence_gaps(extract_versions(led))
+    assert len(v) == 1 and "DSR未实算" in v[0][1] and v[0][0].startswith("G3-dsr-none")
+
+
+def test_dsr_insignificant_diversifier_not_flagged():
+    # diversifier 凭组合边际入册,不受 DSR 约束 → 即便 dsr_p=0.9 也不报
+    led = _ledger([
+        {"id": "famI", "status": "在册", "versions": [
+            {"version": "v1.0", "admission": {"track": "diversifier", "rationale": "负相关"},
+             "nine_gate": dict(IC_B, dsr_p=0.9)}]},
+    ])
+    assert find_standalone_evidence_gaps(extract_versions(led)) == []
+
+
 def test_clean_ledger_passes():
     led = _ledger([
         {"id": "famE", "status": "在册", "versions": [

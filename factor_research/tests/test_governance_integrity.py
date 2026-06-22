@@ -89,10 +89,28 @@ def test_register_recomputes_hit_blocks_handfill():
 def test_register_admission_gate():
     R = _fresh_registry()
     R.register_family("famy", "测试族")
-    # 1) 单体达标 → 自动 standalone 在册
-    R.register("famy", "v-pass", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册")
+    # 1) 单体达标 + DSR 显著(dsr_p<0.05) → 自动 standalone 在册（ADR-020:hit 已不够）
+    R.register("famy", "v-pass", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册",
+               nine_gate={"dsr_p": 0.01})
     v = next(x for x in R._load()["families"][0]["versions"] if x["version"] == "v-pass")
     assert v["admission"]["track"] == "standalone" and v["metrics"]["hit"] is True
+
+    # 1b) 单体达标但无 dsr_p → standalone 自动补轨仍被 DSR 门拦（堵自动补轨后门）
+    raised = False
+    try:
+        R.register("famy", "v-nodsr", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册")
+    except ValueError:
+        raised = True
+    assert raised, "hit 达标但无 DSR 仍裸入 standalone（DSR 门失效）"
+
+    # 1c) 单体达标但 DSR 不显著(>=0.05) → 抛错
+    raised = False
+    try:
+        R.register("famy", "v-dsrfail", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册",
+                   admission={"track": "standalone"}, nine_gate={"dsr_p": 0.34})
+    except ValueError:
+        raised = True
+    assert raised, "DSR>=0.05 仍能入 standalone（多重测试惩罚门失效）"
 
     # 2) 单体不达标 + 无 admission + 在册 → 抛错
     raised = False
@@ -240,7 +258,8 @@ def test_nine_gate_summarize_and_attach():
 
     R = _fresh_registry()
     R.register_family("famz", "测试族")
-    R.register("famz", "v1", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册")
+    R.register("famz", "v1", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册",
+               nine_gate={"dsr_p": 0.01})  # ADR-020:standalone 在册须 DSR 显著
     R.attach_nine_gate("famz", "v1", s, evidence={"hypothesis_id": "H1", "experiment_ids": ["E1", "E2"]})
     v = R._load()["families"][0]["versions"][0]
     assert v["nine_gate"]["dsr_p"] == 0.01
@@ -258,7 +277,7 @@ def test_model_card_sync_persists_real_cards():
     R.REGISTRY = tmp_reg
     R.register_family("fcard", "卡测试族", hypothesis="假设H", regime="R", decay_signal="D")
     R.register("fcard", "v1", "d", {}, {"source": "data_lake", "period": "2023-2026"},
-               {"annual": 0.30, "maxdd": -0.10}, status="在册")
+               {"annual": 0.30, "maxdd": -0.10}, status="在册", nine_gate={"dsr_p": 0.01})
     R.register("fcard", "v2", "d", {}, {}, {"annual": 0.05, "maxdd": -0.10}, status="候选")
     # 临时模型清单（依赖注入，避免污染真实清单）
     tmp_inv = Path(tempfile.mkdtemp()) / "inv.json"
@@ -282,18 +301,22 @@ def test_strategy_gate_status_consumes_dsr():
         tmp = Path(tempfile.mkdtemp()) / "tv.json"
         R.REGISTRY = tmp
         R.register_family("gfam", "闸门族")
-        # 在册 standalone,带 DSR 失败的 nine_gate
-        R.register("gfam", "v1", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册")
+        # 本测试验的是 get_strategy_gate_status 读取器(track 无关:registered 只看 status=在册,
+        # dsr 来自 nine_gate)。用 diversifier 轨入册以绕开 standalone DSR 门(ADR-020),
+        # 不影响读取器三态(DSR失败/未审计/DSR通过)的验证。
+        DIV = {"track": "diversifier", "rationale": "组合层增量"}
+        # 在册,带 DSR 失败的 nine_gate
+        R.register("gfam", "v1", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册", admission=DIV)
         # Task 9: 审批只认 passed_all。完整门未过 → 闸门识别为未通过(不再靠 DSR-only/gate4 推断)
         R.attach_nine_gate("gfam", "v1", {"passed_all": False, "dsr_p": 0.40, "dsr_significant": False})
         g = get_strategy_gate_status("gfam", "v1")
         assert g["registered"] and g["dsr_audited"] and g["dsr_passed"] is False, "完整门失败未被闸门识别"
         # 未审计版本:dsr_audited=False、dsr_passed=None(不应误判失败)
-        R.register("gfam", "v2", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册")
+        R.register("gfam", "v2", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册", admission=DIV)
         g2 = get_strategy_gate_status("gfam", "v2")
         assert g2["registered"] and g2["dsr_audited"] is False and g2["dsr_passed"] is None
         # DSR 通过
-        R.register("gfam", "v3", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册")
+        R.register("gfam", "v3", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册", admission=DIV)
         R.attach_nine_gate("gfam", "v3", {"passed_all": True, "dsr_p": 0.01, "dsr_significant": True})
         assert get_strategy_gate_status("gfam", "v3")["dsr_passed"] is True
     finally:
@@ -315,7 +338,10 @@ def test_trade_readiness_requires_nine_gate_pass():
     try:
         R.REGISTRY = Path(tempfile.mkdtemp()) / "tv.json"
         R.register_family("readyfam", "准备度测试族")
-        R.register("readyfam", "v1", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册")
+        # diversifier 轨入册以绕开 standalone DSR 门(ADR-020);本测试验 trade-readiness 对
+        # DSR 待审/失败/通过三态的处置,与准入轨无关(读取器只看 nine_gate 状态)。
+        R.register("readyfam", "v1", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册",
+                   admission={"track": "diversifier", "rationale": "组合层增量"})
 
         C._SETTINGS = Settings(strategy=StrategyConfig(family="readyfam", version="v1"))
         TR.data_quality = lambda with_duckdb=False: SimpleNamespace(verdict="可用")

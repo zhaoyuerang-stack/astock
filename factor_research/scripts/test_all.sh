@@ -28,6 +28,10 @@ echo "=== check_no_force_promote.py (自动晋级禁 force=True/run_marginal=Fal
 python3 scripts/ci/check_no_force_promote.py
 
 echo ""
+echo "=== check_no_legacy_data.py (R-DATA-001 禁代码 import/加载 data_full 旧口径) ==="
+python3 scripts/ci/check_no_legacy_data.py
+
+echo ""
 echo "=== test_loop_foundations.py (防自欺地基:trial账本 + holdout金库) ==="
 python3 tests/test_loop_foundations.py
 
@@ -202,6 +206,10 @@ python3 tests/test_ontology_shadow_pipeline.py
 echo ""
 echo "=== test_notify.py (运维告警通道 + 日更失败告警去重/恢复) ==="
 python3 tests/test_notify.py
+
+echo ""
+echo "=== test_catalog_status.py (边际贡献定级 ACTIVE/SHADOW 台账写入口) ==="
+python3 -m pytest tests/test_catalog_status.py -q
 
 echo ""
 echo "🎉 All tests passed!"
