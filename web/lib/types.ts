@@ -38,7 +38,8 @@ export interface StrategyView {
   nine_gate?: Record<string, any>;   // Nine-Gate 摘要 {dsr_p, gate4_verdict, n_trials, ...}
   style_betas?: Record<string, number>;        // 家族级风格暴露 {size, value, momentum, ...}
   failure_boundaries?: Record<string, number>; // 家族级失效边界 {max_drawdown, max_drawdown_days}
-  decay_signal?: string;                        // 家族级失效信号(死因/触发条件)
+  decay_signal?: string;                        // 家族级失效信号(死因/触发条件,注册时写的静态文字)
+  decay_check?: Record<string, any>;            // 版本级实测衰减结果 {decayed, rolling_3y_sharpe_latest, reasons, checked_at}
 }
 
 export interface StrategyDetailView {
@@ -87,6 +88,7 @@ export interface FactorHealthView {
   sharpe: number;
   momentum_6m: number;
   trend: string;
+  as_of?: string; // 报告数据截至日;周期生成非实时
 }
 
 export interface MarketStateView {

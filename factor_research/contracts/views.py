@@ -116,6 +116,7 @@ class FactorHealthView(BaseModel):
     sharpe: float = 0.0
     momentum_6m: float = 0.0
     trend: str = ""
+    as_of: str = ""   # 报告数据截至日(reports/factor_health.json::updated);周期生成非实时,明示时效
 
 
 class MarketStateView(BaseModel):

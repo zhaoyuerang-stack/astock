@@ -98,6 +98,7 @@ def _duckdb_scan() -> dict:
 
 def strategy_health() -> list[FactorHealthView]:
     d = _read_json("reports/factor_health.json") or {}
+    as_of = str(d.get("updated", ""))  # 报告数据截至日,透出供前端明示时效(周期生成,非实时)
     out: list[FactorHealthView] = []
     for name, m in d.items():
         if not isinstance(m, dict):
@@ -107,6 +108,7 @@ def strategy_health() -> list[FactorHealthView]:
             sharpe=m.get("sharpe", 0.0),
             momentum_6m=m.get("momentum_6m", 0.0),
             trend=m.get("trend", ""),
+            as_of=as_of,
         ))
     return out
 

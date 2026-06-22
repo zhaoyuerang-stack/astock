@@ -335,7 +335,10 @@ def test_trade_readiness_requires_nine_gate_pass():
     old_data_quality = TR.data_quality
     old_risk_report = TR.risk_report
     old_production_readiness = TR.get_production_readiness
+    old_factor_health = TR._factor_health_from_decay
     try:
+        # factor_health 现读真实 decay 报告;本测试只验 model_version 闸,故固定为 normal 隔离。
+        TR._factor_health_from_decay = lambda: ("normal", {})
         R.REGISTRY = Path(tempfile.mkdtemp()) / "tv.json"
         R.register_family("readyfam", "准备度测试族")
         # diversifier 轨入册以绕开 standalone DSR 门(ADR-020);本测试验 trade-readiness 对
@@ -371,6 +374,7 @@ def test_trade_readiness_requires_nine_gate_pass():
         TR.data_quality = old_data_quality
         TR.risk_report = old_risk_report
         TR.get_production_readiness = old_production_readiness
+        TR._factor_health_from_decay = old_factor_health
     print("✅ test_trade_readiness_requires_nine_gate_pass")
 
 

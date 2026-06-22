@@ -7,6 +7,8 @@
 - **9-Gate 大量已算指标在 `summarize()` 被默默丢弃**(2026-06):`NineGatesEvaluator` 内部 gate2 早算了 `nw_icir/monotonicity_corr/ic_decay`、gate3 算了中性化后 `neut_nw_icir/icir_retention`、gate6 算了 `cost_decay_rate/capacity_limit_aum`、gate7 算了 `bull/bear_sharpe`,但 `NineGatesReport.summarize()` 只留了 DSR/PSR/WF/CV/tail 一小撮 → 台账/前端看着像「没算」。**补字段优先查 summarize() 的留存白名单,别急着写新计算**。
 - **PBO 复用家族多版本做 CSCV**(2026-06):`core/analysis/walk_forward.py::pbo_cscv` 已实现,输入 `{name: 日收益}`。把**同一家族的多版本当策略池**喂进去,直接量化「样本内最优版本是否样本外塌陷」=版本选择过拟合。需先留存每版本 gate5 日收益(`data_lake/version_returns/`,9-Gate 持久化时顺带存,零额外回测)。注意:版本高度相关(corr>0.9,如换皮/`-full` 变体)时 PBO 会偏高且意义弱化——高 PBO 本身可能就是「版本近乎重复」的信号。
 - **`attach_nine_gate` 是整体替换不是合并**:`v["nine_gate"] = dict(summary)` 会覆盖整个字段。分阶段往 nine_gate 加字段(如 2A 摘要 + 2B/2C lineage)必须**先 `_load` 读现有 nine_gate → update 合并 → 再 attach**,否则后写的抹掉先写的。
+- **small-cap-size 换手是结构性的,降换手救不动 DSR**(2026-06-22,别再试):small-cap-size/v2.0 真有 alpha(年化21.6%/回撤-17.7%/夏普1.38/净化CV过)但 DSR=0.086 差一口气。想靠降成本提净夏普压 DSR 时,试了**两个对症单假设全失败**:① 调仓 20→40 天:换手 31.8x→30.2x(几乎不动);② 持仓缓冲 keep50/75(已持有仍在 top50/75 就不卖):31.8x→29.8x。**根因**=小盘成分剧烈轮动 + MA16 二值择时全进全出(翻熊清仓、翻牛买回),不是调仓频率或成分缓冲能解决。别再走降换手死路;真要救只能「平滑择时(band 替二值)」或「换低换手新因子族」,但前者是风控非 alpha(ADR-018)。
+- **救 DSR 是自缚——越救惩罚越重**(2026-06-22):DSR 只能靠提夏普(`n_trials` 不能调低,R-EVIDENCE-001 ④禁低报)。但**「试配置救 DSR」本身是对该家族的新搜索 = 新 trials**;若登记救出来的变体,诚实 `n_trials` 必须含这些救援实验 → DSR 更差。**对症单假设失败即停,不许调到「刚好过 0.05」**(= p-hacking,宪法禁)。两个假设失败就承认它不配 standalone 名分。
 
 ## 数据源 / 联网
 - **东财封禁规律**:逐只接口下 40-50 只就封(返回空 / JSONDecodeError),降速也压不住。**解法 = 换批量/聚合接口**(按报告期 `yjbb_em` 把请求从 2万 → 几十次),**绝不加多线程**(更快触发封禁)。批量接口还白送 退市股 + 公告日 + 行业。
@@ -14,6 +16,7 @@
 - **代理**:本地 clash(7897)下 **新浪源可用、东财 push2 被拦**(ProxyError/502);加 `DOMAIN-SUFFIX,eastmoney.com,DIRECT` 可恢复东财。联网需 `dangerouslyDisableSandbox`。
 - **代码列表偏差**:旧 stocks.json 只有沪市主板(60开头)→ 严重样本偏差(纯蓝筹天花板仅 17%)。必须全市场(`ak.stock_info_a_code_name()`;新浪源加 sh/sz 前缀,北交所 4/8 跳过)。
 - **Python 解释器**:回测/工厂脚本必须用 **`/usr/bin/python3`**(系统 Python,有 pandas/numpy);homebrew 的 `/opt/homebrew/bin/python3` 没装,会 `ModuleNotFoundError: pandas`。只用标准库的脚本(如 `strategy_registry`)两个都能跑,**容易掩盖这个坑**——跑回测一律 `/usr/bin/python3 -m ...`。
+- **日更卡死排查(数据停在某天不前进)**(2026-06-22):症状 = 数据湖 last_date 停在 N 天前、前端如实显示旧数据。根因两类:① **陈旧锁** `logs/daily_update/.scheduled_daily_update.lock` 被**已死 PID** 持有(`ps -p <pid>` 确认死)→ 后续 `scheduled_daily_update` 自跳过(`status=skipped_locked`)。注:flock 进程死会自动释放,但锁**文件**残留易误导,直接 `rm` 掉。② 子步脚本崩:`report_nlp_pipeline.py` 的 `def f()->dict|None:` 在**旧解释器**下 `TypeError: unsupported operand |`(PEP604 注解 def 期求值)→ 加 `from __future__ import annotations` 让注解惰性化,任何解释器都不崩。**解卡 = 删锁 + 修解释器 bug + `--force` 重跑**。但数据补上后信号/paper 仍可能不动——那是 readiness **正确 fail-closed**(部署腿被降级/decay red),不是日更没跑,得看 `[readiness] blocking=[...]`。
 
 ## 数据正确性
 - **防未来函数**:财务用**公告日(ann_date)**对齐交易日 ffill,T 日只用 T 日前已披露。验证:ROE 变化点应落在财报披露日之后(茅台年报在 4 月)。
@@ -762,6 +765,13 @@ AutoResearch → L0-L3 的桥接代码(`factory/autoresearch/pipeline.py`)写完
 ### ② 全局暗黑模式下表单控件“白底白字”冲突
 * **现象**：当将网站换装为暗黑/深色主题（在 `globals.css` body 中全局声明 `color: #EFEFEF` 白字）时，如果 `<input>`, `<select>`, `<textarea>` 等基础表单元素未在组件中显示定义背景类，它们会继承 body 的白字，但保留浏览器原生的白色输入背景，产生**白底白字**这一典型暗色转换 Bug。
 * **处置**：在 `globals.css` 中引入最高优先级（`!important`）的全局表单控件样式覆写，强制声明深色半透明背景及正文高亮颜色。这样无需逐一修改历史组件中零散的表单项，即可自动在全站消除对比度冲突。
+
+### ③ 常驻生产前端崩溃循环：`next start` 找不到 `BUILD_ID`（2026-06-22）
+* **现象**：前端整站打不开。launchd 常驻任务 `com.astcok.web` 跑的是 `npm run start`（= `next start` **生产模式**），它必须有 `next build` 产出的 `.next/BUILD_ID`。日志反复刷 `Error: Could not find a production build in the '.next' directory`，任务崩溃即被 launchd 拉起、再崩，形成重启循环；`:3000` 因此始终无人监听。**后端 API（`com.astcok.api`）完全不受影响，持续 `200 OK`**——所以"系统被破坏"实为前端单点，虚惊一场。
+* **根因**：`.next` 被污染成**残缺混合态**——同时存在 `static/development/`（dev 产物）与残缺的生产 manifest，但**缺 `BUILD_ID`**。几乎可断定是"生产 `next start` 常驻期间又跑了 `next dev`"——两者共用 `.next`，正是本节 ① 与 `web/CLAUDE.md §2.1` 禁止的操作。`.next` 是 gitignore 的**可再生构建产物，不是真实数据**，故此类"删除/破坏"无源码或数据损失（`git status` 0 个 `D` 可证）。
+* **损失评估铁律**：报"系统被删/破坏"时，先 `git status --short | grep '^ ?D'` 看**有无真删的已追踪文件**（本次 0 个），再分清**前端构建产物丢失 ≠ 数据/源码丢失**。API/数据湖/registry/研究代码与前端 `.next` 是隔离的。
+* **处置（即 `web/CLAUDE.md §2.2` 缓存自救 + 重建生产）**：① `launchctl bootout gui/$(id -u)/com.astcok.web` 停掉崩溃循环；② `rm -rf web/.next web/node_modules/.cache` 清污染；③ 在 `web/` 下 `npm run build` 重建生产产物（写出新 `BUILD_ID`）；④ `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.astcok.web.plist` 重新加载；⑤ `curl -s -o /dev/null -w "%{http_code}" localhost:3000/overview` 应回 `200`（`/` 回 `307` 是正常重定向到 `/overview`）。
+* **教训**：常驻生产服务（launchd `next start`）下**严禁**再起 `next dev`。改完前端代码的正确刷新姿势 = `web/` 下 `npm run build` 后 `launchctl kickstart -k gui/$(id -u)/com.astcok.web`，绝不在生产常驻期跑 dev。
 
 
 ## Agent 个股画像:后复权价当股价展示(铁律3 复权陷阱)(2026-06-17)

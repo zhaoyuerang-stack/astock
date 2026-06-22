@@ -9,6 +9,8 @@
 6. 生产模式下 API 异常时记录至 reports/research/report_nlp_failures.jsonl，拒绝 Mock 降级。
 """
 
+from __future__ import annotations  # 注解惰性求值:dict|None 等 PEP604 在旧解释器子进程下也不崩
+
 import os
 import sys
 import json

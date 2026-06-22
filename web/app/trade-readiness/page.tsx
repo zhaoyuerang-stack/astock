@@ -55,7 +55,7 @@ export default function TradeReadinessPage() {
           label="数据质量状态"
           value={data.data_status}
           tone={data.data_status === "可用" ? "ok" : "warn"}
-          sub={`数据纯净度: ${(data.details.data_clean_ratio * 100).toFixed(1)}%`}
+          sub={`数据纯净度: ${data.details.data_clean_ratio != null ? (data.details.data_clean_ratio * 100).toFixed(1) + "%" : "—"}`}
         />
         <MetricCard
           label="模型授权状态"
@@ -81,9 +81,12 @@ export default function TradeReadinessPage() {
             </span>
           </div>
           <div className="py-2.5 flex justify-between items-center">
-            <span className="text-subink">Gate 3: 因子风格中性化率</span>
-            <span className={`font-semibold ${data.factor_health === "normal" ? "text-ok" : "text-warn"}`}>
-              {data.factor_health === "normal" ? "98.5% (PASS)" : "WARNING"}
+            <span className="text-subink">Gate 3: 因子健康/衰减 (decay)</span>
+            <span className={`font-semibold ${data.factor_health === "normal" ? "text-ok" : data.factor_health === "unknown" ? "text-subink" : "text-warn"}`}>
+              {data.factor_health === "normal" ? "正常 (PASS)"
+                : data.factor_health === "degraded" ? "衰减 (DEGRADED)"
+                : data.factor_health === "watch" ? "观察 (WATCH)"
+                : "未知 (UNKNOWN)"}
             </span>
           </div>
           <div className="py-2.5 flex justify-between items-center">
@@ -103,8 +106,10 @@ export default function TradeReadinessPage() {
             </span>
           </div>
           <div className="py-2.5 flex justify-between items-center">
-            <span className="text-subink">交易前预估滑点成本</span>
-            <span className="font-semibold text-ink">{data.details.expected_slippage_bps} bps</span>
+            <span className="text-subink">交易前成本预测</span>
+            <span className={`font-semibold ${data.cost_forecast === "acceptable" ? "text-ok" : "text-subink"}`}>
+              {data.cost_forecast === "unknown" ? "未接入 (—)" : data.cost_forecast.toUpperCase()}
+            </span>
           </div>
           <div className="py-2.5 flex justify-between items-center">
             <span className="text-subink">熔断开关状态 (Kill Switch)</span>

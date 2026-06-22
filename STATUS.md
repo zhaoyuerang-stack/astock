@@ -4,6 +4,15 @@
 
 ## 一句话
 
+**2026-06-22(数据管线解卡 + trade_readiness 去硬编码 + 全池重审确认「目前无可实战 alpha」)**:用户从运行中页面发现「数据不更新/在册 5/因子健康非实时」,实测定位并修复机制问题。
+  · **#1 日更解卡**:日更卡在 06-18 —— 根因 ① 陈旧锁(死 PID 520 持有 `.scheduled_daily_update.lock`)② T-1 NLP 子步 `report_nlp_pipeline.py` 的 `dict|None` 在旧解释器崩。删锁 + 加 `from __future__ import annotations` + 联网重跑 → **数据补到 06-22**。但信号/paper 仍停 06-18,是**正确 fail-closed**:部署清单指向 `illiquidity/v3.1`,ADR-020 已把它降「参考」不可部署 → 需人定换腿(TASKS 待决项坐实)。
+  · **#2 去硬编码**:`trade_readiness.py` 的 `factor_health`/`cost_forecast`/`liquidity_status`/`data_clean_ratio` 全写死。改 `factor_health` 读真实 `decay_status.json`(现=**degraded**,4 策略衰减,正确拉低 allowed_to_trade);cost/liquidity 诚实标 `unknown` 不假绿;data_clean_ratio 用真实 dq。前端 trade-readiness 页删假的「98.5%(PASS)」与 expected_slippage_bps。
+  · **#3 时效标注 + 删 demo**:overview 因子健康加「数据截至 X(周期生成非实时)」;删 `TimeTravelSimulator` 的美股合成 DEMO_DATA(AAPL/NVDA/TSLA)+ demo 模式 + `SimulationModeBanner`(全前端唯一合成数据)。
+  · **「在册 5」是对的**:ADR-020 降 7 个 standalone 后只剩 5 diversifier,前端 live 读台账无误,非 stale。
+  · **全池重审确认(06-22 数据,canonical 9-Gate)**:**无一策略 dsr_p<0.05**。5 个在册 diversifier 全 decayed(回撤 -50%~**-96%**,WF 夏普≈0)= 死。唯一像样 = `small-cap-size/v2.0`(参考):年化 21.6%/回撤 -17.7%/夏普 1.38、回测+净化CV 过,但 **DSR=0.086** 差一口气、成本衰减高。
+  · **small-cap-size 救援尝试 = 证伪**:两个对症单假设(rebal 20→40、持仓缓冲 keep50/75)换手几乎不动(31x→30x),救不动。详见 LESSONS。**结论:它是真 alpha 但经不起诚实统计+成本双审,不该给 standalone 名分。停止,不 p-hack。**
+  · **部署维持防守**(空仓+国债ETF 511010,本就是 small-cap 熊市防守仓)。系统拒绝假 alpha = 宪法在正确执行,非失败。验证:后端全套 `All tests passed!` + web tsc/lint/19 测试绿。
+
 **2026-06-22(holdout boundary 迁移机制:草案转机械强制,ADR-023)**:补 holdout 审计 #6「boundary 迁移无机制」最后一项可行动缺口。
   · **只进不退强制**:唯一推进入口 `governance.holdout.migrate_holdout_boundary()`,后移/相等抛 `HoldoutBoundaryRegression`(复活已偷看金库)。
   · **append-only 历史账本** `app_config/holdout_boundary_history.jsonl`(git 跟踪,genesis=2025-01-01),active=最大值,旧边界自动 superseded 留痕不删。

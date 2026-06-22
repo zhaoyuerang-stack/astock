@@ -13,12 +13,40 @@ from services.read.state import data_quality
 
 ROOT = Path(__file__).resolve().parents[2]
 
+# decay 总体状态 → factor_health 语义。红=有策略衰减,不得当「正常」放行(原代码硬编码 normal)。
+_DECAY_TO_HEALTH = {"green": "normal", "yellow": "watch", "red": "degraded"}
+
+
+def _factor_health_from_decay() -> tuple[str, dict]:
+    """读真实 decay 报告(reports/decay_status.json)定 factor_health,绝不硬编码 normal。
+
+    返回 (health, meta)。文件缺失/解析失败 → "unknown"(诚实未知,不假绿)。
+    """
+    import json
+    p = ROOT / "reports" / "decay_status.json"
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return "unknown", {"source": "decay_status.json", "note": "decay 报告缺失/不可读"}
+    status = str(d.get("status", "")).lower()
+    health = _DECAY_TO_HEALTH.get(status, "unknown")
+    decayed = [s.get("strategy") for s in d.get("strategies", []) if s.get("decayed")]
+    return health, {
+        "source": "decay_status.json",
+        "decay_status": status or "unknown",
+        "as_of_date": d.get("as_of_date", ""),
+        "generated_at": d.get("generated_at", ""),
+        "decayed_strategies": decayed,
+    }
+
 
 def get_trade_readiness() -> TradeReadinessView:
     # 1. Check Data status
+    data_clean_ratio = None
     try:
         dq = data_quality(with_duckdb=False)
         data_status = dq.verdict
+        data_clean_ratio = getattr(dq, "clean_ratio", None)  # 真实清洁率,不再硬编码 0.998
     except Exception:
         data_status = "可用"
 
@@ -51,13 +79,14 @@ def get_trade_readiness() -> TradeReadinessView:
     except Exception:
         model_version = "approved"
 
-    # 4. Factor health & decay check
-    # Check if there are decay reports or decay monitors
-    factor_health = "normal"
+    # 4. Factor health & decay check —— 读真实 decay 报告,不再硬编码 normal(ADR 修复硬编码桩)。
+    #    decay=red(有策略衰减)→ degraded,会拉低 allowed_to_trade,不让衰减期自动放行。
+    factor_health, factor_health_meta = _factor_health_from_decay()
 
-    # 5. Cost forecast & liquidity status
-    cost_forecast = "acceptable"
-    liquidity_status = "normal"
+    # 5. Cost forecast & liquidity status —— 读取路径暂无真实成本/流动性预测源,
+    #    诚实标 unknown(不假绿)。接入真实成本模型/容量评估后再填(见 TASKS)。
+    cost_forecast = "unknown"
+    liquidity_status = "unknown"
 
     # 6. Regime & Confidence
     regime_status = "bull"
@@ -99,9 +128,9 @@ def get_trade_readiness() -> TradeReadinessView:
         and (production_readiness.allowed if production_readiness else True)
     )
     details = {
-        "data_clean_ratio": 0.998,
+        "data_clean_ratio": data_clean_ratio,  # 真实值;读不到为 None,前端按未知呈现
         "max_exposure_allowed": 1.25,
-        "expected_slippage_bps": 15.0,
+        "factor_health_detail": factor_health_meta,  # decay 来源/as_of/衰减策略清单,可追溯
         "model_admission_track": model_gate.get("admission_track", ""),
         "model_dsr_audited": model_gate.get("dsr_audited", False),
         "model_dsr_passed": model_gate.get("dsr_passed"),

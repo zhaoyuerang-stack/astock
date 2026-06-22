@@ -399,7 +399,9 @@ export default function OverviewPage() {
 
         {/* 策略健康度 */}
         <div className="md:col-span-2">
-          <Card title="因子健康度">
+          <Card title={
+            <span>因子健康度{health[0]?.as_of ? <span className="ml-2 text-[11px] text-subink/70 font-normal">数据截至 {health[0].as_of}（周期生成，非实时）</span> : null}</span>
+          }>
             <DataTable<FactorHealthView>
               rows={health}
               getRowKey={(h) => h.name}
