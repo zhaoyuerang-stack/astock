@@ -5,6 +5,8 @@
 
 ## 🔴 进行中 / 优先
 
+- [ ] **【2026-09-30 复核】small-cap-size/v2.0 纸面前向实验(ADR-024)** — 06-22 启动的人工 override 纸面前向(零真金,DSR=0.086 未过门,主仓继续防守)。跟踪器 `scripts/research/paper_forward_smallcap.py` 已接进日更旁路(每日自动累积快照到 `reports/experiments/smallcap_v2_paper_forward.jsonl`)。**到 ~2026-09 底(≥3 月前向)复核**:前向兑现(夏普稳、回撤受控、未破 MA16 防守)→ 证据增强(n_periods↑,DSR 可能真过)→ 再议小额真仓 + 走正式 promote;前向塌陷/破防守 → 证否、停实验。**注:复核前绝不因「纸面好看」就绕 DSR 门登记在册(R-LLM-001/§12.3)。** 谁:用户 + 走 workflow。
+
 ### 引擎修复后的台账诚实性缺口(2026-06-21 发现;均待用户决定,我未碰部署清单)
 - [ ] **生产部署清单指向一个从未真正过闸的策略** — `deployments/production.json` 唯一腿 `illiquidity/v3.1`,加载时报 `spec_hash 不匹配`(清单钉的哈希是修复前的)。但**根因更深**:`decide_nine_gate()`(部署严格闸,要求 `passed_all=True`)从 2026-06-19 到今天重审,从未对这条腿点头过——`migrate_deployment.py --apply` 会因此直接拒绝重新生成清单,不是改个哈希就能"修复"。是否换腿/降级/接受现状,需人决定。谁:用户。**新证据(2026-06-21 周度维护实跑发现)**:这个漂移现在还会连带炸穿 `scripts/ops/scheduled_cross_asset_leg_search.py`(经 `portfolio/cross_asset.py::search_cross_asset_legs()` 调用无保护的 `run_active()`),不是孤立的报告类脚本问题——拖得越久,卡住的下游越多。本轮我只修了"不该崩"的(decay_monitor/production_readiness 已加 try/except),没碰这条因为它的工作本身就需要在册组合真实收益,没法优雅降级,只能等部署决定。
 - [x] **发现并验证 core.engine T+1 fill 修复(5ebcdde7c,06-20 21:04)使此前所有 9-Gate 审计失真** — ✅ 逐日比对 illiquidity/v3.1 修复前后收益序列,从第1天就有差异(最大单日差5.5pp);maxdd 从旧引擎算出的 -14.7% 纠正为真实 -29.3%(发生在2019-2020 COVID段,旧序列误判到2018年末)。已用修复后引擎重跑 illiquidity 全家族(v1.0/v1.1/v1.3/v3.0/v3.1/clean-v1)9-Gate + 持久化收益序列 + `lineage_pbo` 重算:**六个版本 passed_all 全为 False**,Gate4(DSR不显著)/Gate5(回撤超-20%线,v1.0/v1.1/v1.3 甚至-41%~-42%)/Gate6(成本衰减87%~110%)三道独立检验全部不过;家族 PBO=0.92(版本选择基本是噪音);v1.0 与 clean-v1 日收益 corr=1.0(数学同一序列)。衰减监控在新序列上仍判"未衰减"(滚动3年夏普2.20,逐年走高)——alpha本身没变差,是旧引擎一直在低估风险。结果存 `research_ledger`(run_id `30e5e8ed8a7d1b46`)。

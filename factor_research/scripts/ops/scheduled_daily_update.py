@@ -473,6 +473,27 @@ def run_factor_health(report, dry_run=False):
         report["factor_health"]["error"] = proc.stderr[-1000:]
 
 
+def run_paper_forward_smallcap(report, dry_run=False):
+    """旁路:small-cap-size/v2.0 纸面前向实验快照(ADR-024,人工 override,零真金)。
+    非阻塞研究输出——失败不影响日更主流程,也不参与 readiness/部署。"""
+    if dry_run:
+        print("[smallcap-fwd] skip paper-forward tracker")
+        report["smallcap_forward"] = {"ran": False, "dry_run": True}
+        return
+
+    print("[smallcap-fwd] paper_forward_smallcap.py (ADR-024 纸面前向快照)")
+    proc = subprocess.run(
+        [PYTHON, "scripts/research/paper_forward_smallcap.py"],
+        cwd=ROOT, text=True, capture_output=True, check=False,
+    )
+    print(proc.stdout)
+    if proc.stderr:
+        print(proc.stderr, file=sys.stderr)
+    report["smallcap_forward"] = {"ran": proc.returncode == 0, "returncode": proc.returncode}
+    if proc.returncode != 0:
+        report["smallcap_forward"]["error"] = proc.stderr[-1000:]
+
+
 def run_paper_trade(report, dry_run=False):
     if dry_run:
         print("[paper] skip paper_trade")
@@ -598,6 +619,7 @@ def run_daily_update(args):
                     run_report_nlp(report, dry_run=args.dry_run)
                     run_signal(report, dry_run=args.dry_run)
                     run_factor_health(report, dry_run=args.dry_run)
+                    run_paper_forward_smallcap(report, dry_run=args.dry_run)  # ADR-024 旁路
                     if args.dry_run or report.get("signal", {}).get("generated") or args.force:
                         run_paper_trade(report, dry_run=args.dry_run)
                 else:
