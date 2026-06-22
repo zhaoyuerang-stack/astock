@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import MetricCard from "@/components/ui/MetricCard";
 import Card from "@/components/ui/Card";
+import StatusBanner from "@/components/ui/StatusBanner";
 import PlanCard from "@/components/paper/PlanCard";
 import TradesTable from "@/components/paper/TradesTable";
 import NavChart from "@/components/paper/NavChart";
@@ -62,6 +63,17 @@ export default function PortfolioPage() {
     <div>
       <PageHeader title="组合管理" desc="模拟盘跟单(真实盘 T+1 口径)· 当前组合 vs 目标组合 · 实时 /portfolio + /paper" />
       {err && <div className="card text-sm text-danger mb-4">API 错误:{err}<br />请确认后端已启动(uvicorn :8011)。</div>}
+
+      {/* 组合态势头条:跨 tab 常驻,一眼给出净值/累计/姿态这条底线 */}
+      {plan && (
+        <div className="mb-4">
+          <StatusBanner
+            status={plan.total_return >= 0 ? "ready" : "attention"}
+            title={`组合态势:净值 ${(plan.nav / 10000).toFixed(2)} 万 · 累计 ${plan.total_return >= 0 ? "+" : ""}${(plan.total_return * 100).toFixed(2)}%`}
+            detail={`当前 ${plan.action}${plan.regime ? ` · ${plan.regime === "bear" ? "BEAR 防守" : plan.regime === "bull" ? "BULL 进攻" : plan.regime}` : ""} · 现金 ${(plan.cash / 10000).toFixed(0)} 万 · 今日成交 ${plan.executed.length} 笔`}
+          />
+        </div>
+      )}
 
       <div className="flex gap-1 mb-4 border-b border-cardline">
         {TABS.map((t) => (
