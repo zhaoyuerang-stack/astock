@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import MetricCard from "@/components/ui/MetricCard";
 import Card from "@/components/ui/Card";
+import StatusBanner from "@/components/ui/StatusBanner";
 import { api, pct } from "@/lib/api";
 import type { TradePlanView } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
@@ -41,6 +42,12 @@ export default function SignalsPage() {
   useAutoRefresh(load);
 
   const bearMode = paperPlan?.regime === "bear";
+  // 择时态势:LIVE 动态暴露 与 影子二元择时 是否分歧——这条审计信号原本
+  // 只埋在右栏三根进度条里,提到头条揭示「系统内部判定是否一致」。
+  const liveInMarket = (paperPlan?.band_exposure ?? 0) > 0;
+  const shadowInMarket = paperPlan?.binary_in_market_shadow ?? false;
+  const timingDiverge = !!paperPlan && liveInMarket !== shadowInMarket;
+  const timingStatus: "ready" | "attention" = bearMode || timingDiverge ? "attention" : "ready";
 
   return (
     <div className="space-y-6">
@@ -61,6 +68,18 @@ export default function SignalsPage() {
 
       {paperPlan && (
         <>
+          {/* 择时态势头条:一眼回答「今日为什么这么决策、系统内部判定有无矛盾」 */}
+          <StatusBanner
+            status={timingStatus}
+            title={`今日择时判定:${paperPlan.action}`}
+            detail={[
+              bearMode ? "大周期 BEAR · 股票买入权限锁定,维持避险" : "大周期 BULL · 允许股票配置",
+              timingDiverge
+                ? `⚠ LIVE(${liveInMarket ? "持仓" : "空仓"}) 与影子二元(${shadowInMarket ? "持仓" : "空仓"})判定分歧`
+                : "LIVE 与影子择时一致",
+            ].join(" · ")}
+          />
+
           {/* Summary metrics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <MetricCard
