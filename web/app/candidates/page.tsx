@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import MetricCard from "@/components/ui/MetricCard";
 import Card from "@/components/ui/Card";
+import StatusBanner from "@/components/ui/StatusBanner";
 import { api } from "@/lib/api";
 import type { TradePlanView } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
@@ -58,6 +59,17 @@ export default function CandidatesPage() {
 
       {paperPlan && (
         <>
+          {/* 候选池态势头条:一眼回答「这些候选今天可不可执行」——BEAR 下仅供参考 */}
+          <StatusBanner
+            status={bearMode ? "attention" : "ready"}
+            title={`今日因子候选池:${paperPlan.candidates?.length ?? 0} 只标的`}
+            detail={
+              bearMode
+                ? `BEAR 空仓防守 · 候选池仅供审计参考,今日不交易股票,资金已轮动至 ${paperPlan.bond?.name || "国债ETF"} (${paperPlan.bond?.code || "511010"}) 避险`
+                : "BULL 多头入场 · 候选池为今日可交易标的"
+            }
+          />
+
           {/* Summary metrics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <MetricCard
@@ -82,18 +94,6 @@ export default function CandidatesPage() {
               sub="每天交易日收盘后重算"
             />
           </div>
-
-          {/* Timing Warn Banner */}
-          {bearMode && (
-            <div className="card text-sm text-subink border border-[#88ABDA]/20 bg-[#88ABDA]/5 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-[#88ABDA] text-base">🛡️</span>
-                <span>
-                  当前系统择时处于 <b>空仓防守</b> 状态。下方的选股候选池仅供 <b>审计与参考</b>，系统已将闲置资金轮动至 <b>{paperPlan.bond?.name || "国债ETF"} ({paperPlan.bond?.code || "511010"})</b> 进行防御性避险，暂不交易股票。
-                </span>
-              </div>
-            </div>
-          )}
 
           {/* Grid Layout of Candidates */}
           <Card
