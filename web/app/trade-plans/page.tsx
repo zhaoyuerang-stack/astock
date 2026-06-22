@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import MetricCard from "@/components/ui/MetricCard";
 import Card from "@/components/ui/Card";
+import StatusBanner from "@/components/ui/StatusBanner";
 import DataTable from "@/components/ui/DataTable";
 import { api, num } from "@/lib/api";
 import type { TradePlanView, TradeReadinessView } from "@/lib/types";
@@ -140,6 +141,29 @@ export default function TradePlansPage() {
   const totalNotional = orders.reduce((acc, curr) => acc + (curr.side === "HOLD" ? 0 : curr.notional), 0);
   const blockSignOff = !readiness?.allowed_to_trade;
 
+  // 执行闸门态势:把「能不能签发 / 签了吗 / 几笔要执行」综合成一句裁决 + 下一步
+  const planStatus: "ready" | "attention" | "blocked" | "neutral" = signed
+    ? "ready"
+    : blockSignOff
+    ? "blocked"
+    : activeOrdersCount === 0
+    ? "neutral"
+    : "attention";
+  const planTitle = signed
+    ? `交易计划已签发:${activeOrdersCount} 笔执行指令`
+    : blockSignOff
+    ? "交易计划:前置风控拦截,不可签发"
+    : activeOrdersCount === 0
+    ? "交易计划:今日无执行指令,维持持仓"
+    : `交易计划待签发:${activeOrdersCount} 笔执行指令`;
+  const planDetail = signed
+    ? `已电子签名签发 · 指纹 ${hash.substring(11)} · 可导出委托单交券商`
+    : blockSignOff
+    ? "前置网禁 BLOCKED · 需先排除「交易准备度」门禁异常后方可签发"
+    : activeOrdersCount === 0
+    ? "系统维持当前持仓,今日无新增委托"
+    : "前置网禁 PASS · 待交易员核对委托明细后签名签发";
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -159,6 +183,9 @@ export default function TradePlansPage() {
 
       {paperPlan && readiness && (
         <>
+          {/* 执行闸门态势头条:一眼回答「今天该不该动手、下一步做什么」 */}
+          <StatusBanner status={planStatus} title={planTitle} detail={planDetail} />
+
           {/* Summary metrics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <MetricCard
