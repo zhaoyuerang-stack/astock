@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import MetricCard from "@/components/ui/MetricCard";
 import Card from "@/components/ui/Card";
+import StatusBanner from "@/components/ui/StatusBanner";
 import { api } from "@/lib/api";
 import type { StrategyView } from "@/lib/types";
 import { toInstitutionalRow, sortLeaderboard, groupFamilies } from "@/lib/institutional";
@@ -58,6 +59,19 @@ export default function FactorsPage() {
   const retiredCount = strategies.filter((x) => ["退役", "已证伪"].includes(x.status)).length;
   const dupCount = strategies.filter((x) => (x.nine_gate?.corr_to_parent ?? 0) >= 0.9).length;
 
+  // 策略池态势:对引擎已算的 DSR 门禁计数做聚合呈现(不引入新有效性口径)。
+  // 反自欺立场——多数在册若未扛过多重检验,即为「关注」态。
+  const dsrGap = registeredCount - dsrPassCount;
+  const poolStatus: "ready" | "attention" | "neutral" =
+    registeredCount === 0 ? "neutral" : dsrGap === 0 ? "ready" : "attention";
+  const poolDetail = [
+    dsrGap > 0 ? `${dsrGap} 只在册待补 DSR 审计` : "在册版本均已扛过多重检验",
+    dupCount ? `${dupCount} 个版本疑似换皮 (ρ≥0.9)` : null,
+    observationCount ? `观察版本 ${observationCount} 待晋级` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   const rows = useMemo(() => sortLeaderboard(strategies.map(toInstitutionalRow)), [strategies]);
   const families = useMemo(() => groupFamilies(strategies.map(toInstitutionalRow)), [strategies]);
   const activeRow = useMemo(() => (activeStrategy ? toInstitutionalRow(activeStrategy) : null), [activeStrategy]);
@@ -71,6 +85,13 @@ export default function FactorsPage() {
 
       {!loading && !err && (
         <>
+          {/* 策略池态势头条:把「在册多少 / 扛过 DSR 多少」这条反自欺判断提到最显眼处 */}
+          <StatusBanner
+            status={poolStatus}
+            title={`策略池态势:${dsrPassCount}/${registeredCount} 在册扛过多重检验 (DSR)`}
+            detail={poolDetail}
+          />
+
           {/* KPI 带 —— 诚实口径,突出决策信号 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <MetricCard label="在册策略" value={String(registeredCount)} sub="过单母策略门槛" />
