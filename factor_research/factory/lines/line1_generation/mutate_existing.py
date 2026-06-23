@@ -21,7 +21,10 @@ FACTOR_MUTATION_SPECS: dict[str, dict] = {
             falsifiability="size 因子 IC 持续 < 0 一年；小盘指数滚动跑输沪深 300",
         ),
         "param_grid": {
-            "window": [20, 30, 45, 60, 90, 120, 252],   # 7 个 mutation
+            # 短/中/长三档,MI 可区分。原 [20,30,45,60,90,120,252] 经
+            # metasearch/factor_mi_audit 实测 6 窗口互相 MI>2.0(同一信息算 6 遍),
+            # 收敛去重(metasearch_findings_20260623)。
+            "window": [20, 60, 252],
         },
         "data_dependencies": ("price/amount",),
     },
@@ -61,7 +64,9 @@ FACTOR_MUTATION_SPECS: dict[str, dict] = {
             falsifiability="市场成交额持续放大；因子 IC 连续 4 季 < 0",
         ),
         "param_grid": {
-            "n": [5, 10, 20, 40, 60],
+            # 去 n60:metasearch/factor_mi_audit 实测 illiquidity n40↔n60 距离 0.52
+            # (近同一信息源),保 n40(生产相邻口径)(metasearch_findings_20260623)。
+            "n": [5, 10, 20, 40],
         },
         "data_dependencies": ("price/close", "price/volume"),
     },
