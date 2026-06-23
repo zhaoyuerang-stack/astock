@@ -73,7 +73,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: "通用",
     items: [
-      // AI 助手入口已移除:右侧常驻 AgentPanel 已承担 AI 对话,左栏入口冗余(/agent 页仍可经 URL 访问)
+      // AI 助手入口与 /agent 页已移除:右侧常驻 AgentPanel(session API)已承担 AI 对话
       { href: "/settings", label: "系统设置", desc: "数据源、成本、风控规则与模型配置", ready: true, icon: "settings", modes: ["ops", "rd"] },
     ],
   },
