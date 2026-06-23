@@ -1,6 +1,6 @@
 # STATUS — 当前进度
 
-> 更新:2026-06-22。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
+> 更新:2026-06-23。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
 
@@ -8,6 +8,13 @@
   · **绝不洗成达标**:v2.0 仍「参考」、DSR 仍 0.086、不登记在册、不改 register/台账(那是自欺)。只是人明知不达标的旁路纸面观察。
   · **隔离机制**:`scripts/research/paper_forward_smallcap.py`(canonical 引擎 point-in-time,取 06-22 起前向段作 OOS,快照入 `reports/experiments/`),**不改 settings.strategy/production.json**(非可部署策略信号会被 readiness 正确分流 draft,故走独立旁路不污染生产)。零真金,靠 MA16 自带防守,主仓继续防守。
   · **复核**:日更后跑跟踪器,约 2026-09 底(~3 月前向)复核——兑现则证据增强再议小额真仓,塌陷则证否停。基线已立(前向1日;全历史确认 21.6%/1.38/-17.66%)。
+
+**2026-06-23(MetaSearch 三组件重跑:信息论坐实「掺 size 反削弱」+ 搜索空间重定向)**:相对 06-07 首版快照全量重跑 `metasearch/`(signal_flow_tracer + factor_mi_audit + information_map),发现归档 [`reports/research/metasearch_findings_20260623.md`](factor_research/reports/research/metasearch_findings_20260623.md)。
+  · **信息论根因**:`factor_mi_audit` 显示 size-earnings 与 small-cap-size(MI 距离 1.34)/illiquidity(1.56)高度冗余 —— size 与 illiquidity 是同一微盘信息源的不同投影。**「掺 size 反削弱」= 同一信息算两遍、白涨 n_trials、DSR 多重检验把混合版打下去**(印证 06-18 台账:纯 Amihud p=0.032/0.043/0.034 过,v1.3 混合 p=0.086 / size-earnings p=0.152 不过)。
+  · **算力浪费**:21 候选仅 13 个独立信息簇,**38% 算力白算**。最大冗余簇 = `small_cap_factor` window 20/30/45/60/120/252 互相 MI>2.0(一个因子搜 6 遍);illiquidity n40↔n60(0.52)、vol↔amplitude n60(0.50)、high_low_breakout↔price_position(0.38)同因子换皮。建议接 L-1 MI 过滤器,每簇留 1。
+  · **空白区(information_map)**:所有现有因子最独立远邻齐指 `vol_breakout`(2.96–2.98)、基本面族(net_profit_yoy/roe/bp_proxy/gross_margin 距价格族 2.8–2.9)、跨资产对冲腿(2.9)。搜索方向应从 small_cap 多窗口微调转向这三块。
+  · **被丢信号(signal_flow_tracer)**:callee 22→47、333 丢弃事件,3 个 Band 式候选待查 —— `hmm_stress_probability`(后 2 输出丢)、`compute_salience_factors`(首输出丢)、`pg.pricing_gap`(本体丢)。
+  · **行动建议**:① size-earnings 判冗余轨、停止追投;② 算力转 vol_breakout/基本面空白区;③ 接 L-1 MI 过滤;④ 查 3 个被丢信号。**均为搜索空间增删建议,非有效性判断**,候选仍须走 R-WF-001 全流程 + DSR<0.05。产物:`metasearch/{unused_signals.json,info_map_v3.png}`(已刷新,旧 v2/06-07 备份保留)。
 
 **2026-06-22(数据管线解卡 + trade_readiness 去硬编码 + 全池重审确认「目前无可实战 alpha」)**:用户从运行中页面发现「数据不更新/在册 5/因子健康非实时」,实测定位并修复机制问题。
   · **#1 日更解卡**:日更卡在 06-18 —— 根因 ① 陈旧锁(死 PID 520 持有 `.scheduled_daily_update.lock`)② T-1 NLP 子步 `report_nlp_pipeline.py` 的 `dict|None` 在旧解释器崩。删锁 + 加 `from __future__ import annotations` + 联网重跑 → **数据补到 06-22**。但信号/paper 仍停 06-18,是**正确 fail-closed**:部署清单指向 `illiquidity/v3.1`,ADR-020 已把它降「参考」不可部署 → 需人定换腿(TASKS 待决项坐实)。
