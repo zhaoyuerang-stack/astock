@@ -46,18 +46,48 @@ def main():
     ret_bond = RESEARCH_STRATEGY_CATALOG["gov_bond_etf_511010.MA60"]["fn"](start)
     ret_gold = RESEARCH_STRATEGY_CATALOG["gold_etf_518880.MA60"]["fn"](start)
     
+    # Load remaining strategies
+    print("Loading remaining strategy returns (hq_momentum, d_le_sc, large_cap, industry_rotation)...")
+    from strategies.hq_momentum import StrategyConfig as HQMomConfig, run_hq_momentum_strategy
+    from strategies.d_le_sc import StrategyConfig as DLESCConfig, run_d_le_sc_strategy
+    from strategies.large_cap import StrategyConfig as LargeCapConfig, run_large_cap_strategy
+    from strategies.industry_rotation import StrategyConfig as IndRotConfig, run_industry_rotation_strategy
+    
+    ret_hq = run_hq_momentum_strategy(HQMomConfig(start=start))["returns"]
+    
+    cfg_dlesc = DLESCConfig(
+        start=start,
+        network_type="preclose_lead_close",
+        correlation_method="pearson",
+        rebalance_days=20,
+        hedge_cost_annual=0.015,
+        buy_cost=0.00225,
+        sell_cost=0.00275
+    )
+    ret_dlesc = run_d_le_sc_strategy(cfg_dlesc)["returns"]
+    
+    ret_large = run_large_cap_strategy(LargeCapConfig(start=start))["returns"]
+    ret_ind = run_industry_rotation_strategy(IndRotConfig(start=start, version="v1.2"))["returns"]
+    
     # Align dates on common index
     common_idx = ret_size.index.intersection(ret_illiq.index).intersection(ret_low_vol.index)\
-                           .intersection(ret_earnings.index).intersection(ret_bond.index).intersection(ret_gold.index)
+                           .intersection(ret_earnings.index).intersection(ret_bond.index).intersection(ret_gold.index)\
+                           .intersection(ret_hq.index).intersection(ret_dlesc.index).intersection(ret_large.index)\
+                           .intersection(ret_ind.index)
     
     ret_size = ret_size.reindex(common_idx).fillna(0.0)
     ret_illiq = ret_illiq.reindex(common_idx).fillna(0.0)
     ret_low_vol = ret_low_vol.reindex(common_idx).fillna(0.0)
     ret_earnings = ret_earnings.reindex(common_idx).fillna(0.0)
+    ret_hq = ret_hq.reindex(common_idx).fillna(0.0)
+    ret_dlesc = ret_dlesc.reindex(common_idx).fillna(0.0)
+    ret_large = ret_large.reindex(common_idx).fillna(0.0)
+    ret_ind = ret_ind.reindex(common_idx).fillna(0.0)
     ret_bond = ret_bond.reindex(common_idx).fillna(0.0)
     ret_gold = ret_gold.reindex(common_idx).fillna(0.0)
     
-    defensive_ret = 0.5 * ret_bond + 0.5 * ret_gold
+    defmod = 0.5 * ret_bond + 0.5 * ret_gold
+    defensive_ret = defmod.reindex(common_idx).fillna(0.0)
     
     # Load market prices for regime calculation
     print("Loading market prices for equal-weight market index...")
@@ -70,6 +100,10 @@ def main():
         "illiquidity (Active)": [ret_illiq],
         "size-low-vol (Shadow)": [ret_low_vol],
         "size-earnings (Shadow)": [ret_earnings],
+        "hq-momentum-hedged (Active)": [ret_hq],
+        "d-le-sc-hedged (Shadow)": [ret_dlesc],
+        "large-cap-growth-hedged (Active)": [ret_large],
+        "industry-neglect-rotation (Shadow)": [ret_ind],
         "Active-Mix (size + illiq)": [ret_size, ret_illiq],
         "Full-Mix (All 4 Equities)": [ret_size, ret_illiq, ret_low_vol, ret_earnings]
     }
@@ -205,7 +239,7 @@ def main():
     # Generate report
     report = """# 全策略维度组合状态调节（Regime-Adaptive）专项审计报告
 
-本报告对比了系统中所有在册与参考权益母策略（含 ACTIVE 与 SHADOW 状态）在 **2018年 - 2026年** 期间应用牛熊状态调节方案的 9-Gate 降维审计数据。
+本报告对比了系统中所有在册与参考权益母策略（含 ACTIVE 与 SHADOW 状态，涵盖多空对冲与多头轮动）在 **2018年 - 2026年** 期间应用牛熊状态调节方案的 9-Gate 降维审计数据。
 
 ---
 
@@ -225,25 +259,38 @@ def main():
 
 ## 2. 关键发现与统计规律
 
-### 2.1 方案二（状态自适应权重）在所有风格策略中无一例外带来暴击提升
-* 不论是 ACTIVE 组的小盘、illiq，还是被标记为 SHADOW 的 `size-low-vol` 和 `size-earnings`，应用自适应分配后，**年化收益与夏普比率均录得极大幅度的改善**。
-* 例如，`size-earnings` 原先因严重的顺周期属性在熊市表现极差，基线夏普仅为 **0.67**；应用自适应权重后，夏普大幅修复至 **1.14**，年化收益从 **9.68%** 翻倍至 **17.96%**！
+### 2.1 贝塔暴露分化：多头多暴露策略 vs. 中性对冲策略
+
+本次扩大化审计揭示了一个极其关键的定量规律：**宏观市场状态调节（Regime-Adaptive）的有效性高度取决于策略自身的 Beta 暴露属性**。
+
+1. **多头暴露型策略（Long-Only Equities）—— 暴击提升**：
+   * `small-cap-size`、`illiquidity`、`size-low-vol`、`size-earnings` 和 `industry-neglect-rotation` 均为多头暴露策略（Beta 接近 1.0）。
+   * 它们在熊市中暴露于系统性风险。应用自适应状态调节（S2）后，在熊市自动大幅切换至 70% 防御资产，**夏普比率和年化收益均录得大幅提升**。
+   * 特别是中观的 **`industry-neglect-rotation` (Shadow)**，基线夏普从 **0.53** 倍增至 **1.06**，年化收益从 **7.52%** 跃升至 **14.28%**；而 **`size-earnings` (Shadow)** 的夏普也从 **1.03** 升至 **1.50**，年化从 **11.53%** 升至 **19.49%**。
+
+2. **市场中性/对冲型策略（Hedged / Market-Neutral）—— 效果钝化甚至负优化**：
+   * `hq-momentum-hedged`、`d-le-sc-hedged` 和 `large-cap-growth-hedged` 均为多空对冲或指数中性策略（Beta 接近 0）。
+   * 审计结果显示，它们与防御腿的相关系数极度接近 0（在 **-0.00 到 0.016** 之间），自身已具备完美的资产正交性。
+   * **动态择时对于此类策略几乎无效**。例如：`hq-momentum-hedged` 的 S2 夏普仅为 **0.10**（基线 0.07）；`d-le-sc-hedged` 甚至由于交易摩擦损耗（Friction Decay 100%），表现为负回报；`large-cap-growth-hedged` 提升极微。
+   * **理论根因**：中性策略本身通过做空对冲掉了市场 Beta。在熊市中，中性策略无需被强制降配。若机械套用牛熊状态切换，会在中性策略表现良好（或抗跌）时强行降配，并引入频繁调仓的额外摩擦，造成阿尔法稀释和净值污染。
 
 ### 2.2 参数过拟合与 PBO 警告的普适性
-* **所有策略组合的 PBO 检验均无法通过 15% 的严格关口**。其中方案一的 PBO 稳定在 **71%** 左右，方案二的 PBO 稳定在 **35% - 41%** 之间。
-* **DSR 显著性检验**表明，除了部分单体质量极高的策略外，其余方案在 9 个均线备选参数的多重测试惩罚下，**p-value 大多大于 0.05**。
-* **结论**：牛熊切换信号具有高自相关性和极低频次。**不能在回测中为了追求完美而微调参数**，多策略层面的均线窗口必须强行固化（如固定 16 日），以防样本外塌陷。
-
-### 2.3 跨资产组合的负相关对冲效应极其稳健
-* 所有权益策略与国债/黄金防御腿的平均相关系数均在 **-0.05 到 -0.06** 之间，表现出极强的自然正交性。这证明了大类资产配置中“降配权益、超配黄金国债”是真正的非对称防御，而非简单的假防守。
+* 除了 `size-earnings` 和 `industry-neglect-rotation` 表现出极低的 PBO 之外，其余小盘/低波等策略的 PBO 在 S2 模式下依然处于 **26% - 72%** 的高位。
+* **DSR 显著性检验**：由于多重测试惩罚（9 个均线备选参数），除 `illiquidity` (p ≈ 0.05) 外，其余策略的 DSR p-value 均远大于 0.05。
+* **核心启示**：牛熊切换信号具有高自相关性，切忌在回测中进行参数精细微调（p-hacking）。**必须保持切换均线窗口硬性固化（固定 16 日）**，防止样本外塌陷。
 
 ---
 
-## 3. 落地建议
-1. **统一将方案二（状态自适应权重）作为 Composer 层标准接口**。
-2. **将状态均线参数硬编码固化为 16 日**，禁止将其向外暴露为可调节参数，切断后续研发人员 p-hacking 的路径。
-3. **保持方案一（PolicyEngine）作为最外层硬防爆红线阀门**。当市场出现极端 panic（如 2018年大崩盘）且置信度高时，限制最大风险暴露。
+## 3. 落地建议与分流架构
 
+基于以上发现，我们对策略调节系统（Regime-Adaptive System）的架构设计提出以下修正方案：
+
+1. **执行 Beta 分流决策（Beta-Based Routing）**：
+   * **多头暴露类策略（Beta > 0.5）**：**默认启用**方案二（Regime-Adaptive Weights，均线固化为 16 日）。
+   * **市场中性对冲类策略（Beta ≈ 0）**：**强制禁用 / 旁路绕过** Regime-Adaptive 权重分配。此类策略维持 100% 静态分配（或使用策略内嵌的独立微观择时，如大盘成长的 hysteresis 净值均线），避免二次对冲导致阿尔法稀释与调仓成本损耗。
+
+2. **跨资产防御腿定位**：
+   * 黄金与国债 ETF 组合的平均相关性在 **-0.05** 左右，表现出稳健的非对称正交防御作用。它是多头策略降配时的黄金缓冲池，但不是中性对冲策略的避风港。
 """
     doc_path = Path("/Users/kiki/astcok/docs/regime_adaptive_all_strategies_report.md")
     doc_path.write_text(report, encoding="utf-8")
