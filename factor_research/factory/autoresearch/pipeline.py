@@ -259,6 +259,7 @@ def run_validation_pipeline(
                 "details": e.result.details,
                 "error": e.result.error,
                 "notes": e.notes,
+                "cost_spent_seconds": float(e.cost_spent_seconds) if e.cost_spent_seconds is not None else 0.0,
             }
             for e in experiments
         ],
