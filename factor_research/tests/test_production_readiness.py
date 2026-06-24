@@ -133,6 +133,32 @@ def test_build_production_readiness_blocks_stale_and_governance_failures():
     assert "governance:dsr_not_significant" in dsr_failed.blocking_reasons
 
 
+def test_build_production_readiness_surfaces_deployment_identity_error():
+    from runtime.production_readiness import build_production_readiness
+
+    readiness = build_production_readiness(
+        data_date="2026-06-18",
+        expected_trade_date="2026-06-18",
+        governance_status="approved",
+        decay_status="normal",
+        paper_status="ok",
+        trading_day_status="trading_day",
+        deployment_identity_error="illiquidity/v3.1 spec_hash 不匹配:清单=4f667d162dc5 注册=c9b026914617",
+    )
+    assert readiness.allowed is False
+    assert any(r.startswith("deployment_identity:") for r in readiness.blocking_reasons)
+
+    clean = build_production_readiness(
+        data_date="2026-06-18",
+        expected_trade_date="2026-06-18",
+        governance_status="approved",
+        decay_status="normal",
+        paper_status="ok",
+        trading_day_status="trading_day",
+    )
+    assert not any(r.startswith("deployment_identity:") for r in clean.blocking_reasons)
+
+
 def test_paper_latest_signal_ignores_drafts():
     from services.read import paper as P
 
@@ -182,6 +208,7 @@ if __name__ == "__main__":
     test_blocked_signal_writes_draft_and_preserves_formal_state()
     test_allowed_signal_writes_formal_signal_and_state()
     test_build_production_readiness_blocks_stale_and_governance_failures()
+    test_build_production_readiness_surfaces_deployment_identity_error()
     test_paper_latest_signal_ignores_drafts()
     test_scheduled_report_records_production_readiness()
     print("✅ test_production_readiness")

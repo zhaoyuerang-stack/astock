@@ -232,9 +232,13 @@ def build_production_readiness(
     paper_status: str = "",
     trading_day_status: str = "",
     data_issue_status: dict | str | None = None,
+    deployment_identity_error: str | None = None,
 ) -> ProductionReadinessView:
     blocking_reasons: list[str] = []
     warnings: list[str] = []
+
+    if deployment_identity_error:
+        blocking_reasons.append(f"deployment_identity:{deployment_identity_error[:80]}")
 
     data_date = _date_str(data_date)
     expected_trade_date = _date_str(expected_trade_date)
@@ -320,8 +324,11 @@ def get_production_readiness(
         governance_status = current_governance_status()
     try:
         expected_identity = current_deployment_identity()
-    except Exception:
+    except Exception as e:
         expected_identity = None
+        deployment_identity_error = str(e)
+    else:
+        deployment_identity_error = None
     if decay_status is None:
         decay_status = current_decay_status(root, expected=expected_identity)
     if paper_status is None:
@@ -339,4 +346,5 @@ def get_production_readiness(
         paper_status=paper_status or "",
         trading_day_status=trading_day_status or "",
         data_issue_status=data_issue_status,
+        deployment_identity_error=deployment_identity_error,
     )
