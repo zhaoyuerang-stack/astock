@@ -55,6 +55,7 @@ def _run_candidates(
     experiment_log: ExperimentLog | None = None,
     review_queue: ReviewQueue | None = None,
     runners: dict[str, Callable] | None = None,
+    computation_time_budget: float = 10.0,
 ) -> AutoResearchRunResponse:
     """共用驱动:一批已校验候选走真实 L0/L1/L2/L3 验证线。"""
     if max_stage not in {"l0", "l1", "l2", "l3"}:
@@ -83,6 +84,7 @@ def _run_candidates(
             runners=runners,
             sample_dates=sample_dates,
             max_stage=max_stage,
+            computation_time_budget=computation_time_budget,
         )
         results.append(
             AutoResearchRunResultView(

@@ -343,6 +343,7 @@ def post_autoresearch_run_llm(
     max_stage: str = "l1",
     start: str = "2018-01-01",
     sample_dates: int | None = 120,
+    computation_time_budget: float = 10.0,
     _confirmed: None = Depends(require_action_token),
 ) -> ActionJobView:
     """LLM 生成候选并走真实验证线。LLM 未配置 → 400。"""
@@ -354,6 +355,7 @@ def post_autoresearch_run_llm(
         max_stage=max_stage,
         start=start,
         sample_dates=sample_dates,
+        computation_time_budget=computation_time_budget,
     )
     audit_action("submit AutoResearch LLM", f"job_id={job.job_id} n={n} max_stage={max_stage}", status=job.status)
     return job
@@ -369,6 +371,8 @@ def post_autoresearch_island_search(
     use_llm: bool = True,
     start: str = "2018-01-01",
     sample_dates: int | None = 120,
+    complexity_weight: float = 0.0,
+    computation_time_budget: float = 10.0,
     _confirmed: None = Depends(require_action_token),
 ) -> ActionJobView:
     """多岛屿进化搜索(分钟级;LLM 可用时按主题播种,否则确定性种子)。"""
@@ -383,6 +387,8 @@ def post_autoresearch_island_search(
         use_llm=use_llm,
         start=start,
         sample_dates=sample_dates,
+        complexity_weight=complexity_weight,
+        computation_time_budget=computation_time_budget,
     )
     audit_action("submit AutoResearch island search", f"job_id={job.job_id} islands={islands}", status=job.status)
     return job
