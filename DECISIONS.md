@@ -223,6 +223,17 @@
 
 ---
 
+### ADR-025 大盘宇宙判定 Bug 修复（量纲校正与真实总市值接入）
+- **上下文**: 在对系统全策略进行牛熊状态自适应评估时，发现大中盘策略 `large-cap-growth-hedged` 的大盘宇宙过滤代码 [large_cap.py:build_universe](file:///Users/kiki/astcok/factor_research/factors/large_cap.py#L90-L94) 存在维度/量纲错误：计算市值 `cap` 时使用了 `ADTV (amount.rolling(20)) * raw_close`。由于成交额 `amount = 成交量 * 股价`，该公式实际计算的是 `成交量 * 股价^2`（量纲为 $\text{CNY}^2 / \text{share}$），导致大盘选股宇宙严重偏向绝对高股价而非大市值的个股，污染了策略真实的 Alpha。
+- **决策**:
+  1. 引入真实的日频总市值数据 `total_mv`。在 `load_clean_panels_with_growth` 中，通过 `load_daily_basic_panel` 从数据湖 `daily_basic` 表中载入当日真实总市值（万元），对齐并 ffill 填充。
+  2. 重构 `build_universe`：如果面板中存在 `total_mv`，则直接按其进行截面排序选取 `top_n=200` 公司；否则保留原逻辑作为 Fallback。
+  3. 通过 `raw_close.columns.tolist()` 将 Index 转化为 List，修复了 pandas Index 在 boolean 判断下的 truth-value 歧义错误。
+- **理由**: 修正维度错误保证了大盘宇宙的绝对真实性。重新评估后，`large-cap-growth-hedged` 的 Baseline 夏普由 0.54 修正为 0.44；而动态状态分配（S2）夏普提升至 0.71（+0.27 分离度，好于修复前的 +0.14），与黄金国债防御腿的相关系数下降为 -0.070，为组合配置提供了更优秀的正交性。
+- **验证**: 跑通了全部项目级测试（`test_all.sh`）。
+
+---
+
 ## ③ 投资/交易决策记录
 
 > 实盘/模拟盘的逐日决策**已自动落盘**:`factor_research/signals/<date>.json`(信号)+ Obsidian `30.output/A股v2.0模拟盘/`(操作卡)。本节只记**需人工复盘的关键决策**(regime 切换、风控动作、异常),不重复日常信号。
@@ -234,5 +245,6 @@
 | 2026-06-19 | — | 策略正式晋级与登记在册：`illiquidity-large-cap v1.0` | 通过 9-Gate 完整审计，满足 standalone 准入，高容量 alpha 储备 | ⚠️ 见下行:9-Gate 证据经查为照抄,已 ADR-017 修订 |
 | 2026-06-19 | — | **修订**:`illiquidity-large-cap v1.0` standalone 资格不成立,待退役/重分类(ADR-017) | 独立审计:Top800 自有宇宙 IC=−0.084 反向,58% 全来自 MA16 择时;9-Gate 证据照抄小盘家族 | 待 workflow 处置 |
 | 2026-06-20 | — | 整理 `illiquidity/clean-v1` 为首个干净登记范本(ADR-018) | 三轮搜索证实小盘仅一异象簇;唯一通过全套验真:L0 夏普1.05/IC t=5.94/金库样本外夏普2.08 | 待 workflow phase1~4(补 PBO) |
+| 2026-06-23 | — | 修复 `large-cap` 宇宙维度 Bug (ADR-025)，重新审计大容量策略 | 大盘宇宙过滤公式误用量纲 `ADTV * price`。校正为真实总市值 `total_mv`，测试全部通过 | 重算后 S2 表现更优（夏普 0.71/与防御正交性 -0.07） |
 
 > 复盘要点(填):切换是否过频(regime 无滞回)、成本损耗是否超预期、事后是否印证。损耗超预期 → 立新假设走研究流程,不私改口径。
