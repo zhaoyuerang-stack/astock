@@ -1455,6 +1455,91 @@ def test_llm_generation_injects_failure_ledger_into_prompt():
         assert "失败台账" not in captured["user"]
 
 
+def test_island_fitness_penalizes_complexity():
+    """测试在进化搜索中复杂度惩罚生效。"""
+    from factory.autoresearch.islands import run_island_search
+    from factory.autoresearch.complexity import compute_complexity
+
+    def fake_l0(hyp, *args, **kwargs):
+        return Experiment(
+            experiment_id="fake-l0",
+            hypothesis_id=hyp.id,
+            protocol=ExperimentProtocol.L0_IC_SCAN,
+            vintage_id=kwargs.get("vintage_id", "synthetic"),
+            result=ExperimentResult(metrics={"ICIR": 0.1}, details={"direction": "long"}),
+            decision=Decision.PROMOTE,
+            notes="fake l0 pass",
+        )
+
+    close, volume, amount = _synthetic_panel()
+    from factory.lines.line2_validation.l0_ic_scan import precompute_forward_returns
+    forward_ret = precompute_forward_returns(close)
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        result = run_island_search(
+            close, volume, amount, forward_ret,
+            vintage_id="synthetic",
+            n_islands=2, generations=1, population=4, top_k=4, rng_seed=7,
+            runners={"l0": fake_l0},
+            complexity_weight=0.1,
+            repository=CandidateRepository(root / "candidates.jsonl"),
+            experiment_log=ExperimentLog(root / "experiment_log.jsonl"),
+            review_queue=ReviewQueue(root / "review_queue.jsonl"),
+        )
+
+    assert result.champions
+    for c in result.champions:
+        # Calculate expected fitness: edge (0.1) + novelty_weight(0.25)*novelty - complexity_weight(0.1)*complexity
+        assert c.complexity > 0.0
+        expected_fit = abs(c.icir) + 0.25 * c.novelty - 0.1 * c.complexity
+        assert abs(c.fitness - expected_fit) < 1e-9
+
+
+def test_validation_pipeline_computation_time_budget():
+    """测试当计算耗时超出预算时，因子被舍弃。"""
+    from factory.autoresearch.pipeline import run_validation_pipeline
+
+    def slow_l0(hyp, *args, **kwargs):
+        return Experiment(
+            experiment_id="slow-l0",
+            hypothesis_id=hyp.id,
+            protocol=ExperimentProtocol.L0_IC_SCAN,
+            vintage_id=kwargs.get("vintage_id", "synthetic"),
+            result=ExperimentResult(metrics={"ICIR": 0.1}, details={"direction": "long"}),
+            decision=Decision.PROMOTE,
+            notes="fake l0 pass",
+            cost_spent_seconds=5.0,  # 耗时 5 秒
+        )
+
+    close, volume, amount = _synthetic_panel()
+    from factory.lines.line2_validation.l0_ic_scan import precompute_forward_returns
+    forward_ret = precompute_forward_returns(close)
+
+    # Simple candidate
+    cand = validate_candidate_ast({
+        "type": "linear_combo",
+        "terms": [{"factor": "volume_ratio", "params": {"window": 5}, "transforms": ["zscore"]}],
+        "thesis": {"mechanism": "test", "citation": "test"}
+    })
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        res = run_validation_pipeline(
+            cand,
+            close=close, volume=volume, amount=amount, forward_ret=forward_ret,
+            vintage_id="synthetic",
+            max_stage="l0",
+            computation_time_budget=2.0,  # 预算为 2 秒，小于 5 秒
+            runners={"l0": slow_l0},
+            repository=CandidateRepository(root / "candidates.jsonl"),
+            experiment_log=ExperimentLog(root / "experiment_log.jsonl"),
+            review_queue=ReviewQueue(root / "review_queue.jsonl"),
+        )
+        assert res.decision.value == "discard"
+        assert "computation time budget exceeded" in res.reason
+
+
 if __name__ == "__main__":
     test_json_ast_validation_rejects_free_string_and_unknown_ops()
     test_neutralize_declaration_rejected_until_runtime_supports_it()
@@ -1494,4 +1579,6 @@ if __name__ == "__main__":
     test_read_views_expose_candidates_and_review_queue()
     test_failure_ledger_aggregates_death_causes_with_evidence_gated_lessons()
     test_llm_generation_injects_failure_ledger_into_prompt()
+    test_island_fitness_penalizes_complexity()
+    test_validation_pipeline_computation_time_budget()
     print("✅ Auto Factor Research Engine tests passed")

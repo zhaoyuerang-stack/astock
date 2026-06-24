@@ -133,6 +133,7 @@ def run_validation_pipeline(
     sample_dates: int | None = None,
     max_stage: str = "l3",
     knowledge_graph=None,
+    computation_time_budget: float = 10.0,
 ) -> CandidateEvaluationResult:
     """Run a candidate through the existing real L0/L1/L2/L3 validation functions."""
     repository = repository or CandidateRepository()
@@ -207,6 +208,13 @@ def run_validation_pipeline(
     for stage in stage_order[: stop_at + 1]:
         if stage == "l0":
             exp = runners[stage](hyp, close, volume, amount, forward_ret, vintage_id=vintage_id, sample_dates=sample_dates)
+            if exp.cost_spent_seconds > computation_time_budget:
+                from dataclasses import replace
+                exp = replace(
+                    exp,
+                    decision=Decision.DISCARD,
+                    notes=f"computation time budget exceeded ({exp.cost_spent_seconds:.2f} s > {computation_time_budget} s)"
+                )
             if exp.decision == Decision.PROMOTE:
                 hyp = _hyp_with_status(hyp, HypothesisStatus.L0_PASSED)
                 direction = _direction_from_l0(exp)

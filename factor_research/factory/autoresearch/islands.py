@@ -178,6 +178,7 @@ class ChampionRecord:
     corr_to_book: float = 0.0
     turnover: float = 0.0
     provenance: dict = field(default_factory=dict)  # ADR-022 种子溯源(随冠军透出供审视/晋级)
+    complexity: float = 0.0
 
 
 @dataclass
@@ -205,6 +206,8 @@ def run_island_search(
     novelty_weight: float = 0.25,
     corr_weight: float = 0.0,
     turnover_weight: float = 0.0,
+    complexity_weight: float = 0.0,
+    computation_time_budget: float = 10.0,
     rediscovery_corr: float = 0.5,
     reference_panels: list | None = None,
     behavior_dates: int = 60,
@@ -231,6 +234,7 @@ def run_island_search(
         close=close, volume=volume, amount=amount, forward_ret=forward_ret,
         vintage_id=vintage_id, repository=repository, experiment_log=experiment_log,
         review_queue=review_queue, runners=runners, sample_dates=sample_dates,
+        computation_time_budget=computation_time_budget,
     )
 
     memo: dict[str, tuple[float, object]] = {}  # fingerprint -> (fitness, result)
@@ -291,6 +295,12 @@ def run_island_search(
         if turnover_weight > 0 and panel is not None:
             turn = topn_turnover(panel, top_n)
 
+        # Complexity penalty
+        comp_val = 0.0
+        if complexity_weight > 0:
+            from factory.autoresearch.complexity import compute_complexity
+            comp_val = float(compute_complexity(candidate).score)
+
         # 重发现硬闸:与在册腿相关 ≥ 阈值 = 该 edge 在册已捕获,**边际为零** →
         # 把 |ICIR| 归零(无论毛 IC 多高都不该霸占冠军席)。corr/turnover 罚仍计入,
         # 使重发现沉到所有真候选之下。WF OOS 发现:0.3 软罚压不住 0.76 IC 的 illiquidity 重发现。
@@ -300,7 +310,7 @@ def run_island_search(
         priority_adjustment = float(
             (result.metrics.get("knowledge_gate", {}) or {}).get("priority_adjustment", 1.0)
         )
-        fit = (edge + novelty_weight * nov - corr_weight * corr - turnover_weight * turn) * priority_adjustment
+        fit = (edge + novelty_weight * nov - corr_weight * corr - turnover_weight * turn - complexity_weight * comp_val) * priority_adjustment
         memo[candidate.fingerprint] = (fit, result)
         meta[candidate.fingerprint] = (island, generation, float(icir) if icir is not None else 0.0, candidate, nov, corr, turn)
         return fit
@@ -393,11 +403,14 @@ def run_island_search(
         result = l0_result
         if final_stage != "l0":
             result = run_validation_pipeline(candidate, max_stage=final_stage, **pipe_kw)
+        from factory.autoresearch.complexity import compute_complexity
+        comp_report = compute_complexity(candidate)
         champions.append(ChampionRecord(
             fingerprint=fp, island=island, generation=gen, icir=icir,
             expr=ast_expr(candidate.ast),
             status=result.status.value, decision=result.decision.value, reason=result.reason,
             novelty=nov, fitness=fit, corr_to_book=corr, turnover=turn,
             provenance=dict(candidate.provenance or {}),
+            complexity=float(comp_report.score),
         ))
     return IslandSearchResult(evaluated=evaluated, champions=champions)
