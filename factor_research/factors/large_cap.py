@@ -81,14 +81,23 @@ def load_clean_panels_with_growth(data_lake_path=Path("data_lake")):
     pb = raw_aligned / bps_aligned
     pb = pb.clip(lower=0.1, upper=30)
 
+    # Load total_mv for true market capitalization
+    from lake.load_lake import load_daily_basic_panel
+    basic_panels = load_daily_basic_panel(trade_dates, codes=raw_close.columns.tolist(), fields=["total_mv"])
+    total_mv = basic_panels["total_mv"].reindex(index=raw_close.index, columns=raw_close.columns).ffill().fillna(0.0)
+
     return {
         "pe": pe, "pb": pb,
         "roe": panels["roe"], "npy": panels["net_profit_yoy"],
         "raw_close": raw_close, "amount": amount, "close": close_adj,
+        "total_mv": total_mv,
     }
 
 def build_universe(panels, top_n=200):
     """Select the top N largest market cap stocks."""
+    if "total_mv" in panels:
+        return panels["total_mv"].rank(axis=1, ascending=False, pct=False) <= top_n
+    # Fallback to ADTV * price if total_mv not available
     cap = panels["amount"].rolling(20).mean() * panels["raw_close"]
     return cap.rank(axis=1, ascending=False, pct=False) <= top_n
 
