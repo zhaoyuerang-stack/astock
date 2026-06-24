@@ -335,7 +335,12 @@ export function DrilldownPanel({ row, onClose }: { row: InstitutionalRow; onClos
         {/* 失效边界 + 死因/下一步 */}
         <div className="border-t border-[#EFECE3] pt-3 space-y-1.5 text-[11px]">
           <Kv k="失效边界" v={Object.keys(fb).length ? Object.entries(fb).map(([k, v]) => `${k}=${v}`).join(" · ") : "—"} />
-          {r.deathCause ? <div className="text-danger">死因:{r.deathCause}</div> : <Kv k="失效信号 / 下一步" v={r.nextAction || "—"} />}
+          <Kv k="实测衰减(滚动3年夏普)" v={r.decayed != null ? (
+            <span className={r.decayed ? "text-danger" : "text-songshi"}>
+              {r.decayed ? "是" : "否"}{r.rolling3ySharpeLatest != null ? ` (${num(r.rolling3ySharpeLatest)})` : ""}
+            </span>
+          ) : "未计算"} />
+          {r.deathCause ? <div className="text-danger">死因:{r.deathCause}</div> : <Kv k="失效信号 / 下一步(静态)" v={r.nextAction || "—"} />}
         </div>
 
         {/* config + 研究记录(折叠)*/}

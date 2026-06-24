@@ -58,6 +58,10 @@ export interface InstitutionalRow {
   corrParentVersion: string | null; // 相关性对照的父版本号
   incrementalAlpha: number | null;  // 2C: 对父版本正交后的增量 alpha(年化)
   paramStability: number | null;    // 仍待:参数邻域通过率(需 param grid,未计算)
+  // 实测衰减(governance/decay.py::decay_check,版本级,与上面家族级 deathCause/nextAction 是两件事)
+  decayed: boolean | null;
+  rolling3ySharpeLatest: number | null;
+  decayCheckedAt: string | null;
 }
 
 export type VerdictTone = "success" | "ok" | "warn" | "danger" | "default";
@@ -118,6 +122,11 @@ export function toInstitutionalRow(s: StrategyView): InstitutionalRow {
     : null;
   const nextAction = isDead ? null : (s.decay_signal || null);
 
+  const dc = s.decay_check || {};
+  const decayed = typeof dc.decayed === "boolean" ? dc.decayed : null;
+  const rolling3ySharpeLatest = n(dc.rolling_3y_sharpe_latest);
+  const decayCheckedAt = typeof dc.checked_at === "string" ? dc.checked_at : null;
+
   const dsrP = n(ng.dsr_p);
   const dsrSig = typeof ng.dsr_significant === "boolean" ? ng.dsr_significant : null;
   const psr = n(ng.psr);
@@ -163,6 +172,7 @@ export function toInstitutionalRow(s: StrategyView): InstitutionalRow {
     corrParentVersion: typeof ng.corr_parent_version === "string" ? ng.corr_parent_version : null,
     incrementalAlpha: n(ng.incremental_alpha),
     paramStability: null,   // 参数邻域通过率仍需 param grid,未计算
+    decayed, rolling3ySharpeLatest, decayCheckedAt,
   };
 }
 

@@ -198,21 +198,21 @@ export default function OverviewPage() {
         </div>
 
         {/* 3. 今日执行清单:统一为标准卡,Step3 去重(结论已由横幅承担) */}
-        <Card title={<span className="font-quant tracking-wider uppercase text-[#5AA4AE]">今日策略执行清单 (Checklist)</span>} tone="ok">
+        <Card title={<span className="font-quant tracking-wider uppercase text-songshi">今日策略执行清单 (Checklist)</span>} tone="ok">
           <div className="space-y-6">
             {/* Step 1 */}
             <div className="flex gap-4">
               <div className="flex flex-col items-center">
-                <div className="w-6 h-6 rounded-full bg-[#5AA4AE]/20 border border-[#5AA4AE]/50 text-[#5AA4AE] text-xs font-semibold flex items-center justify-center">1</div>
-                <div className="w-[1px] flex-1 bg-[#3C4654]/40 my-1" />
+                <div className="w-6 h-6 rounded-full bg-songshi/10 border border-songshi/40 text-songshi text-xs font-semibold flex items-center justify-center">1</div>
+                <div className="w-[1px] flex-1 bg-line/60 my-1" />
               </div>
               <div className="pb-4">
-                <h4 className="text-[13px] font-bold text-[#EFEFEF]">第一步：市场状态研判 [Regime]</h4>
+                <h4 className="text-[13px] font-bold text-ink">第一步：市场状态研判 [Regime]</h4>
                 <div className="mt-1 flex items-center gap-2">
-                  <span className="text-[12px] px-2 py-0.5 rounded bg-[#5AA4AE]/15 text-[#5AA4AE] border border-[#5AA4AE]/25 font-quant">
+                  <span className="text-[12px] px-2 py-0.5 rounded bg-songshi/10 text-songshi border border-songshi/20 font-quant">
                     {market?.last_action || "等待中"}
                   </span>
-                  <span className="text-[12px] text-[#547689]">
+                  <span className="text-[12px] text-subink">
                     当前仓位指示: {market?.current_position === "cash" && bondHoldings.length > 0 ? "空仓防守 (已轮动持债)" : market?.current_position ?? "—"} ({holdingSummaryText})
                   </span>
                 </div>
@@ -222,12 +222,12 @@ export default function OverviewPage() {
             {/* Step 2 */}
             <div className="flex gap-4">
               <div className="flex flex-col items-center">
-                <div className="w-6 h-6 rounded-full bg-[#88ABDA]/20 border border-[#88ABDA]/50 text-[#88ABDA] text-xs font-semibold flex items-center justify-center">2</div>
-                <div className="w-[1px] flex-1 bg-[#3C4654]/40 my-1" />
+                <div className="w-6 h-6 rounded-full bg-qielan/10 border border-qielan/40 text-qielan text-xs font-semibold flex items-center justify-center">2</div>
+                <div className="w-[1px] flex-1 bg-line/60 my-1" />
               </div>
               <div className="pb-4">
-                <h4 className="text-[13px] font-bold text-[#EFEFEF]">第二步：日内执行信号 [Signal Actions]</h4>
-                <div className="mt-1 text-[12px] text-[#547689]">
+                <h4 className="text-[13px] font-bold text-ink">第二步：日内执行信号 [Signal Actions]</h4>
+                <div className="mt-1 text-[12px] text-subink">
                   {signalRows.length > 0 ? (
                     <span>共 {signalRows.length} 条信号，明细见下方「今日交易与轮动信号」表</span>
                   ) : (
@@ -240,11 +240,11 @@ export default function OverviewPage() {
             {/* Step 3:仅留前置校验明细,不再重述总结论 */}
             <div className="flex gap-4">
               <div className="flex flex-col items-center">
-                <div className="w-6 h-6 rounded-full bg-[#FAC03D]/20 border border-[#FAC03D]/50 text-[#FAC03D] text-xs font-semibold flex items-center justify-center">3</div>
+                <div className="w-6 h-6 rounded-full bg-taishi/20 border border-taishi/50 text-taishi text-xs font-semibold flex items-center justify-center">3</div>
               </div>
               <div>
-                <h4 className="text-[13px] font-bold text-[#EFEFEF]">第三步：前置风控拦截审计 [Compliance Guardrails]</h4>
-                <div className="mt-1 text-[12px] text-[#547689]">
+                <h4 className="text-[13px] font-bold text-ink">第三步：前置风控拦截审计 [Compliance Guardrails]</h4>
+                <div className="mt-1 text-[12px] text-subink">
                   准备度校验: 数据质量 {readiness?.data_status === "可用" ? "可用" : "异常"} · 模型版本 {readiness?.model_version.toUpperCase() ?? "—"} · 明细见右侧「前置合规校验」
                 </div>
               </div>
@@ -266,19 +266,19 @@ export default function OverviewPage() {
                     header: "方向",
                     render: (r) => (
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                        r.dir === "BUY" ? "bg-ok/10 text-ok" : r.dir === "HOLD" ? "bg-[#88ABDA]/10 text-[#88ABDA]" : "bg-danger/10 text-danger"
+                        r.dir === "BUY" ? "bg-ok/10 text-ok" : r.dir === "HOLD" ? "bg-taishi/20 text-taishi/80" : "bg-danger/10 text-danger"
                       }`}>{r.dir}</span>
                     ),
                   },
                   {
                     key: "name",
                     header: "标的",
-                    className: "font-medium text-[#EFEFEF]",
+                    className: "font-medium text-ink",
                     render: (r) => (
-                      <>{r.name} <span className="text-[11px] text-[#547689] font-mono">{r.code}</span></>
+                      <>{r.name} <span className="text-[11px] text-subink font-mono">{r.code}</span></>
                     ),
                   },
-                  { key: "refPrice", header: "参考价格", align: "right", className: "text-[#EFEFEF] font-mono", render: (r) => r.refPrice },
+                  { key: "refPrice", header: "参考价格", align: "right", className: "text-ink font-mono", render: (r) => r.refPrice },
                   { key: "sharesText", header: "估算股数", align: "right", className: "text-subink font-mono", render: (r) => r.sharesText },
                   { key: "notionalText", header: "估算名义额", align: "right", className: "text-subink font-mono", render: (r) => r.notionalText },
                 ]}
@@ -302,12 +302,26 @@ export default function OverviewPage() {
               </div>
               <div className="flex justify-between items-center py-1.5 border-b border-cardline/30">
                 <span className="text-subink">资金流动性预估 (Liquidity)</span>
-                <span className="font-semibold text-[#EFEFEF]">{readiness?.liquidity_status.toUpperCase() ?? "—"}</span>
+                <span className="font-semibold text-ink">{readiness?.liquidity_status.toUpperCase() ?? "—"}</span>
               </div>
               <div className="flex justify-between items-center py-1.5">
                 <span className="text-subink">人工签名确认 (Signoff Needed)</span>
-                <span className="font-semibold text-[#EFEFEF]">{readiness?.human_approval_required ? "YES" : "NO"}</span>
+                <span className="font-semibold text-ink">{readiness?.human_approval_required ? "YES" : "NO"}</span>
               </div>
+              {(() => {
+                const reasons: string[] = readiness?.details?.production_readiness?.blocking_reasons ?? [];
+                if (!reasons.length) return null;
+                return (
+                  <div className="pt-1.5 border-t border-cardline/30">
+                    <span className="text-subink block mb-1">拦截原因 (Blocking Reasons)</span>
+                    <ul className="space-y-0.5">
+                      {reasons.map((r) => (
+                        <li key={r} className="font-mono text-[11px] text-danger">· {r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })()}
             </div>
           </Card>
         </div>
@@ -322,13 +336,13 @@ export default function OverviewPage() {
               {
                 key: "name",
                 header: "标的",
-                className: "font-medium text-[#EFEFEF]",
-                render: (p) => (<>{p.name} <span className="text-[11px] text-[#547689] font-mono">{p.code}</span></>),
+                className: "font-medium text-ink",
+                render: (p) => (<>{p.name} <span className="text-[11px] text-subink font-mono">{p.code}</span></>),
               },
               { key: "shares", header: "持有股数", align: "right", className: "font-mono text-subink", render: (p) => p.shares },
               { key: "cost", header: "持仓成本", align: "right", className: "font-mono text-subink", render: (p) => p.cost.toFixed(3) },
-              { key: "price", header: "当前市价", align: "right", className: "font-mono text-[#EFEFEF]", render: (p) => p.price?.toFixed(3) ?? "—" },
-              { key: "mv", header: "持仓市值", align: "right", className: "font-mono text-[#EFEFEF]", render: (p) => num(p.mv, 0) },
+              { key: "price", header: "当前市价", align: "right", className: "font-mono text-ink", render: (p) => p.price?.toFixed(3) ?? "—" },
+              { key: "mv", header: "持仓市值", align: "right", className: "font-mono text-ink", render: (p) => num(p.mv, 0) },
               {
                 key: "pnl",
                 header: "持仓盈亏",
