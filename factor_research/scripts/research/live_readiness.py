@@ -40,17 +40,27 @@ if in_market and holdings:
 else:
     print("  容量   : (空仓,无需)")
 
-# ── 失效状态 ──
+# ── 失效状态(decay_status.json 是 scripts/ops/decay_monitor.py 写的多版本 schema:
+#    {"strategies": [{"strategy": "family.version", "decayed", "rolling_3y_sharpe_latest",
+#    "reasons", "action"}, ...]},不是旧版单策略 IC schema,按 small-cap-size.v2.0 取一条)──
 dp = Path("reports/decay_status.json")
+STRATEGY_NAME = "small-cap-size.v2.0"
 if dp.exists():
     d = json.loads(dp.read_text())
-    warn = str(d.get("status", "")).startswith("🔴")
-    print(f"  失效   : {d['status']}  (IC {d['ic']} vs 历史 {d['ic_hist']} | 小盘动量 {d['rel_mom']:+.1%} | 滚动夏普 {d['roll_sharpe']})  更新 {d.get('updated')}")
-    if d.get("msgs"):
-        print(f"           触发: {', '.join(d['msgs'])}")
+    entry = next((s for s in d.get("strategies", []) if s.get("strategy") == STRATEGY_NAME), None)
+    if entry is not None:
+        warn = bool(entry.get("decayed"))
+        sh = entry.get("rolling_3y_sharpe_latest")
+        print(f"  失效   : {'🔴 衰减' if warn else '🟢 健康'}  (滚动3年夏普 {sh} | {entry.get('action', '')})  "
+              f"更新 {d.get('generated_at', '')}")
+        if entry.get("reasons"):
+            print(f"           触发: {'; '.join(entry['reasons'])}")
+    else:
+        warn = True
+        print(f"  失效   : ⚠️ decay_status.json 里没有 {STRATEGY_NAME},跑 decay_monitor 刷新")
 else:
     warn = True
-    print("  失效   : ⚠️ decay_status.json 缺失,跑 decay_monitor 刷新(上次🔴预警:size因子IC衰减)")
+    print("  失效   : ⚠️ decay_status.json 缺失,跑 decay_monitor 刷新")
 
 # ── 综合建议 ──
 print("-" * 58)

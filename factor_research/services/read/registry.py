@@ -37,6 +37,7 @@ def list_strategies() -> list[StrategyView]:
                 style_betas=fam.get("style_betas", {}) or {},
                 failure_boundaries=fam.get("failure_boundaries", {}) or {},
                 decay_signal=fam.get("decay_signal", "") or "",
+                decay_check=v.get("decay_check", {}) or {},
             ))
     return out
 

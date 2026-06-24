@@ -130,15 +130,24 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocke
               f"- 择时: {'🟢 持仓' if signal['in_market'] else '🔴 空仓'}  (小盘指数 vs MA16: {dist:+.2%})",
               f"  > 小盘指数=成交额后50%股票的等权平均净值. MA16=其16日均线.",
               f"  > 站上MA16=小盘趋势向好→持仓; 跌破=小盘走弱→空仓."]
+    # decay_status.json 是 scripts/ops/decay_monitor.py 写的多版本 schema
+    # ({"strategies": [{"strategy": "family.version", "decayed", "rolling_3y_sharpe_latest",
+    # "reasons", "action"}, ...]}),按本卡实际部署的 illiquidity.{strategy_ver} 取一条。
+    decay_entry = None
     if decay:
-        lines += [f"- 失效: {decay['status']}  更新 {decay.get('updated')}",
-                  f"  > Rank IC={decay['ic']}(历史均值{decay['ic_hist']}): 因子选股排名和次日收益的相关性,>0=有效,<0=失效.",
-                  f"  > 小盘动量={decay['rel_mom']:+.1%}: 小盘相对于全市场的超额走势,正值=小盘跑赢.",
-                  f"  > 滚动夏普={decay['roll_sharpe']}: 近12个月策略风险调整收益,>1=良好,<0.5=预警."]
-        if decay.get("msgs"):
-            lines += [f"  - 触发: {', '.join(decay['msgs'])}"]
+        decay_entry = next(
+            (s for s in decay.get("strategies", []) if s.get("strategy") == f"illiquidity.{strategy_ver}"),
+            None,
+        )
+    if decay_entry is not None:
+        warn_tag = "🔴 衰减" if decay_entry.get("decayed") else "🟢 健康"
+        lines += [f"- 失效: {warn_tag}  更新 {decay.get('generated_at', '')}",
+                  f"  > 滚动3年夏普={decay_entry.get('rolling_3y_sharpe_latest')}: <0.5 触发退役复核.",
+                  f"  > {decay_entry.get('action', '')}"]
+        if decay_entry.get("reasons"):
+            lines += [f"  - 触发: {'; '.join(decay_entry['reasons'])}"]
     else:
-        lines += ["- 失效: (decay_status.json 缺失,跑 decay_monitor 刷新)"]
+        lines += ["- 失效: (decay_status.json 缺失或无 illiquidity 条目,跑 decay_monitor 刷新)"]
 
     # ── 轮动建议 ──
     rotation = signal.get("rotation", {})

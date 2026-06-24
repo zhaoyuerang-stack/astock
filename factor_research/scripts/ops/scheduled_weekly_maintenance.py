@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 
 LOG_DIR = ROOT / "logs/weekly_maintenance"
 REPORT_DIR = ROOT / "reports/ops/weekly_maintenance"
-PYTHON = "/usr/bin/python3"
+PYTHON = "/opt/homebrew/bin/python3"
 
 
 class Tee:
@@ -104,7 +104,7 @@ def run_weekly(args):
             # v2.0 实盘监控三件套:失效监控 → 容量/可成交 → 就绪卡
             report["decay_monitor"] = run_subprocess(
                 "v2.0 decay monitor (失效监控 → reports/decay_status.json)",
-                [PYTHON, "-m", "scripts.research.decay_monitor"],
+                [PYTHON, "-m", "scripts.ops.decay_monitor"],
                 dry_run=args.dry_run,
             )
             report["tradability"] = run_subprocess(

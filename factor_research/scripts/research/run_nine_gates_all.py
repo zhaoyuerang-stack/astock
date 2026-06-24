@@ -45,6 +45,9 @@ STRATEGY_TO_FAMILY = {
 VERSION_OVERRIDES = {
     ("large_cap", "v1.1"): {"w_cpv_max": 0.5},
     ("large_cap", "v1.1-full"): {"w_cpv_max": 0.5},
+    # v1.0-full 与 v1.0 config 逐字段相同(仅回测窗口不同,_taibook_start 已从台账自动取),
+    # 空字典不是占位符——唯一作用是让 _auditable() 的成员判断为 True,不被 --audit-stale 漏审。
+    ("hq_momentum", "v1.0-full"): {},
 }
 
 # illiquidity 各台账版本的真实配置规格(对齐 strategy_versions.json 的 config):

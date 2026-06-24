@@ -39,24 +39,31 @@ DECAY_FILE = ROOT / "reports" / "decay_status.json"
 # ═══════════════════════════════════════════════════
 
 def check_decay() -> dict:
-    """Read decay_status.json, return status dict."""
+    """Read decay_status.json(scripts/ops/decay_monitor.py 写的多版本 schema:
+    {"strategies": [{"strategy": "family.version", "decayed", "rolling_3y_sharpe_latest",
+    "reasons", "action"}, ...]}),取部署身份对应的那一条(身份不明时退回第一个
+    illiquidity.* 条目保底,不空手)。"""
     if not DECAY_FILE.exists():
         return {"status": "⚠️ 无数据", "alerts": [],
                 "detail": "decay_status.json 缺失，先跑 decay_monitor"}
 
     d = json.loads(DECAY_FILE.read_text())
+    family, version = d.get("family", "illiquidity"), d.get("version", "")
+    name = f"{family}.{version}" if version else None
+    strategies = d.get("strategies", [])
+    entry = next((s for s in strategies if s.get("strategy") == name), None) if name else None
+    if entry is None:
+        entry = next((s for s in strategies if str(s.get("strategy", "")).startswith("illiquidity.")), {})
     status = d.get("status", "?")
-    alerts = d.get("msgs", [])
+    alerts = entry.get("reasons", [])
     return {
         "status": status,
         "alerts": alerts,
-        "ic": d.get("ic", 0),
-        "ic_hist": d.get("ic_hist", 0),
-        "rel_mom": d.get("rel_mom", 0),
-        "roll_sharpe": d.get("roll_sharpe", 0),
-        "strategy": d.get("strategy", "illiquidity"),
-        "updated": d.get("updated", "?"),
-        "level": "critical" if "🔴" in status else "warning" if "🟡" in status else "ok",
+        "decayed": entry.get("decayed"),
+        "rolling_3y_sharpe": entry.get("rolling_3y_sharpe_latest", 0),
+        "strategy": entry.get("strategy", family),
+        "updated": d.get("generated_at", "?"),
+        "level": "critical" if entry.get("decayed") else "ok",
     }
 
 
@@ -158,9 +165,8 @@ def notify_obsidian(checks: dict, overall_level: str):
         "",
         "## 📉 失效监控",
         f"- 状态: {decay.get('status', '?')}",
-        f"- 非流动性 IC: {decay.get('ic', 0):+.3f} (历史均 {decay.get('ic_hist', 0):+.3f})",
-        f"- 小盘相对动量: {decay.get('rel_mom', 0):+.1%}",
-        f"- 滚动 12月夏普: {decay.get('roll_sharpe', 0):.2f}",
+        f"- 策略: {decay.get('strategy', '?')}",
+        f"- 滚动3年夏普: {decay.get('rolling_3y_sharpe', 0):.2f}(<0.5 触发退役复核)",
         f"- 更新: {decay.get('updated', '?')}",
     ]
 

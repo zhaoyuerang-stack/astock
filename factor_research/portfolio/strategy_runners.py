@@ -114,6 +114,10 @@ def _run_etf_trend(code: str, ma: int = 60, start: str = "2018-01-01") -> pd.Ser
 #   ACTIVE = 进入组合，贡献组合层 alpha
 #   SHADOW = 不进入组合 (paper trade 观察期，等待恢复或正式退役)
 #
+# 下面写死的 status 是历史种子值;模块加载时 _apply_registry_catalog_status() 会用
+# 台账 catalog_status 字段(workflow/promote.py::_run_marginal 边际贡献算完自动写入)
+# 覆盖——之后调级不必再改这个文件,除非该 family/version 在台账里还没有 catalog_status。
+#
 # 决策依据 (2026-06-07 实测 2018-2026 全样本)：
 #   illiquidity v1.0:   单 Sharpe 1.78，组合基线
 #   small-cap v2.0:     marginal +0.104 (加入提升组合) → ACTIVE
@@ -207,6 +211,34 @@ def run_size_earnings(start: str = "2018-01-01") -> pd.Series:
 
 
 RESEARCH_STRATEGY_CATALOG["size-earnings.v1.0"]["fn"] = run_size_earnings
+
+
+def _apply_registry_catalog_status(catalog: dict) -> None:
+    """用台账 catalog_status(workflow/promote.py::_run_marginal 写入,见 strategy_registry.
+    attach_catalog_status)覆盖目录里写死的 status 字符串——取代过去"算完边际贡献只打印,
+    人工改这个文件里的字符串"的流程。模块加载时跑一次(够用:边际定级是低频事件,非
+    实时信号);ETF 跨资产腿(无 family/version 对应台账条目)查不到,保留写死默认值。
+    """
+    try:
+        import strategy_registry
+        data = strategy_registry._load()
+    except Exception:
+        return
+    fam_by_id = {f["id"]: f for f in data.get("families", [])}
+    for name, spec in catalog.items():
+        family, _, version = name.partition(".")
+        fam = fam_by_id.get(family)
+        if fam is None:
+            continue
+        v = next((x for x in fam.get("versions", []) if x.get("version") == version), None)
+        if v is None:
+            continue
+        status = (v.get("catalog_status") or {}).get("status")
+        if status in {"ACTIVE", "SHADOW"}:
+            spec["status"] = status
+
+
+_apply_registry_catalog_status(RESEARCH_STRATEGY_CATALOG)
 
 # 向后兼容别名：外部(scratch/metasearch/apps)仍 import LIVE_STRATEGIES。
 # 不再代表生产事实——「在跑什么」看 DeploymentManifest。

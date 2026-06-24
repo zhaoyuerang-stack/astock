@@ -305,8 +305,16 @@ def _run_marginal(spec, report):
         mres = marginal_alpha(cand_bare, live)
         print(f"  [marginal-residual] corr(book)={mres.get('corr_to_book')} "
               f"残差夏普={mres.get('residual_sharpe')} → {mres['marginal_verdict']}", flush=True)
-        if "冗余" in mres.get("marginal_verdict", ""):
-            print("  ⚠️ 残差判定冗余:与在册组合同质,建议 SHADOW 不并实盘权重(governance 据此降级)。", flush=True)
+        catalog_status = "SHADOW" if "冗余" in mres.get("marginal_verdict", "") else "ACTIVE"
+        if catalog_status == "SHADOW":
+            print("  ⚠️ 残差判定冗余:与在册组合同质,降级 SHADOW 不并实盘权重。", flush=True)
+        try:
+            import strategy_registry
+            strategy_registry.attach_catalog_status(report.family, report.version, catalog_status, marginal=mres)
+            print(f"  [marginal] 已写台账 catalog_status={catalog_status}"
+                  f"(portfolio/strategy_runners.py 下次加载时生效)", flush=True)
+        except Exception as e:
+            print(f"  [marginal] 写台账失败(non-fatal): {type(e).__name__}: {str(e)[:80]}", flush=True)
     except Exception as e:
         print(f"  marginal 跳过(non-fatal): {type(e).__name__}: {str(e)[:80]}", flush=True)
 
