@@ -37,6 +37,7 @@ STRATEGY_TO_FAMILY = {
     "large_cap": "large-cap-growth-hedged",
     "hq_momentum": "hq-momentum-hedged",
     "illiquidity": "illiquidity",
+    "roc_yc": "roc-yc",
 }
 
 # 台账版本 → 该版本真实 config 的非周期参数（来自 strategy_versions.json 的 config 字段）。
@@ -153,11 +154,45 @@ def _apply_version_overrides(config, strategy_name, version, start):
     if start:
         overrides["start"] = start
     else:
-        fam = STRATEGY_TO_FAMILY.get(strategy_name)
+        fam = STRATEGY_TO_FAMILY.get(strategy_name, strategy_name)
         ts = _taibook_start(fam, eff_version) if fam else None
         if ts:
             overrides["start"] = ts
     return dataclasses.replace(config, **overrides) if overrides else config
+
+
+def _load_spec_from_registry(family: str, version: str | None) -> dict | None:
+    """从台账载入策略规格 spec 字典。"""
+    if not version:
+        try:
+            import strategy_registry
+            data = strategy_registry._load()
+            for fam in data.get("families", []):
+                if fam["id"] == family:
+                    default_ver = DEFAULT_VERSIONS.get(family)
+                    if default_ver:
+                        for v in fam.get("versions", []):
+                            if v["version"] == default_ver and v.get("executable_spec") and v["executable_spec"].get("spec"):
+                                return v["executable_spec"]["spec"]
+                    for v in fam.get("versions", []):
+                        if v.get("executable_spec") and v["executable_spec"].get("spec"):
+                            return v["executable_spec"]["spec"]
+        except Exception:
+            pass
+        return None
+
+    try:
+        import strategy_registry
+        data = strategy_registry._load()
+        for fam in data.get("families", []):
+            if fam["id"] == family:
+                for v in fam.get("versions", []):
+                    if v["version"] == version:
+                        if v.get("executable_spec") and v["executable_spec"].get("spec"):
+                            return v["executable_spec"]["spec"]
+    except Exception:
+        pass
+    return None
 
 
 def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: bool = False,
@@ -168,102 +203,163 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
 
     # 1. Dynamically run strategy and retrieve outputs
     print(f"\n[Step 1] Loading and executing strategy '{strategy_name}'...", flush=True)
-    
-    if strategy_name == "small_cap":
-        from strategies.small_cap import run_small_cap_strategy, StrategyConfig
-        config = StrategyConfig()
-        config = _apply_version_overrides(config, strategy_name, version, start)
-        res = run_small_cap_strategy(config)
-        thesis = {
-            "mechanism": "做多极小市值个股（-log 成交额），获取流动性溢价与小市值规模溢价，并在行情转熊时使用择时过滤器空仓防守。",
-            "citation": "small_cap size premium"
-        }
-    elif strategy_name == "size_earnings":
-        from strategies.size_earnings import run_strategy, StrategyConfig
-        config = StrategyConfig()
-        config = _apply_version_overrides(config, strategy_name, version, start)
-        res = run_strategy(config)
-        thesis = {
-            "mechanism": "小盘效应与成长逻辑重合：利用 size 因子提供牛市弹性，结合 net_profit_yoy (净利润增长) 在熊市期提供质量安全锚。",
-            "citation": "size-earnings blend strategy"
-        }
-    elif strategy_name == "large_cap":
-        from strategies.large_cap import run_large_cap_strategy, StrategyConfig
-        config = StrategyConfig()
-        config = _apply_version_overrides(config, strategy_name, version, start)
-        res = run_large_cap_strategy(config)
-        # Note: large cap does not use volume/amount directly in factor, but we can evaluate the long premium factor
-        thesis = {
-            "mechanism": "做多大盘高质量估值合理白马股，并等权重做空大盘指数以剥离 Beta，捕捉纯粹大盘成长股特质超额收益。",
-            "citation": "large_cap growth hedged"
-        }
-    elif strategy_name == "hq_momentum":
-        from strategies.hq_momentum import run_hq_momentum_strategy, StrategyConfig
-        config = StrategyConfig()
-        config = _apply_version_overrides(config, strategy_name, version, start)
-        res = run_hq_momentum_strategy(config)
-        thesis = {
-            "mechanism": "做多高质量且前期具备动量共振特征的中大盘股票，对冲大盘指数，捕获高保真动量趋势残差收益。",
-            "citation": "high quality momentum hedged"
-        }
-    elif strategy_name == "illiquidity":
-        # 配置驱动适配器:按 ILLIQ_SPECS 复现各台账版本真实配置(因子/veto/择时/top_n),
-        # 让 9-Gate 审计 illiquidity 全部在册版本(v1.0/v1.1/v1.3/v3.1),非仅生产 v3.1。
-        from types import SimpleNamespace
-        ver = version or "v3.1"
-        spec = ILLIQ_SPECS.get(ver)
-        if spec is None:
-            raise ValueError(f"illiquidity 无 {ver} 配置规格;请在 ILLIQ_SPECS 按台账 config 补该版本")
-        from strategies.small_cap import load_price_panels, build_rebalance_weights
-        from factors.small_cap import small_cap_timing, small_cap_factor
-        from factors.alpha import transforms  # noqa: F401 register zscore/mad_clip/shift
-        from factors.alpha.base import FactorData
-        from factors.alpha.builtins.illiq import AmihudIlliq
-        from factors.veto import salience_covariance_veto
-        from services.actions.run_backtest import _band_exposure
-        from app_config.settings import get_settings
 
-        ts = start or _taibook_start("illiquidity", ver) or "2018-01-01"
-        config = SimpleNamespace(version=ver, start=ts)
+    family_id = STRATEGY_TO_FAMILY.get(strategy_name, strategy_name)
+    spec_dict = _load_spec_from_registry(family_id, version)
+
+    if spec_dict:
+        print(f"  Found executable_spec in registry for {family_id}/{version}. Running dynamically via ExecutableStrategySpec...", flush=True)
+        from core.strategy_spec import ExecutableStrategySpec
+        from strategies.executable import build_executable_strategy
+        from types import SimpleNamespace
+
+        ts = start or _taibook_start(family_id, version) or spec_dict.get("data", {}).get("warmup_start", "2018-01-01")
+        spec_dict["data"]["warmup_start"] = ts
+
+        spec = ExecutableStrategySpec.from_dict(spec_dict)
+        spec.validate()
+
+        from app_config.settings import get_settings
         warmup = get_settings().data.warmup_start
         ds = str(min(pd.Timestamp(ts), pd.Timestamp(warmup)).date())
+
+        from strategies.small_cap import load_price_panels
         close, volume, amount = load_price_panels(ds)
-        fdata = FactorData(close=close, volume=volume, amount=amount)
-        amihud = AmihudIlliq(window=20).mad_clip(5).zscore().shift(1).compute(fdata)
-        if spec["factor"] == "blend":   # v1.3: 0.5×illiq20 + 0.5×size60
-            factor = 0.5 * amihud + 0.5 * small_cap_factor(amount, window=60).shift(1)
-        else:
-            factor = amihud
-        veto = salience_covariance_veto(close).shift(1) if spec["veto"] else None
-        traw, _, tdist = small_cap_timing(close, amount, ma_window=16)
-        timing = _band_exposure(tdist) if spec["timing"] == "band" else traw
-        scheduled = build_rebalance_weights(
-            factor, close, top_n=spec["top_n"], rebalance_days=20, veto_factor=veto, veto_q=0.30,
-        )
+        prices = PricePanel(close=close, volume=volume, amount=amount)
+
+        strat = build_executable_strategy(spec, prices)
+
         res = {
-            "close": close, "volume": volume, "amount": amount, "factor": factor,
-            "scheduled_weights": scheduled, "timing": timing,
+            "close": prices.close,
+            "volume": prices.volume,
+            "amount": prices.amount,
+            "factor": strat.factor,
+            "scheduled_weights": strat.scheduled_weights,
+            "timing": strat.timing,
         }
+
+        thesis_mechanism = f"Spec-driven execution of {family_id} {version}"
+        thesis_citation = family_id
+        try:
+            import strategy_registry
+            data = strategy_registry._load()
+            for fam in data.get("families", []):
+                if fam["id"] == family_id:
+                    thesis_mechanism = fam.get("hypothesis", thesis_mechanism)
+                    thesis_citation = fam.get("name", thesis_citation)
+        except Exception:
+            pass
+
         thesis = {
-            "mechanism": ("Amihud 非流动性溢价(|ret|/amount,20日)"
-                          + ("+0.5×Size60 混合" if spec["factor"] == "blend" else "")
-                          + (";Salience Veto 30%" if spec["veto"] else "")
-                          + (";PureTrend MA16 " + ("Band" if spec["timing"] == "band" else "二值") + "择时")),
-            "citation": "Amihud (2002) illiquidity premium",
+            "mechanism": thesis_mechanism,
+            "citation": thesis_citation
         }
+        config = SimpleNamespace(version=spec.version, start=ts)
     else:
-        raise ValueError(f"Unknown strategy name: {strategy_name}")
+        if strategy_name == "small_cap":
+            from strategies.small_cap import run_small_cap_strategy, StrategyConfig
+            config = StrategyConfig()
+            config = _apply_version_overrides(config, strategy_name, version, start)
+            res = run_small_cap_strategy(config)
+            thesis = {
+                "mechanism": "做多极小市值个股（-log 成交额），获取流动性溢价与小市值规模溢价，并在行情转熊时使用择时过滤器空仓防守。",
+                "citation": "small_cap size premium"
+            }
+        elif strategy_name == "size_earnings":
+            from strategies.size_earnings import run_strategy, StrategyConfig
+            config = StrategyConfig()
+            config = _apply_version_overrides(config, strategy_name, version, start)
+            res = run_strategy(config)
+            thesis = {
+                "mechanism": "小盘效应与成长逻辑重合：利用 size 因子提供牛市弹性，结合 net_profit_yoy (净利润增长) 在熊市期提供质量安全锚。",
+                "citation": "size-earnings blend strategy"
+            }
+        elif strategy_name == "large_cap":
+            from strategies.large_cap import run_large_cap_strategy, StrategyConfig
+            config = StrategyConfig()
+            config = _apply_version_overrides(config, strategy_name, version, start)
+            res = run_large_cap_strategy(config)
+            thesis = {
+                "mechanism": "做多大盘高质量估值合理白马股，并等权重做空大盘指数以剥离 Beta，捕捉纯粹大盘成长股特质超额收益。",
+                "citation": "large_cap growth hedged"
+            }
+        elif strategy_name == "hq_momentum":
+            from strategies.hq_momentum import run_hq_momentum_strategy, StrategyConfig
+            config = StrategyConfig()
+            config = _apply_version_overrides(config, strategy_name, version, start)
+            res = run_hq_momentum_strategy(config)
+            thesis = {
+                "mechanism": "做多高质量且前期具备动量共振特征的中大盘股票，对冲大盘指数，捕获高保真动量趋势残差收益。",
+                "citation": "high quality momentum hedged"
+            }
+        elif strategy_name == "roc_yc":
+            from strategies.roc_yc import run_roc_yc_strategy, StrategyConfig
+            config = StrategyConfig(
+                blend_weight=0.5,
+                neutralize=True,
+                hedged=True,
+            )
+            config = _apply_version_overrides(config, strategy_name, version, start)
+            res = run_roc_yc_strategy(config)
+            thesis = {
+                "mechanism": "结合 A 股基本面资本回报率（ROC/ROE）与盈利收益率（YC/EP），即经典的乔·格林布拉特“神奇公式”，并在截面上剥离 CNE6 风格与行业暴露，最后做多高品质便宜股票并做空 top-800 市值等权基准以剥离 Beta，获取长期风格中性且市场中性的纯净超额收益。",
+                "citation": "Joel Greenblatt's Magic Formula (Style-Neutralized & Hedged)"
+            }
+        elif strategy_name == "illiquidity":
+            from types import SimpleNamespace
+            ver = version or "v3.1"
+            spec = ILLIQ_SPECS.get(ver)
+            if spec is None:
+                raise ValueError(f"illiquidity 无 {ver} 配置规格;请在 ILLIQ_SPECS 按台账 config 补该版本")
+            from strategies.small_cap import load_price_panels, build_rebalance_weights
+            from factors.small_cap import small_cap_timing, small_cap_factor
+            from factors.alpha import transforms  # noqa: F401 register zscore/mad_clip/shift
+            from factors.alpha.base import FactorData
+            from factors.alpha.builtins.illiq import AmihudIlliq
+            from factors.veto import salience_covariance_veto
+            from services.actions.run_backtest import _band_exposure
+            from app_config.settings import get_settings
+
+            ts = start or _taibook_start("illiquidity", ver) or "2018-01-01"
+            config = SimpleNamespace(version=ver, start=ts)
+            warmup = get_settings().data.warmup_start
+            ds = str(min(pd.Timestamp(ts), pd.Timestamp(warmup)).date())
+            close, volume, amount = load_price_panels(ds)
+            fdata = FactorData(close=close, volume=volume, amount=amount)
+            amihud = AmihudIlliq(window=20).mad_clip(5).zscore().shift(1).compute(fdata)
+            if spec["factor"] == "blend":
+                factor = 0.5 * amihud + 0.5 * small_cap_factor(amount, window=60).shift(1)
+            else:
+                factor = amihud
+            veto = salience_covariance_veto(close).shift(1) if spec["veto"] else None
+            traw, _, tdist = small_cap_timing(close, amount, ma_window=16)
+            timing = _band_exposure(tdist) if spec["timing"] == "band" else traw
+            scheduled = build_rebalance_weights(
+                factor, close, top_n=spec["top_n"], rebalance_days=20, veto_factor=veto, veto_q=0.30,
+            )
+            res = {
+                "close": close, "volume": volume, "amount": amount, "factor": factor,
+                "scheduled_weights": scheduled, "timing": timing,
+            }
+            thesis = {
+                "mechanism": ("Amihud 非流动性溢价(|ret|/amount,20日)"
+                              + ("+0.5×Size60 混合" if spec["factor"] == "blend" else "")
+                              + (";Salience Veto 30%" if spec["veto"] else "")
+                              + (";PureTrend MA16 " + ("Band" if spec["timing"] == "band" else "二值") + "择时")),
+                "citation": "Amihud (2002) illiquidity premium",
+            }
+        else:
+            raise ValueError(f"Unknown strategy name: {strategy_name}")
 
     # Extract returned components
     close = res["close"]
-    # Check if raw_close or alternative panels are needed
     volume = res.get("volume")
     if volume is None:
         volume = pd.DataFrame(1000.0, index=close.index, columns=close.columns)
     amount = res.get("amount")
     if amount is None:
         amount = volume * 100 * close
-        
+
     prices = PricePanel(close=close, volume=volume, amount=amount)
     factor = res["factor"]
     scheduled = res["scheduled_weights"]
@@ -282,13 +378,44 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
     # 3. Instantiate and run NineGatesEvaluator
     # n_trials 未显式指定 → 取研究账本搜索广度（多重检验诚实下界），替代硬编码 15
     if n_trials is None:
-        n_trials = _family_n_trials(STRATEGY_TO_FAMILY.get(strategy_name))
+        try:
+            n_trials = _family_n_trials(STRATEGY_TO_FAMILY.get(strategy_name, strategy_name))
+        except TrialCountUnknown as e:
+            try:
+                import strategy_registry
+                data = strategy_registry._load()
+                fam_id = STRATEGY_TO_FAMILY.get(strategy_name, strategy_name)
+                found = False
+                for fam in data.get("families", []):
+                    if fam["id"] == fam_id:
+                        for v in fam.get("versions", []):
+                            if v["version"] == config.version:
+                                nt = (v.get("nine_gate") or {}).get("n_trials")
+                                if nt is not None and int(nt) >= 1:
+                                    n_trials = int(nt)
+                                    found = True
+                                    break
+                        if found:
+                            break
+            except Exception:
+                pass
+            if n_trials is None:
+                print(f"  ⚠️ Warning: {e}. No search trials logged in governance ledger. Using default n_trials=1.")
+                n_trials = 1
         print(f"  [n_trials] 自动取该母策略台账迭代数 N={n_trials}（逐家族搜索广度，公平多重检验）", flush=True)
     print(f"\n[Step 2] Initializing 9-Gate Evaluator (n_trials={n_trials}, start={config.start}) & running audits...", flush=True)
-    
+
     # We define a stub factor builder to support look-ahead perturbation checks
     def factor_builder_stub(p: PricePanel) -> pd.DataFrame:
-        # Returns precomputed factor for look-ahead check (if it was static, look-ahead will show 0 diff)
+        if spec_dict:
+            try:
+                from core.strategy_spec import ExecutableStrategySpec
+                from strategies.executable import build_executable_strategy
+                s = ExecutableStrategySpec.from_dict(spec_dict)
+                strat_pert = build_executable_strategy(s, p)
+                return strat_pert.factor
+            except Exception as e:
+                print(f"  [lookahead check] Dynamic factor rebuild failed: {e}. Falling back to cached factor.")
         return factor
 
     evaluator = NineGatesEvaluator(
@@ -302,7 +429,7 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
 
     # Run the evaluation
     reports = evaluator.evaluate_all(signal, start=config.start)
-    
+
     # Check overall passed
     passed_all = all(r.passed for r in reports)
 
@@ -316,11 +443,11 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
 
     # 4. Save report
     markdown_content = report.to_markdown()
-    
+
     report_dir = ROOT / "reports" / "research"
     report_dir.mkdir(parents=True, exist_ok=True)
     report_path = report_dir / f"{strategy_name}_9_gates_report.md"
-    
+
     report_path.write_text(markdown_content, encoding="utf-8")
 
     print("\n" + "=" * 80)
@@ -337,7 +464,7 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
     summary.setdefault("strategy", strategy_name)
     summary.setdefault("version", config.version)
     if persist:
-        family_id = STRATEGY_TO_FAMILY.get(strategy_name)
+        family_id = STRATEGY_TO_FAMILY.get(strategy_name, strategy_name)
         if not family_id:
             print(f"  [persist] 跳过：{strategy_name} 无台账 family 映射")
         else:
@@ -365,13 +492,17 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
 
 
 # 各策略的默认版本(无 override 即审此版本)
-DEFAULT_VERSIONS = {"small_cap": "v2.0", "size_earnings": "v1.0", "large_cap": "v1.0", "hq_momentum": "v1.0"}
+DEFAULT_VERSIONS = {"small_cap": "v2.0", "size_earnings": "v1.0", "large_cap": "v1.0", "hq_momentum": "v1.0", "roc_yc": "v1.0"}
 
 
 def _auditable(strategy_name, version) -> bool:
     """该 (strategy, version) 是否有已知真实配置可审 —— 避免用错配置产出假 DSR。"""
     if strategy_name is None:
         return False
+    # If the version has an executable spec in the registry, it is auditable dynamically!
+    family_id = STRATEGY_TO_FAMILY.get(strategy_name, strategy_name)
+    if _load_spec_from_registry(family_id, version) is not None:
+        return True
     if strategy_name == "illiquidity":
         return version in ILLIQ_SPECS
     if (strategy_name, version) in VERSION_OVERRIDES:
@@ -390,7 +521,7 @@ def audit_stale_registered(persist: bool = True) -> list[dict]:
     data = strategy_registry._load()
     results: list[dict] = []
     for fam in data.get("families", []):
-        sname = fam_to_strat.get(fam["id"])
+        sname = fam_to_strat.get(fam["id"], fam["id"])
         for v in fam.get("versions", []):
             if v.get("status") != "在册":
                 continue
@@ -417,7 +548,6 @@ def audit_stale_registered(persist: bool = True) -> list[dict]:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run 9-Gate Strategy Evaluator")
     parser.add_argument("--strategy",
-                        choices=["small_cap", "size_earnings", "large_cap", "hq_momentum", "illiquidity"],
                         help="Strategy name to run evaluation on")
     parser.add_argument("--audit-stale", action="store_true",
                         help="自动补审:扫描所有未审计的在册版本,对配置已知者自动跑并落台账")
