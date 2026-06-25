@@ -4,9 +4,9 @@
   "pattern": "WF negative window 2018",
   "detail": "OOS annual=-9.1% in 2018",
   "fix": "Manual review needed.",
-  "hit_count": 15,
+  "hit_count": 21,
   "first_seen": "2026-06-06",
-  "last_seen": "2026-06-17",
+  "last_seen": "2026-06-24",
   "strategies": [
     "size-earnings-e2e",
     "small-cap-size",
@@ -21,6 +21,11 @@
     "small_cap_factor__window45",
     "small_cap_factor__window60",
     "small_cap_factor__window90",
-    "small_cap_factor__window120"
+    "small_cap_factor__window120",
+    "autoresearch_7258f152",
+    "autoresearch_4063f1c4",
+    "autoresearch_fb43fa16",
+    "autoresearch_a23f4dde",
+    "autoresearch_69ede240"
   ]
 }

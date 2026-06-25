@@ -2559,6 +2559,54 @@
       "failure_boundaries": {}
     },
     {
+      "id": "roc-yc",
+      "versions": [
+        {
+          "version": "v1.0",
+          "date": "2026-06-23",
+          "desc": "风格中性化与市值匹配对冲的神奇公式（ROC + YC）策略",
+          "config": {
+            "blend_weight": 0.5,
+            "neutralize": true,
+            "hedged": true,
+            "top_n": 25,
+            "rebalance_days": 20,
+            "leverage": 1.25,
+            "exclude_star": true
+          },
+          "data_scope": {
+            "period": "2018-2026",
+            "universe": "A股全市场（排除科创板688）"
+          },
+          "metrics": {
+            "annual": 0.069,
+            "maxdd": -0.3692,
+            "sharpe": 0.44,
+            "hit": false
+          },
+          "status": "参考",
+          "notes": "经过56次参数扫频，原始神奇公式在A股由于小盘垃圾股溢价跑输。通过Barra风格中性化成功扭转因子单调性（-1.00至+0.40），夏普回升至0.28。市值匹配对冲（Top-800）进一步将回撤从-54%降至-36.92%，夏普提升至0.44。由于DSR不显著（p-val=0.9554），未达独立在册门槛，记为参考。",
+          "evidence": {},
+          "admission": {},
+          "nine_gate": {
+            "dsr_p": 0.9554,
+            "psr": 0.786,
+            "n_trials": 56,
+            "wf_sharpe": 0.46,
+            "cv_sharpe": 0.46
+          }
+        }
+      ],
+      "name": "资本回报率与盈利收益率双因子组合",
+      "hypothesis": "结合A股基本面资本回报率（ROC/ROE）与盈利收益率（YC/EP），即经典的乔·格林布拉特“神奇公式”，并在截面上剥离CNE6风格与行业暴露，最后做多高品质便宜股票并做空top-800市值等权基准以对冲Beta风险，捕捉长期风格中性且市场中性的纯净基本面超额。",
+      "regime": "",
+      "decay_signal": "",
+      "status": "active",
+      "style_betas": {},
+      "capacity_m": 0.0,
+      "failure_boundaries": {}
+    },
+    {
       "id": "size-earnings",
       "versions": [
         {

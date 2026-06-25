@@ -64,6 +64,10 @@ echo "=== test_autoresearch_engine.py (Auto Factor Research Lite) ==="
 python3 tests/test_autoresearch_engine.py
 
 echo ""
+echo "=== test_agent_loop.py (5-Component Agent Control Loop) ==="
+python3 -m pytest tests/test_agent_loop.py -q
+
+echo ""
 echo "=== test_services_phase0.py (产品 services 接缝;全量比对设 PHASE0_FULL=1) ==="
 python3 tests/test_services_phase0.py
 
@@ -210,6 +214,10 @@ python3 tests/test_notify.py
 echo ""
 echo "=== test_catalog_status.py (边际贡献定级 ACTIVE/SHADOW 台账写入口) ==="
 python3 -m pytest tests/test_catalog_status.py -q
+
+echo ""
+echo "=== test_moving_average_overlay.py (防御择时参数独立DSR审计单元测试) ==="
+python3 -m pytest tests/test_moving_average_overlay.py -q
 
 echo ""
 echo "🎉 All tests passed!"

@@ -6,5 +6,6 @@ chained together.
 """
 from .hmm_macro_overlay import HMMMacroOverlay, OverlayMonitor, OverlayConfig
 from .pure_trend_overlay import PureTrendOverlay
+from .moving_average_overlay import MovingAverageOverlay
 
-__all__ = ["HMMMacroOverlay", "OverlayMonitor", "OverlayConfig", "PureTrendOverlay"]
+__all__ = ["HMMMacroOverlay", "OverlayMonitor", "OverlayConfig", "PureTrendOverlay", "MovingAverageOverlay"]
