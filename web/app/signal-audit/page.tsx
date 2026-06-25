@@ -5,7 +5,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
 import DataTable from "@/components/ui/DataTable";
 import { api, num } from "@/lib/api";
-import type { TradePlanView, TradeReadinessView, StrategyDetailView } from "@/lib/types";
+import type { TradePlanView, TradeReadinessView, StrategyDetailView, SystemConfigView } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 import { HashCopy, PipelineStepper, RiskBadge } from "@/components/ui/QuantComponents";
@@ -32,6 +32,7 @@ export default function SignalAuditPage() {
   const [paperPlan, setPaperPlan] = useState<TradePlanView | null>(null);
   const [readiness, setReadiness] = useState<TradeReadinessView | null>(null);
   const [strategyDetail, setStrategyDetail] = useState<StrategyDetailView | null>(null);
+  const [systemConfig, setSystemConfig] = useState<SystemConfigView | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
@@ -40,12 +41,14 @@ export default function SignalAuditPage() {
     Promise.all([
       api.paperPlan(),
       api.tradeReadiness(),
-      api.strategyDetail(selectedStrategyId, selectedStrategyVersion)
+      api.strategyDetail(selectedStrategyId, selectedStrategyVersion),
+      api.systemConfig()
     ])
-      .then(([pp, tr, sd]) => {
+      .then(([pp, tr, sd, sc]) => {
         setPaperPlan(pp);
         setReadiness(tr);
         setStrategyDetail(sd);
+        setSystemConfig(sc);
 
         const dataScope = sd?.strategy?.data_scope;
         const reproducibility = typeof dataScope === "object" && dataScope !== null 
@@ -53,19 +56,33 @@ export default function SignalAuditPage() {
           : null;
         const specHash = sd?.strategy?.nine_gate?.config_hash || reproducibility?.git_commit || "—";
 
+        const activeFamily = (sc?.strategy?.family as string) || "illiquidity";
+        const activeVersion = (sc?.strategy?.version as string) || "v3.1";
+        const isProd = selectedStrategyId === activeFamily && selectedStrategyVersion === activeVersion;
+
         setContext({
           page: "signal-audit",
           title: "信號審計系統",
-          summary: `當前信號審計：${tr.allowed_to_trade ? "【通過】" : "【攔截】"}。已鎖定 Spec Hash: ${specHash}。`,
-          evidence: [
+          summary: isProd 
+            ? `當前信號審計：${tr.allowed_to_trade ? "【通過】" : "【攔截】"}。已鎖定 Spec Hash: ${specHash}。`
+            : `當前策略為非運行生產策略。生產運行中主策略為: ${activeFamily} ${activeVersion}。`,
+          evidence: isProd ? [
             `信號發布狀態: ${tr.allowed_to_trade ? "正式發布" : "草稿/阻塞"}`,
             `選股管道漏斗: ${pp.candidates?.length ?? 0} 只候選 -> ${pp.plan?.length ?? 0} 只交易項目`,
             `大週期狀態: ${pp.regime || "—"}`,
             `數據集指紋: ${reproducibility?.data_snapshot ? "git_" + reproducibility.git_commit : "—"}`,
+          ] : [
+            `當前選定策略: ${selectedStrategyId} ${selectedStrategyVersion}`,
+            `生產運行策略: ${activeFamily} ${activeVersion}`,
+            `此非生產策略無每日實盤信號生成`,
           ],
-          risk: tr.allowed_to_trade ? [] : ["信號生成的數據指紋不一致，已觸發一致性阻尼攔截"],
-          recommendation: ["核對在冊代碼版本的 Git commit 標籤", "執行信號重新生成校驗"],
-          nextActions: ["前往「系統治理」下載本次審計證據包", "比對回測口徑與真實執行偏差"],
+          risk: isProd ? (tr.allowed_to_trade ? [] : ["信號生成的數據指紋不一致，已觸發一致性阻尼攔截"]) : [],
+          recommendation: isProd 
+            ? ["核對在冊代碼版本的 Git commit 標籤", "執行信號重新生成校驗"]
+            : ["如需查看實盤信號與審計，請在下拉選單切換至生產主策略"],
+          nextActions: isProd 
+            ? ["前往「系統治理」下載本次審計證據包", "比對回測口徑與真實執行偏差"]
+            : ["前往「策略實驗室」或「因子研究」查看該策略的歷史回測與九門禁審計指標"],
         });
       })
       .catch((e) => setErr(String(e)));
@@ -73,52 +90,63 @@ export default function SignalAuditPage() {
 
   useAutoRefresh(load);
 
+  const activeFamily = (systemConfig?.strategy?.family as string) || "illiquidity";
+  const activeVersion = (systemConfig?.strategy?.version as string) || "v3.1";
+  const isProductionStrategy = selectedStrategyId === activeFamily && selectedStrategyVersion === activeVersion;
+
   // Steps for PipelineStepper derived dynamically
   const candidatesCount = paperPlan?.candidates?.length ?? 0;
   const planCount = paperPlan?.plan?.length ?? 0;
 
-  const pipelineSteps = [
+  const pipelineSteps = isProductionStrategy ? [
     { name: "1. 原始候選池", count: "—", desc: "A股全市場覆蓋", status: "completed" as const },
     { name: "2. 否決器過濾", count: "—", desc: "排除 ST / 高風險", status: "completed" as const },
     { name: "3. 因子打分排序", count: candidatesCount > 0 ? `${candidatesCount} 只` : "—", desc: "策略選股成員", status: "active" as const },
     { name: "4. 執行調倉計劃", count: planCount > 0 ? `${planCount} 只` : "—", desc: "當前調倉執行項", status: planCount > 0 ? ("completed" as const) : ("pending" as const) },
+  ] : [
+    { name: "1. 原始候選池", count: "—", desc: "A股全市場覆蓋", status: "pending" as const },
+    { name: "2. 否決器過濾", count: "—", desc: "排除 ST / 高風險", status: "pending" as const },
+    { name: "3. 因子打分排序", count: "—", desc: "策略選股成員", status: "pending" as const },
+    { name: "4. 執行調倉計劃", count: "—", desc: "當前調倉執行項", status: "pending" as const },
   ];
 
   // Candidates list mapping dynamically
   const candidateRows: CandidateRow[] = [];
-  if (paperPlan?.plan && paperPlan.plan.length > 0) {
-    paperPlan.plan.forEach((item, index) => {
-      const isStAsset = item.name.includes("ST") || item.name.includes("*ST");
-      candidateRows.push({
-        rank: index + 1,
-        code: item.code,
-        name: item.name,
-        score: null,
-        amount: item.est_notional,
-        industry: null,
-        isSt: isStAsset,
-        reason: item.action === "BUY" ? "策略買入信號" : "策略賣出信號",
-        sizeExposure: null,
-        valueExposure: null,
-        momentumExposure: null,
+  if (isProductionStrategy) {
+    if (paperPlan?.plan && paperPlan.plan.length > 0) {
+      paperPlan.plan.forEach((item, index) => {
+        const isStAsset = item.name.includes("ST") || item.name.includes("*ST");
+        candidateRows.push({
+          rank: index + 1,
+          code: item.code,
+          name: item.name,
+          score: null,
+          amount: item.est_notional,
+          industry: null,
+          isSt: isStAsset,
+          reason: item.action === "BUY" ? "策略買入信號" : "策略賣出信號",
+          sizeExposure: null,
+          valueExposure: null,
+          momentumExposure: null,
+        });
       });
-    });
-  } else if (paperPlan?.candidates) {
-    paperPlan.candidates.forEach((c, index) => {
-      candidateRows.push({
-        rank: index + 1,
-        code: c.code,
-        name: c.name,
-        score: null,
-        amount: 0,
-        industry: null,
-        isSt: c.name.includes("ST") || c.name.includes("*ST"),
-        reason: "策略候選",
-        sizeExposure: null,
-        valueExposure: null,
-        momentumExposure: null,
+    } else if (paperPlan?.candidates) {
+      paperPlan.candidates.forEach((c, index) => {
+        candidateRows.push({
+          rank: index + 1,
+          code: c.code,
+          name: c.name,
+          score: null,
+          amount: 0,
+          industry: null,
+          isSt: c.name.includes("ST") || c.name.includes("*ST"),
+          reason: "策略候選",
+          sizeExposure: null,
+          valueExposure: null,
+          momentumExposure: null,
+        });
       });
-    });
+    }
   }
 
   // Execution risks data calculated dynamically
@@ -130,7 +158,7 @@ export default function SignalAuditPage() {
     return `${((count / totalCandidates) * 100).toFixed(1)}%`;
   };
 
-  const executionRisks = [
+  const executionRisks = isProductionStrategy ? [
     { 
       riskType: "漲停買不進", 
       count: getRiskCount("涨停"), 
@@ -159,6 +187,11 @@ export default function SignalAuditPage() {
       amount: "¥0", 
       action: "正常" 
     },
+  ] : [
+    { riskType: "漲停買不進", count: "—", ratio: "—", amount: "—", action: "非生產運行策略，不執行評估" },
+    { riskType: "跌停賣不出", count: "—", ratio: "—", amount: "—", action: "非生產運行策略，不執行評估" },
+    { riskType: "停牌 / 臨時停牌", count: "—", ratio: "—", amount: "—", action: "非生產運行策略，不執行評估" },
+    { riskType: "一字板限制", count: "—", ratio: "—", amount: "—", action: "非生產運行策略，不執行評估" },
   ];
 
   const dataScope = strategyDetail?.strategy?.data_scope;
@@ -181,39 +214,60 @@ export default function SignalAuditPage() {
         </div>
       )}
 
+      {!isProductionStrategy && (
+        <div className="p-4 bg-[#BF5AF2]/10 border border-[#BF5AF2]/20 rounded-lg text-sm text-[#BF5AF2] flex items-start gap-2.5">
+          <span className="text-sm mt-0.5">⚠️</span>
+          <div>
+            <div className="font-bold text-[#F5F5F7] text-[13px]">即時信號審計受限</div>
+            <div className="text-[#8E8E93] text-[12px] mt-1 leading-relaxed">
+              當前選取的策略 <span className="font-mono text-[#0A84FF] font-semibold">{selectedStrategyId} {selectedStrategyVersion}</span> 非生產部署狀態。
+              即時信號審計與交易執行清單僅對生產運行中的主策略（當前：<span className="font-mono text-[#F5F5F7] font-semibold">{activeFamily} {activeVersion}</span>）開放，以防止多策略口徑信號數據混淆。
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. 信號身份卡 */}
       <Card title="信號身份與部署元數據 (Signal Identity Fingerprint)">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-[12px] py-2">
           <div className="space-y-2">
             <div>
               <span className="text-[#8E8E93]">信號日期：</span>
-              <span className="font-bold text-[#F5F5F7] font-mono">{paperPlan?.signal_date || "2026-06-24"}</span>
+              <span className="font-bold text-[#F5F5F7] font-mono">{isProductionStrategy ? (paperPlan?.signal_date || "2026-06-24") : "—"}</span>
             </div>
             <div>
               <span className="text-[#8E8E93]">大周期狀態：</span>
-              <span className="font-bold text-[#F5F5F7]">{paperPlan?.regime === "bear" ? "🔴 BEAR (避險)" : "🟢 BULL (運行)"}</span>
+              <span className="font-bold text-[#F5F5F7]">
+                {isProductionStrategy ? (paperPlan?.regime === "bear" ? "🔴 BEAR (避險)" : "🟢 BULL (運行)") : "—"}
+              </span>
             </div>
             <div>
               <span className="text-[#8E8E93]">建議動作：</span>
-              <span className="text-[#0A84FF] font-bold">{paperPlan?.action || "—"}</span>
+              <span className="text-[#0A84FF] font-bold">{isProductionStrategy ? (paperPlan?.action || "—") : "—"}</span>
             </div>
           </div>
 
           <div className="space-y-2">
             <div>
               <span className="text-[#8E8E93]">發布狀態：</span>
-              <span className={`px-2 py-0.5 rounded text-[10px] border font-bold ${
-                readiness?.allowed_to_trade
-                  ? "text-[#30D158] bg-[#30D158]/10 border-[#30D158]/20"
-                  : "text-[#FF453A] bg-[#FF453A]/10 border-[#FF453A]/20"
-              }`}>
-                {readiness?.allowed_to_trade ? "正式發布" : "已阻塞 (草稿)"}
-              </span>
+              {isProductionStrategy ? (
+                <span className={`px-2 py-0.5 rounded text-[10px] border font-bold ${
+                  readiness?.allowed_to_trade
+                    ? "text-[#30D158] bg-[#30D158]/10 border-[#30D158]/20"
+                    : "text-[#FF453A] bg-[#FF453A]/10 border-[#FF453A]/20"
+                }`}>
+                  {readiness?.allowed_to_trade ? "正式發布" : "已阻塞 (草稿)"}
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded text-[10px] border font-bold text-[#8E8E93] bg-[#8E8E93]/10 border-[#8E8E93]/20">
+                  非生產部署
+                </span>
+              )}
             </div>
             <div>
               <span className="text-[#8E8E93]">部署 ID：</span>
               <span className="text-[#F5F5F7] font-mono">
-                deploy_{paperPlan?.signal_date ? paperPlan.signal_date.replace(/-/g, "") : "20260624"}_{selectedStrategyVersion}
+                {isProductionStrategy ? `deploy_${paperPlan?.signal_date ? paperPlan.signal_date.replace(/-/g, "") : "20260624"}_${selectedStrategyVersion}` : "—"}
               </span>
             </div>
             <div>
@@ -253,7 +307,7 @@ export default function SignalAuditPage() {
         <DataTable<CandidateRow>
           rows={candidateRows}
           getRowKey={(r) => r.code}
-          empty="當前無執行清單數據"
+          empty={isProductionStrategy ? "當前無執行清單數據" : "非運行中生產策略無即時交易信號數據。請切換至生產主策略以查看信號審計。"}
           columns={[
             {
               key: "rank",
