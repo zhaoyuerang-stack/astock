@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAppStore } from "@/lib/appStore";
+import { api } from "@/lib/api";
 
 export default function TopBar() {
   const {
@@ -17,13 +18,36 @@ export default function TopBar() {
   const [stratOpen, setStratOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
 
-  // Strategies available for switching
-  const strategyVersions = [
-    { id: "illiquidity", version: "v3.1", name: "illiquidity v3.1" },
-    { id: "illiquidity", version: "v3.0", name: "illiquidity v3.0" },
-    { id: "size-earnings", version: "v1.0", name: "size-earnings v1.0" },
-    { id: "roc-yc", version: "v1.0", name: "roc-yc v1.0" },
-  ];
+  // Strategies list loaded dynamically from backend and sorted alphabetically
+  const [strategyVersions, setStrategyVersions] = useState<{ id: string; version: string; name: string }[]>([]);
+
+  useEffect(() => {
+    api.strategies()
+      .then((data) => {
+        const sorted = [...data].sort((a, b) => {
+          if (a.family !== b.family) {
+            return a.family.localeCompare(b.family);
+          }
+          return b.version.localeCompare(a.version);
+        });
+        setStrategyVersions(
+          sorted.map((s) => ({
+            id: s.family,
+            version: s.version,
+            name: `${s.family} ${s.version}`,
+          }))
+        );
+      })
+      .catch(() => {
+        // Fallback static list
+        setStrategyVersions([
+          { id: "illiquidity", version: "v3.1", name: "illiquidity v3.1" },
+          { id: "illiquidity", version: "v3.0", name: "illiquidity v3.0" },
+          { id: "size-earnings", version: "v1.0", name: "size-earnings v1.0" },
+          { id: "roc-yc", version: "v1.0", name: "roc-yc v1.0" },
+        ]);
+      });
+  }, []);
 
   const getStatusColor = () => {
     switch (dataStatus) {
