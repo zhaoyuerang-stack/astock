@@ -245,19 +245,22 @@ def _named_out(named: list[dict]) -> tuple[AgentOutput, object]:
 
 
 def _each_out(data: list[dict]) -> tuple[AgentOutput, object]:
-    live = [s for s in data if s["status"] == "在册"]
+    live_count = sum(1 for s in data if s["status"] == "在册")
+    display_list = [s for s in data if s["status"] == "在册"]
+    if not display_list:
+        display_list = [s for s in data if s["status"] in ("参考", "候选")]
     proj = [
         {"id": s["strategy_id"], "status": s["status"], "family_name": s.get("family_name"),
          "hypothesis": (s.get("hypothesis") or "")[:50], **(s.get("metrics") or {})}
-        for s in live[:30]
+        for s in display_list[:30]
     ]
     out = AgentOutput(
-        summary=f"在册 {len(live)} 个策略,台账共 {len(data)} 个版本。",
-        evidence=[_metric_line(s) for s in live[:10]],
+        summary=f"在册 {live_count} 个策略,台账共 {len(data)} 个版本。" if live_count > 0 else f"在册 0 个策略（已全部降级防守；当前候选/参考共 {len(display_list)} 个），台账共 {len(data)} 个版本。",
+        evidence=[_metric_line(s) for s in display_list[:10]],
         recommendation=["绩效为历史回测口径,不构成买卖建议"],
         confidence=0.85,
     )
-    return out, {"在册策略数": len(live), "台账版本总数": len(data), "在册策略": proj}
+    return out, {"在册策略数": live_count, "台账版本总数": len(data), "在册策略": proj}
 
 
 def _match_family(data: list[dict], hint: str | None) -> list[dict]:
@@ -277,6 +280,7 @@ def _strategies_answer(data: list[dict], request: str, intent: str | None = None
     """返回 (确定性 out, 给 DeepSeek 讲解用的 data)。
     intent 由 LLM 给出时纯意图驱动;intent=None(LLM 不可用)时回退关键词判别。"""
     live = [s for s in data if s["status"] == "在册"]
+    rank_pool = live if live else [s for s in data if s["status"] in ("参考", "候选")]
     if intent is None:                                   # ── 离线降级:关键词 ──
         named = _match_family(data, request)
         if named:
@@ -284,7 +288,7 @@ def _strategies_answer(data: list[dict], request: str, intent: str | None = None
         if any(k in (request or "") for k in ("每个", "各个", "逐个", "分别", "都有哪些", "哪些策略", "所有策略", "各策略")):
             return _each_out(data)
         if _wants_best_strategy(request):
-            return _ranking_out(live, rank_by)
+            return _ranking_out(rank_pool, rank_by)
         return _count_out(data, live), data
     # ── 在线:LLM 意图驱动(排名/计数仍由代码算)──
     if intent == "named":
@@ -293,7 +297,7 @@ def _strategies_answer(data: list[dict], request: str, intent: str | None = None
             return _named_out(named)
         return _count_out(data, live), data              # 名字没对上(LLM 抽错)→ 安全退回
     if intent == "ranking":
-        return _ranking_out(live, rank_by)
+        return _ranking_out(rank_pool, rank_by)
     if intent == "each":
         return _each_out(data)
     return _count_out(data, live), data                  # count / overview / 兜底
