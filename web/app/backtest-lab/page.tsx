@@ -105,6 +105,33 @@ export default function BacktestLabPage() {
 
   const selectedSegment = segments[activeSegmentTab];
 
+  // Dynamic SVG path generator based on annual returns and maxdd
+  const generateNAVPoints = (ann: number, maxdd: number) => {
+    const years = 8;
+    const finalAsset = Math.pow(1 + ann, years);
+    const endY = Math.max(20, Math.min(170, 170 - ((finalAsset - 1.0) / 5.0) * 150));
+    
+    // Intermediate random-walk nodes styled by return and drawdown
+    const p1 = 170 - (170 - endY) * 0.15 + (maxdd * 20);
+    const p2 = 170 - (170 - endY) * 0.30 - (maxdd * 10);
+    const p3 = 170 - (170 - endY) * 0.45 + (maxdd * 30);
+    const p4 = 170 - (170 - endY) * 0.60 - (maxdd * 15);
+    const p5 = 170 - (170 - endY) * 0.75 + (maxdd * 40);
+    const p6 = 170 - (170 - endY) * 0.90;
+    
+    return `20,170 80,${p1.toFixed(0)} 140,${p2.toFixed(0)} 200,${p3.toFixed(0)} 260,${p4.toFixed(0)} 320,${p5.toFixed(0)} 440,${p6.toFixed(0)} 600,${endY.toFixed(0)}`;
+  };
+
+  const generateDrawdownPath = (maxdd: number) => {
+    const maxDrop = Math.abs(maxdd) * 120;
+    const p1 = 195 - maxDrop * 0.1;
+    const p2 = 195 - maxDrop * 0.7;
+    const p3 = 195 - maxDrop * 0.3;
+    const p4 = 195 - maxDrop * 0.9;
+    const p5 = 195 - maxDrop * 0.2;
+    return `M 20,195 L 80,${p1.toFixed(0)} L 140,195 L 200,${p2.toFixed(0)} L 260,195 L 320,195 L 380,${p3.toFixed(0)} L 440,${p4.toFixed(0)} L 500,195 L 560,${p5.toFixed(0)} L 600,195 Z`;
+  };
+
   // Parameter sensitivity heatmap data structure (Holding Limit vs Signal Threshold)
   const heatmapRows = [
     { threshold: "0.80", limit10: 1.15, limit12: 1.45, limit15: 1.58, limit20: 1.35 },
@@ -115,15 +142,20 @@ export default function BacktestLabPage() {
 
   // Helper colors for heatmap intensity
   const getHeatmapColor = (val: number) => {
-    if (val >= 1.70) return "bg-[#35D06E] text-bg font-bold";
-    if (val >= 1.50) return "bg-[#35D06E]/70 text-bg";
-    if (val >= 1.30) return "bg-[#3D7BFF]/50 text-ink";
-    return "bg-[#1F3550]/40 text-subink";
+    if (val >= 1.70) return "bg-[#30D158] text-bg font-bold";
+    if (val >= 1.50) return "bg-[#30D158]/70 text-bg";
+    if (val >= 1.30) return "bg-brand/50 text-ink";
+    return "bg-line/40 text-subink";
   };
 
   // SVG dimensions for Backtest Chart
   const W = 620;
   const H = 200;
+
+  // Formatted display values
+  const displayCalmar = metrics?.calmar !== undefined ? metrics.calmar.toFixed(2) : "1.38";
+  const displayTurnover = metrics?.turnover_annual !== undefined ? `${(metrics.turnover_annual * 100).toFixed(1)}%` : "324.5%";
+  const displayNet = metrics?.cost_annual && metrics?.annual_2023 ? `${((metrics.annual_2023 - metrics.cost_annual) * 100).toFixed(2)}%` : "14.25%";
 
   return (
     <div className="space-y-6">
@@ -140,12 +172,12 @@ export default function BacktestLabPage() {
 
       {/* 1. 回測摘要指標 */}
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-        <QuantMetricCard label="年化收益率 (Annual)" value="20.55%" intent="positive" />
-        <QuantMetricCard label="夏普比率 (Sharpe)" value="1.58" intent="positive" />
-        <QuantMetricCard label="最大回撤 (MaxDD)" value="-14.85%" intent="negative" />
-        <QuantMetricCard label="卡瑪比率 (Calmar)" value="1.38" intent="neutral" />
-        <QuantMetricCard label="年化換手率" value="324.5%" intent="neutral" />
-        <QuantMetricCard label="成本後收益 (Net)" value="14.25%" intent="positive" />
+        <QuantMetricCard label="年化收益率 (Annual)" value={annVal} intent="positive" />
+        <QuantMetricCard label="夏普比率 (Sharpe)" value={sharpeVal} intent="positive" />
+        <QuantMetricCard label="最大回撤 (MaxDD)" value={maxddVal} intent="negative" />
+        <QuantMetricCard label="卡瑪比率 (Calmar)" value={displayCalmar} intent="neutral" />
+        <QuantMetricCard label="年化換手率" value={displayTurnover} intent="neutral" />
+        <QuantMetricCard label="成本後收益 (Net)" value={displayNet} intent="positive" />
       </div>
 
       <div className="text-[11px] text-subink font-mono bg-navy border border-line px-4 py-2 rounded-lg">
@@ -163,7 +195,7 @@ export default function BacktestLabPage() {
                   <button
                     key={range}
                     className={`px-2 py-0.5 text-[10px] font-bold rounded ${
-                      range === "ALL" ? "bg-[#3D7BFF] text-white" : "text-subink hover:text-[#E6EDF7]"
+                      range === "ALL" ? "bg-brand text-white" : "text-subink hover:text-ink"
                     }`}
                   >
                     {range}
@@ -172,48 +204,48 @@ export default function BacktestLabPage() {
               </div>
             }
           >
-            <div className="p-2 border border-line/40 rounded bg-[#06111F]/30">
+            <div className="p-2 border border-line/45 rounded bg-[#161617]/30">
               <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
                 {/* Benchmark Area / Shading */}
                 <polyline
                   points="20,170 80,165 140,180 200,160 260,175 320,150 380,165 440,175 500,185 560,170 600,180"
                   fill="none"
-                  stroke="#5F728A"
+                  stroke="#6E6E73"
                   strokeWidth="1.5"
                   strokeDasharray="3 3"
                 />
                 
                 {/* Drawdown area chart at the bottom (Red shaded block) */}
                 <path
-                  d="M 20,195 L 80,190 L 140,195 L 200,175 L 260,195 L 320,195 L 380,180 L 440,165 L 500,195 L 560,195 L 600,195 Z"
-                  fill="rgba(255, 92, 92, 0.15)"
-                  stroke="rgba(255, 92, 92, 0.3)"
+                  d={generateDrawdownPath(metrics?.maxdd !== undefined ? metrics.maxdd : -0.1485)}
+                  fill="rgba(255, 69, 58, 0.15)"
+                  stroke="rgba(255, 69, 58, 0.3)"
                   strokeWidth="1"
                 />
 
                 {/* Strategy NAV Line */}
                 <polyline
-                  points="20,170 80,140 140,155 200,110 260,125 320,70 380,95 440,65 500,80 560,45 600,52"
+                  points={generateNAVPoints(metrics?.annual !== undefined ? metrics.annual : 0.2240, metrics?.maxdd !== undefined ? metrics.maxdd : -0.1485)}
                   fill="none"
-                  stroke="#3D7BFF"
+                  stroke="#0A84FF"
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
 
                 {/* Y-axis metrics */}
-                <text x="25" y="20" fontSize="9" fill="#5F728A" fontFamily="monospace">NAV 4.50</text>
-                <text x="25" y="100" fontSize="9" fill="#5F728A" fontFamily="monospace">NAV 2.50</text>
-                <text x="25" y="175" fontSize="9" fill="#5F728A" fontFamily="monospace">NAV 1.00</text>
-                <text x="25" y="195" fontSize="8" fill="#FF5C5C" fontFamily="monospace">DD 0% ~ -15%</text>
+                <text x="25" y="20" fontSize="9" fill="#6E6E73" fontFamily="monospace">NAV {(Math.pow(1 + (metrics?.annual || 0.224), 8)).toFixed(2)}</text>
+                <text x="25" y="100" fontSize="9" fill="#6E6E73" fontFamily="monospace">NAV {(Math.pow(1 + (metrics?.annual || 0.224), 4)).toFixed(2)}</text>
+                <text x="25" y="175" fontSize="9" fill="#6E6E73" fontFamily="monospace">NAV 1.00</text>
+                <text x="25" y="195" fontSize="8" fill="#FF453A" fontFamily="monospace">DD 0% ~ {((metrics?.maxdd || -0.1485) * 100).toFixed(0)}%</text>
 
                 {/* Date markers */}
-                <text x="20" y={H - 4} fontSize="8" fill="#5F728A">2018</text>
-                <text x="310" y={H - 4} fontSize="8" fill="#5F728A" textAnchor="middle">2022</text>
-                <text x="600" y={H - 4} fontSize="8" fill="#5F728A" textAnchor="end">2026</text>
+                <text x="20" y={H - 4} fontSize="8" fill="#6E6E73">2018</text>
+                <text x="310" y={H - 4} fontSize="8" fill="#6E6E73" textAnchor="middle">2022</text>
+                <text x="600" y={H - 4} fontSize="8" fill="#6E6E73" textAnchor="end">2026</text>
               </svg>
             </div>
-            <div className="flex justify-between items-center text-[10px] text-[#5F728A] mt-2 font-mono">
+            <div className="flex justify-between items-center text-[10px] text-weak mt-2 font-mono">
               <span>🔵 策略淨值 (NAV)</span>
               <span>⚪ 基準指數 (中證2000)</span>
               <span>🔴 回撤區間比例 (Area)</span>
