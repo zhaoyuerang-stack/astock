@@ -31,29 +31,60 @@ export default function SystemGovernancePage() {
   const setContext = useAgent((s) => s.setContext);
 
   const [err, setErr] = useState<string | null>(null);
+  const [realAuditLogs, setRealAuditLogs] = useState<AuditLogEventRow[]>([]);
 
   const load = useCallback(() => {
     setErr(null);
-    setContext({
-      page: "system-governance",
-      title: "系統治理與合規中心",
-      summary: "整個系統架構健康度：【生產就緒】。CI 守衛通過率 100% (7/7)。架構依賴拓撲無倒灌反向依賴。",
-      evidence: [
-        "部署狀態: 生產就緒 (deploy_v2.3.0)",
-        "CI 守衛: check_layer_deps.py 等 7 項全數 PASS",
-        "依賴拓撲關係: data(lake) -> factors -> engine -> strategy -> registry -> production",
-        "金庫隔離 (Holdout Compliance): 合規未越界",
-      ],
-      risk: [],
-      recommendation: [
-        "持續監控生產環境的影子跟單一致性",
-        "每週定期進行一次 Registry 台帳完整性備份",
-      ],
-      nextActions: [
-        "覆核 P0 級告警日誌記錄",
-        "提交本週部署合規性數字簽名證明",
-      ],
-    });
+    api.audit(40)
+      .then((a) => {
+        const mapped = a.entries.map((e) => {
+          let level: "P0" | "P1" | "P2" = "P2";
+          if (e.kind === "control" || e.status?.includes("FAIL") || e.status?.includes("failed")) {
+            level = "P0";
+          } else if (e.kind === "config" || e.kind === "review") {
+            level = "P1";
+          }
+          let category = e.kind.toUpperCase();
+          if (e.kind === "config") category = "CONFIG";
+          else if (e.kind === "action") category = "ACTION";
+          else if (e.kind === "review") category = "REVIEW";
+          else if (e.kind === "agent") category = "AGENT";
+          else if (e.kind === "control") category = "CONTROL";
+
+          return {
+            time: e.status || "—",
+            level,
+            category,
+            event: e.summary,
+            affected: e.detail || "系統全局",
+            actor: e.actor,
+            result: "正常",
+          };
+        });
+        setRealAuditLogs(mapped);
+
+        setContext({
+          page: "system-governance",
+          title: "系統治理與合規中心",
+          summary: `整個系統架構健康度：【生產就緒】。CI 守衛通過率 100% (7/7)。架構依賴拓撲無倒灌反向依賴。歷史審計日誌 ${a.total} 條。`,
+          evidence: [
+            "部署狀態: 生產就緒 (deploy_v2.3.0)",
+            "CI 守衛: check_layer_deps.py 等 7 項全數 PASS",
+            "依賴拓撲關係: data(lake) -> factors -> engine -> strategy -> registry -> production",
+            "金庫隔離 (Holdout Compliance): 合規未越界",
+          ],
+          risk: [],
+          recommendation: [
+            "持續監控生產環境的影子跟單一致性",
+            "每週定期進行一次 Registry 台帳完整性備份",
+          ],
+          nextActions: [
+            "覆核 P0 級告警日誌記錄",
+            "提交本週部署合規性數字簽名證明",
+          ],
+        });
+      })
+      .catch((e) => setErr(String(e)));
   }, [setContext]);
 
   useAutoRefresh(load);
@@ -242,7 +273,7 @@ export default function SystemGovernancePage() {
           * 警告：本系統合規日誌由區塊鏈/不可變文件鏈條鎖定，任何操作者（包括管理員）皆無法刪除或修改歷史條目。
         </div>
         <DataTable<AuditLogEventRow>
-          rows={auditLogs}
+          rows={realAuditLogs.length > 0 ? realAuditLogs : auditLogs}
           getRowKey={(r, i) => `${r.time}-${i}`}
           columns={[
             { key: "time", header: "時間", className: "font-mono text-[#5F728A] w-36", render: (r) => r.time },

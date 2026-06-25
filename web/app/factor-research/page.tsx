@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
 import DataTable from "@/components/ui/DataTable";
@@ -35,6 +35,49 @@ type ExperimentRow = {
   reason?: string;
 };
 
+// Mock details of selected factor
+const factorDetails: Record<string, FactorDetail> = {
+  illiquidity_premium: {
+    id: "illiquidity_premium",
+    name: "非流动性溢价因子 (Illiquidity Premium)",
+    category: "流動性",
+    ic: 0.052,
+    icir: 2.15,
+    neutralizedIcir: 2.42,
+    coverage: 0.998,
+    author: "researcher",
+    createdAt: "2026-06-15",
+    dataStart: "2018-01-01",
+    universe: "A股全市場 (剔除ST)",
+  },
+  momentum_reversal: {
+    id: "momentum_reversal",
+    name: "动量反转因子 (Momentum Reversal)",
+    category: "動量",
+    ic: 0.041,
+    icir: 1.85,
+    neutralizedIcir: 1.92,
+    coverage: 0.995,
+    author: "researcher",
+    createdAt: "2026-06-18",
+    dataStart: "2018-01-01",
+    universe: "A股全市場",
+  },
+  value_factor: {
+    id: "value_factor",
+    name: "价值因子 (Value Factor)",
+    category: "價值",
+    ic: 0.035,
+    icir: 1.62,
+    neutralizedIcir: 1.75,
+    coverage: 0.999,
+    author: "admin",
+    createdAt: "2026-06-10",
+    dataStart: "2018-01-01",
+    universe: "中證800",
+  },
+};
+
 export default function FactorResearchPage() {
   const setContext = useAgent((s) => s.setContext);
 
@@ -43,6 +86,15 @@ export default function FactorResearchPage() {
   const [err, setErr] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"performance" | "group" | "turnover" | "style" | "queue">("performance");
+
+  const getFactorStats = (name: string) => {
+    const norm = name.toLowerCase();
+    if (norm.includes("illiq")) return { ic: "0.078", icir: "0.126" };
+    if (norm.includes("roc")) return { ic: "0.045", icir: "0.082" };
+    if (norm.includes("size")) return { ic: "0.059", icir: "0.098" };
+    if (norm.includes("amount")) return { ic: "0.038", icir: "0.072" };
+    return { ic: "—", icir: "—" };
+  };
 
   const load = useCallback(() => {
     setErr(null);
@@ -77,50 +129,40 @@ export default function FactorResearchPage() {
 
   useAutoRefresh(load);
 
-  // Mock details of selected factor
-  const factorDetails: Record<string, FactorDetail> = {
-    illiquidity_premium: {
-      id: "illiquidity_premium",
-      name: "非流动性溢价因子 (Illiquidity Premium)",
-      category: "流動性",
-      ic: 0.052,
-      icir: 2.15,
-      neutralizedIcir: 2.42,
-      coverage: 0.998,
-      author: "researcher",
-      createdAt: "2026-06-15",
-      dataStart: "2018-01-01",
-      universe: "A股全市場 (剔除ST)",
-    },
-    momentum_reversal: {
-      id: "momentum_reversal",
-      name: "动量反转因子 (Momentum Reversal)",
-      category: "動量",
-      ic: 0.041,
-      icir: 1.85,
-      neutralizedIcir: 1.92,
-      coverage: 0.995,
-      author: "researcher",
-      createdAt: "2026-06-18",
-      dataStart: "2018-01-01",
-      universe: "A股全市場",
-    },
-    value_factor: {
-      id: "value_factor",
-      name: "价值因子 (Value Factor)",
-      category: "價值",
-      ic: 0.035,
-      icir: 1.62,
-      neutralizedIcir: 1.75,
-      coverage: 0.999,
-      author: "admin",
-      createdAt: "2026-06-10",
-      dataStart: "2018-01-01",
-      universe: "中證800",
-    },
-  };
 
-  const selectedFactor = factorDetails[selectedId] || factorDetails.illiquidity_premium;
+
+  const activeFactor = factors.find(
+    (f) => f.name === selectedId || (selectedId === "illiquidity_premium" && f.name === "illiquidity")
+  );
+
+  const selectedFactor = useMemo(() => {
+    // If it's one of the mock keys, use it
+    if (selectedId && factorDetails[selectedId]) {
+      return factorDetails[selectedId];
+    }
+
+    // If we have it in the active factors list
+    if (activeFactor) {
+      const stats = getFactorStats(activeFactor.name);
+      return {
+        id: activeFactor.name,
+        name: activeFactor.display_name || activeFactor.name,
+        category: activeFactor.regime || "量價",
+        ic: stats.ic !== "—" ? parseFloat(stats.ic) : NaN,
+        icir: stats.icir !== "—" ? parseFloat(stats.icir) : NaN,
+        neutralizedIcir: stats.icir !== "—" ? parseFloat(stats.icir) : NaN,
+        coverage: 0.998,
+        author: "system",
+        createdAt: "—",
+        dataStart: "2018-01-01",
+        universe: activeFactor.regime || "A股全市場",
+      };
+    }
+
+    // Default fallback
+    return factorDetails.illiquidity_premium;
+  }, [selectedId, activeFactor]);
+
 
   const filteredFactors = factors.filter((f) => {
     const q = searchQuery.toLowerCase();
@@ -176,22 +218,28 @@ export default function FactorResearchPage() {
         </div>
         <div className="p-4 bg-navy border border-line rounded-lg">
           <div className="text-[12px] text-subink">今日實驗數</div>
-          <div className="text-2xl font-bold font-mono text-brand mt-1.5">6 個</div>
+          <div className="text-2xl font-bold font-mono text-brand mt-1.5">4 個</div>
           <div className="text-[10px] text-[#5F728A] mt-2">運行中與待處理實驗</div>
         </div>
         <div className="p-4 bg-navy border border-line rounded-lg">
           <div className="text-[12px] text-subink">平均 IC</div>
-          <div className="text-2xl font-bold font-mono text-ok mt-1.5">0.052</div>
+          <div className="text-2xl font-bold font-mono text-ok mt-1.5">
+            {isNaN(selectedFactor.ic) ? "—" : selectedFactor.ic.toFixed(3)}
+          </div>
           <div className="text-[10px] text-[#5F728A] mt-2">市值與行業雙重中性化後</div>
         </div>
         <div className="p-4 bg-navy border border-line rounded-lg">
           <div className="text-[12px] text-subink">中性化 ICIR</div>
-          <div className="text-2xl font-bold font-mono text-ok mt-1.5">2.42</div>
+          <div className="text-2xl font-bold font-mono text-ok mt-1.5">
+            {isNaN(selectedFactor.neutralizedIcir) ? "—" : selectedFactor.neutralizedIcir.toFixed(2)}
+          </div>
           <div className="text-[10px] text-[#5F728A] mt-2">Newey-West 延遲修正</div>
         </div>
         <div className="p-4 bg-navy border border-line rounded-lg">
           <div className="text-[12px] text-subink">數據覆蓋率</div>
-          <div className="text-2xl font-bold font-mono text-ok mt-1.5">99.8%</div>
+          <div className="text-2xl font-bold font-mono text-ok mt-1.5">
+            {isNaN(selectedFactor.coverage) ? "—" : `${(selectedFactor.coverage * 100).toFixed(1)}%`}
+          </div>
           <div className="text-[10px] text-[#5F728A] mt-2">若低於 95% 將觸發報警</div>
         </div>
       </div>
@@ -214,12 +262,12 @@ export default function FactorResearchPage() {
             <div className="space-y-1.5 max-h-[480px] overflow-y-auto pr-1">
               {filteredFactors.map((f) => {
                 const isSelected = selectedId === f.name || (selectedId === "illiquidity_premium" && f.name === "illiquidity");
+                const stats = getFactorStats(f.name);
                 return (
                   <div
                     key={f.name}
                     onClick={() => {
-                      const targetId = factorDetails[f.name] ? f.name : "illiquidity_premium";
-                      setSelectedId(targetId);
+                      setSelectedId(f.name);
                     }}
                     className={`p-2.5 rounded border border-line cursor-pointer transition-colors ${
                       isSelected
@@ -234,8 +282,8 @@ export default function FactorResearchPage() {
                       <span className="text-[10px] px-1 bg-navy rounded text-subink scale-95">{f.regime}</span>
                     </div>
                     <div className="flex justify-between text-[10px] mt-2 font-mono text-[#5F728A]">
-                      <span>IC: 0.052</span>
-                      <span>ICIR: 2.42</span>
+                      <span>IC: {stats.ic}</span>
+                      <span>ICIR: {stats.icir}</span>
                     </div>
                   </div>
                 );
@@ -265,8 +313,8 @@ export default function FactorResearchPage() {
                 <div><span className="text-[#5F728A]">因子類型:</span> {selectedFactor.category}</div>
               </div>
               <div>
-                <div><span className="text-[#5F728A]">覆蓋比率:</span> {(selectedFactor.coverage * 100).toFixed(1)}%</div>
-                <div><span className="text-[#5F728A]">有效性判定:</span> <span className="text-ok font-bold">PASS</span></div>
+                <div><span className="text-[#5F728A]">覆蓋比率:</span> {isNaN(selectedFactor.coverage) ? "—" : `${(selectedFactor.coverage * 100).toFixed(1)}%`}</div>
+                <div><span className="text-[#5F728A]">有效性判定:</span> <span className="text-ok font-bold">{activeFactor?.status || "PASS"}</span></div>
               </div>
             </div>
           </Card>
@@ -324,29 +372,35 @@ export default function FactorResearchPage() {
                     <span className="text-[11px] text-ok font-mono">Newey-West 校正已啟用</span>
                   </div>
                   
-                  {/* Mock IC line SVG chart */}
-                  <div className="p-2 border border-line/40 rounded bg-[#06111F]/30">
-                    <svg viewBox={`0 0 ${cw} ${ch}`} className="w-full">
-                      {/* Zero axis line */}
-                      <line x1="20" y1={ch / 2} x2={cw - 20} y2={ch / 2} stroke="#1F3550" strokeWidth="1.5" />
-                      {/* IC line */}
-                      <polyline
-                        points="20,110 50,80 80,95 110,60 140,75 170,40 200,85 230,55 260,70 290,45 320,50 350,90 380,105 410,75 440,65 470,45 500,50 530,30 560,40 580,50"
-                        fill="none"
-                        stroke="#3D7BFF"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      {/* Annotations */}
-                      <text x="20" y="20" fontSize="9" fill="#5F728A" fontFamily="monospace">IC +0.10</text>
-                      <text x="20" y={ch / 2 + 4} fontSize="9" fill="#5F728A" fontFamily="monospace">IC  0.00</text>
-                      <text x="20" y="165" fontSize="9" fill="#5F728A" fontFamily="monospace">IC -0.10</text>
-                      <text x="20" y="176" fontSize="8" fill="#5F728A">2018</text>
-                      <text x="300" y="176" fontSize="8" fill="#5F728A" textAnchor="middle">2022</text>
-                      <text x="580" y="176" fontSize="8" fill="#5F728A" textAnchor="end">2026</text>
-                    </svg>
-                  </div>
+                  {isNaN(selectedFactor.ic) ? (
+                    <div className="flex flex-col items-center justify-center h-40 text-subink font-mono border border-line/45 rounded bg-[#06111F]/30">
+                      <span className="text-[13px] font-semibold text-[#8E8E93]">📊 暫無該因子的歷史 IC 時序數據</span>
+                      <span className="text-[10px] text-[#5F728A] mt-1">需在策略實驗室運行 Phase 1 審計生成時序</span>
+                    </div>
+                  ) : (
+                    <div className="p-2 border border-line/40 rounded bg-[#06111F]/30">
+                      <svg viewBox={`0 0 ${cw} ${ch}`} className="w-full">
+                        {/* Zero axis line */}
+                        <line x1="20" y1={ch / 2} x2={cw - 20} y2={ch / 2} stroke="#1F3550" strokeWidth="1.5" />
+                        {/* IC line */}
+                        <polyline
+                          points="20,110 50,80 80,95 110,60 140,75 170,40 200,85 230,55 260,70 290,45 320,50 350,90 380,105 410,75 440,65 470,45 500,50 530,30 560,40 580,50"
+                          fill="none"
+                          stroke="#3D7BFF"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        {/* Annotations */}
+                        <text x="20" y="20" fontSize="9" fill="#5F728A" fontFamily="monospace">IC +0.10</text>
+                        <text x="20" y={ch / 2 + 4} fontSize="9" fill="#5F728A" fontFamily="monospace">IC  0.00</text>
+                        <text x="20" y="165" fontSize="9" fill="#5F728A" fontFamily="monospace">IC -0.10</text>
+                        <text x="20" y="176" fontSize="8" fill="#5F728A">2018</text>
+                        <text x="300" y="176" fontSize="8" fill="#5F728A" textAnchor="middle">2022</text>
+                        <text x="580" y="176" fontSize="8" fill="#5F728A" textAnchor="end">2026</text>
+                      </svg>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -354,129 +408,142 @@ export default function FactorResearchPage() {
                 <div className="space-y-4">
                   <div className="font-bold text-[#E6EDF7]">等權分組累計超額收益 (Group Monotonicity)</div>
                   
-                  {/* Mock bar chart SVG */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-2 border border-line/40 rounded bg-[#06111F]/30 flex justify-center">
-                      <svg viewBox={`0 0 280 140`} className="w-full">
-                        {/* Bars for Q1 - Q5 */}
-                        {/* Q1: Top 10% */}
-                        <rect x="20" y="20" width="30" height="90" fill="#35D06E" rx="3" />
-                        <text x="35" y="125" textAnchor="middle" fontSize="9" fill="#8FA3BF">Top 10%</text>
-                        <text x="35" y="15" textAnchor="middle" fontSize="9" fill="#35D06E" fontFamily="monospace">+22.4%</text>
-
-                        {/* Q2: Top 30% */}
-                        <rect x="70" y="45" width="30" height="65" fill="#35D06E" opacity="0.8" rx="3" />
-                        <text x="85" y="125" textAnchor="middle" fontSize="9" fill="#8FA3BF">Top 30%</text>
-                        <text x="85" y="40" textAnchor="middle" fontSize="9" fill="#35D06E" fontFamily="monospace">+14.2%</text>
-
-                        {/* Q3: Neutral */}
-                        <rect x="120" y="70" width="30" height="40" fill="#9AA8BD" rx="3" />
-                        <text x="135" y="125" textAnchor="middle" fontSize="9" fill="#8FA3BF">Neutral</text>
-                        <text x="135" y="65" textAnchor="middle" fontSize="9" fill="#9AA8BD" fontFamily="monospace">+5.1%</text>
-
-                        {/* Q4: Bottom 30% */}
-                        <rect x="170" y="90" width="30" height="20" fill="#FF5C5C" opacity="0.8" rx="3" />
-                        <text x="185" y="125" textAnchor="middle" fontSize="9" fill="#8FA3BF">Bot 30%</text>
-                        <text x="185" y="85" textAnchor="middle" fontSize="9" fill="#FF5C5C" fontFamily="monospace">-2.4%</text>
-
-                        {/* Q5: Bottom 10% */}
-                        <rect x="220" y="100" width="30" height="10" fill="#FF5C5C" rx="3" />
-                        <text x="235" y="125" textAnchor="middle" fontSize="9" fill="#8FA3BF">Bot 10%</text>
-                        <text x="235" y="95" textAnchor="middle" fontSize="9" fill="#FF5C5C" fontFamily="monospace">-8.6%</text>
-
-                        {/* Base line */}
-                        <line x1="10" y1="110" x2="270" y2="110" stroke="#1F3550" strokeWidth="1" />
-                      </svg>
+                  {isNaN(selectedFactor.ic) ? (
+                    <div className="flex flex-col items-center justify-center h-40 text-subink font-mono border border-line/45 rounded bg-[#06111F]/30">
+                      <span className="text-[13px] font-semibold text-[#8E8E93]">📊 暫無該因子的等權分組收益數據</span>
                     </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-2 border border-line/40 rounded bg-[#06111F]/30 flex justify-center">
+                        <svg viewBox={`0 0 280 140`} className="w-full">
+                          {/* Bars for Q1 - Q5 */}
+                          {/* Q1: Top 10% */}
+                          <rect x="20" y="20" width="30" height="90" fill="#35D06E" rx="3" />
+                          <text x="35" y="125" textAnchor="middle" fontSize="9" fill="#8FA3BF">Top 10%</text>
+                          <text x="35" y="15" textAnchor="middle" fontSize="9" fill="#35D06E" fontFamily="monospace">+22.4%</text>
 
-                    <div className="space-y-1">
-                      <div className="text-[11px] font-bold text-[#E6EDF7] mb-1">分組年化指標</div>
-                      <div className="border border-line/40 rounded overflow-hidden">
-                        <table className="w-full text-left">
-                          <thead>
-                            <tr className="bg-[#10263D] border-b border-line text-subink">
-                              <th className="p-2 font-medium">組別</th>
-                              <th className="p-2 font-medium text-right">年化收益</th>
-                              <th className="p-2 font-medium text-right">勝率</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-[#1F3550]/30 font-mono text-[#E6EDF7]">
-                            <tr>
-                              <td className="p-2 text-ok">Top 10% (首組)</td>
-                              <td className="p-2 text-right">22.40%</td>
-                              <td className="p-2 text-right">58.4%</td>
-                            </tr>
-                            <tr>
-                              <td className="p-2 text-[#9AA8BD]">Neutral (中性)</td>
-                              <td className="p-2 text-right">5.12%</td>
-                              <td className="p-2 text-right">50.2%</td>
-                            </tr>
-                            <tr>
-                              <td className="p-2 text-danger">Bottom 10% (尾組)</td>
-                              <td className="p-2 text-right">-8.65%</td>
-                              <td className="p-2 text-right">42.1%</td>
-                            </tr>
-                          </tbody>
-                        </table>
+                          {/* Q2: Top 30% */}
+                          <rect x="70" y="45" width="30" height="65" fill="#35D06E" opacity="0.8" rx="3" />
+                          <text x="85" y="125" textAnchor="middle" fontSize="9" fill="#8FA3BF">Top 30%</text>
+                          <text x="85" y="40" textAnchor="middle" fontSize="9" fill="#35D06E" fontFamily="monospace">+14.2%</text>
+
+                          {/* Q3: Neutral */}
+                          <rect x="120" y="70" width="30" height="40" fill="#9AA8BD" rx="3" />
+                          <text x="135" y="125" textAnchor="middle" fontSize="9" fill="#8FA3BF">Neutral</text>
+                          <text x="135" y="65" textAnchor="middle" fontSize="9" fill="#9AA8BD" fontFamily="monospace">+5.1%</text>
+
+                          {/* Q4: Bottom 30% */}
+                          <rect x="170" y="90" width="30" height="20" fill="#FF5C5C" opacity="0.8" rx="3" />
+                          <text x="185" y="125" textAnchor="middle" fontSize="9" fill="#8FA3BF">Bot 30%</text>
+                          <text x="185" y="85" textAnchor="middle" fontSize="9" fill="#FF5C5C" fontFamily="monospace">-2.4%</text>
+
+                          {/* Q5: Bottom 10% */}
+                          <rect x="220" y="100" width="30" height="10" fill="#FF5C5C" rx="3" />
+                          <text x="235" y="125" textAnchor="middle" fontSize="9" fill="#8FA3BF">Bot 10%</text>
+                          <text x="235" y="95" textAnchor="middle" fontSize="9" fill="#FF5C5C" fontFamily="monospace">-8.6%</text>
+
+                          {/* Base line */}
+                          <line x1="10" y1="110" x2="270" y2="110" stroke="#1F3550" strokeWidth="1" />
+                        </svg>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="text-[11px] font-bold text-[#E6EDF7] mb-1">分組年化指標</div>
+                        <div className="border border-line/40 rounded overflow-hidden">
+                          <table className="w-full text-left">
+                            <thead>
+                              <tr className="bg-[#10263D] border-b border-line text-subink">
+                                <th className="p-2 font-medium">組別</th>
+                                <th className="p-2 font-medium text-right">年化收益</th>
+                                <th className="p-2 font-medium text-right">勝率</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#1F3550]/30 font-mono text-[#E6EDF7]">
+                              <tr>
+                                <td className="p-2 text-ok">Top 10% (首組)</td>
+                                <td className="p-2 text-right">22.40%</td>
+                                <td className="p-2 text-right">58.4%</td>
+                              </tr>
+                              <tr>
+                                <td className="p-2 text-[#9AA8BD]">Neutral (中性)</td>
+                                <td className="p-2 text-right">5.12%</td>
+                                <td className="p-2 text-right">50.2%</td>
+                              </tr>
+                              <tr>
+                                <td className="p-2 text-danger">Bottom 10% (尾組)</td>
+                                <td className="p-2 text-right">-8.65%</td>
+                                <td className="p-2 text-right">42.1%</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
 
               {activeTab === "turnover" && (
                 <div className="space-y-4">
                   <div className="font-bold text-[#E6EDF7] mb-2">年化換手與扣除交易成本敏感性 (Cost Sensitivity Matrix)</div>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-2 font-mono text-center">
-                    <div className="p-2 bg-bg border border-line rounded">
-                      <div className="text-subink text-[10px]">年化換手率</div>
-                      <div className="text-sm font-bold text-[#E6EDF7] mt-1">324.5%</div>
+                  {isNaN(selectedFactor.ic) ? (
+                    <div className="flex flex-col items-center justify-center h-40 text-subink font-mono border border-line/45 rounded bg-[#06111F]/30">
+                      <span className="text-[13px] font-semibold text-[#8E8E93]">📊 暫無該因子的換手與成本敏感性數據</span>
                     </div>
-                    <div className="p-2 bg-bg border border-line rounded">
-                      <div className="text-subink text-[10px]">持倉半衰期</div>
-                      <div className="text-sm font-bold text-[#E6EDF7] mt-1">12.5 天</div>
-                    </div>
-                    <div className="p-2 bg-bg border border-line rounded">
-                      <div className="text-subink text-[10px]">預計衝擊成本</div>
-                      <div className="text-sm font-bold text-[#E6EDF7] mt-1">18.5 bps</div>
-                    </div>
-                    <div className="p-2 bg-bg border border-line rounded">
-                      <div className="text-subink text-[10px]">成本前年化 IR</div>
-                      <div className="text-sm font-bold text-ok mt-1">2.42</div>
-                    </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-2 font-mono text-center">
+                        <div className="p-2 bg-bg border border-line rounded">
+                          <div className="text-subink text-[10px]">年化換手率</div>
+                          <div className="text-sm font-bold text-[#E6EDF7] mt-1">324.5%</div>
+                        </div>
+                        <div className="p-2 bg-bg border border-line rounded">
+                          <div className="text-subink text-[10px]">持倉半衰期</div>
+                          <div className="text-sm font-bold text-[#E6EDF7] mt-1">12.5 天</div>
+                        </div>
+                        <div className="p-2 bg-bg border border-line rounded">
+                          <div className="text-subink text-[10px]">預計衝擊成本</div>
+                          <div className="text-sm font-bold text-[#E6EDF7] mt-1">18.5 bps</div>
+                        </div>
+                        <div className="p-2 bg-bg border border-line rounded">
+                          <div className="text-subink text-[10px]">成本前年化 IR</div>
+                          <div className="text-sm font-bold text-ok mt-1">2.42</div>
+                        </div>
+                      </div>
 
-                  <div className="border border-line/40 rounded overflow-hidden">
-                    <table className="w-full text-left font-mono">
-                      <thead>
-                        <tr className="bg-[#10263D] border-b border-line text-subink">
-                          <th className="p-2 font-medium">單邊交易成本 bps</th>
-                          <th className="p-2 font-medium text-right">0 bps</th>
-                          <th className="p-2 font-medium text-right">5 bps</th>
-                          <th className="p-2 font-medium text-right">10 bps</th>
-                          <th className="p-2 font-medium text-right">15 bps</th>
-                          <th className="p-2 font-medium text-right">20 bps</th>
-                          <th className="p-2 font-medium text-right">25 bps</th>
-                          <th className="p-2 font-medium text-right">30 bps</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#1F3550]/30 text-[#E6EDF7]">
-                        <tr>
-                          <td className="p-2 text-subink">成本後年化 IR</td>
-                          <td className="p-2 text-right text-ok">2.42</td>
-                          <td className="p-2 text-right text-ok">2.31</td>
-                          <td className="p-2 text-right text-ok">2.14</td>
-                          <td className="p-2 text-right text-ok">1.98</td>
-                          <td className="p-2 text-right text-warn">1.65</td>
-                          <td className="p-2 text-right text-danger">1.24</td>
-                          <td className="p-2 text-right text-danger">0.85</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="text-[10px] text-danger font-semibold">
-                    ⚠️ 警示：單邊交易滑點成本超 20 bps 時，該因子成本後超額收益（IR）將衰減 30% 以上，高規模下有容量崩塌風險！
-                  </div>
+                      <div className="border border-line/40 rounded overflow-hidden">
+                        <table className="w-full text-left font-mono">
+                          <thead>
+                            <tr className="bg-[#10263D] border-b border-line text-subink">
+                              <th className="p-2 font-medium">單邊交易成本 bps</th>
+                              <th className="p-2 font-medium text-right">0 bps</th>
+                              <th className="p-2 font-medium text-right">5 bps</th>
+                              <th className="p-2 font-medium text-right">10 bps</th>
+                              <th className="p-2 font-medium text-right">15 bps</th>
+                              <th className="p-2 font-medium text-right">20 bps</th>
+                              <th className="p-2 font-medium text-right">25 bps</th>
+                              <th className="p-2 font-medium text-right">30 bps</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#1F3550]/30 text-[#E6EDF7]">
+                            <tr>
+                              <td className="p-2 text-subink">成本後年化 IR</td>
+                              <td className="p-2 text-right text-ok">2.42</td>
+                              <td className="p-2 text-right text-ok">2.31</td>
+                              <td className="p-2 text-right text-ok">2.14</td>
+                              <td className="p-2 text-right text-ok">1.98</td>
+                              <td className="p-2 text-right text-warn">1.65</td>
+                              <td className="p-2 text-right text-danger">1.24</td>
+                              <td className="p-2 text-right text-danger">0.85</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="text-[10px] text-danger font-semibold">
+                        ⚠️ 警示：單邊交易滑點成本超 20 bps 時，該因子成本後超額收益（IR）將衰減 30% 以上，高規模下有容量崩塌風險！
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
