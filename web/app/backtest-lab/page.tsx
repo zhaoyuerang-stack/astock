@@ -65,41 +65,37 @@ export default function BacktestLabPage() {
 
   const metrics = detail?.strategy?.metrics;
 
-  const annVal = metrics?.annual !== undefined ? `${(metrics.annual * 100).toFixed(2)}%` : "22.40%";
-  const sharpeVal = metrics?.sharpe !== undefined ? metrics.sharpe.toFixed(2) : "1.85";
-  const maxddVal = metrics?.maxdd !== undefined ? `${(metrics.maxdd * 100).toFixed(2)}%` : "-12.45%";
+  const annVal = metrics?.annual !== undefined ? `${(metrics.annual * 100).toFixed(2)}%` : "—";
+  const sharpeVal = metrics?.sharpe !== undefined ? metrics.sharpe.toFixed(2) : "—";
+  const maxddVal = metrics?.maxdd !== undefined ? `${(metrics.maxdd * 100).toFixed(2)}%` : "—";
   
   // Diff computation for realExecution vs theoretical
-  const realAnn = metrics?.annual_2023 !== undefined ? `${(metrics.annual_2023 * 100).toFixed(2)}%` : "20.55%";
-  const realSharpe = metrics?.sharpe_2023 !== undefined ? metrics.sharpe_2023.toFixed(2) : "1.58";
-  const realMaxdd = metrics?.maxdd_2023 !== undefined ? `${(metrics.maxdd_2023 * 100).toFixed(2)}%` : "-14.85%";
+  const realAnn = metrics?.annual_2023 !== undefined ? `${(metrics.annual_2023 * 100).toFixed(2)}%` : "—";
+  const realSharpe = metrics?.sharpe_2023 !== undefined ? metrics.sharpe_2023.toFixed(2) : "—";
+  const realMaxdd = metrics?.maxdd_2023 !== undefined ? `${(metrics.maxdd_2023 * 100).toFixed(2)}%` : "—";
 
   // Mismatch table rows
   const mismatchRows: PerformanceStatsRow[] = [
-    { metric: "年化收益率", theoretical: annVal, realExecution: realAnn, diff: metrics?.annual && metrics?.annual_2023 ? `${((metrics.annual_2023 - metrics.annual) * 100).toFixed(2)}%` : "-1.85%" },
-    { metric: "夏普比率 (Sharpe)", theoretical: sharpeVal, realExecution: realSharpe, diff: metrics?.sharpe && metrics?.sharpe_2023 ? (metrics.sharpe_2023 - metrics.sharpe).toFixed(2) : "-0.27" },
-    { metric: "最大回撤", theoretical: maxddVal, realExecution: realMaxdd, diff: metrics?.maxdd && metrics?.maxdd_2023 ? `${((metrics.maxdd_2023 - metrics.maxdd) * 100).toFixed(2)}%` : "-2.40%" },
-    { metric: "年化換手率", theoretical: "324.5%", realExecution: "324.5%", diff: "0.0%" },
-    { metric: "成本後年化收益", theoretical: metrics?.cost_annual ? `${((metrics.annual - metrics.cost_annual) * 100).toFixed(2)}%` : "16.42%", realExecution: metrics?.cost_annual && metrics?.annual_2023 ? `${((metrics.annual_2023 - metrics.cost_annual) * 100).toFixed(2)}%` : "14.25%", diff: "-2.17%" },
+    { metric: "年化收益率", theoretical: annVal, realExecution: realAnn, diff: metrics?.annual !== undefined && metrics?.annual_2023 !== undefined ? `${((metrics.annual_2023 - metrics.annual) * 100).toFixed(2)}%` : "—" },
+    { metric: "夏普比率 (Sharpe)", theoretical: sharpeVal, realExecution: realSharpe, diff: metrics?.sharpe !== undefined && metrics?.sharpe_2023 !== undefined ? (metrics.sharpe_2023 - metrics.sharpe).toFixed(2) : "—" },
+    { metric: "最大回撤", theoretical: maxddVal, realExecution: realMaxdd, diff: metrics?.maxdd !== undefined && metrics?.maxdd_2023 !== undefined ? `${((metrics.maxdd_2023 - metrics.maxdd) * 100).toFixed(2)}%` : "—" },
+    { metric: "年化換手率", theoretical: "—", realExecution: "—", diff: "—" },
+    { metric: "成本後年化收益", theoretical: metrics?.cost_annual !== undefined ? `${(metrics.cost_annual * 100).toFixed(2)}%` : "—", realExecution: metrics?.cost_annual !== undefined && metrics?.annual_2023 !== undefined ? `${(metrics.annual_2023 * 100).toFixed(2)}%` : "—", diff: "—" },
   ];
 
   // Segment performances
   const segments = {
     is: [
-      { period: "2018-2022 (In-Sample)", annual: metrics?.annual_2018 !== undefined ? `${(metrics.annual_2018 * 100).toFixed(2)}%` : "24.12%", sharpe: metrics?.sharpe_2018 !== undefined ? metrics.sharpe_2018.toFixed(2) : "1.95", maxdd: metrics?.maxdd_2018 !== undefined ? `${(metrics.maxdd_2018 * 100).toFixed(2)}%` : "-11.20%", winRate: "59.2%" },
+      { period: "2018-2022 (In-Sample)", annual: metrics?.annual_2018 !== undefined ? `${(metrics.annual_2018 * 100).toFixed(2)}%` : "—", sharpe: metrics?.sharpe_2018 !== undefined ? metrics.sharpe_2018.toFixed(2) : "—", maxdd: metrics?.maxdd_2018 !== undefined ? `${(metrics.maxdd_2018 * 100).toFixed(2)}%` : "—", winRate: "—" },
     ],
     oos: [
-      { period: "2023-2026 (Out-of-Sample)", annual: realAnn, sharpe: realSharpe, maxdd: realMaxdd, winRate: "56.4%" },
+      { period: "2023-2026 (Out-of-Sample)", annual: realAnn, sharpe: realSharpe, maxdd: realMaxdd, winRate: "—" },
     ],
     wf: [
-      { period: "Walk-Forward Cutoff 2021", annual: "21.82%", sharpe: "1.72", maxdd: "-12.50%", winRate: "57.8%" },
-      { period: "Walk-Forward Cutoff 2024", annual: "19.80%", sharpe: "1.45", maxdd: "-15.20%", winRate: "55.1%" },
+      { period: "Walk-Forward (全區間)", annual: metrics?.wf_annual !== undefined ? `${(metrics.wf_annual * 100).toFixed(2)}%` : "—", sharpe: metrics?.wf_sharpe !== undefined ? metrics.wf_sharpe.toFixed(2) : "—", maxdd: metrics?.wf_maxdd !== undefined ? `${(metrics.wf_maxdd * 100).toFixed(2)}%` : "—", winRate: "—" },
     ],
     stress: [
-      { period: "2018 全年單邊熊市", annual: "-3.20%", sharpe: "-0.15", maxdd: "-11.20%", winRate: "48.2%" },
-      { period: "2024 年初微盤股流動性危機", annual: "-12.40%", sharpe: "-0.85", maxdd: "-14.85%", winRate: "42.5%" },
-      { period: "2025 极端行情波动", annual: "28.50%", sharpe: "2.10", maxdd: "-8.50%", winRate: "61.2%" },
-      { period: "2010-2017 歷史壓力段", annual: metrics?.annual_2010 !== undefined ? `${(metrics.annual_2010 * 100).toFixed(2)}%` : "28.50%", sharpe: metrics?.sharpe_2010 !== undefined ? metrics.sharpe_2010.toFixed(2) : "2.10", maxdd: metrics?.maxdd_2010 !== undefined ? `${(metrics.maxdd_2010 * 100).toFixed(2)}%` : "-18.94%", winRate: "61.2%" },
+      { period: "2010 至今長週期壓力回測", annual: metrics?.annual_2010 !== undefined ? `${(metrics.annual_2010 * 100).toFixed(2)}%` : "—", sharpe: metrics?.sharpe_2010 !== undefined ? metrics.sharpe_2010.toFixed(2) : "—", maxdd: metrics?.maxdd_2010 !== undefined ? `${(metrics.maxdd_2010 * 100).toFixed(2)}%` : "—", winRate: "—" },
     ],
   };
 
@@ -134,13 +130,14 @@ export default function BacktestLabPage() {
 
   // Parameter sensitivity heatmap data structure (Holding Limit vs Signal Threshold)
   // Dynamically scales values based on the strategy's Sharpe ratio
-  const activeSharpe = sharpeVal !== "—" ? parseFloat(sharpeVal) : 1.58;
-  const heatmapRows = [
+  const activeSharpe = sharpeVal !== "—" ? parseFloat(sharpeVal) : null;
+  const heatmapRows = activeSharpe !== null ? [
     { threshold: "0.80", limit10: activeSharpe * 0.72, limit12: activeSharpe * 0.91, limit15: activeSharpe * 1.0, limit20: activeSharpe * 0.85 },
     { threshold: "0.85", limit10: activeSharpe * 0.79, limit12: activeSharpe * 0.96, limit15: activeSharpe * 1.06, limit20: activeSharpe * 0.89 },
     { threshold: "0.90", limit10: activeSharpe * 0.82, limit12: activeSharpe * 1.0, limit15: activeSharpe * 1.09, limit20: activeSharpe * 0.91 },
     { threshold: "0.95", limit10: activeSharpe * 0.75, limit12: activeSharpe * 0.93, limit15: activeSharpe * 0.98, limit20: activeSharpe * 0.82 },
-  ];
+  ] : [];
+
 
   // Helper colors for heatmap intensity
   const getHeatmapColor = (val: number) => {
@@ -155,9 +152,20 @@ export default function BacktestLabPage() {
   const H = 200;
 
   // Formatted display values
-  const displayCalmar = metrics?.calmar !== undefined ? metrics.calmar.toFixed(2) : "1.38";
-  const displayTurnover = metrics?.turnover_annual !== undefined ? `${(metrics.turnover_annual * 100).toFixed(1)}%` : "324.5%";
-  const displayNet = metrics?.cost_annual && metrics?.annual_2023 ? `${((metrics.annual_2023 - metrics.cost_annual) * 100).toFixed(2)}%` : "14.25%";
+  const displayCalmar = metrics?.calmar !== undefined ? metrics.calmar.toFixed(2) : "—";
+  const displayTurnover = metrics?.turnover_annual !== undefined ? `${(metrics.turnover_annual * 100).toFixed(1)}%` : "—";
+  const displayNet = metrics?.cost_annual !== undefined ? `${(metrics.cost_annual * 100).toFixed(2)}%` : "—";
+
+  const cvWin = detail?.strategy?.nine_gate?.cv_win_rate;
+  const icWin = detail?.strategy?.nine_gate?.ic_win_rate;
+  const displayWinRate = cvWin !== undefined ? `${(cvWin * 100).toFixed(1)}%` : icWin !== undefined ? `${(icWin * 100).toFixed(1)}%` : "—";
+
+  const tailRatio = detail?.strategy?.nine_gate?.tail_ratio;
+  const displayProfitLossRatio = tailRatio !== undefined ? `${tailRatio.toFixed(2)} : 1` : "—";
+
+  const dailyMean = detail?.strategy?.nine_gate?.daily_mean_expected;
+  const displayAvgReturn = dailyMean !== undefined ? `${(dailyMean * 100).toFixed(3)}%` : "—";
+
 
   return (
     <div className="space-y-6">
@@ -316,7 +324,7 @@ export default function BacktestLabPage() {
             <table className="w-full text-center border-collapse">
               <thead>
                 <tr className="bg-[#10263D] border-b border-line text-subink text-[11px]">
-                  <th className="p-2 border-r border-line">閾值 \ 持倉限額</th>
+                  <th className="p-2 border-r border-line">備值 \ 持倉限額</th>
                   <th className="p-2 border-r border-line">10%</th>
                   <th className="p-2 border-r border-line">12%</th>
                   <th className="p-2 border-r border-line">15% (當前)</th>
@@ -324,7 +332,7 @@ export default function BacktestLabPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1F3550]/30 font-mono">
-                {heatmapRows.map((row) => (
+                {heatmapRows.length > 0 ? heatmapRows.map((row) => (
                   <tr key={row.threshold} className="border-b border-line/30">
                     <td className="p-2.5 font-bold bg-[#10263D]/40 text-subink border-r border-line">{row.threshold}</td>
                     <td className={`p-2.5 border-r border-line/30 ${getHeatmapColor(row.limit10)}`}>{row.limit10.toFixed(2)}</td>
@@ -334,7 +342,11 @@ export default function BacktestLabPage() {
                     </td>
                     <td className={`p-2.5 ${getHeatmapColor(row.limit20)}`}>{row.limit20.toFixed(2)}</td>
                   </tr>
-                ))}
+                )) : (
+                  <tr>
+                    <td colSpan={5} className="p-4 text-center text-[#8E8E93]">無敏感度熱力圖數據</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -402,19 +414,19 @@ export default function BacktestLabPage() {
           </div>
           <div className="p-3 bg-bg border border-line rounded">
             <div className="text-subink text-[10px]">交易勝率</div>
-            <div className="text-sm font-bold text-ok mt-1">56.4%</div>
+            <div className="text-sm font-bold text-ok mt-1">{displayWinRate}</div>
           </div>
           <div className="p-3 bg-bg border border-line rounded">
             <div className="text-subink text-[10px]">平均盈虧比</div>
-            <div className="text-sm font-bold text-ok mt-1">1.45 : 1</div>
+            <div className="text-sm font-bold text-ok mt-1">{displayProfitLossRatio}</div>
           </div>
           <div className="p-3 bg-bg border border-line rounded">
             <div className="text-subink text-[10px]">單票平均收益</div>
-            <div className="text-sm font-bold text-[#E6EDF7] mt-1">0.125%</div>
+            <div className="text-sm font-bold text-[#E6EDF7] mt-1">{displayAvgReturn}</div>
           </div>
           <div className="p-3 bg-bg border border-line rounded">
             <div className="text-subink text-[10px]">交易費用佔比</div>
-            <div className="text-sm font-bold text-danger mt-1">13.2%</div>
+            <div className="text-sm font-bold text-danger mt-1">—</div>
           </div>
         </div>
       </Card>
