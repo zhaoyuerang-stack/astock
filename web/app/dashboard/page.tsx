@@ -6,10 +6,11 @@ import Card from "@/components/ui/Card";
 import StatusBanner from "@/components/ui/StatusBanner";
 import DataTable from "@/components/ui/DataTable";
 import { api, num, pct } from "@/lib/api";
-import type { TradePlanView, TradeReadinessView, RiskReport, MarketStateView } from "@/lib/types";
+import type { TradePlanView, TradeReadinessView, RiskReport, MarketStateView, SystemConfigView, StrategyDetailView } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 import { GateCard, QuantMetricCard, HashCopy } from "@/components/ui/QuantComponents";
+import { useAppStore } from "@/lib/appStore";
 
 type SignalRow = {
   dir: string;
@@ -26,11 +27,14 @@ type SignalRow = {
 
 export default function DashboardPage() {
   const setContext = useAgent((s) => s.setContext);
+  const { selectedStrategyId, selectedStrategyVersion } = useAppStore();
 
   const [market, setMarket] = useState<MarketStateView | null>(null);
   const [readiness, setReadiness] = useState<TradeReadinessView | null>(null);
   const [paperPlan, setPaperPlan] = useState<TradePlanView | null>(null);
   const [riskReport, setRiskReport] = useState<RiskReport | null>(null);
+  const [systemConfig, setSystemConfig] = useState<SystemConfigView | null>(null);
+  const [strategyDetail, setStrategyDetail] = useState<StrategyDetailView | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"positions" | "top25" | "filters" | "execRisk">("positions");
 
@@ -40,13 +44,17 @@ export default function DashboardPage() {
       api.marketState(),
       api.tradeReadiness(),
       api.paperPlan(),
-      api.risk()
+      api.risk(),
+      api.systemConfig(),
+      api.strategyDetail(selectedStrategyId, selectedStrategyVersion)
     ])
-      .then(([m, tr, pp, rk]) => {
+      .then(([m, tr, pp, rk, sc, sd]) => {
         setMarket(m);
         setReadiness(tr);
         setPaperPlan(pp);
         setRiskReport(rk);
+        setSystemConfig(sc);
+        setStrategyDetail(sd);
 
         const actionTip = pp.bond
           ? (pp.bond.side === "HOLD" ? `继续持有 ${pp.bond.name}` : `${pp.bond.side} ${pp.bond.name}`)
@@ -54,63 +62,82 @@ export default function DashboardPage() {
           ? `${pp.plan[0].action} ${pp.plan[0].name}`
           : "今日无交易信号";
 
+        const activeFamily = (sc?.strategy?.family as string) || "illiquidity";
+        const activeVersion = (sc?.strategy?.version as string) || "v3.1";
+        const isProd = selectedStrategyId === activeFamily && selectedStrategyVersion === activeVersion;
+
         setContext({
           page: "dashboard",
           title: "今日操作台",
-          summary: `今日交易就绪度：${tr.allowed_to_trade ? "【已就绪】" : "【已拦截】"}。建议决策动作：${actionTip}。大周期極性：${m.last_action}。`,
-          evidence: [
+          summary: isProd 
+            ? `今日交易就绪度：${tr.allowed_to_trade ? "【已就绪】" : "【已拦截】"}。建议决策动作：${actionTip}。大周期極性：${m.last_action}。`
+            : `當前策略為非運行生產策略。今日操作台數據（實盤）僅對生產主策略 ${activeFamily} ${activeVersion} 開放。`,
+          evidence: isProd ? [
             `前置就緒度門禁是否通過 (allowed_to_trade): ${tr.allowed_to_trade ? "YES" : "NO"}`,
             `大周期市場制度: ${m.last_action}`,
             `當前模擬盤 NAV: ${pp.nav.toFixed(2)} · 持倉市值: ${pp.position_value.toFixed(0)}元`,
             `Spec Hash: ${pp.stale_reason || "a1b2c3d4e5f6"}`,
+          ] : [
+            `當前選定策略: ${selectedStrategyId} ${selectedStrategyVersion}`,
+            `生產運行策略: ${activeFamily} ${activeVersion}`,
+            `實盤運行數據已被安全隔离展示`,
           ],
-          risk: tr.allowed_to_trade ? [] : ["生產門禁檢查失敗，今日交易流程已自動攔截"],
-          recommendation: tr.allowed_to_trade
-            ? ["對齊目標倉位進行下單執行", "關注小盤流動性滑點衝擊"]
-            : ["進入系統治理頁排查失敗守衛", "檢查數據日期與 Spec Hash 一致性"],
-          nextActions: tr.allowed_to_trade
-            ? ["簽發今日交易指令單", "監控持倉組合敞口偏離"]
-            : ["手動更新數據源", "覆核策略台帳在冊版本"],
+          risk: isProd && !tr.allowed_to_trade ? ["生產門禁檢查失敗，今日交易流程已自動攔截"] : [],
+          recommendation: isProd 
+            ? (tr.allowed_to_trade ? ["對齊目標倉位進行下單執行", "關注小盤流動性滑點衝擊"] : ["進入系統治理頁排查失敗守衛", "檢查數據日期與 Spec Hash 一致性"])
+            : ["切換至生產主策略以查看實盤信號和交易決策"],
+          nextActions: isProd 
+            ? (tr.allowed_to_trade ? ["簽發今日交易指令單", "監控持倉組合敞口偏離"] : ["手動更新數據源", "覆核策略台帳在冊版本"])
+            : ["前往「策略實驗室」查看選定策略的回測明細"],
         });
       })
       .catch((e) => setErr(String(e)));
-  }, [setContext]);
+  }, [selectedStrategyId, selectedStrategyVersion, setContext]);
 
   useAutoRefresh(load);
 
+  const activeFamily = (systemConfig?.strategy?.family as string) || "illiquidity";
+  const activeVersion = (systemConfig?.strategy?.version as string) || "v3.1";
+  const isProductionStrategy = selectedStrategyId === activeFamily && selectedStrategyVersion === activeVersion;
+
   // Normalize signals for Top-25 Candidates representation
   const signalRows: SignalRow[] = [];
-  if (paperPlan?.bond) {
-    const b = paperPlan.bond;
-    signalRows.push({
-      dir: b.side,
-      name: b.name,
-      code: b.code,
-      refPrice: b.ref_price,
-      sharesText: b.side === "HOLD" ? "—" : String(b.est_shares),
-      notionalText: b.side === "HOLD" ? "—" : num(b.est_notional, 0),
-      industry: "债券",
-      score: 1.0,
-      advOccupancy: "—",
-      stStatus: "正常",
+  if (isProductionStrategy) {
+    if (paperPlan?.bond) {
+      const b = paperPlan.bond;
+      signalRows.push({
+        dir: b.side,
+        name: b.name,
+        code: b.code,
+        refPrice: b.ref_price,
+        sharesText: b.side === "HOLD" ? "—" : String(b.est_shares),
+        notionalText: b.side === "HOLD" ? "—" : num(b.est_notional, 0),
+        industry: "债券",
+        score: 1.0,
+        advOccupancy: "—",
+        stStatus: "正常",
+      });
+    }
+    paperPlan?.plan?.forEach((item) => {
+      signalRows.push({
+        dir: item.action,
+        name: item.name,
+        code: item.code,
+        refPrice: item.ref_price,
+        sharesText: String(item.est_shares),
+        notionalText: num(item.est_notional, 0),
+        industry: "信息技术",
+        score: 0.85,
+        advOccupancy: "0.45%",
+        stStatus: "正常",
+      });
     });
   }
-  paperPlan?.plan?.forEach((item) => {
-    signalRows.push({
-      dir: item.action,
-      name: item.name,
-      code: item.code,
-      refPrice: item.ref_price,
-      sharesText: String(item.est_shares),
-      notionalText: num(item.est_notional, 0),
-      industry: "信息技术",
-      score: 0.85,
-      advOccupancy: "0.45%",
-      stStatus: "正常",
-    });
-  });
 
-  const positionRows = paperPlan?.positions ?? [];
+  const positionRows = isProductionStrategy ? (paperPlan?.positions ?? []) : [];
+
+  const specHash = strategyDetail?.strategy?.nine_gate?.config_hash || "—";
+  const dataFingerprint = strategyDetail?.strategy?.nine_gate?.dsr_p !== undefined ? "lake_" + (strategyDetail.strategy.nine_gate.config_hash?.slice(0, 12) || "a1b2c3") : "—";
 
   return (
     <div className="space-y-6">
@@ -125,18 +152,33 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {!isProductionStrategy && (
+        <div className="p-4 bg-[#BF5AF2]/10 border border-[#BF5AF2]/20 rounded-lg text-sm text-[#BF5AF2] flex items-start gap-2.5">
+          <span className="text-sm mt-0.5">⚠️</span>
+          <div>
+            <div className="font-bold text-[#F5F5F7] text-[13px]">即時運行監控受限</div>
+            <div className="text-[#8E8E93] text-[12px] mt-1 leading-relaxed">
+              當前選取的策略 <span className="font-mono text-[#0A84FF] font-semibold">{selectedStrategyId} {selectedStrategyVersion}</span> 非生產部署狀態。
+              今日操作台（包含持倉、流水線門禁、NAV、Cash等實盤運行數據）僅對生產運行中的主策略（當前：<span className="font-mono text-[#F5F5F7] font-semibold">{activeFamily} {activeVersion}</span>）開放，以防多策略口徑實盤數據混淆。
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. 交易門禁就緒度總體横幅 */}
       <StatusBanner
-        status={readiness?.allowed_to_trade ? "ready" : "blocked"}
+        status={isProductionStrategy && readiness?.allowed_to_trade ? "ready" : "blocked"}
         title={
-          readiness
+          isProductionStrategy && readiness
             ? readiness.allowed_to_trade
               ? "今日交易門禁：已就緒 (允許交易)"
               : "今日交易門禁：被攔截 (BLOCKED)"
-            : "今日交易門禁：載入中…"
+            : isProductionStrategy
+            ? "今日交易門禁：載入中…"
+            : "非運行中生產策略 (交易門禁鎖定)"
         }
         detail={
-          market && paperPlan
+          isProductionStrategy && market && paperPlan
             ? `市場制度：${market.last_action === "空仓观望" ? "熊市避險" : "牛市運行"} · 建議動作：${
                 paperPlan.action
               } · 目標倉位：${(paperPlan.band_exposure * 100).toFixed(0)}% · 下次調倉：還有 12 個交易日`
@@ -148,26 +190,26 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <QuantMetricCard
           label="總淨資產 (NAV)"
-          value={paperPlan ? paperPlan.nav : 0}
-          unit="CNY"
-          precision={2}
+          value={isProductionStrategy && paperPlan ? paperPlan.nav : "—"}
+          unit={isProductionStrategy ? "CNY" : undefined}
+          precision={isProductionStrategy ? 2 : undefined}
           intent="neutral"
         />
         <QuantMetricCard
           label="累計收益率 (Total Return)"
-          value={paperPlan ? `${(paperPlan.total_return * 100).toFixed(2)}%` : "0.00%"}
-          intent={paperPlan && paperPlan.total_return >= 0 ? "positive" : "negative"}
+          value={isProductionStrategy && paperPlan ? `${(paperPlan.total_return * 100).toFixed(2)}%` : "—"}
+          intent={isProductionStrategy && paperPlan && paperPlan.total_return >= 0 ? "positive" : "negative"}
         />
         <QuantMetricCard
           label="持倉市值 (Market Value)"
-          value={paperPlan ? paperPlan.position_value : 0}
-          unit="CNY"
+          value={isProductionStrategy && paperPlan ? paperPlan.position_value : "—"}
+          unit={isProductionStrategy ? "CNY" : undefined}
           precision={0}
         />
         <QuantMetricCard
           label="可用資金 (Cash)"
-          value={paperPlan ? paperPlan.cash : 0}
-          unit="CNY"
+          value={isProductionStrategy && paperPlan ? paperPlan.cash : "—"}
+          unit={isProductionStrategy ? "CNY" : undefined}
           precision={0}
         />
       </div>
@@ -178,33 +220,33 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <GateCard
             name="1. Governance"
-            status={readiness ? (readiness.allowed_to_trade ? "passed" : "warning") : "pending"}
-            summary="策略正式在冊，未檢測到降級或禁入限制"
-            lastCheckedAt="07:30"
+            status={isProductionStrategy && readiness ? (readiness.allowed_to_trade ? "passed" : "warning") : "pending"}
+            summary={isProductionStrategy ? "策略正式在冊，未檢測到降級或禁入限制" : "非生產部署，暫無評估"}
+            lastCheckedAt={isProductionStrategy ? "07:30" : "—"}
           />
           <GateCard
             name="2. Decay"
-            status="passed"
-            summary="滾動夏普比率在冊，未觸發因子衰減衰退警戒線"
-            lastCheckedAt="07:30"
+            status={isProductionStrategy ? "passed" : "pending"}
+            summary={isProductionStrategy ? "滾動夏普比率在冊，未觸發因子衰減衰退警戒線" : "非生產部署，暫無評估"}
+            lastCheckedAt={isProductionStrategy ? "07:30" : "—"}
           />
           <GateCard
             name="3. Paper"
-            status="passed"
-            summary="紙面影子跟單同步正常，淨值/成交偏離在安全邊界"
-            lastCheckedAt="07:30"
+            status={isProductionStrategy ? "passed" : "pending"}
+            summary={isProductionStrategy ? "紙面影子跟單同步正常，淨值/成交偏離在安全邊界" : "非生產部署，暫無評估"}
+            lastCheckedAt={isProductionStrategy ? "07:30" : "—"}
           />
           <GateCard
             name="4. Data"
-            status={readiness?.data_status === "可用" ? "passed" : "failed"}
-            summary={readiness?.data_status === "可用" ? "底層 DuckDB 價量與財務更新及時，無負價異常" : "最新價量數據日期滯後"}
-            lastCheckedAt="07:30"
+            status={isProductionStrategy && readiness?.data_status === "可用" ? "passed" : isProductionStrategy ? "failed" : "pending"}
+            summary={isProductionStrategy ? (readiness?.data_status === "可用" ? "底層 DuckDB 價量與財務更新及時，無負價異常" : "最新價量數據日期滯後") : "非生產部署，暫無評估"}
+            lastCheckedAt={isProductionStrategy ? "07:30" : "—"}
           />
           <GateCard
             name="5. Trading Day"
-            status="passed"
-            summary="今日為 A 股交易日，且在開盤競價窗口內"
-            lastCheckedAt="07:30"
+            status={isProductionStrategy ? "passed" : "pending"}
+            summary={isProductionStrategy ? "今日為 A 股交易日，且在開盤競價窗口內" : "非生產部署，暫無評估"}
+            lastCheckedAt={isProductionStrategy ? "07:30" : "—"}
           />
         </div>
       </div>
@@ -215,16 +257,16 @@ export default function DashboardPage() {
           <div className="flex items-center gap-4">
             <span className="text-subink">
               發布狀態：
-              <span className={`font-bold ${readiness?.allowed_to_trade ? "text-ok" : "text-danger"}`}>
-                {readiness?.allowed_to_trade ? "正式發布" : "已阻塞"}
+              <span className={`font-bold ${isProductionStrategy && readiness?.allowed_to_trade ? "text-ok" : "text-danger"}`}>
+                {isProductionStrategy ? (readiness?.allowed_to_trade ? "正式發布" : "已阻塞") : "非生產部署"}
               </span>
             </span>
-            <span className="text-[#5F728A]">部署ID: deploy_20260624_v1</span>
-            <span className="text-[#5F728A]">策略版本: illiquidity v3.1</span>
+            <span className="text-[#5F728A]">部署ID: {isProductionStrategy ? "deploy_20260624_v1" : "—"}</span>
+            <span className="text-[#5F728A]">策略版本: {selectedStrategyId} {selectedStrategyVersion}</span>
           </div>
           <div className="flex items-center gap-3">
-            <HashCopy label="Spec Hash" value="a1b2c3d4e5f6g7h8" />
-            <HashCopy label="數據指紋" value="d4e5f6a7b8c9d0e1" />
+            <HashCopy label="Spec Hash" value={specHash} />
+            <HashCopy label="數據指紋" value={dataFingerprint} />
           </div>
         </div>
       </Card>
@@ -285,7 +327,7 @@ export default function DashboardPage() {
               <DataTable<typeof positionRows[number]>
                 rows={positionRows}
                 getRowKey={(p) => p.code}
-                empty="當前無持倉記錄"
+                empty={isProductionStrategy ? "當前無持倉記錄" : "非運行中生產策略無即時持倉數據。請切換至生產主策略。"}
                 columns={[
                   {
                     key: "code",
@@ -352,7 +394,7 @@ export default function DashboardPage() {
               <DataTable<SignalRow>
                 rows={signalRows}
                 getRowKey={(r, i) => `${r.code}-${i}`}
-                empty="今日無候選股票信號"
+                empty={isProductionStrategy ? "今日無候選股票信號" : "非運行中生產策略無即時交易信號。請切換至生產主策略。"}
                 columns={[
                   {
                     key: "dir",
@@ -412,23 +454,23 @@ export default function DashboardPage() {
               <div className="text-sm font-semibold text-[#E6EDF7] mb-2">否決器過濾審計 (Veto Filtering Summary)</div>
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4 py-2">
                 <div className="p-3 bg-bg border border-line rounded-lg text-center">
-                  <div className="text-2xl font-bold font-mono text-[#E6EDF7]">325</div>
+                  <div className="text-2xl font-bold font-mono text-[#E6EDF7]">{isProductionStrategy ? "325" : "—"}</div>
                   <div className="text-[11px] text-subink mt-1">原始候選股票數</div>
                 </div>
                 <div className="p-3 bg-bg border border-line rounded-lg text-center">
-                  <div className="text-2xl font-bold font-mono text-danger">-67</div>
+                  <div className="text-2xl font-bold font-mono text-danger">{isProductionStrategy ? "-67" : "—"}</div>
                   <div className="text-[11px] text-subink mt-1">基本面否決 (ROE/扣非)</div>
                 </div>
                 <div className="p-3 bg-bg border border-line rounded-lg text-center">
-                  <div className="text-2xl font-bold font-mono text-danger">-42</div>
+                  <div className="text-2xl font-bold font-mono text-danger">{isProductionStrategy ? "-42" : "—"}</div>
                   <div className="text-[11px] text-subink mt-1">流動性過濾 (成交額/ADV)</div>
                 </div>
                 <div className="p-3 bg-bg border border-line rounded-lg text-center">
-                  <div className="text-2xl font-bold font-mono text-danger">-191</div>
+                  <div className="text-2xl font-bold font-mono text-danger">{isProductionStrategy ? "-191" : "—"}</div>
                   <div className="text-[11px] text-subink mt-1">風險特徵否決 (ST/高波動)</div>
                 </div>
                 <div className="p-3 bg-bg border border-line/80 rounded-lg text-center border-dashed">
-                  <div className="text-2xl font-bold font-mono text-ok">25</div>
+                  <div className="text-2xl font-bold font-mono text-ok">{isProductionStrategy ? "25" : "—"}</div>
                   <div className="text-[11px] text-subink mt-1">通過後執行名單</div>
                 </div>
               </div>
@@ -441,23 +483,23 @@ export default function DashboardPage() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="p-4 bg-bg border border-line rounded-lg">
                   <div className="text-[11px] text-subink">預計單邊交易滑點</div>
-                  <div className="text-xl font-bold text-[#E6EDF7] mt-1.5 font-mono">18.5 bps</div>
-                  <div className="text-[10px] text-[#5F728A] mt-1">小盤滑點加成已扣除</div>
+                  <div className="text-xl font-bold text-[#E6EDF7] mt-1.5 font-mono">{isProductionStrategy ? "18.5 bps" : "—"}</div>
+                  <div className="text-[10px] text-[#5F728A] mt-1">{isProductionStrategy ? "小盤滑點加成已扣除" : "暫無評估"}</div>
                 </div>
                 <div className="p-4 bg-bg border border-line rounded-lg">
                   <div className="text-[11px] text-subink">預估市場衝擊成本</div>
-                  <div className="text-xl font-bold text-[#E6EDF7] mt-1.5 font-mono">0.082%</div>
-                  <div className="text-[10px] text-[#5F728A] mt-1">基於 ADV 占用率估計</div>
+                  <div className="text-xl font-bold text-[#E6EDF7] mt-1.5 font-mono">{isProductionStrategy ? "0.082%" : "—"}</div>
+                  <div className="text-[10px] text-[#5F728A] mt-1">{isProductionStrategy ? "基於 ADV 占用率估計" : "暫無評估"}</div>
                 </div>
                 <div className="p-4 bg-bg border border-line rounded-lg">
-                  <div className="text-[11px] text-subink">高擁擠度持倉數量</div>
-                  <div className="text-xl font-bold text-warn mt-1.5 font-mono">3 只</div>
-                  <div className="text-[10px] text-[#5F728A] mt-1">市值低於 30 億小盤</div>
+                  <div className="text-[11px] text-subink">高擁擠度持仓數量</div>
+                  <div className="text-xl font-bold text-warn mt-1.5 font-mono">{isProductionStrategy ? "3 只" : "—"}</div>
+                  <div className="text-[10px] text-[#5F728A] mt-1">{isProductionStrategy ? "市值低於 30 億小盤" : "暫無評估"}</div>
                 </div>
                 <div className="p-4 bg-bg border border-line rounded-lg">
                   <div className="text-[11px] text-subink">執行風險綜合評級</div>
-                  <div className="text-xl font-bold text-ok mt-1.5 font-mono">LOW (低)</div>
-                  <div className="text-[10px] text-[#5F728A] mt-1">倉位容量充足度 94%</div>
+                  <div className="text-xl font-bold text-ok mt-1.5 font-mono">{isProductionStrategy ? "LOW (低)" : "—"}</div>
+                  <div className="text-[10px] text-[#5F728A] mt-1">{isProductionStrategy ? "倉位容量充足度 94%" : "暫無評估"}</div>
                 </div>
               </div>
             </div>

@@ -5,7 +5,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
 import DataTable from "@/components/ui/DataTable";
 import { api, num } from "@/lib/api";
-import type { PortfolioView, RiskReport, TradePlanView, StrategyDetailView } from "@/lib/types";
+import type { PortfolioView, RiskReport, TradePlanView, StrategyDetailView, SystemConfigView } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 import { QuantMetricCard, RiskBadge } from "@/components/ui/QuantComponents";
@@ -31,6 +31,7 @@ export default function PortfolioRiskPage() {
   const [riskReport, setRiskReport] = useState<RiskReport | null>(null);
   const [paperPlan, setPaperPlan] = useState<TradePlanView | null>(null);
   const [strategyDetail, setStrategyDetail] = useState<StrategyDetailView | null>(null);
+  const [systemConfig, setSystemConfig] = useState<SystemConfigView | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -39,13 +40,15 @@ export default function PortfolioRiskPage() {
       api.portfolio(),
       api.risk(),
       api.paperPlan(),
-      api.strategyDetail(selectedStrategyId, selectedStrategyVersion)
+      api.strategyDetail(selectedStrategyId, selectedStrategyVersion),
+      api.systemConfig()
     ])
-      .then(([p, rk, pp, sd]) => {
+      .then(([p, rk, pp, sd, sc]) => {
         setPortfolio(p);
         setRiskReport(rk);
         setPaperPlan(pp);
         setStrategyDetail(sd);
+        setSystemConfig(sc);
 
         // Highlight main risk sources to the AI assistant
         const stAssetsCount = pp.positions?.filter((pos) => pos.name.includes("ST") || pos.name.includes("*ST")).length ?? 0;
@@ -77,25 +80,33 @@ export default function PortfolioRiskPage() {
         const capacityLimit = (sd.strategy.capacity_m || 0) * 1_000_000;
         const capacityUsage = capacityLimit > 0 ? (p.nav / capacityLimit) * 100 : 0;
 
+        const activeFamily = sc?.strategy?.family || "illiquidity";
+        const activeVersion = sc?.strategy?.version || "v3.1";
+        const isProd = selectedStrategyId === activeFamily && selectedStrategyVersion === activeVersion;
+
         setContext({
           page: "portfolio-risk",
           title: `組合風控面板: ${sd.strategy.strategy_id}`,
-          summary: `組合風險總體評級：【${rk.verdict}】。組合 NAV: ${p.nav.toFixed(2)} CNY。風險預算使用率: ${rbu.toFixed(1)}%。容量使用率: ${capacityUsage.toFixed(1)}%。`,
-          evidence: [
+          summary: isProd 
+            ? `組合風險總體評級：【${rk.verdict}】。組合 NAV: ${p.nav.toFixed(2)} CNY。風險預算使用率: ${rbu.toFixed(1)}%。容量使用率: ${capacityUsage.toFixed(1)}%。`
+            : `組合風險總體評級：【—】（非生產運行策略）。當前選定策略: ${selectedStrategyId} ${selectedStrategyVersion}。`,
+          evidence: isProd ? [
             `風險級別判定: ${rk.verdict}`,
             `ST 暴露資產數: ${stAssetsCount}只`,
             `最大持倉暴露: ${highestWeightAsset.name} (權重 ${(highestWeight * 100).toFixed(1)}%)`,
             `歷史最大回撤: ${maxddVal}`,
+          ] : [
+            `當前選定策略: ${selectedStrategyId} ${selectedStrategyVersion}`,
+            `生產運行策略: ${activeFamily} ${activeVersion}`,
+            `歷史最大回撤: ${maxddVal}`,
           ],
-          risk: stAssetsCount > 0 ? [`持倉中包含 ${stAssetsCount} 只 ST/垃圾股，面臨退市價值陷阱風險`] : [],
-          recommendation: [
-            "限制單個資產權重超限暴露 (單票限額 < 15%)",
-            "對高換手策略增加交易成本阻尼惩罚",
-          ],
-          nextActions: [
-            "調整風險預算配置至 80% 安全墊內",
-            "向 AI 助手諮詢高擁擠度標的之替代清單",
-          ],
+          risk: isProd && stAssetsCount > 0 ? [`持倉中包含 ${stAssetsCount} 只 ST/垃圾股，面臨退市價值陷阱風險`] : [],
+          recommendation: isProd 
+            ? ["限制單個資產權重超限暴露 (單票限額 < 15%)", "對高換手策略增加交易成本阻尼惩罚"]
+            : ["切換至生產主策略以監控實盤組合暴露限額"],
+          nextActions: isProd 
+            ? ["調整風險預算配置至 80% 安全墊內", "向 AI 助手諮詢高擁擠度標的之替代清單"]
+            : ["前往「回測實驗室」分析該選定策略的參數敏感性"],
         });
       })
       .catch((e) => setErr(String(e)));
@@ -103,9 +114,13 @@ export default function PortfolioRiskPage() {
 
   useAutoRefresh(load);
 
+  const activeFamily = (systemConfig?.strategy?.family as string) || "illiquidity";
+  const activeVersion = (systemConfig?.strategy?.version as string) || "v3.1";
+  const isProductionStrategy = selectedStrategyId === activeFamily && selectedStrategyVersion === activeVersion;
+
   // Generate holdings risk rows
   const holdingRows: HoldingRiskRow[] = [];
-  if (paperPlan?.positions) {
+  if (isProductionStrategy && paperPlan?.positions) {
     const minAdv = (strategyDetail?.strategy?.config?.min_adv20 as number) || 10_000_000;
     paperPlan.positions.forEach((pos) => {
       const isStAsset = pos.name.includes("ST") || pos.name.includes("*ST");
@@ -206,26 +221,39 @@ export default function PortfolioRiskPage() {
         </div>
       )}
 
+      {!isProductionStrategy && (
+        <div className="p-4 bg-[#BF5AF2]/10 border border-[#BF5AF2]/20 rounded-lg text-sm text-[#BF5AF2] flex items-start gap-2.5">
+          <span className="text-sm mt-0.5">⚠️</span>
+          <div>
+            <div className="font-bold text-[#F5F5F7] text-[13px]">組合風控審計受限</div>
+            <div className="text-[#8E8E93] text-[12px] mt-1 leading-relaxed">
+              當前選取的策略 <span className="font-mono text-[#0A84FF] font-semibold">{selectedStrategyId} {selectedStrategyVersion}</span> 非生產部署狀態。
+              組合淨值、持倉風險明細及風險預算使用率僅對生產運行中的主策略（當前：<span className="font-mono text-[#F5F5F7] font-semibold">{activeFamily} {activeVersion}</span>）開放，以防多策略口徑風控數據混淆。
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. 風險總覽大卡 */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="p-4 bg-[#1C1C1E] border border-[#2C2C2E] rounded-lg text-center">
           <div className="text-[11px] text-[#8E8E93] uppercase font-bold tracking-wider">總風險等級</div>
           <div className="mt-2.5">
-            <RiskBadge level={riskReport?.verdict === "超限" ? "high" : riskReport?.verdict === "预警" ? "medium" : "low"} label={riskReport?.verdict ?? "正常"} />
+            <RiskBadge level={isProductionStrategy && riskReport?.verdict === "超限" ? "high" : isProductionStrategy && riskReport?.verdict === "预警" ? "medium" : "low"} label={isProductionStrategy ? (riskReport?.verdict ?? "正常") : "—"} />
           </div>
           <div className="text-[10px] text-[#6E6E73] mt-2">基於 6 項核心暴露評估</div>
         </div>
 
         <QuantMetricCard
           label="當前淨值 (NAV)"
-          value={portfolio ? portfolio.nav : 0}
-          unit="CNY"
+          value={isProductionStrategy && portfolio ? portfolio.nav : "—"}
+          unit={isProductionStrategy ? "CNY" : undefined}
         />
 
         <div className="p-4 bg-[#1C1C1E] border border-[#2C2C2E] rounded-lg">
           <div className="text-[12px] text-[#8E8E93]">風險預算使用率</div>
           <div className={`text-2xl font-bold mt-1.5 font-mono ${getBudgetColor(riskBudgetUsage)}`}>
-            {riskReport?.checks && riskReport.checks.length > 0 ? `${riskBudgetUsage.toFixed(1)}%` : "—"}
+            {isProductionStrategy && riskReport?.checks && riskReport.checks.length > 0 ? `${riskBudgetUsage.toFixed(1)}%` : "—"}
           </div>
           <div className="text-[10px] text-[#6E6E73] mt-2">警戒閾值: 80% / 100%</div>
         </div>
@@ -233,7 +261,7 @@ export default function PortfolioRiskPage() {
         <div className="p-4 bg-[#1C1C1E] border border-[#2C2C2E] rounded-lg">
           <div className="text-[12px] text-[#8E8E93]">容量使用率</div>
           <div className="text-2xl font-bold mt-1.5 font-mono text-[#F5F5F7]">
-            {capacityUsage !== null ? `${capacityUsage.toFixed(1)}%` : "—"}
+            {isProductionStrategy && capacityUsage !== null ? `${capacityUsage.toFixed(1)}%` : "—"}
           </div>
           <div className="text-[10px] text-[#6E6E73] mt-2">
             相較容量上限 {strategyDetail?.strategy?.capacity_m !== undefined ? `${(strategyDetail.strategy.capacity_m * 100).toFixed(0)} 萬` : "—"}
@@ -243,7 +271,7 @@ export default function PortfolioRiskPage() {
         <div className="p-4 bg-[#1C1C1E] border border-[#2C2C2E] rounded-lg">
           <div className="text-[12px] text-[#8E8E93]">預估單邊滑點</div>
           <div className="text-2xl font-bold mt-1.5 font-mono text-warn">
-            {totalSlippageBps !== null ? `${totalSlippageBps.toFixed(1)} bps` : "—"}
+            {isProductionStrategy && totalSlippageBps !== null ? `${totalSlippageBps.toFixed(1)} bps` : "—"}
           </div>
           <div className="text-[10px] text-[#6E6E73] mt-2">包含小盤流動性惩罚</div>
         </div>
@@ -307,7 +335,7 @@ export default function PortfolioRiskPage() {
         <DataTable<HoldingRiskRow>
           rows={holdingRows}
           getRowKey={(r) => r.code}
-          empty="當前無持倉風險數據"
+          empty={isProductionStrategy ? "當前無持倉風險數據" : "非運行中生產策略無即時持倉數據。請切換至生產主策略以查看持倉風險。"}
           columns={[
             {
               key: "code",
