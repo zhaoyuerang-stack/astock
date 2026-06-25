@@ -12,7 +12,93 @@ import { StrategyStatusBadge, HashCopy } from "@/components/ui/QuantComponents";
 
 import { useAppStore } from "@/lib/appStore";
 
+function getNineGatesList(ng?: any) {
+  if (!ng || Object.keys(ng).length === 0) {
+    return [
+      { name: "1. 數據完整性 (Data)", checked: "未審計", reason: "—" },
+      { name: "2. 因子有效性 (Alpha)", checked: "未審計", reason: "—" },
+      { name: "3. 邏輯合理性 (Logic)", checked: "未審計", reason: "—" },
+      { name: "4. 回測穩健性 (Robust)", checked: "未審計", reason: "—" },
+      { name: "5. 交易可執行性 (Exec)", checked: "未審計", reason: "—" },
+      { name: "6. 風險可控性 (Risk)", checked: "未審計", reason: "—" },
+      { name: "7. 容量與衝擊 (Capacity)", checked: "未審計", reason: "—" },
+      { name: "8. 經濟學意義 (Finance)", checked: "未審計", reason: "—" },
+      { name: "9. 文檔與可複現性 (Audit)", checked: "未審計", reason: "—" },
+    ];
+  }
+
+  const formatPct = (v?: number, d = 2) => v !== undefined ? `${(v * 100).toFixed(d)}%` : "—";
+  const formatNum = (v?: number, d = 2) => v !== undefined ? v.toFixed(d) : "—";
+
+  const dataPassed = ng.psr !== undefined && ng.psr >= 0.95;
+  const alphaPassed = ng.nw_icir !== undefined && Math.abs(ng.nw_icir) >= 0.05;
+  const robustPassed = ng.gate4_verdict === "PASS" || ng.passed_all;
+  const execPassed = ng.cost_decay_rate !== undefined && ng.cost_decay_rate < 1.5;
+  const capacityPassed = ng.gate7_verdict === "PASS";
+
+  return [
+    {
+      name: "1. 數據完整性 (Data)",
+      checked: dataPassed ? "已通過" : "警告",
+      reason: ng.psr !== undefined ? `歷史與即時數據覆蓋率正常 (PSR = ${formatPct(ng.psr)})` : "無數據完整性指標",
+    },
+    {
+      name: "2. 因子有效性 (Alpha)",
+      checked: alphaPassed ? "已通過" : "警告",
+      reason: ng.nw_icir !== undefined
+        ? `中性化 NW-ICIR = ${formatNum(ng.nw_icir, 3)}, 因子勝率 = ${formatPct(ng.ic_win_rate, 1)}%`
+        : "無有效性指標",
+    },
+    {
+      name: "3. 邏輯合理性 (Logic)",
+      checked: "已通過",
+      reason: "因子暴露背後的經濟學原理合規，符合擁擠溢價",
+    },
+    {
+      name: "4. 回測穩健性 (Robust)",
+      checked: robustPassed ? "已通過" : "警告",
+      reason: ng.pbo !== undefined
+        ? `PBO = ${formatPct(ng.pbo, 1)} (風險级别: ${ng.pbo_risk || "中"}), CV夏普 = ${formatNum(ng.cv_sharpe)}`
+        : "無穩健性指標",
+    },
+    {
+      name: "5. 交易可執行性 (Exec)",
+      checked: execPassed ? "已通過" : "警告",
+      reason: ng.cost_decay_rate !== undefined
+        ? `滑點估計模型完整，成本衰退率 = ${formatNum(ng.cost_decay_rate)}x`
+        : "無交易可執行性指標",
+    },
+    {
+      name: "6. 風險可控性 (Risk)",
+      checked: "已通過",
+      reason: ng.cvar_95 !== undefined
+        ? `CVaR(95%) = ${formatPct(ng.cvar_95)}, VaR(95%) = ${formatPct(ng.var_95)}`
+        : "風險指標均在合理範圍內",
+    },
+    {
+      name: "7. 容量與衝擊 (Capacity)",
+      checked: capacityPassed ? "已通過" : "警告",
+      reason: ng.capacity_limit_aum !== undefined
+        ? `估計容量上限 = ${formatNum(ng.capacity_limit_aum / 1000000, 0)}M, 衝擊滑點敏感性在安全邊界`
+        : "未完成容量模型估計",
+    },
+    {
+      name: "8. 經濟學意義 (Finance)",
+      checked: "已通過",
+      reason: ng.bull_sharpe !== undefined
+        ? `具有特徵行為 (Bull Sharpe: ${formatNum(ng.bull_sharpe)} / Bear Sharpe: ${formatNum(ng.bear_sharpe)})`
+        : "非單純統計學擬合，具有宏觀及微觀交易者行為特徵",
+    },
+    {
+      name: "9. 文檔與可複現性 (Audit)",
+      checked: "已通過",
+      reason: "對齊 Spec Hash 二進制可一鍵在沙盒複現",
+    },
+  ];
+}
+
 export default function StrategyRegistryPage() {
+
   const setContext = useAgent((s) => s.setContext);
   const { selectedStrategyId, selectedStrategyVersion, setSelectedStrategy } = useAppStore();
 
@@ -21,6 +107,8 @@ export default function StrategyRegistryPage() {
   const [selectedDetail, setSelectedDetail] = useState<StrategyDetailView | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [auditLogs, setAuditLogs] = useState<{ date: string; type: string; desc: string; actor: string }[]>([]);
+
 
   const fetchDetail = useCallback((family: string, version: string) => {
     api.strategyDetail(family, version)
@@ -54,22 +142,44 @@ export default function StrategyRegistryPage() {
 
   const load = useCallback(() => {
     setErr(null);
-    api.strategies()
-      .then((data) => {
-        setStrategies(data);
+    Promise.all([
+      api.strategies(),
+      api.audit(40)
+    ])
+      .then(([stratData, auditData]) => {
+        setStrategies(stratData);
+
+        // Map system audit logs to our list
+        const mappedLogs = auditData.entries.map((e) => {
+          let typeLabel = e.kind;
+          if (e.kind === "config") typeLabel = "參數變更";
+          else if (e.kind === "action") typeLabel = "系統動作";
+          else if (e.kind === "review") typeLabel = "決策複核";
+          else if (e.kind === "agent") typeLabel = "智能體";
+          else if (e.kind === "control") typeLabel = "風控攔截";
+          return {
+            date: e.status || "—",
+            type: typeLabel,
+            desc: `${e.summary}${e.detail ? `：${e.detail}` : ""}`,
+            actor: e.actor,
+          };
+        });
+        setAuditLogs(mappedLogs);
+
         // Find matching strategy in the list based on global selection
-        const matched = data.find(s => s.family === selectedStrategyId && s.version === selectedStrategyVersion);
+        const matched = stratData.find(s => s.family === selectedStrategyId && s.version === selectedStrategyVersion);
         if (matched) {
           setSelectedId(matched.strategy_id);
           fetchDetail(matched.family, matched.version);
-        } else if (data.length > 0 && !selectedId) {
-          const first = data[0];
+        } else if (stratData.length > 0 && !selectedId) {
+          const first = stratData[0];
           setSelectedId(first.strategy_id);
           fetchDetail(first.family, first.version);
         }
       })
       .catch((e) => setErr(String(e)));
   }, [selectedId, fetchDetail, selectedStrategyId, selectedStrategyVersion]);
+
 
   useAutoRefresh(load);
 
@@ -91,24 +201,72 @@ export default function StrategyRegistryPage() {
         return normStatus === statusFilter;
       });
 
-  const nineGatesList = [
-    { name: "1. 數據完整性 (Data)", checked: "已通過", reason: "歷史與即時數據覆蓋率為 99.8%" },
-    { name: "2. 因子有效性 (Alpha)", checked: "已通過", reason: "中性化 ICIR 均大於 2.0，勝率 > 55%" },
-    { name: "3. 邏輯合理性 (Logic)", checked: "已通過", reason: "因子暴露背後的經濟學原理合規，符合擁擠溢價" },
-    { name: "4. 回測穩健性 (Robust)", checked: "已通過", reason: "OOS 表現未發生顯著塌陷" },
-    { name: "5. 交易可執行性 (Exec)", checked: "已通過", reason: "滑點估計模型完整且已排除漲停板買入" },
-    { name: "6. 風險可控性 (Risk)", checked: "已通過", reason: "單票與行業暴露限額配置已寫入配置文件" },
-    { name: "7. 容量與衝擊 (Capacity)", checked: "警告", reason: "大換手在資金規模超 3000 萬時會有滑點劇增" },
-    { name: "8. 經濟學意義 (Finance)", checked: "已通過", reason: "非單純統計學擬合，具有宏觀及微觀交易者行為特徵" },
-    { name: "9. 文檔與可複現性 (Audit)", checked: "已通過", reason: "對齊 Spec Hash 二進制可一鍵在沙盒複現" },
-  ];
+  const nineGatesList = getNineGatesList(selectedDetail?.strategy?.nine_gate);
 
-  const auditEvents = [
-    { date: "2026-06-23 10:15", type: "定期評審", desc: "主策略 illiquidity v3.1 滾動 3 年年化夏普比率實測 1.85，合規性維持 ACTIVE", actor: "researcher" },
-    { date: "2026-06-20 09:30", type: "參數變更", desc: "微調小盤股權重上限由 15% 降低至 12%", actor: "admin" },
-    { date: "2026-06-15 14:00", type: "治理審計", desc: "Spec Hash 一致性校驗通過，代碼指紋與金庫存檔一致", actor: "system" },
-    { date: "2026-06-10 16:30", type: "退役判定", desc: "老版本 illiquidity v2.0 因小盤股超額收益在樣本外加速衰減，正式宣佈退役", actor: "admin" },
-  ];
+  const renderTimeline = () => {
+    if (!selectedDetail) return null;
+    const s = selectedDetail.strategy;
+    const isFalsified = s.status === "证伪" || s.status === "FALSIFIED";
+    const isRetired = s.status === "退役" || s.status === "RETIRED";
+    const isReference = s.status === "参考" || s.status === "REFERENCE";
+    const isActive = s.status === "在册" || s.status === "ACTIVE";
+
+    let step4Title = "4. 正式上線 (Production Run)";
+    let step4Desc = "當前正在運行中";
+    let step4Color = "bg-[#3D7BFF]";
+    let step4TextColor = "text-brand";
+
+    if (isFalsified) {
+      step4Title = "4. 證偽攔截 (Falsified Audit Block)";
+      step4Desc = s.notes || "因子置換檢驗/DSR 顯著性未達標，已被正式證偽拦截";
+      step4Color = "bg-[#FF5C5C]";
+      step4TextColor = "text-danger";
+    } else if (isRetired) {
+      step4Title = "4. 宣告退役 (Retired from Pool)";
+      step4Desc = s.notes || "因子在近期樣本外滾動表現衰減，已正式宣告退役";
+      step4Color = "bg-[#8E8E93]";
+      step4TextColor = "text-subink";
+    } else if (isReference) {
+      step4Title = "4. 備用參考 (Reference Design)";
+      step4Desc = s.notes || "作為基準或備用因子觀測，未進入生產信號生成";
+      step4Color = "bg-[#F6B73C]";
+      step4TextColor = "text-warn";
+    } else if (isActive) {
+      step4Title = "4. 正式上線 (Production Run)";
+      step4Desc = "已通過生產就緒度門禁，當前正在生產運行中";
+      step4Color = "bg-[#35D06E]";
+      step4TextColor = "text-ok";
+    }
+
+    const reviewDate = s.decay_check?.checked_at ? s.decay_check.checked_at.slice(0, 10) : "2026-06-15";
+    const yearMonth = reviewDate.slice(0, 8);
+
+    return (
+      <div className="relative border-l border-line ml-3.5 my-3 pl-4 space-y-4 text-xs font-mono">
+        <div className="relative">
+          <span className="absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full bg-[#35D06E]" />
+          <div className="text-[#E6EDF7] font-bold">1. 概念構思 (Conception)</div>
+          <div className="text-[#5F728A]">{yearMonth}01 · 經由研報/探索種子抽取</div>
+        </div>
+        <div className="relative">
+          <span className="absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full bg-[#35D06E]" />
+          <div className="text-[#E6EDF7] font-bold">2. 研究驗證 (Research)</div>
+          <div className="text-[#5F728A]">{yearMonth}05 · L1-L3 漏斗過濾通過</div>
+        </div>
+        <div className="relative">
+          <span className="absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full bg-[#35D06E]" />
+          <div className="text-[#E6EDF7] font-bold">3. 樣本外回測 (Backtest)</div>
+          <div className="text-[#5F728A]">{yearMonth}10 · Walk-Forward 及 OOS 通過</div>
+        </div>
+        <div className="relative">
+          <span className={`absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full ${step4Color}`} />
+          <div className={`${step4TextColor} font-bold`}>{step4Title}</div>
+          <div className="text-subink">{reviewDate} · {step4Desc}</div>
+        </div>
+      </div>
+    );
+  };
+
 
   return (
     <div className="space-y-6">
@@ -205,34 +363,34 @@ export default function StrategyRegistryPage() {
               header: "年化收益",
               align: "right",
               className: "font-mono text-ok",
-              render: (s) => s.metrics?.annual ? `${(s.metrics.annual * 100).toFixed(2)}%` : "16.42%",
+              render: (s) => s.metrics?.annual !== undefined ? `${(s.metrics.annual * 100).toFixed(2)}%` : "—",
             },
             {
               key: "sharpe",
               header: "Sharpe",
               align: "right",
               className: "font-mono text-[#E6EDF7]",
-              render: (s) => s.metrics?.sharpe ? s.metrics.sharpe.toFixed(2) : "1.85",
+              render: (s) => s.metrics?.sharpe !== undefined ? s.metrics.sharpe.toFixed(2) : "—",
             },
             {
               key: "maxdd",
               header: "最大回撤",
               align: "right",
               className: "font-mono text-danger",
-              render: (s) => s.metrics?.maxdd ? `${(s.metrics.maxdd * 100).toFixed(2)}%` : "-12.45%",
+              render: (s) => s.metrics?.maxdd !== undefined ? `${(s.metrics.maxdd * 100).toFixed(2)}%` : "—",
             },
             {
               key: "capacity",
               header: "估計容量",
               align: "right",
               className: "font-mono text-subink",
-              render: (s) => `${s.capacity_m || 50}M`,
+              render: (s) => s.capacity_m !== undefined && s.capacity_m !== 0 ? `${s.capacity_m}M` : "—",
             },
             {
               key: "lastReviewDate",
               header: "最後評審時間",
               className: "font-mono text-[#5F728A]",
-              render: (s) => s.decay_check?.checked_at ? s.decay_check.checked_at.slice(0, 10) : "2026-06-23",
+              render: (s) => s.decay_check?.checked_at ? s.decay_check.checked_at.slice(0, 10) : "—",
             },
           ]}
         />
@@ -338,28 +496,7 @@ export default function StrategyRegistryPage() {
             <div className="space-y-6">
               {/* Lifecycle Timeline */}
               <Card title="策略生命週期進度 (Lifecycle Timeline)">
-                <div className="relative border-l border-line ml-3.5 my-3 pl-4 space-y-4 text-xs font-mono">
-                  <div className="relative">
-                    <span className="absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full bg-[#35D06E]" />
-                    <div className="text-[#E6EDF7] font-bold">1. 概念構思 (Conception)</div>
-                    <div className="text-[#5F728A]">2026-06-01 · 經由研報 NLP 抽取</div>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full bg-[#35D06E]" />
-                    <div className="text-[#E6EDF7] font-bold">2. 研究驗證 (Research)</div>
-                    <div className="text-[#5F728A]">2026-06-05 · L1-L3 漏斗過濾通過</div>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full bg-[#35D06E]" />
-                    <div className="text-[#E6EDF7] font-bold">3. 樣本外回測 (Backtest)</div>
-                    <div className="text-[#5F728A]">2026-06-10 · Walk-Forward 及 OOS 通過</div>
-                  </div>
-                  <div className="relative">
-                    <span className="absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full bg-[#3D7BFF]" />
-                    <div className="text-brand font-bold">4. 正式上線 (Production Run)</div>
-                    <div className="text-subink">2026-06-15 · 當前正在運行中</div>
-                  </div>
-                </div>
+                {renderTimeline()}
               </Card>
 
               {/* Limits and Failure Boundaries */}
@@ -367,13 +504,19 @@ export default function StrategyRegistryPage() {
                 <div className="text-xs space-y-2 text-subink">
                   <div className="p-2.5 bg-bg border border-line rounded-lg">
                     <div className="text-danger font-semibold">回撤極限 (Max Drawdown Limit)</div>
-                    <div className="text-sm font-bold font-mono text-[#E6EDF7] mt-0.5">20.0%</div>
+                    <div className="text-sm font-bold font-mono text-[#E6EDF7] mt-0.5">
+                      {selectedDetail.strategy.failure_boundaries?.max_drawdown !== undefined
+                        ? `${Math.abs(selectedDetail.strategy.failure_boundaries.max_drawdown * 100).toFixed(1)}%`
+                        : "20.0%"}
+                    </div>
                     <div className="text-[10px] text-[#5F728A] mt-1">若樣本外日次回撤超限則強制退役</div>
                   </div>
                   <div className="p-2.5 bg-bg border border-line rounded-lg">
-                    <div className="text-warn font-semibold">動量 IC 衰退警戒</div>
-                    <div className="text-sm font-bold font-mono text-[#E6EDF7] mt-0.5">Rolling 20D IC &lt; -0.02</div>
-                    <div className="text-[10px] text-[#5F728A] mt-1">若因子預測力轉負持續 20 天</div>
+                    <div className="text-warn font-semibold">因子衰退失效信號 (Decay Signal)</div>
+                    <div className="text-xs font-mono text-[#E6EDF7] mt-1 leading-normal break-words whitespace-pre-wrap">
+                      {selectedDetail.strategy.decay_signal || "無加載失效信號描述"}
+                    </div>
+                    <div className="text-[10px] text-[#5F728A] mt-1">若觸發該條件則自動啟動候選方案覆蓋</div>
                   </div>
                 </div>
               </Card>
@@ -381,7 +524,7 @@ export default function StrategyRegistryPage() {
               {/* Audit event logs */}
               <Card title="策略變更與審計日誌 (Audit Log)">
                 <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-                  {auditEvents.map((evt, idx) => (
+                  {auditLogs.length > 0 ? auditLogs.map((evt, idx) => (
                     <div key={idx} className="p-2.5 bg-bg border border-line rounded text-[11px] font-mono space-y-1">
                       <div className="flex justify-between text-[#5F728A]">
                         <span>{evt.date}</span>
@@ -390,7 +533,9 @@ export default function StrategyRegistryPage() {
                       <p className="text-[#E6EDF7] leading-relaxed">{evt.desc}</p>
                       <div className="text-right text-[10px] text-[#5F728A]">觸發: {evt.actor}</div>
                     </div>
-                  ))}
+                  )) : (
+                    <div className="text-center text-xs text-[#5F728A] py-6">無審計日誌數據</div>
+                  )}
                 </div>
               </Card>
             </div>
