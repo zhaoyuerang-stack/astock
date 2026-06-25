@@ -44,15 +44,68 @@ def _target_cached(start: str, top_n: int, rebalance_days: int, factor_window: i
     缓存键含 data_version(湖文件 mtime):数据日更后自动重算,无需重启后端。
     返回 hashable 元组。
     """
-    from strategies.small_cap import load_price_panels, build_rebalance_weights
+    import pandas as pd
+    from strategies.small_cap import load_price_panels
     from factors.small_cap import small_cap_factor
 
-    close, _volume, amount = load_price_panels(start)
-    factor = small_cap_factor(amount, window=factor_window)
-    weights = build_rebalance_weights(factor, close, top_n=top_n, rebalance_days=rebalance_days)
-    if not weights:                       # dict {effective_date: Series(等权 top_n)}
+    # 1. Load fdates directly from the first few symbol files to avoid loading the whole large pivot table
+    daily_dir = ROOT / "data_lake/price/daily"
+    symbol_files = sorted(daily_dir.glob("*.parquet"))[:5]
+    fast_dates_set = set()
+    for fp in symbol_files:
+        try:
+            df = pd.read_parquet(fp, columns=["date"])
+            fast_dates_set.update(pd.to_datetime(df["date"]))
+        except Exception:
+            continue
+    if not fast_dates_set:
         return ()
-    latest = weights[max(weights.keys())].sort_values(ascending=False)
+    fast_dates = pd.DatetimeIndex(sorted(fast_dates_set))
+    fdates = fast_dates[fast_dates >= pd.Timestamp(start)]
+    if len(fdates) <= factor_window:
+        return ()
+
+    # 2. Account for the factor_window warmup: drop the first `factor_window - 1` elements
+    warmup_dropped = factor_window - 1
+    fdates_aligned = fdates[warmup_dropped:]
+
+    # 3. Determine the rebalance dates
+    rebal_dates = list(fdates_aligned[::rebalance_days])
+    if not rebal_dates:
+        return ()
+
+    # The latest rebalance date is:
+    latest_rebal_date = rebal_dates[-1]
+
+    # 4. Find the index of latest_rebal_date in fdates
+    try:
+        idx = list(fdates).index(latest_rebal_date)
+    except ValueError:
+        return ()
+
+    # 5. Determine the start date to load (load factor_window + 15 days of buffer)
+    load_start_idx = max(0, idx - factor_window - 15)
+    load_start_date = fdates[load_start_idx]
+
+    # 6. Load only this small slice
+    close_fast, _volume, amount_fast = load_price_panels(str(load_start_date.date()))
+
+    # 7. Compute factor
+    factor_fast = small_cap_factor(amount_fast, window=factor_window)
+
+    # 8. Extract weights on latest_rebal_date
+    if latest_rebal_date not in factor_fast.index or latest_rebal_date not in close_fast.index:
+        return ()
+    f = factor_fast.loc[latest_rebal_date].dropna()
+    active = close_fast.loc[latest_rebal_date].dropna().index
+    f = f.reindex(active).dropna()
+    
+    if len(f) >= top_n:
+        fast_weights = pd.Series(1.0 / top_n, index=f.nlargest(top_n).index, dtype="float64")
+    else:
+        fast_weights = pd.Series(dtype="float64")
+        
+    latest = fast_weights.sort_values(ascending=False)
     return tuple((str(c), float(w)) for c, w in latest.items())
 
 

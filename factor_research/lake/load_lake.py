@@ -23,9 +23,14 @@ def load_prices(codes=None, start="2010-01-01", fields=("close", "volume", "amou
     all_fp = LAKE / "price/daily_all.parquet"
     if all_fp.exists():
         cols = ["date", "code"] + list(fields)
-        df = pd.read_parquet(all_fp, columns=cols)
+        try:
+            # Optimize: pushdown date filter to avoid reading the whole file (15M+ rows) into memory
+            df = pd.read_parquet(all_fp, columns=cols, filters=[("date", ">=", pd.Timestamp(start))])
+        except Exception:
+            df = pd.read_parquet(all_fp, columns=cols)
+            df["date"] = pd.to_datetime(df["date"])
+            df = df[df["date"] >= pd.Timestamp(start)]
         df["date"] = pd.to_datetime(df["date"])
-        df = df[df["date"] >= pd.Timestamp(start)]
         if codes:
             df = df[df["code"].isin(codes)]
         df = repair_ohlc(apply_quarantine(df))   # 确定性清洗(隔离坏数据 + OHLC 自洽)
@@ -94,9 +99,14 @@ def load_raw_close(codes=None, start="2010-01-01"):
     """
     all_fp = LAKE / "price/daily_raw_all.parquet"
     if all_fp.exists():
-        df = pd.read_parquet(all_fp, columns=["date", "code", "raw_close"])
+        try:
+            # Optimize: pushdown date filter to avoid reading the whole file (15M+ rows) into memory
+            df = pd.read_parquet(all_fp, columns=["date", "code", "raw_close"], filters=[("date", ">=", pd.Timestamp(start))])
+        except Exception:
+            df = pd.read_parquet(all_fp, columns=["date", "code", "raw_close"])
+            df["date"] = pd.to_datetime(df["date"])
+            df = df[df["date"] >= pd.Timestamp(start)]
         df["date"] = pd.to_datetime(df["date"])
-        df = df[df["date"] >= pd.Timestamp(start)]
         if codes:
             df = df[df["code"].isin(codes)]
         df = apply_quarantine(df)   # 与复权价一致地排除隔离区间
@@ -129,7 +139,11 @@ def _load_capital_long(name, codes=None, start="2010-01-01"):
     fp = LAKE / "capital" / f"{name}_all.parquet"
     if not fp.exists():
         return pd.DataFrame()
-    df = pd.read_parquet(fp)
+    try:
+        # Optimize: pushdown date filter to avoid reading the whole file into memory
+        df = pd.read_parquet(fp, filters=[("date", ">=", pd.Timestamp(start))])
+    except Exception:
+        df = pd.read_parquet(fp)
     if "date" not in df.columns or "code" not in df.columns:
         return pd.DataFrame()
     df["date"] = pd.to_datetime(df["date"])
