@@ -3,14 +3,6 @@
 This module provides:
 - ``to_signal()`` – bridge factor panels to ``core.engine.Signal``
 - ``performance_metrics()`` – metrics from a return series
-
-Deprecated
-----------
-- ``calc_portfolio_return()`` is deprecated.  For portfolio backtests use
-  ``core.engine.BacktestEngine.run()`` which unifies costs, timing, leverage,
-  and financing in a single path.
-- ``top_n_portfolio()`` is deprecated.  Use ``core.engine.Signal(factor=..., top_n=...)``
-  which calls ``BacktestEngine._factor_to_weights()`` internally.
 """
 import pandas as pd
 import numpy as np
