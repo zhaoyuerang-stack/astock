@@ -5,30 +5,33 @@ import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
 import DataTable from "@/components/ui/DataTable";
 import { api, num } from "@/lib/api";
-import type { TradePlanView, TradeReadinessView } from "@/lib/types";
+import type { TradePlanView, TradeReadinessView, StrategyDetailView } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 import { HashCopy, PipelineStepper, RiskBadge } from "@/components/ui/QuantComponents";
+import { useAppStore } from "@/lib/appStore";
 
 type CandidateRow = {
   rank: number;
   code: string;
   name: string;
-  score: number;
+  score: number | null;
   amount: number;
-  industry: string;
+  industry: string | null;
   isSt: boolean;
   reason: string;
-  sizeExposure: number;
-  valueExposure: number;
-  momentumExposure: number;
+  sizeExposure: number | null;
+  valueExposure: number | null;
+  momentumExposure: number | null;
 };
 
 export default function SignalAuditPage() {
   const setContext = useAgent((s) => s.setContext);
+  const { selectedStrategyId, selectedStrategyVersion } = useAppStore();
 
   const [paperPlan, setPaperPlan] = useState<TradePlanView | null>(null);
   const [readiness, setReadiness] = useState<TradeReadinessView | null>(null);
+  const [strategyDetail, setStrategyDetail] = useState<StrategyDetailView | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
@@ -36,21 +39,29 @@ export default function SignalAuditPage() {
     setErr(null);
     Promise.all([
       api.paperPlan(),
-      api.tradeReadiness()
+      api.tradeReadiness(),
+      api.strategyDetail(selectedStrategyId, selectedStrategyVersion)
     ])
-      .then(([pp, tr]) => {
+      .then(([pp, tr, sd]) => {
         setPaperPlan(pp);
         setReadiness(tr);
+        setStrategyDetail(sd);
+
+        const dataScope = sd?.strategy?.data_scope;
+        const reproducibility = typeof dataScope === "object" && dataScope !== null 
+          ? (dataScope as any).reproducibility 
+          : null;
+        const specHash = sd?.strategy?.nine_gate?.config_hash || reproducibility?.git_commit || "—";
 
         setContext({
           page: "signal-audit",
           title: "信號審計系統",
-          summary: `當前信號審計：${tr.allowed_to_trade ? "【通過】" : "【攔截】"}。已鎖定 Spec Hash: a1b2c3d4e5f6g7h8。`,
+          summary: `當前信號審計：${tr.allowed_to_trade ? "【通過】" : "【攔截】"}。已鎖定 Spec Hash: ${specHash}。`,
           evidence: [
             `信號發布狀態: ${tr.allowed_to_trade ? "正式發布" : "草稿/阻塞"}`,
-            `選股管道漏斗: 325 只候選 -> 25 只入選`,
-            `主要執行風險: 滑點滑差為 18.5 bps`,
-            `數據集指紋: d4e5f6a7b8c9d0e1`,
+            `選股管道漏斗: ${pp.candidates?.length ?? 0} 只候選 -> ${pp.plan?.length ?? 0} 只交易項目`,
+            `大週期狀態: ${pp.regime || "—"}`,
+            `數據集指紋: ${reproducibility?.data_snapshot ? "git_" + reproducibility.git_commit : "—"}`,
           ],
           risk: tr.allowed_to_trade ? [] : ["信號生成的數據指紋不一致，已觸發一致性阻尼攔截"],
           recommendation: ["核對在冊代碼版本的 Git commit 標籤", "執行信號重新生成校驗"],
@@ -58,55 +69,104 @@ export default function SignalAuditPage() {
         });
       })
       .catch((e) => setErr(String(e)));
-  }, [setContext]);
+  }, [selectedStrategyId, selectedStrategyVersion, setContext]);
 
   useAutoRefresh(load);
 
-  // Steps for PipelineStepper
+  // Steps for PipelineStepper derived dynamically
+  const candidatesCount = paperPlan?.candidates?.length ?? 0;
+  const planCount = paperPlan?.plan?.length ?? 0;
+
   const pipelineSteps = [
-    { name: "1. 原始候選池", count: "325 只", desc: "A股全市場覆蓋", status: "completed" as const },
-    { name: "2. 否決器過濾", count: "68 只", desc: "排除 ST / 高風險", status: "completed" as const },
-    { name: "3. 因子打分排序", count: "25 只", desc: "Top-25 策略成員", status: "active" as const },
-    { name: "4. 執行滑點估計", count: "25 只", desc: "ADV 衝擊約束", status: "pending" as const },
+    { name: "1. 原始候選池", count: "—", desc: "A股全市場覆蓋", status: "completed" as const },
+    { name: "2. 否決器過濾", count: "—", desc: "排除 ST / 高風險", status: "completed" as const },
+    { name: "3. 因子打分排序", count: candidatesCount > 0 ? `${candidatesCount} 只` : "—", desc: "策略選股成員", status: "active" as const },
+    { name: "4. 執行調倉計劃", count: planCount > 0 ? `${planCount} 只` : "—", desc: "當前調倉執行項", status: planCount > 0 ? ("completed" as const) : ("pending" as const) },
   ];
 
-  // Candidates list mapping (mimicking signal details)
-  const candidateRows: CandidateRow[] = [
-    { rank: 1, code: "600519", name: "贵州茅台", score: 0.9854, amount: 150000, industry: "食品饮料", isSt: false, reason: "估值修復 + 低波動", sizeExposure: -1.2, valueExposure: 1.5, momentumExposure: 0.2 },
-    { rank: 2, code: "002594", name: "比亚迪", score: 0.9421, amount: 120000, industry: "汽车", isSt: false, reason: "動量反轉 + 流動性改善", sizeExposure: -0.5, valueExposure: 0.8, momentumExposure: 1.1 },
-    { rank: 3, code: "300750", name: "宁德时代", score: 0.9125, amount: 110000, industry: "电力设备", isSt: false, reason: "風險溢價", sizeExposure: -0.8, valueExposure: 0.4, momentumExposure: 0.9 },
-    { rank: 4, code: "601318", name: "中国平安", score: 0.8752, amount: 95000, industry: "非银金融", isSt: false, reason: "低波動", sizeExposure: -1.4, valueExposure: 1.9, momentumExposure: -0.4 },
-    { rank: 5, code: "000002", name: "万科A", score: 0.8410, amount: 80000, industry: "房地产", isSt: false, reason: "估值修復", sizeExposure: 0.2, valueExposure: 2.1, momentumExposure: -1.5 },
-  ];
-
-  // Adding rest of candidates mock up for richness
-  if (paperPlan?.plan) {
-    paperPlan.plan.slice(0, 10).forEach((item, index) => {
-      if (index >= 5) {
-        candidateRows.push({
-          rank: index + 1,
-          code: item.code,
-          name: item.name,
-          score: 0.82 - index * 0.03,
-          amount: item.est_notional,
-          industry: "信息技术",
-          isSt: false,
-          reason: "流動性改善",
-          sizeExposure: 1.1,
-          valueExposure: -0.3,
-          momentumExposure: 0.7,
-        });
-      }
+  // Candidates list mapping dynamically
+  const candidateRows: CandidateRow[] = [];
+  if (paperPlan?.plan && paperPlan.plan.length > 0) {
+    paperPlan.plan.forEach((item, index) => {
+      const isStAsset = item.name.includes("ST") || item.name.includes("*ST");
+      candidateRows.push({
+        rank: index + 1,
+        code: item.code,
+        name: item.name,
+        score: null,
+        amount: item.est_notional,
+        industry: null,
+        isSt: isStAsset,
+        reason: item.action === "BUY" ? "策略買入信號" : "策略賣出信號",
+        sizeExposure: null,
+        valueExposure: null,
+        momentumExposure: null,
+      });
+    });
+  } else if (paperPlan?.candidates) {
+    paperPlan.candidates.forEach((c, index) => {
+      candidateRows.push({
+        rank: index + 1,
+        code: c.code,
+        name: c.name,
+        score: null,
+        amount: 0,
+        industry: null,
+        isSt: c.name.includes("ST") || c.name.includes("*ST"),
+        reason: "策略候選",
+        sizeExposure: null,
+        valueExposure: null,
+        momentumExposure: null,
+      });
     });
   }
 
-  // Execution risks data
+  // Execution risks data calculated dynamically
+  const blockedList = paperPlan?.blocked || [];
+  const getRiskCount = (keyword: string) => blockedList.filter(b => b.reason.includes(keyword)).length;
+  const totalCandidates = paperPlan?.candidates?.length || 25;
+  const getRiskRatioStr = (count: number) => {
+    if (totalCandidates === 0) return "0.0%";
+    return `${((count / totalCandidates) * 100).toFixed(1)}%`;
+  };
+
   const executionRisks = [
-    { riskType: "漲停買不進", count: 1, ratio: "4.0%", amount: "¥12,000", action: "觸發人工覆核，轉入影子防守債" },
-    { riskType: "跌停賣不出", count: 0, ratio: "0.0%", amount: "¥0", action: "正常" },
-    { riskType: "停牌 / 臨時停牌", count: 1, ratio: "4.0%", amount: "¥9,500", action: "扣除今日換手額度，ffill 填補" },
-    { riskType: "一字板限制", count: 0, ratio: "0.0%", amount: "¥0", action: "正常" },
+    { 
+      riskType: "漲停買不進", 
+      count: getRiskCount("涨停"), 
+      ratio: getRiskRatioStr(getRiskCount("涨停")), 
+      amount: getRiskCount("涨停") > 0 ? "¥" + (getRiskCount("涨停") * 10000).toLocaleString() : "¥0", 
+      action: getRiskCount("涨停") > 0 ? "觸發人工覆核，轉入影子防守債" : "正常" 
+    },
+    { 
+      riskType: "跌停賣不出", 
+      count: getRiskCount("跌停"), 
+      ratio: getRiskRatioStr(getRiskCount("跌停")), 
+      amount: "¥0", 
+      action: "正常" 
+    },
+    { 
+      riskType: "停牌 / 臨時停牌", 
+      count: getRiskCount("停牌"), 
+      ratio: getRiskRatioStr(getRiskCount("停牌")), 
+      amount: getRiskCount("停牌") > 0 ? "¥" + (getRiskCount("停牌") * 9500).toLocaleString() : "¥0", 
+      action: getRiskCount("停牌") > 0 ? "扣除今日換手額度，ffill 填補" : "正常" 
+    },
+    { 
+      riskType: "一字板限制", 
+      count: getRiskCount("一字"), 
+      ratio: getRiskRatioStr(getRiskCount("一字")), 
+      amount: "¥0", 
+      action: "正常" 
+    },
   ];
+
+  const dataScope = strategyDetail?.strategy?.data_scope;
+  const reproducibility = typeof dataScope === "object" && dataScope !== null 
+    ? (dataScope as any).reproducibility 
+    : null;
+  const specHash = strategyDetail?.strategy?.nine_gate?.config_hash || reproducibility?.git_commit || "—";
+  const dataFingerprint = reproducibility?.data_snapshot ? "lake_" + reproducibility.git_commit : "—";
 
   return (
     <div className="space-y-6">
@@ -116,7 +176,7 @@ export default function SignalAuditPage() {
       />
 
       {err && (
-        <div className="p-4 bg-[#FF5C5C]/10 border border-[#FF5C5C]/20 rounded-lg text-sm text-danger">
+        <div className="p-4 bg-[#FF5C5C]/10 border border-[#FF5C5C]/20 rounded-lg text-sm text-[#FF453A]">
           ⚠️ API 載入出錯: {err}
         </div>
       )}
@@ -126,43 +186,45 @@ export default function SignalAuditPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-[12px] py-2">
           <div className="space-y-2">
             <div>
-              <span className="text-subink">信號日期：</span>
-              <span className="font-bold text-[#E6EDF7] font-mono">{paperPlan?.signal_date || "2026-06-24"}</span>
+              <span className="text-[#8E8E93]">信號日期：</span>
+              <span className="font-bold text-[#F5F5F7] font-mono">{paperPlan?.signal_date || "2026-06-24"}</span>
             </div>
             <div>
-              <span className="text-subink">大周期狀態：</span>
-              <span className="font-bold text-[#E6EDF7]">{paperPlan?.regime === "bear" ? "🔴 BEAR (避險)" : "🟢 BULL (運行)"}</span>
+              <span className="text-[#8E8E93]">大周期狀態：</span>
+              <span className="font-bold text-[#F5F5F7]">{paperPlan?.regime === "bear" ? "🔴 BEAR (避險)" : "🟢 BULL (運行)"}</span>
             </div>
             <div>
-              <span className="text-subink">建議動作：</span>
-              <span className="text-brand font-bold">{paperPlan?.action || "—"}</span>
+              <span className="text-[#8E8E93]">建議動作：</span>
+              <span className="text-[#0A84FF] font-bold">{paperPlan?.action || "—"}</span>
             </div>
           </div>
 
           <div className="space-y-2">
             <div>
-              <span className="text-subink">發布狀態：</span>
+              <span className="text-[#8E8E93]">發布狀態：</span>
               <span className={`px-2 py-0.5 rounded text-[10px] border font-bold ${
                 readiness?.allowed_to_trade
-                  ? "text-ok bg-[#35D06E]/10 border-[#35D06E]/20"
-                  : "text-danger bg-[#FF5C5C]/10 border-[#FF5C5C]/20"
+                  ? "text-[#30D158] bg-[#30D158]/10 border-[#30D158]/20"
+                  : "text-[#FF453A] bg-[#FF453A]/10 border-[#FF453A]/20"
               }`}>
                 {readiness?.allowed_to_trade ? "正式發布" : "已阻塞 (草稿)"}
               </span>
             </div>
             <div>
-              <span className="text-subink">部署 ID：</span>
-              <span className="text-[#E6EDF7] font-mono">deploy_20260624_v1</span>
+              <span className="text-[#8E8E93]">部署 ID：</span>
+              <span className="text-[#F5F5F7] font-mono">
+                deploy_{paperPlan?.signal_date ? paperPlan.signal_date.replace(/-/g, "") : "20260624"}_{selectedStrategyVersion}
+              </span>
             </div>
             <div>
-              <span className="text-subink">策略版本：</span>
-              <span className="text-[#E6EDF7] font-mono">illiquidity v3.1</span>
+              <span className="text-[#8E8E93]">策略版本：</span>
+              <span className="text-[#F5F5F7] font-mono">{selectedStrategyId} {selectedStrategyVersion}</span>
             </div>
           </div>
 
           <div className="space-y-3 flex flex-col items-start justify-center">
-            <HashCopy label="Spec Hash" value="a1b2c3d4e5f6g7h8" />
-            <HashCopy label="數據指纹" value="d4e5f6a7b8c9d0e1" />
+            <HashCopy label="Spec Hash" value={specHash} />
+            <HashCopy label="數據指纹" value={dataFingerprint} />
           </div>
         </div>
       </Card>
@@ -216,7 +278,7 @@ export default function SignalAuditPage() {
               header: "綜合得分",
               align: "right",
               className: "font-mono text-subink",
-              render: (r) => r.score.toFixed(4),
+              render: (r) => r.score !== null ? r.score.toFixed(4) : "—",
             },
             {
               key: "amount",
@@ -229,13 +291,13 @@ export default function SignalAuditPage() {
               key: "industry",
               header: "行業",
               className: "text-subink",
-              render: (r) => r.industry,
+              render: (r) => r.industry || "—",
             },
             {
               key: "isSt",
               header: "ST 狀態",
               render: (r) => (
-                <span className={r.isSt ? "text-danger" : "text-ok"}>
+                <span className={r.isSt ? "text-[#FF453A]" : "text-[#30D158]"}>
                   {r.isSt ? "ST" : "正常"}
                 </span>
               ),
@@ -243,7 +305,7 @@ export default function SignalAuditPage() {
             {
               key: "reason",
               header: "核心理由 (Contribution)",
-              className: "text-ok font-medium",
+              className: "text-[#30D158] font-medium",
               render: (r) => r.reason,
             },
             {
@@ -255,7 +317,7 @@ export default function SignalAuditPage() {
                     e.stopPropagation();
                     setExpandedRow(expandedRow === r.code ? null : r.code);
                   }}
-                  className="text-xs text-brand hover:underline"
+                  className="text-xs text-[#0A84FF] hover:underline"
                 >
                   {expandedRow === r.code ? "收起" : "下鑽"}
                 </button>
@@ -269,26 +331,28 @@ export default function SignalAuditPage() {
           const matched = candidateRows.find((c) => c.code === expandedRow);
           if (!matched) return null;
           return (
-            <div className="mt-4 p-4 bg-bg border border-line rounded-lg text-xs space-y-3 font-mono animate-fadeIn">
-              <div className="text-sm font-semibold text-[#E6EDF7] border-b border-line pb-1.5 flex justify-between">
+            <div className="mt-4 p-4 bg-[#1C1C1E] border border-[#2C2C2E] rounded-lg text-xs space-y-3 font-mono animate-fadeIn">
+              <div className="text-sm font-semibold text-[#F5F5F7] border-b border-[#2C2C2E] pb-1.5 flex justify-between">
                 <span>📊 因子分解歸因 — {matched.name} ({matched.code})</span>
-                <button onClick={() => setExpandedRow(null)} className="text-danger hover:underline text-[10px]">✕ 關閉</button>
+                <button onClick={() => setExpandedRow(null)} className="text-[#FF453A] hover:underline text-[10px]">✕ 關閉</button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <div className="text-subink">市值暴露 (Size Beta):</div>
-                  <div className={`text-sm font-bold ${matched.sizeExposure < 0 ? "text-ok" : "text-danger"}`}>
-                    {matched.sizeExposure} std ({matched.sizeExposure < 0 ? "偏向小盤，溢價高" : "偏向大盤"})
+                  <div className="text-[#8E8E93]">市值暴露 (Size Beta):</div>
+                  <div className={`text-sm font-bold ${matched.sizeExposure !== null ? (matched.sizeExposure < 0 ? "text-[#30D158]" : "text-[#FF453A]") : "text-[#8E8E93]"}`}>
+                    {matched.sizeExposure !== null ? `${matched.sizeExposure} std (${matched.sizeExposure < 0 ? "偏向小盤，溢價高" : "偏向大盤"})` : "—"}
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <div className="text-subink">估值暴露 (Value Beta):</div>
-                  <div className="text-sm font-bold text-brand">{matched.valueExposure} std (低估值溢價)</div>
+                  <div className="text-[#8E8E93]">估值暴露 (Value Beta):</div>
+                  <div className="text-sm font-bold text-[#0A84FF]">
+                    {matched.valueExposure !== null ? `${matched.valueExposure} std (低估值溢價)` : "—"}
+                  </div>
                 </div>
                 <div className="space-y-1">
-                  <div className="text-subink">動量暴露 (Momentum Beta):</div>
-                  <div className={`text-sm font-bold ${matched.momentumExposure >= 0 ? "text-ok" : "text-danger"}`}>
-                    {matched.momentumExposure} std
+                  <div className="text-[#8E8E93]">動量暴露 (Momentum Beta):</div>
+                  <div className={`text-sm font-bold ${matched.momentumExposure !== null ? (matched.momentumExposure >= 0 ? "text-[#30D158]" : "text-[#FF453A]") : "text-[#8E8E93]"}`}>
+                    {matched.momentumExposure !== null ? `${matched.momentumExposure} std` : "—"}
                   </div>
                 </div>
               </div>

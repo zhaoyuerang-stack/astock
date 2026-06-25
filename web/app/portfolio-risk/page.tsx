@@ -5,10 +5,11 @@ import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
 import DataTable from "@/components/ui/DataTable";
 import { api, num } from "@/lib/api";
-import type { PortfolioView, RiskReport, TradePlanView } from "@/lib/types";
+import type { PortfolioView, RiskReport, TradePlanView, StrategyDetailView } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 import { QuantMetricCard, RiskBadge } from "@/components/ui/QuantComponents";
+import { useAppStore } from "@/lib/appStore";
 
 type HoldingRiskRow = {
   code: string;
@@ -24,10 +25,12 @@ type HoldingRiskRow = {
 
 export default function PortfolioRiskPage() {
   const setContext = useAgent((s) => s.setContext);
+  const { selectedStrategyId, selectedStrategyVersion } = useAppStore();
 
   const [portfolio, setPortfolio] = useState<PortfolioView | null>(null);
   const [riskReport, setRiskReport] = useState<RiskReport | null>(null);
   const [paperPlan, setPaperPlan] = useState<TradePlanView | null>(null);
+  const [strategyDetail, setStrategyDetail] = useState<StrategyDetailView | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -35,12 +38,14 @@ export default function PortfolioRiskPage() {
     Promise.all([
       api.portfolio(),
       api.risk(),
-      api.paperPlan()
+      api.paperPlan(),
+      api.strategyDetail(selectedStrategyId, selectedStrategyVersion)
     ])
-      .then(([p, rk, pp]) => {
+      .then(([p, rk, pp, sd]) => {
         setPortfolio(p);
         setRiskReport(rk);
         setPaperPlan(pp);
+        setStrategyDetail(sd);
 
         // Highlight main risk sources to the AI assistant
         const stAssetsCount = pp.positions?.filter((pos) => pos.name.includes("ST") || pos.name.includes("*ST")).length ?? 0;
@@ -53,15 +58,34 @@ export default function PortfolioRiskPage() {
           ? (highestWeightAsset.mv / (pp.position_value || 1))
           : 0;
 
+        const maxddVal = sd.strategy.metrics?.maxdd !== undefined 
+          ? `${(sd.strategy.metrics.maxdd * 100).toFixed(2)}%` 
+          : "—";
+
+        // Calculate dynamic risk budget usage ratio
+        let rbu = 0.0;
+        if (rk.checks && rk.checks.length > 0) {
+          const ratios = rk.checks.map(c => {
+            if (c.current !== null && c.threshold !== null && c.threshold !== 0) {
+              return Math.abs(c.current) / Math.abs(c.threshold);
+            }
+            return 0;
+          });
+          rbu = Math.max(...ratios) * 100;
+        }
+
+        const capacityLimit = (sd.strategy.capacity_m || 0) * 1_000_000;
+        const capacityUsage = capacityLimit > 0 ? (p.nav / capacityLimit) * 100 : 0;
+
         setContext({
           page: "portfolio-risk",
-          title: "組合風控面板",
-          summary: `組合風險總體評級：【${rk.verdict}】。組合 NAV: ${p.nav.toFixed(2)} CNY。風險預算使用率: 45%。容量使用率: 18%。`,
+          title: `組合風控面板: ${sd.strategy.strategy_id}`,
+          summary: `組合風險總體評級：【${rk.verdict}】。組合 NAV: ${p.nav.toFixed(2)} CNY。風險預算使用率: ${rbu.toFixed(1)}%。容量使用率: ${capacityUsage.toFixed(1)}%。`,
           evidence: [
             `風險級別判定: ${rk.verdict}`,
             `ST 暴露資產數: ${stAssetsCount}只`,
             `最大持倉暴露: ${highestWeightAsset.name} (權重 ${(highestWeight * 100).toFixed(1)}%)`,
-            `預估滑點衝擊: 18.5 bps`,
+            `歷史最大回撤: ${maxddVal}`,
           ],
           risk: stAssetsCount > 0 ? [`持倉中包含 ${stAssetsCount} 只 ST/垃圾股，面臨退市價值陷阱風險`] : [],
           recommendation: [
@@ -75,13 +99,14 @@ export default function PortfolioRiskPage() {
         });
       })
       .catch((e) => setErr(String(e)));
-  }, [setContext]);
+  }, [selectedStrategyId, selectedStrategyVersion, setContext]);
 
   useAutoRefresh(load);
 
   // Generate holdings risk rows
   const holdingRows: HoldingRiskRow[] = [];
   if (paperPlan?.positions) {
+    const minAdv = (strategyDetail?.strategy?.config?.min_adv20 as number) || 10_000_000;
     paperPlan.positions.forEach((pos) => {
       const isStAsset = pos.name.includes("ST") || pos.name.includes("*ST");
       const weightPct = pos.mv / (paperPlan.position_value || 1);
@@ -89,13 +114,15 @@ export default function PortfolioRiskPage() {
       const tags = [];
       if (isStAsset) tags.push("ST 標的");
       if (weightPct > 0.15) tags.push("單票集中");
-      if (pos.mv > 500000) tags.push("ADV使用過高");
+      
+      const advUsageRatio = pos.mv / minAdv;
+      if (advUsageRatio > 0.05) tags.push("ADV使用過高");
 
       holdingRows.push({
         code: pos.code,
         name: pos.name,
         weight: weightPct,
-        advUsage: pos.mv > 500000 ? "4.2%" : "0.3%",
+        advUsage: `${(advUsageRatio * 100).toFixed(1)}%`,
         isSt: isStAsset,
         liquidityScore: isStAsset ? 0.2 : 0.85,
         estSlippageBps: isStAsset ? 45 : 12,
@@ -105,42 +132,57 @@ export default function PortfolioRiskPage() {
     });
   }
 
-  // Stress test scenarios data
+  // Dynamic calculated aggregate variables
+  const riskBudgetUsage = (() => {
+    if (!riskReport?.checks || riskReport.checks.length === 0) return 0;
+    const ratios = riskReport.checks.map(c => {
+      if (c.current !== null && c.threshold !== null && c.threshold !== 0) {
+        return Math.abs(c.current) / Math.abs(c.threshold);
+      }
+      return 0;
+    });
+    return Math.max(...ratios) * 100;
+  })();
+
+  const capacityLimit = (strategyDetail?.strategy?.capacity_m || 0) * 1_000_000;
+  const capacityUsage = capacityLimit > 0 && portfolio?.nav ? (portfolio.nav / capacityLimit) * 100 : null;
+
+  const totalSlippageBps = holdingRows.length > 0 
+    ? holdingRows.reduce((sum, r) => sum + r.weight * r.estSlippageBps, 0)
+    : null;
+
+  const stExposureVal = holdingRows.reduce((sum, r) => sum + (r.isSt ? r.weight : 0), 0) * 100;
+  const maxSingleWeight = holdingRows.length > 0 ? Math.max(...holdingRows.map(r => r.weight)) * 100 : null;
+
+  // Style betas from backend
+  const styleSize = strategyDetail?.strategy?.style_betas?.size;
+  const styleLiq = strategyDetail?.strategy?.style_betas?.illiquidity ?? strategyDetail?.strategy?.style_betas?.liquidity;
+
+  // Stress test scenarios data from actual metrics
+  const metrics = strategyDetail?.strategy?.metrics;
+  const nineGate = strategyDetail?.strategy?.nine_gate;
+
   const stressTests = [
     {
-      scenario: "連續跌停踩踏",
-      desc: "市場流動性極度崩塌下，組合中 5 只小盤股遭遇連續 3 日無量跌停",
-      pnl: "-12.45%",
-      drawdown: "18.2%",
-      level: "high" as const,
+      scenario: "BEAR 避險熊市大週期",
+      desc: "市場大勢擇時為 BEAR 避險大週期下，策略（空倉或國債輪動）的實測收益表現",
+      pnl: nineGate?.bear_annual !== undefined ? `${(nineGate.bear_annual * 100).toFixed(2)}%` : "—",
+      drawdown: nineGate?.bear_sharpe !== undefined ? `夏普 ${nineGate.bear_sharpe.toFixed(2)}` : "—",
+      level: (nineGate?.bear_sharpe !== undefined && nineGate.bear_sharpe < 0) ? "high" as const : "medium" as const,
     },
     {
-      scenario: "反轉踩踏與流動性凍結",
-      desc: "市場風格急劇由微盤反轉到大盤，流動性凍結，無法按收盤價順暢減倉",
-      pnl: "-9.32%",
-      drawdown: "14.5%",
-      level: "high" as const,
-    },
-    {
-      scenario: "風格反轉暴露",
-      desc: "小盤股暴露（Size Exposure）發生均值回歸，大小盤切換回大盤價值風格",
-      pnl: "-5.80%",
-      drawdown: "8.90%",
-      level: "medium" as const,
-    },
-    {
-      scenario: "開盤跳空跳水",
-      desc: "隔夜宏觀事件衝擊，個股開盤集合競價直接跳空低開 5%",
-      pnl: "-3.15%",
-      drawdown: "4.50%",
-      level: "medium" as const,
-    },
-    {
-      scenario: "融資利率上行 100bp",
-      desc: "槓桿成本上升，融資年化成本從 6.5% 上升至 7.5%",
-      pnl: "-1.25%",
-      drawdown: "1.25%",
+      scenario: "BULL 運行牛市大週期",
+      desc: "市場風格與大勢擇時為 BULL 運行大週期下，策略滿倉暴露選股的收益表現",
+      pnl: nineGate?.bull_annual !== undefined ? `${(nineGate.bull_annual * 100).toFixed(2)}%` : "—",
+      drawdown: nineGate?.bull_sharpe !== undefined ? `夏普 ${nineGate.bull_sharpe.toFixed(2)}` : "—",
       level: "low" as const,
+    },
+    {
+      scenario: "2010-2026 長週期壓力回測",
+      desc: "涵蓋 2010 年至今全歷史的所有單邊熊市、震蕩及流動性危機區間的壓力評估",
+      pnl: metrics?.annual_2010 !== undefined ? `${(metrics.annual_2010 * 100).toFixed(2)}%` : "—",
+      drawdown: metrics?.maxdd_2010 !== undefined ? `${(metrics.maxdd_2010 * 100).toFixed(2)}%` : "—",
+      level: (metrics?.maxdd_2010 !== undefined && metrics.maxdd_2010 < -0.30) ? "high" as const : "medium" as const,
     },
   ];
 
@@ -148,7 +190,7 @@ export default function PortfolioRiskPage() {
   const getBudgetColor = (pct: number) => {
     if (pct > 100) return "text-danger";
     if (pct > 80) return "text-warn";
-    return "text-ok";
+    return "text-[#30D158]";
   };
 
   return (
@@ -159,19 +201,19 @@ export default function PortfolioRiskPage() {
       />
 
       {err && (
-        <div className="p-4 bg-[#FF5C5C]/10 border border-[#FF5C5C]/20 rounded-lg text-sm text-danger">
+        <div className="p-4 bg-[#FF5C5C]/10 border border-[#FF5C5C]/20 rounded-lg text-sm text-[#FF453A]">
           ⚠️ API 載入出錯: {err}
         </div>
       )}
 
       {/* 1. 風險總覽大卡 */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="p-4 bg-navy border border-line rounded-lg text-center">
-          <div className="text-[11px] text-subink uppercase font-bold tracking-wider">總風險等級</div>
+        <div className="p-4 bg-[#1C1C1E] border border-[#2C2C2E] rounded-lg text-center">
+          <div className="text-[11px] text-[#8E8E93] uppercase font-bold tracking-wider">總風險等級</div>
           <div className="mt-2.5">
-            <RiskBadge level={riskReport?.verdict === "超限" ? "high" : "low"} label={riskReport?.verdict ?? "正常"} />
+            <RiskBadge level={riskReport?.verdict === "超限" ? "high" : riskReport?.verdict === "预警" ? "medium" : "low"} label={riskReport?.verdict ?? "正常"} />
           </div>
-          <div className="text-[10px] text-[#5F728A] mt-2">基於 6 項核心暴露評估</div>
+          <div className="text-[10px] text-[#6E6E73] mt-2">基於 6 項核心暴露評估</div>
         </div>
 
         <QuantMetricCard
@@ -180,58 +222,82 @@ export default function PortfolioRiskPage() {
           unit="CNY"
         />
 
-        <div className="p-4 bg-navy border border-line rounded-lg">
-          <div className="text-[12px] text-subink">風險預算使用率</div>
-          <div className={`text-2xl font-bold mt-1.5 font-mono ${getBudgetColor(45)}`}>45.2%</div>
-          <div className="text-[10px] text-[#5F728A] mt-2">警戒閾值: 80% / 100%</div>
+        <div className="p-4 bg-[#1C1C1E] border border-[#2C2C2E] rounded-lg">
+          <div className="text-[12px] text-[#8E8E93]">風險預算使用率</div>
+          <div className={`text-2xl font-bold mt-1.5 font-mono ${getBudgetColor(riskBudgetUsage)}`}>
+            {riskReport?.checks && riskReport.checks.length > 0 ? `${riskBudgetUsage.toFixed(1)}%` : "—"}
+          </div>
+          <div className="text-[10px] text-[#6E6E73] mt-2">警戒閾值: 80% / 100%</div>
         </div>
 
-        <div className="p-4 bg-navy border border-line rounded-lg">
-          <div className="text-[12px] text-subink">容量使用率</div>
-          <div className="text-2xl font-bold mt-1.5 font-mono text-[#E6EDF7]">18.4%</div>
-          <div className="text-[10px] text-[#5F728A] mt-2">相較策略容量上限 5000 萬</div>
+        <div className="p-4 bg-[#1C1C1E] border border-[#2C2C2E] rounded-lg">
+          <div className="text-[12px] text-[#8E8E93]">容量使用率</div>
+          <div className="text-2xl font-bold mt-1.5 font-mono text-[#F5F5F7]">
+            {capacityUsage !== null ? `${capacityUsage.toFixed(1)}%` : "—"}
+          </div>
+          <div className="text-[10px] text-[#6E6E73] mt-2">
+            相較容量上限 {strategyDetail?.strategy?.capacity_m !== undefined ? `${(strategyDetail.strategy.capacity_m * 100).toFixed(0)} 萬` : "—"}
+          </div>
         </div>
 
-        <div className="p-4 bg-navy border border-line rounded-lg">
-          <div className="text-[12px] text-subink">預估單邊滑點</div>
-          <div className="text-2xl font-bold mt-1.5 font-mono text-warn">18.5 bps</div>
-          <div className="text-[10px] text-[#5F728A] mt-2">包含小盤流動性惩罚</div>
+        <div className="p-4 bg-[#1C1C1E] border border-[#2C2C2E] rounded-lg">
+          <div className="text-[12px] text-[#8E8E93]">預估單邊滑點</div>
+          <div className="text-2xl font-bold mt-1.5 font-mono text-warn">
+            {totalSlippageBps !== null ? `${totalSlippageBps.toFixed(1)} bps` : "—"}
+          </div>
+          <div className="text-[10px] text-[#6E6E73] mt-2">包含小盤流動性惩罚</div>
         </div>
       </div>
 
       {/* 2. 六項風險暴露暴露卡 */}
       <div className="space-y-3">
-        <h3 className="text-sm font-bold text-subink tracking-wider uppercase">風險暴露總覽 (Risk Exposures)</h3>
+        <h3 className="text-sm font-bold text-[#8E8E93] tracking-wider uppercase">風險暴露總覽 (Risk Exposures)</h3>
         <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-          <div className="p-3 bg-navy border border-line rounded-lg">
-            <div className="text-[11px] text-subink">小盤暴露 (Size)</div>
-            <div className="text-lg font-bold text-danger font-mono mt-1">1.48 std</div>
-            <div className="text-[9px] text-danger/80 mt-1">高風險暴露</div>
+          <div className="p-3 bg-[#1C1C1E] border border-[#2C2C2E] rounded-lg">
+            <div className="text-[11px] text-[#8E8E93]">小盤暴露 (Size)</div>
+            <div className={`text-lg font-bold font-mono mt-1 ${styleSize !== undefined && styleSize > 0.5 ? "text-[#FF453A]" : "text-[#30D158]"}`}>
+              {styleSize !== undefined ? `${styleSize.toFixed(2)} std` : "—"}
+            </div>
+            <div className="text-[9px] text-[#8E8E93] mt-1">
+              {styleSize !== undefined ? (styleSize > 0.5 ? "高風險暴露" : "安全範圍") : "未定義"}
+            </div>
           </div>
-          <div className="p-3 bg-navy border border-line rounded-lg">
-            <div className="text-[11px] text-subink">流動性暴露 (Liq)</div>
-            <div className="text-lg font-bold text-warn font-mono mt-1">-0.82 std</div>
-            <div className="text-[9px] text-warn/80 mt-1">中風險暴露</div>
+          <div className="p-3 bg-[#1C1C1E] border border-[#2C2C2E] rounded-lg">
+            <div className="text-[11px] text-[#8E8E93]">流動性暴露 (Liq)</div>
+            <div className={`text-lg font-bold font-mono mt-1 ${styleLiq !== undefined && Math.abs(styleLiq) > 0.5 ? "text-warn" : "text-[#30D158]"}`}>
+              {styleLiq !== undefined ? `${styleLiq.toFixed(2)} std` : "—"}
+            </div>
+            <div className="text-[9px] text-[#8E8E93] mt-1">
+              {styleLiq !== undefined ? (Math.abs(styleLiq) > 0.5 ? "中風險暴露" : "安全範圍") : "未定義"}
+            </div>
           </div>
-          <div className="p-3 bg-navy border border-line rounded-lg">
-            <div className="text-[11px] text-subink">ST 暴露 (Trash)</div>
-            <div className="text-lg font-bold text-ok font-mono mt-1">0.00%</div>
-            <div className="text-[9px] text-ok/80 mt-1">安全</div>
+          <div className="p-3 bg-[#1C1C1E] border border-[#2C2C2E] rounded-lg">
+            <div className="text-[11px] text-[#8E8E93]">ST 暴露 (Trash)</div>
+            <div className={`text-lg font-bold font-mono mt-1 ${stExposureVal > 5 ? "text-[#FF453A]" : stExposureVal > 0 ? "text-warn" : "text-[#30D158]"}`}>
+              {stExposureVal.toFixed(2)}%
+            </div>
+            <div className="text-[9px] text-[#8E8E93] mt-1">
+              {stExposureVal > 5 ? "高風險暴露" : stExposureVal > 0 ? "中風險暴露" : "安全範圍"}
+            </div>
           </div>
-          <div className="p-3 bg-navy border border-line rounded-lg">
-            <div className="text-[11px] text-subink">行業集中度 (Ind)</div>
-            <div className="text-lg font-bold text-ok font-mono mt-1">14.2%</div>
-            <div className="text-[9px] text-ok/80 mt-1">安全 (限額 30%)</div>
+          <div className="p-3 bg-[#1C1C1E] border border-[#2C2C2E] rounded-lg">
+            <div className="text-[11px] text-[#8E8E93]">行業集中度 (Ind)</div>
+            <div className="text-lg font-bold text-[#8E8E93] font-mono mt-1">—</div>
+            <div className="text-[9px] text-[#6E6E73] mt-1">安全 (限額 30%)</div>
           </div>
-          <div className="p-3 bg-navy border border-line rounded-lg">
-            <div className="text-[11px] text-subink">單票集中度 (Idio)</div>
-            <div className="text-lg font-bold text-ok font-mono mt-1">8.5%</div>
-            <div className="text-[9px] text-ok/80 mt-1">安全 (限額 15%)</div>
+          <div className="p-3 bg-[#1C1C1E] border border-[#2C2C2E] rounded-lg">
+            <div className="text-[11px] text-[#8E8E93]">單票集中度 (Idio)</div>
+            <div className={`text-lg font-bold font-mono mt-1 ${maxSingleWeight !== null && maxSingleWeight > 15 ? "text-[#FF453A]" : maxSingleWeight !== null && maxSingleWeight > 10 ? "text-warn" : "text-[#30D158]"}`}>
+              {maxSingleWeight !== null ? `${maxSingleWeight.toFixed(2)}%` : "—"}
+            </div>
+            <div className="text-[9px] text-[#8E8E93] mt-1">
+              {maxSingleWeight !== null ? (maxSingleWeight > 15 ? "單票超限" : maxSingleWeight > 10 ? "接近預警" : "安全 (限額 15%)") : "無持倉"}
+            </div>
           </div>
-          <div className="p-3 bg-navy border border-line rounded-lg">
-            <div className="text-[11px] text-subink">換手壓力 (Turnover)</div>
-            <div className="text-lg font-bold text-warn font-mono mt-1">32.4% / 月</div>
-            <div className="text-[9px] text-warn/80 mt-1">中等換手成本</div>
+          <div className="p-3 bg-[#1C1C1E] border border-[#2C2C2E] rounded-lg">
+            <div className="text-[11px] text-[#8E8E93]">換手壓力 (Turnover)</div>
+            <div className="text-lg font-bold text-[#8E8E93] font-mono mt-1">—</div>
+            <div className="text-[9px] text-[#6E6E73] mt-1">未定義</div>
           </div>
         </div>
       </div>

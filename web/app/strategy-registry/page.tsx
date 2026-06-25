@@ -248,22 +248,46 @@ export default function StrategyRegistryPage() {
             <div className="lg:col-span-2 space-y-6">
               {/* ID Card */}
               <Card title={`Dossier: ${selectedDetail.strategy.strategy_id}`}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono text-subink py-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono text-[#8E8E93] py-2">
                   <div>
-                    <div><span className="text-[#5F728A]">策略名稱：</span>{selectedDetail.strategy.family_name || selectedDetail.strategy.family}</div>
-                    <div><span className="text-[#5F728A]">所屬家族：</span>{selectedDetail.strategy.family}</div>
-                    <div><span className="text-[#5F728A]">版本代號：</span>{selectedDetail.strategy.version}</div>
-                    <div><span className="text-[#5F728A]">創建作者：</span>researcher</div>
+                    <div><span className="text-[#6E6E73]">策略名稱：</span>{selectedDetail.strategy.family_name || selectedDetail.strategy.family}</div>
+                    <div><span className="text-[#6E6E73]">所屬家族：</span>{selectedDetail.strategy.family}</div>
+                    <div><span className="text-[#6E6E73]">版本代號：</span>{selectedDetail.strategy.version}</div>
+                    <div><span className="text-[#6E6E73]">創建作者：</span>researcher</div>
                   </div>
                   <div>
-                    <div><span className="text-[#5F728A]">負責人員：</span>researcher</div>
-                    <div><span className="text-[#5F728A]">創建日期：</span>2026-06-15</div>
-                    <div><span className="text-[#5F728A]">重大變更：</span>無</div>
-                    <div><span className="text-[#5F728A]">文檔鏈接：</span>
-                      <a href="#" className="text-brand hover:underline">evidence_v3.1.pdf</a>
+                    <div><span className="text-[#6E6E73]">負責人員：</span>researcher</div>
+                    <div><span className="text-[#6E6E73]">創建日期：</span>{selectedDetail.strategy.decay_check?.checked_at ? selectedDetail.strategy.decay_check.checked_at.slice(0, 10) : "2026-06-15"}</div>
+                    <div><span className="text-[#6E6E73]">重大變更：</span>無</div>
+                    <div><span className="text-[#6E6E73]">文檔鏈接：</span>
+                      <a href="#" className="text-[#0A84FF] hover:underline">evidence_{selectedDetail.strategy.version}.pdf</a>
                     </div>
                   </div>
                 </div>
+              </Card>
+
+              {/* Dynamic Configuration Parameters */}
+              <Card title="策略配置參數 (Configuration Parameters)">
+                {selectedDetail.strategy.config && Object.keys(selectedDetail.strategy.config).length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs font-mono py-2">
+                    {Object.entries(selectedDetail.strategy.config).map(([key, val]) => {
+                      let displayVal = "";
+                      if (val && typeof val === "object") {
+                        displayVal = JSON.stringify(val);
+                      } else {
+                        displayVal = String(val);
+                      }
+                      return (
+                        <div key={key} className="flex justify-between border-b border-[#2C2C2E] pb-1">
+                          <span className="text-[#8E8E93]">{key}：</span>
+                          <span className="text-[#F5F5F7] font-semibold break-all text-right max-w-[70%]">{displayVal}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-xs text-[#8E8E93] font-mono py-2 text-center">無配置參數數據</div>
+                )}
               </Card>
 
               {/* Hypothesis & Market */}

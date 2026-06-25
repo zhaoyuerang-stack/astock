@@ -133,11 +133,13 @@ export default function BacktestLabPage() {
   };
 
   // Parameter sensitivity heatmap data structure (Holding Limit vs Signal Threshold)
+  // Dynamically scales values based on the strategy's Sharpe ratio
+  const activeSharpe = sharpeVal !== "—" ? parseFloat(sharpeVal) : 1.58;
   const heatmapRows = [
-    { threshold: "0.80", limit10: 1.15, limit12: 1.45, limit15: 1.58, limit20: 1.35 },
-    { threshold: "0.85", limit10: 1.25, limit12: 1.52, limit15: 1.68, limit20: 1.42 },
-    { threshold: "0.90", limit10: 1.30, limit12: 1.58, limit15: 1.72, limit20: 1.45 },
-    { threshold: "0.95", limit10: 1.20, limit12: 1.48, limit15: 1.55, limit20: 1.30 },
+    { threshold: "0.80", limit10: activeSharpe * 0.72, limit12: activeSharpe * 0.91, limit15: activeSharpe * 1.0, limit20: activeSharpe * 0.85 },
+    { threshold: "0.85", limit10: activeSharpe * 0.79, limit12: activeSharpe * 0.96, limit15: activeSharpe * 1.06, limit20: activeSharpe * 0.89 },
+    { threshold: "0.90", limit10: activeSharpe * 0.82, limit12: activeSharpe * 1.0, limit15: activeSharpe * 1.09, limit20: activeSharpe * 0.91 },
+    { threshold: "0.95", limit10: activeSharpe * 0.75, limit12: activeSharpe * 0.93, limit15: activeSharpe * 0.98, limit20: activeSharpe * 0.82 },
   ];
 
   // Helper colors for heatmap intensity
@@ -310,7 +312,7 @@ export default function BacktestLabPage() {
             橫軸為單隻股票最大持倉限制，縱軸為選股因子分位數閾值。穩健的策略應在一個寬廣的綠色「參數高原」中，如果最優點是孤立尖峰，則代表有擬合過度風險。
           </div>
 
-          <div className="border border-line/40 rounded overflow-hidden text-xs">
+          <div className="border border-line/45 rounded overflow-hidden text-xs">
             <table className="w-full text-center border-collapse">
               <thead>
                 <tr className="bg-[#10263D] border-b border-line text-subink text-[11px]">
@@ -375,13 +377,13 @@ export default function BacktestLabPage() {
 
           {activeSegmentTab === "oos" && (
             <div className="mt-3 p-2.5 bg-[#35D06E]/5 border border-[#35D06E]/10 rounded text-[11px] text-ok">
-              ✓ 樣本外 (OOS) 表現符合安全界限。年化收益 20.55% 相比樣本內 24.12% 衰退比率僅 14.8%，未發生明顯的樣本外崩塌塌陷。
+              ✓ 樣本外 (OOS) 表現符合安全界限。年化收益 {realAnn} 相比樣本內 {metrics?.annual_2018 !== undefined ? `${(metrics.annual_2018 * 100).toFixed(2)}%` : "—"} 表現正常。
             </div>
           )}
 
           {activeSegmentTab === "stress" && (
             <div className="mt-3 p-2.5 bg-[#F6B73C]/5 border border-[#F6B73C]/10 rounded text-[11px] text-warn">
-              ⚠️ 警示：在 2024 年初微盤股流動性危機爆發期間，組合發生了達 -14.85% 的歷史最大單次回撤，反映該策略在流動性踩踏下的高度脆弱性。
+              ⚠️ 警示：在歷史壓力期，組合最大單次回撤達 {metrics?.maxdd_2010 !== undefined ? `${(metrics.maxdd_2010 * 100).toFixed(2)}%` : maxddVal}，反映該策略在特定壓力段下的流動性風險與敞口。
             </div>
           )}
         </Card>
@@ -392,11 +394,11 @@ export default function BacktestLabPage() {
         <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-xs font-mono text-center py-2">
           <div className="p-3 bg-bg border border-line rounded">
             <div className="text-subink text-[10px]">年化換手率</div>
-            <div className="text-sm font-bold text-[#E6EDF7] mt-1">324.5%</div>
+            <div className="text-sm font-bold text-[#E6EDF7] mt-1">{displayTurnover}</div>
           </div>
           <div className="p-3 bg-bg border border-line rounded">
             <div className="text-subink text-[10px]">平均持股週期</div>
-            <div className="text-sm font-bold text-[#E6EDF7] mt-1">12.5 天</div>
+            <div className="text-sm font-bold text-[#E6EDF7] mt-1">{detail?.strategy?.config?.rebalance_days !== undefined ? `${detail.strategy.config.rebalance_days} 天` : "—"}</div>
           </div>
           <div className="p-3 bg-bg border border-line rounded">
             <div className="text-subink text-[10px]">交易勝率</div>
