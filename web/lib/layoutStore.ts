@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-// 三栏宽度约束(像素)。默认值刻意等于原硬编码值,保证 SSR 首屏一致、无水合告警。
 export const SIDEBAR_DEFAULT = 220;
 export const SIDEBAR_MIN = 180;
 export const SIDEBAR_MAX = 360;
@@ -14,14 +13,19 @@ const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(mi
 interface LayoutState {
   sidebarWidth: number;
   agentWidth: number;
+  rightPanelWidth: number; // alias for agentWidth requested by requirements doc
   sidebarCollapsed: boolean;
   agentCollapsed: boolean;
+  theme: "dark" | "light";
+  
   setSidebarWidth: (w: number) => void;
   setAgentWidth: (w: number) => void;
+  setRightPanelWidth: (w: number) => void;
   resetSidebar: () => void;
   resetAgent: () => void;
   toggleSidebar: () => void;
   toggleAgent: () => void;
+  setTheme: (theme: "dark" | "light") => void;
 }
 
 export const useLayoutStore = create<LayoutState>()(
@@ -29,19 +33,28 @@ export const useLayoutStore = create<LayoutState>()(
     (set) => ({
       sidebarWidth: SIDEBAR_DEFAULT,
       agentWidth: AGENT_DEFAULT,
+      rightPanelWidth: AGENT_DEFAULT,
       sidebarCollapsed: false,
       agentCollapsed: false,
-      // clamp 收敛在唯一写入口,任何调用方都越不了界
+      theme: "dark", // Default to dark terminal style
+
       setSidebarWidth: (w) => set({ sidebarWidth: clamp(w, SIDEBAR_MIN, SIDEBAR_MAX) }),
-      setAgentWidth: (w) => set({ agentWidth: clamp(w, AGENT_MIN, AGENT_MAX) }),
+      setAgentWidth: (w) => {
+        const val = clamp(w, AGENT_MIN, AGENT_MAX);
+        set({ agentWidth: val, rightPanelWidth: val });
+      },
+      setRightPanelWidth: (w) => {
+        const val = clamp(w, AGENT_MIN, AGENT_MAX);
+        set({ agentWidth: val, rightPanelWidth: val });
+      },
       resetSidebar: () => set({ sidebarWidth: SIDEBAR_DEFAULT }),
-      resetAgent: () => set({ agentWidth: AGENT_DEFAULT }),
+      resetAgent: () => set({ agentWidth: AGENT_DEFAULT, rightPanelWidth: AGENT_DEFAULT }),
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       toggleAgent: () => set((s) => ({ agentCollapsed: !s.agentCollapsed })),
+      setTheme: (theme) => set({ theme }),
     }),
     {
       name: "quant-os-layout",
-      // 手动 rehydrate(见 LayoutHydrator),避免 Next.js SSR 首屏水合不一致
       skipHydration: true,
     },
   ),

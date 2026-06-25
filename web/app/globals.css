@@ -3,60 +3,60 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 body {
-  background: #FCFAF2; /* 凝脂偏亮背景 [本层] */
-  color: #31322C;      /* 京元 [主文本] */
-  font-family: var(--font-noto-sans-sc), -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background-color: #06111F; /* Deep space background */
+  color: #E6EDF7;            /* Main text color */
+  font-family: var(--font-sans), -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-/* 统一卡片骨架 */
+/* Unified Card structure */
 .card {
-  background: #FFFFFF; /* 纯白卡片 */
-  border: 1px solid rgba(223, 215, 194, 0.5); /* 蜜合 [显·环] 边框 */
+  background-color: #0E2238; /* Sleek card background */
+  border: 1px solid #1F3550; /* Border color */
   border-radius: 8px;
   padding: 1rem;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02);
-  transition: border-color 0.15s ease;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease-in-out;
 }
 
 .card:hover {
-  border-color: rgba(225, 138, 59, 0.5); /* 库金 [显·焦] 微光 */
+  border-color: #3D7BFF; /* Clickable info indicator color */
 }
 
-/* 全局表单输入元素强制亮色样式 */
+/* Form Elements */
 input, select, textarea {
-  background-color: #FFFFFF !important;                  /* 纯白 */
-  color: #31322C !important;                             /* 京元 */
-  border: 1px solid rgba(223, 215, 194, 0.7) !important;  /* 蜜合边框 */
+  background-color: #081827 !important;
+  color: #E6EDF7 !important;
+  border: 1px solid #1F3550 !important;
   outline: none !important;
+  border-radius: 6px;
 }
 
 input:focus, select:focus, textarea:focus {
-  border-color: #E18A3B !important;                      /* 库金高亮 */
-  box-shadow: 0 0 0 2px rgba(225, 138, 59, 0.15) !important;
+  border-color: #3D7BFF !important;
+  box-shadow: 0 0 0 2px rgba(61, 123, 255, 0.2) !important;
 }
 
 select option {
-  background-color: #FFFFFF !important;                  /* 下拉选项背景 */
-  color: #31322C !important;
+  background-color: #0E2238 !important;
+  color: #E6EDF7 !important;
 }
 
-/* 占位符颜色 */
 ::placeholder {
-  color: rgba(85, 81, 71, 0.4) !important;               /* 骖骊 */
+  color: #5F728A !important;
 }
 
-/* 专为量化数字与代码设计的等宽数字排版 */
+/* Monospace fonts for numbers and code */
 .font-quant {
-  font-family: var(--font-ibm-plex-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   letter-spacing: 0.03em;
 }
 
-/* 表格细化样式 */
+/* Tables */
 table {
   border-collapse: collapse;
 }
@@ -66,10 +66,10 @@ tr {
 }
 
 tbody tr:hover {
-  background-color: rgba(223, 215, 194, 0.15); /* 蜜合微量悬浮光 */
+  background-color: rgba(31, 53, 80, 0.3); /* Sleek hover effect */
 }
 
-/* 滚动条 */
+/* Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -80,10 +80,34 @@ tbody tr:hover {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(223, 215, 194, 0.5); /* 蜜合半透明 */
+  background: #1F3550;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(225, 138, 59, 0.5); /* 库金半透明 */
+  background: #3D7BFF;
+}
+
+/* Semantic helper color variables */
+.text-ok {
+  color: #35D06E;
+}
+.text-warn {
+  color: #F6B73C;
+}
+.text-danger {
+  color: #FF5C5C;
+}
+.text-brand {
+  color: #3D7BFF;
+}
+
+.bg-ok-dim {
+  background-color: rgba(53, 208, 110, 0.1);
+}
+.bg-warn-dim {
+  background-color: rgba(246, 183, 60, 0.1);
+}
+.bg-danger-dim {
+  background-color: rgba(255, 92, 92, 0.1);
 }

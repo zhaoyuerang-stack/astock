@@ -91,8 +91,7 @@ export default function ExperimentsPage() {
   const blocked = counts?.blocked ?? 0;
   const ready = counts?.ready ?? 0;
   const running = counts?.running ?? 0;
-  const queueStatus: "ready" | "attention" | "neutral" =
-    review > 0 || blocked > 0 ? "attention" : ready > 0 || running > 0 ? "ready" : "neutral";
+  const queueStatus = review > 0 || blocked > 0 ? "attention" : ready > 0 || running > 0 ? "ready" : "neutral";
   const queueTitle =
     review > 0
       ? `研究队列:${review} 项待人工复核(最高优先)`
@@ -105,103 +104,250 @@ export default function ExperimentsPage() {
       : "研究队列:空闲,无待办";
 
   return (
-    <div className="space-y-5">
-      <PageHeader title="研究实验室" desc="登记前工作台：研究素材 → 草案/候选 → L0–L3 → 人工复核 → 正式晋级" />
+    <div className="space-y-6">
+      <PageHeader
+        title="研究实验室"
+        desc="量化因子孕育工作台：从学术证据出发，经过 L0（预测力）、L1（交易成本）、L2/L3 等深度风险验证，最后完成人工审批与正式晋级。"
+      />
       <ResearchNav />
 
-      {error && <div className="card text-sm text-danger">{error}</div>}
+      {error && (
+        <div className="p-4 rounded-xl bg-danger/10 border border-danger/20 text-sm text-danger flex flex-col gap-1 font-medium">
+          <span className="font-bold text-[15px]">⚠️ 执行错误或阻塞拦截:</span>
+          <span>{error}</span>
+        </div>
+      )}
 
-      {/* 研究队列态势头条:不复述计数,给优先级裁决 + 工作流纪律(§0.A 顺序 / 晋级须留批准记录) */}
       {data && (
         <StatusBanner
           status={queueStatus}
           title={queueTitle}
-          detail="处理顺序:待复核 → 阻塞 → 可执行 → 运行中 · 正式晋级须留人工批准记录"
+          detail="审计处理顺序: 待人工复核 → 解决阻塞/失败项 → 运行就绪队列。正式策略晋级在册必须含有批准记录。"
         />
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <MetricCard label="待人工复核" value={String(data?.counts.review ?? 0)} tone="warn" sub="需要明确批准或拒绝" />
-        <MetricCard label="失败 / 阻塞" value={String(data?.counts.blocked ?? 0)} tone="danger" sub="优先处理失败原因" />
-        <MetricCard label="可执行" value={String(data?.counts.ready ?? 0)} tone="ok" sub="已有唯一下一步" />
-        <MetricCard label="运行中" value={String(data?.counts.running ?? 0)} sub="异步 Job 执行" />
+      {/* Metrics Dashboard */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard label="待人工复核" value={String(review)} tone="warn" sub="需要明确批准或拒绝" />
+        <MetricCard label="失败 / 阻塞" value={String(blocked)} tone="danger" sub="优先处理验证失败原因" />
+        <MetricCard label="就绪可执行" value={String(ready)} tone="ok" sub="含有唯一下一步" />
+        <MetricCard label="运行中任务" value={String(running)} sub="正在进行异步回测审计" />
       </div>
 
+      {/* Actions Bar */}
       <div className="flex items-center justify-between gap-3">
-        <label className="text-[11px] text-subink flex items-center gap-2">
-          <input type="checkbox" checked={showArchive} onChange={(e) => setShowArchive(e.target.checked)} />
-          显示已登记 / 已归档
+        <label className="text-[12px] text-subink flex items-center gap-2 cursor-pointer font-medium hover:text-ink">
+          <input
+            type="checkbox"
+            checked={showArchive}
+            onChange={(e) => setShowArchive(e.target.checked)}
+            className="rounded border-line text-brand focus:ring-brand"
+          />
+          显示已登记 / 已归档的研究历史
         </label>
         <details className="relative">
-          <summary className="list-none cursor-pointer px-3 py-1.5 rounded-lg bg-brand text-white text-[12px] font-semibold">创建研究任务</summary>
+          <summary className="list-none cursor-pointer px-4 py-2 rounded-lg bg-brand hover:bg-brand-dark text-white text-[12px] font-bold shadow transition-colors">
+            {busy.startsWith("create:") ? "任务启动中..." : "启动自主探索任务"}
+          </summary>
           <div className="absolute right-0 mt-2 z-20 w-56 bg-white border border-line rounded-xl shadow-lg p-2 space-y-1">
-            <Link href="/experiments/evidence" className="block px-3 py-2 rounded hover:bg-jilan text-[12px]">从研报证据创建草案</Link>
-            <button onClick={() => launch("seed")} className="w-full text-left px-3 py-2 rounded hover:bg-jilan text-[12px]" disabled={!!busy}>运行确定性种子</button>
-            <button onClick={() => launch("llm")} className="w-full text-left px-3 py-2 rounded hover:bg-jilan text-[12px]" disabled={!!busy}>LLM 生成候选</button>
-            <button onClick={() => launch("island")} className="w-full text-left px-3 py-2 rounded hover:bg-jilan text-[12px]" disabled={!!busy}>岛屿搜索</button>
+            <Link href="/experiments/evidence" className="block px-3 py-2 rounded hover:bg-jilan text-[12px] font-medium text-ink">
+              📖 从研报证据创建草案
+            </Link>
+            <button
+              onClick={() => launch("seed")}
+              className="w-full text-left px-3 py-2 rounded hover:bg-jilan text-[12px] font-medium text-ink disabled:opacity-50"
+              disabled={!!busy}
+            >
+              🌱 运行确定性种子演化
+            </button>
+            <button
+              onClick={() => launch("llm")}
+              className="w-full text-left px-3 py-2 rounded hover:bg-jilan text-[12px] font-medium text-ink disabled:opacity-50"
+              disabled={!!busy}
+            >
+              🤖 LLM 探索新因子候选
+            </button>
+            <button
+              onClick={() => launch("island")}
+              className="w-full text-left px-3 py-2 rounded hover:bg-jilan text-[12px] font-medium text-ink disabled:opacity-50"
+              disabled={!!busy}
+            >
+              🏝️ 启动多数据岛屿搜索
+            </button>
           </div>
         </details>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-        <div className="lg:col-span-3 card overflow-hidden p-0">
-          <div className="px-4 py-3 border-b border-line text-sm font-semibold">优先处理队列</div>
+      {/* Workspace Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Table Queue (Left) */}
+        <div className="lg:col-span-3 card overflow-hidden p-0 border border-line rounded-xl shadow-sm bg-white">
+          <div className="px-4 py-3 border-b border-line text-sm font-bold text-ink">工作队列</div>
           <div className="overflow-x-auto max-h-[620px]">
             <table className="w-full text-[12px]">
-              <thead className="sticky top-0 bg-jilan text-subink text-left">
-                <tr><th className="px-3 py-2">研究对象</th><th className="px-3 py-2">来源</th><th className="px-3 py-2">阶段</th><th className="px-3 py-2">下一步</th></tr>
+              <thead className="sticky top-0 bg-neutral-50 text-subink text-left border-b border-line">
+                <tr>
+                  <th className="px-4 py-2.5">研究对象</th>
+                  <th className="px-4 py-2.5">来源</th>
+                  <th className="px-4 py-2.5">阶段</th>
+                  <th className="px-4 py-2.5">下一步行动</th>
+                </tr>
               </thead>
-              <tbody>
-                {visible.map((item) => (
-                  <tr
-                    key={item.work_id}
-                    onClick={() => setSelectedId(item.work_id)}
-                    className={`border-t border-line/50 cursor-pointer ${selected?.work_id === item.work_id ? "bg-brand/8" : "hover:bg-jilan/20"}`}
-                  >
-                    <td className="px-3 py-3">
-                      <div className="font-semibold text-ink">{item.title}</div>
-                      <div className="mt-1"><WorkItemBadge status={item.status} /></div>
+              <tbody className="divide-y divide-line/40">
+                {visible.map((item) => {
+                  const isSelected = selected?.work_id === item.work_id;
+                  const isItemRunning = item.status === "running" || busy === item.work_id;
+                  return (
+                    <tr
+                      key={item.work_id}
+                      onClick={() => setSelectedId(item.work_id)}
+                      className={`cursor-pointer transition-colors ${
+                        isSelected ? "bg-brand/5 font-medium" : "hover:bg-neutral-50"
+                      }`}
+                    >
+                      <td className="px-4 py-3.5">
+                        <div className="font-bold text-ink flex items-center gap-2">
+                          {item.title}
+                          {isItemRunning && (
+                            <span className="flex h-2.5 w-2.5 relative">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-brand"></span>
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1.5 flex items-center gap-1.5">
+                          <WorkItemBadge status={item.status} />
+                          {item.status === "running" && <span className="text-[10px] text-brand font-medium">执行中...</span>}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5 text-subink font-medium">{sourceLabel(item.source)}</td>
+                      <td className="px-4 py-3.5 font-mono text-subink uppercase">{item.stage || "DRAFT"}</td>
+                      <td className="px-4 py-3.5 text-brand font-bold">{actionLabel(item.next_action) || "等待中"}</td>
+                    </tr>
+                  );
+                })}
+                {visible.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-12 text-center text-subink font-medium">
+                      当前队列无待办事项。
                     </td>
-                    <td className="px-3 py-3 text-subink">{sourceLabel(item.source)}</td>
-                    <td className="px-3 py-3 font-mono text-subink">{item.stage.toUpperCase()}</td>
-                    <td className="px-3 py-3 text-brand font-medium">{actionLabel(item.next_action)}</td>
                   </tr>
-                ))}
-                {visible.length === 0 && <tr><td colSpan={4} className="px-3 py-8 text-center text-subink">当前队列为空</td></tr>}
+                )}
               </tbody>
             </table>
           </div>
         </div>
 
-        <div className="lg:col-span-2 card h-fit lg:sticky lg:top-5">
+        {/* Detail Panel (Right Sidebar) */}
+        <div className="lg:col-span-2 card border border-line rounded-xl p-5 bg-white shadow-sm h-fit lg:sticky lg:top-5 space-y-5">
           {selected ? (
             <div className="space-y-4">
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start justify-between gap-3 border-b border-line pb-3">
                 <div>
-                  <h2 className="font-bold text-ink">{selected.title}</h2>
-                  <div className="text-[11px] text-subink mt-1">{selected.work_id}</div>
+                  <h2 className="font-bold text-ink text-base">{selected.title}</h2>
+                  <div className="text-[11px] font-mono text-subink mt-1 bg-neutral-100 px-1.5 py-0.5 rounded border border-line w-fit">
+                    {selected.work_id}
+                  </div>
                 </div>
                 <WorkItemBadge status={selected.status} />
               </div>
-              <div className="space-y-2 text-[12px]">
-                <div><span className="text-subink">经济假设：</span>{selected.mechanism || "未填写"}</div>
-                <div><span className="text-subink">证据来源：</span>{selected.citation || sourceLabel(selected.source)}</div>
-                <div><span className="text-subink">当前阶段：</span>{selected.stage.toUpperCase()}</div>
-                <div><span className="text-subink">当前风险：</span>{selected.blocked_reason || selected.latest_result?.reason || "暂无阻塞"}</div>
-                <div><span className="text-subink">唯一下一步：</span><strong>{actionLabel(selected.next_action)}</strong></div>
+
+              {/* Information Table */}
+              <div className="space-y-3 text-[12px]">
+                {/* Hypothesis Quote Box */}
+                <div className="bg-neutral-50 border-l-3 border-brand/50 rounded-r-lg p-3 space-y-1">
+                  <div className="text-[10px] text-subink font-bold uppercase tracking-wider">经济合理性假说</div>
+                  <p className="text-[13px] text-ink font-medium italic">
+                    “{selected.mechanism || "未填写机制假设" }”
+                  </p>
+                  {selected.citation && (
+                    <div className="text-[11px] text-subink mt-2">
+                      📖 引用依据: {selected.citation}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-y-2 gap-x-4 pt-1 border-t border-line/50">
+                  <div>
+                    <span className="text-subink block">当前审计阶段:</span>
+                    <span className="font-mono text-ink uppercase font-bold">{selected.stage.toUpperCase() || "草案"}</span>
+                  </div>
+                  <div>
+                    <span className="text-subink block">来源维度:</span>
+                    <span className="font-semibold text-ink">{sourceLabel(selected.source)}</span>
+                  </div>
+                </div>
+
+                {/* Risk / Block Alert Box */}
+                {selected.status === "blocked" && (
+                  <div className="bg-danger/10 border border-danger/20 rounded-lg p-3 text-[12px] text-danger font-medium">
+                    <span className="font-bold block">❌ 验证被拦截 / 阻塞风险:</span>
+                    <span>{selected.blocked_reason || "该阶段的指标审计未达到设定值门槛。"}</span>
+                  </div>
+                )}
+
+                {/* Latest Result / Details Metrics */}
+                {selected.latest_result && Object.keys(selected.latest_result).length > 0 && (
+                  <div className="bg-neutral-50 border border-line rounded-lg p-3 text-[11px] space-y-1.5 font-mono">
+                    <div className="font-bold text-subink text-[10px] uppercase font-sans tracking-wide">最近运行统计 / 属性</div>
+                    <div className="divide-y divide-line/40 max-h-40 overflow-y-auto pr-1">
+                      {Object.entries(selected.latest_result).map(([key, val]) => (
+                        <div key={key} className="flex justify-between py-1 gap-2">
+                          <span className="text-subink font-medium">{key}</span>
+                          <span className="text-ink font-semibold text-right break-all">
+                            {typeof val === "object" ? JSON.stringify(val) : String(val)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-line/50 flex flex-col gap-1">
+                  <span className="text-subink">下一步推荐行动:</span>
+                  <strong className="text-brand text-[13px]">{actionLabel(selected.next_action) || "已完成全部流程"}</strong>
+                </div>
               </div>
-              {selected.next_action === "review" ? (
-                <Link href="/experiments/reviews" className="block text-center px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold">进入人工复核</Link>
-              ) : selected.next_action === "complete_draft" ? (
-                <Link href={`/experiments/${selected.kind}/${selected.item_id}`} className="block text-center px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold">补全研究草案</Link>
-              ) : selected.next_action ? (
-                <button onClick={() => execute(selected)} disabled={busy === selected.work_id} className="w-full px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold disabled:opacity-50">
-                  {busy === selected.work_id ? "执行中…" : actionLabel(selected.next_action)}
-                </button>
-              ) : null}
-              <Link href={`/experiments/${selected.kind}/${selected.item_id}`} className="block text-center text-[12px] text-brand hover:underline">查看完整研究档案</Link>
+
+              {/* Action Buttons */}
+              <div className="pt-2 space-y-2">
+                {selected.next_action === "review" ? (
+                  <Link
+                    href="/experiments/reviews"
+                    className="block text-center px-4 py-2.5 rounded-lg bg-brand hover:bg-brand-dark text-white text-sm font-bold shadow transition-colors"
+                  >
+                    进入人工复核
+                  </Link>
+                ) : selected.next_action === "complete_draft" ? (
+                  <Link
+                    href={`/experiments/${selected.kind}/${selected.item_id}`}
+                    className="block text-center px-4 py-2.5 rounded-lg bg-brand hover:bg-brand-dark text-white text-sm font-bold shadow transition-colors"
+                  >
+                    补全研究草案
+                  </Link>
+                ) : selected.next_action ? (
+                  <button
+                    onClick={() => execute(selected)}
+                    disabled={!!busy}
+                    className="w-full px-4 py-2.5 rounded-lg bg-brand hover:bg-brand-dark text-white text-sm font-bold shadow transition-colors disabled:opacity-50"
+                  >
+                    {busy === selected.work_id ? "异步审计计算中…" : `启动 ${actionLabel(selected.next_action)}`}
+                  </button>
+                ) : null}
+
+                <Link
+                  href={`/experiments/${selected.kind}/${selected.item_id}`}
+                  className="block text-center text-[12px] text-brand hover:underline font-semibold"
+                >
+                  查看完整研究档案与代码
+                </Link>
+              </div>
             </div>
-          ) : <div className="text-sm text-subink">选择一个研究对象查看详情。</div>}
+          ) : (
+            <div className="text-sm text-subink text-center py-10">
+              👈 选择左侧队列中的研究对象以查看详情。
+            </div>
+          )}
         </div>
       </div>
     </div>

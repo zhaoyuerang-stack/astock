@@ -120,9 +120,7 @@ export default function AgentPanel() {
   const placeholderText = isOps
     ? "问:交易就绪度 / 信号审计 / 风控偏离…"
     : "问:因子IC衰退 / 回测参数 / Pareto前沿…";
-  const disclaimerText = isOps
-    ? "交易辅助内容，不构成投资建议 · 给 ANTHROPIC_API_KEY 即接真 LLM"
-    : "研究辅助内容，不构成投资建议 · 给 ANTHROPIC_API_KEY 即接真 LLM";
+  const disclaimerText = "AI 僅供研究與審計參考，不替代有效性裁決，不構成交易建議。";
 
   const width = useLayoutStore((s) => s.agentWidth);
   const collapsed = useLayoutStore((s) => s.agentCollapsed);

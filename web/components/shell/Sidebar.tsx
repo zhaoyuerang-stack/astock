@@ -120,9 +120,9 @@ export default function Sidebar() {
 
     if (!activeItem || !activeItem.modes.includes(newMode)) {
       if (newMode === "ops") {
-        router.push("/overview");
+        router.push("/dashboard");
       } else {
-        router.push("/factors");
+        router.push("/factor-research");
       }
     }
   };
@@ -156,7 +156,7 @@ export default function Sidebar() {
   return (
     <aside
       style={{ width }}
-      className="shrink-0 bg-[#F3EFE0] border-r border-line/40 text-ink flex flex-col h-screen sticky top-0 font-sans shadow-sm"
+      className="shrink-0 bg-[#081827] border-r border-line/40 text-ink flex flex-col h-screen sticky top-0 font-sans shadow-sm"
     >
       {/* Title Header */}
       <div className="px-5 py-5 border-b border-line/30 flex items-start justify-between gap-2">
@@ -256,12 +256,11 @@ export default function Sidebar() {
       </nav>
       
       {/* Footer Status */}
-      <div className="px-5 py-3 border-t border-line/30 text-[10px] text-subink bg-jilan/25 font-quant">
-        <div className="flex items-center gap-1.5">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-songshi" />
-          <span>系统就绪 (松石)</span>
-        </div>
-        <div className="mt-1 text-[9px] opacity-75">本地数据运行 · Phase 1</div>
+      <div className="px-5 py-3.5 border-t border-line/30 text-[11px] text-subink/80 bg-jilan/25 font-mono space-y-1 bg-opacity-5 border-opacity-50">
+        <div>當前用戶：researcher</div>
+        <div>當前策略：illiquidity v3.1</div>
+        <div>系統版本：v2.3.0</div>
+        <div>數據日期：2026-06-23</div>
       </div>
     </aside>
   );

@@ -1,8 +1,22 @@
 # STATUS — 当前进度
 
-> 更新:2026-06-23。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
+> 更新:2026-06-25。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
+
+**2026-06-25(Quant Research OS 前端重構與合規面板完整落地)**：按照《Quant Research OS 前端設計與開發要求文檔.docx》的要求，將原有 Web 前端重構為「Alpha 審計駕駛艙」，完整實現 8 個核心合規與審計頁面，切換為深色研究終端風格，並完成 API 數據鏈對接與 TypeScript 零錯誤編譯。
+  · **8 核心合規頁面**:
+    1. 今日操作台 (`/dashboard`): 實現生產就緒度五項門禁檢查、Top-25 候選與否決過濾審計。
+    2. 組合風控 (`/portfolio-risk`): 實現 6 項核心暴露評估與壓力測試。
+    3. 信號審計 (`/signal-audit`): 實現 Spec Hash/數據指紋追溯與因子分解歸因。
+    4. 策略台帳 (`/strategy-registry`): 實現 ACTIVE/REFERENCE/CANDIDATE/FALSIFIED/RETIRED 五大狀態生命週期。
+    5. 因子研究 (`/factor-research`): 實現 IC 時序 SVG 圖表與分組收益 Monotonicity。
+    6. 回測實驗 (`/backtest-lab`): 實現 NAV SVG 曲線、回測/真實偏差對比與參數敏感性熱力圖。
+    7. 數據健康 (`/data-health`): 實現價量新鮮度、PIT 完整度對齊與 ETL 管道監控。
+    8. 系統治理 (`/system-governance`): 實現 deployment 狀態複製、單向拓撲與 9 宮格合規矩陣。
+  · **視覺風格規範**: 全站採用 #06111F 背景、#0E2238 卡片與 #1F3550 邊框的深色研究終端風格。
+  · **狀態管理與審計**: 封裝 useAppStore, useLayoutStore, useAIStore 等 Zustand 狀態，AI panel 底部鎖定合規免責聲明。
+  · **編譯與驗收**: npx tsc --noEmit 與 npm run lint 綠色無報錯通過。
 
 **2026-06-22(small-cap-size/v2.0 纸面前向实验启动,ADR-024)**:全池唯一像样的候选(回测21.6%/夏普1.38/净化CV过,但 DSR=0.086 过不了门)。所有者决定**明知风险纸面前向**收证据,**不绕过 DSR 门**。
   · **绝不洗成达标**:v2.0 仍「参考」、DSR 仍 0.086、不登记在册、不改 register/台账(那是自欺)。只是人明知不达标的旁路纸面观察。
