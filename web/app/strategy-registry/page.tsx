@@ -10,8 +10,11 @@ import { useAgent } from "@/lib/agentStore";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 import { StrategyStatusBadge, HashCopy } from "@/components/ui/QuantComponents";
 
+import { useAppStore } from "@/lib/appStore";
+
 export default function StrategyRegistryPage() {
   const setContext = useAgent((s) => s.setContext);
+  const { selectedStrategyId, selectedStrategyVersion, setSelectedStrategy } = useAppStore();
 
   const [strategies, setStrategies] = useState<StrategyView[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -54,15 +57,19 @@ export default function StrategyRegistryPage() {
     api.strategies()
       .then((data) => {
         setStrategies(data);
-        if (data.length > 0 && !selectedId) {
-          // Select the first strategy by default
+        // Find matching strategy in the list based on global selection
+        const matched = data.find(s => s.family === selectedStrategyId && s.version === selectedStrategyVersion);
+        if (matched) {
+          setSelectedId(matched.strategy_id);
+          fetchDetail(matched.family, matched.version);
+        } else if (data.length > 0 && !selectedId) {
           const first = data[0];
           setSelectedId(first.strategy_id);
           fetchDetail(first.family, first.version);
         }
       })
       .catch((e) => setErr(String(e)));
-  }, [selectedId, fetchDetail]);
+  }, [selectedId, fetchDetail, selectedStrategyId, selectedStrategyVersion]);
 
   useAutoRefresh(load);
 
@@ -174,6 +181,7 @@ export default function StrategyRegistryPage() {
                   onClick={() => {
                     setSelectedId(s.strategy_id);
                     fetchDetail(s.family, s.version);
+                    setSelectedStrategy(s.family, s.version);
                   }}
                   className={`text-left hover:underline ${selectedId === s.strategy_id ? "text-[#E6EDF7]" : ""}`}
                 >

@@ -21,8 +21,8 @@ export default function TopBar() {
   const strategyVersions = [
     { id: "illiquidity", version: "v3.1", name: "illiquidity v3.1" },
     { id: "illiquidity", version: "v3.0", name: "illiquidity v3.0" },
-    { id: "size_earnings", version: "v1.0", name: "size_earnings v1.0" },
-    { id: "roc_yc", version: "v1.0", name: "roc_yc v1.0" },
+    { id: "size-earnings", version: "v1.0", name: "size-earnings v1.0" },
+    { id: "roc-yc", version: "v1.0", name: "roc-yc v1.0" },
   ];
 
   const getStatusColor = () => {
