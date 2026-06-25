@@ -139,7 +139,10 @@ export default function TradePlansPage() {
 
   const activeOrdersCount = orders.filter((o) => o.side !== "HOLD").length;
   const totalNotional = orders.reduce((acc, curr) => acc + (curr.side === "HOLD" ? 0 : curr.notional), 0);
-  const blockSignOff = !readiness?.allowed_to_trade;
+
+  const isStale = !!paperPlan?.stale;
+  const isDemoted = !!(readiness && readiness.model_version !== "approved");
+  const blockSignOff = !readiness?.allowed_to_trade || isStale || isDemoted;
 
   // 执行闸门态势:把「能不能签发 / 签了吗 / 几笔要执行」综合成一句裁决 + 下一步
   const planStatus: "ready" | "attention" | "blocked" | "neutral" = signed
@@ -149,17 +152,27 @@ export default function TradePlansPage() {
     : activeOrdersCount === 0
     ? "neutral"
     : "attention";
+
   const planTitle = signed
     ? `交易计划已签发:${activeOrdersCount} 笔执行指令`
+    : isStale
+    ? "交易计划: 信号数据已过期"
+    : isDemoted
+    ? `交易计划: 部署策略已被拦截 (${readiness?.model_version})`
     : blockSignOff
     ? "交易计划:前置风控拦截,不可签发"
     : activeOrdersCount === 0
     ? "交易计划:今日无执行指令,维持持仓"
     : `交易计划待签发:${activeOrdersCount} 笔执行指令`;
+
   const planDetail = signed
     ? `已电子签名签发 · 指纹 ${hash.substring(11)} · 可导出委托单交券商`
+    : isStale
+    ? `信号日期为 ${paperPlan?.signal_date}，早于当前系统最新交易日。禁止签发以防未来漏洞，请等待日更补齐数据。`
+    : isDemoted
+    ? `主策略 [${readiness?.details?.model_admission_track || "未知"}] 状态为 ${readiness?.model_version}，未通过合规/DSR检验。`
     : blockSignOff
-    ? "前置网禁 BLOCKED · 需先排除「交易准备度」门禁异常后方可签发"
+    ? "前置网禁 BLOCKED · 需先排除「交易准备度」前置门禁异常后方可签发"
     : activeOrdersCount === 0
     ? "系统维持当前持仓,今日无新增委托"
     : "前置网禁 PASS · 待交易员核对委托明细后签名签发";
@@ -290,7 +303,11 @@ export default function TradePlansPage() {
 
                       {blockSignOff && (
                         <div className="text-[11px] text-danger border border-danger/30 bg-danger/5 rounded-[6px] p-2">
-                          ⚠️ <b>当前不可签发</b>：风控拦截拦截中，请排除「交易准备度」前置门禁异常后再运行。
+                          ⚠️ <b>当前不可签发</b>：{
+                            isStale ? "信号已过期，等待数据更新。" :
+                            isDemoted ? `主策略被拦截 (${readiness?.model_version})。` :
+                            "前置门禁拦截，请检查交易准备度。"
+                          }
                         </div>
                       )}
                     </div>
@@ -298,9 +315,9 @@ export default function TradePlansPage() {
 
                   <button
                     onClick={handleExportCSV}
-                    disabled={activeOrdersCount === 0}
+                    disabled={activeOrdersCount === 0 || blockSignOff}
                     className={`w-full py-2 px-4 rounded-[8px] border text-[13px] font-medium flex items-center justify-center gap-1.5 transition-all ${
-                      activeOrdersCount === 0
+                      activeOrdersCount === 0 || blockSignOff
                         ? "border-cardline text-subink cursor-not-allowed bg-transparent"
                         : "border-cardline text-ink hover:bg-cardline/20"
                     }`}

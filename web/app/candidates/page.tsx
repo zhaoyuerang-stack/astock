@@ -6,21 +6,22 @@ import MetricCard from "@/components/ui/MetricCard";
 import Card from "@/components/ui/Card";
 import StatusBanner from "@/components/ui/StatusBanner";
 import { api } from "@/lib/api";
-import type { TradePlanView } from "@/lib/types";
+import type { TradePlanView, TradeReadinessView } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 
 export default function CandidatesPage() {
   const [paperPlan, setPaperPlan] = useState<TradePlanView | null>(null);
+  const [readiness, setReadiness] = useState<TradeReadinessView | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const setContext = useAgent((s) => s.setContext);
 
   const load = useCallback(() => {
     setErr(null);
-    api
-      .paperPlan()
-      .then((pp) => {
+    Promise.all([api.paperPlan(), api.tradeReadiness()])
+      .then(([pp, tr]) => {
         setPaperPlan(pp);
+        setReadiness(tr);
 
         const count = pp.candidates?.length ?? 0;
         setContext({
@@ -39,6 +40,29 @@ export default function CandidatesPage() {
   useAutoRefresh(load);
 
   const bearMode = paperPlan?.regime === "bear";
+  const isStale = !!paperPlan?.stale;
+  const isDemoted = !!(readiness && readiness.model_version !== "approved");
+
+  const status: "ready" | "attention" | "blocked" = 
+    isStale || isDemoted
+      ? "blocked"
+      : bearMode
+      ? "attention"
+      : "ready";
+
+  const bannerTitle = isStale
+    ? "⚠️ 候选池: 数据已过期"
+    : isDemoted
+    ? `⚠️ 部署策略已被风控降级 (${readiness?.model_version})`
+    : `今日因子候选池:${paperPlan?.candidates?.length ?? 0} 只标的`;
+
+  const bannerDetail = isStale
+    ? `信号日期为 ${paperPlan?.signal_date}，早于当前系统最新交易日。候选股票池数据已失效。`
+    : isDemoted
+    ? `主策略 [${readiness?.details?.model_admission_track || "未知"}] 状态为 ${readiness?.model_version}，未通过 DSR 显著性审计或安全阀门，已被拦截部署。候选股票池仅供审计参考。`
+    : bearMode
+    ? `BEAR 空仓防守 · 候选池仅供审计参考,今日不交易股票,资金已轮动至 ${paperPlan?.bond?.name || "国债ETF"} (${paperPlan?.bond?.code || "511010"}) 避险`
+    : "BULL 多头入场 · 候选池为今日可交易标的";
 
   return (
     <div className="space-y-6">
@@ -61,13 +85,9 @@ export default function CandidatesPage() {
         <>
           {/* 候选池态势头条:一眼回答「这些候选今天可不可执行」——BEAR 下仅供参考 */}
           <StatusBanner
-            status={bearMode ? "attention" : "ready"}
-            title={`今日因子候选池:${paperPlan.candidates?.length ?? 0} 只标的`}
-            detail={
-              bearMode
-                ? `BEAR 空仓防守 · 候选池仅供审计参考,今日不交易股票,资金已轮动至 ${paperPlan.bond?.name || "国债ETF"} (${paperPlan.bond?.code || "511010"}) 避险`
-                : "BULL 多头入场 · 候选池为今日可交易标的"
-            }
+            status={status}
+            title={bannerTitle}
+            detail={bannerDetail}
           />
 
           {/* Summary metrics */}
@@ -105,7 +125,11 @@ export default function CandidatesPage() {
                 {paperPlan.candidates.map((stock, idx) => (
                   <div
                     key={stock.code}
-                    className="p-3 rounded-[10px] bg-bg/50 border border-cardline/30 hover:border-[#88ABDA]/40 transition-all duration-300 group flex flex-col relative overflow-hidden"
+                    className={`p-3 rounded-[10px] bg-bg/50 border border-cardline/30 transition-all duration-300 group flex flex-col relative overflow-hidden ${
+                      isStale || isDemoted
+                        ? "opacity-40 grayscale"
+                        : "hover:border-[#88ABDA]/40"
+                    }`}
                   >
                     <div className="absolute right-0 top-0 w-8 h-8 bg-gradient-to-bl from-[#88ABDA]/5 to-transparent rounded-bl-xl opacity-0 group-hover:opacity-100 transition-opacity" />
                     <div className="text-[10px] text-subink font-quant mb-1 flex justify-between items-center">

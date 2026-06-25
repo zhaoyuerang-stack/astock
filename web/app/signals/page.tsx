@@ -6,27 +6,29 @@ import MetricCard from "@/components/ui/MetricCard";
 import Card from "@/components/ui/Card";
 import StatusBanner from "@/components/ui/StatusBanner";
 import { api, pct } from "@/lib/api";
-import type { TradePlanView } from "@/lib/types";
+import type { TradePlanView, TradeReadinessView } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 
 export default function SignalsPage() {
   const [paperPlan, setPaperPlan] = useState<TradePlanView | null>(null);
+  const [readiness, setReadiness] = useState<TradeReadinessView | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const setContext = useAgent((s) => s.setContext);
 
   const load = useCallback(() => {
     setErr(null);
-    api
-      .paperPlan()
-      .then((pp) => {
+    Promise.all([api.paperPlan(), api.tradeReadiness()])
+      .then(([pp, tr]) => {
         setPaperPlan(pp);
+        setReadiness(tr);
 
         setContext({
           page: "signals",
           title: "策略信号与择时指标",
           summary: `当前择时判定为「${pp.action}」，动态风险暴露为 ${pp.band_exposure.toFixed(2)}x。趋势偏离度为 ${(pp.small_index_vs_ma16 * 100).toFixed(2)}%。`,
           evidence: [
+            `是否允许交易: ${tr.allowed_to_trade ? "YES" : "NO"}`,
             `小盘 vs MA16 趋势偏离度: ${(pp.small_index_vs_ma16 * 100).toFixed(2)}%`,
             `大周期极性 (Regime Dist): ${(pp.regime_dist * 100).toFixed(2)}%`,
             `影子二元择时 (Binary): ${pp.binary_in_market_shadow ? "持仓" : "空仓"}`,
@@ -42,12 +44,37 @@ export default function SignalsPage() {
   useAutoRefresh(load);
 
   const bearMode = paperPlan?.regime === "bear";
-  // 择时态势:LIVE 动态暴露 与 影子二元择时 是否分歧——这条审计信号原本
-  // 只埋在右栏三根进度条里,提到头条揭示「系统内部判定是否一致」。
   const liveInMarket = (paperPlan?.band_exposure ?? 0) > 0;
   const shadowInMarket = paperPlan?.binary_in_market_shadow ?? false;
   const timingDiverge = !!paperPlan && liveInMarket !== shadowInMarket;
-  const timingStatus: "ready" | "attention" = bearMode || timingDiverge ? "attention" : "ready";
+
+  const isStale = !!paperPlan?.stale;
+  const isDemoted = !!(readiness && readiness.model_version !== "approved");
+
+  // If stale or strategy is demoted (not approved), raise to blocked status
+  const timingStatus: "ready" | "attention" | "blocked" = 
+    isStale || isDemoted
+      ? "blocked"
+      : bearMode || timingDiverge
+      ? "attention"
+      : "ready";
+
+  const bannerTitle = isStale
+    ? "⚠️ 策略信号: 数据已过期"
+    : isDemoted
+    ? `⚠️ 部署策略已被风控降级 (${readiness?.model_version})`
+    : `今日择时判定:${paperPlan?.action}`;
+
+  const bannerDetail = isStale
+    ? `信号日期为 ${paperPlan?.signal_date}，早于当前系统最新交易日。请等待日更补齐数据。`
+    : isDemoted
+    ? `主策略 [${readiness?.details?.model_admission_track || "未知"}] 状态为 ${readiness?.model_version}，未通过 DSR 显著性审计或回撤控制阀门，已被拦截部署。`
+    : [
+        bearMode ? "大周期 BEAR · 股票买入权限锁定,维持避险" : "大周期 BULL · 允许股票配置",
+        timingDiverge
+          ? `⚠ LIVE(${liveInMarket ? "持仓" : "空仓"}) 与影子二元(${shadowInMarket ? "持仓" : "空仓"})判定分歧`
+          : "LIVE 与影子择时一致",
+      ].join(" · ");
 
   return (
     <div className="space-y-6">
@@ -68,16 +95,11 @@ export default function SignalsPage() {
 
       {paperPlan && (
         <>
-          {/* 择时态势头条:一眼回答「今日为什么这么决策、系统内部判定有无矛盾」 */}
+          {/* 择时态势头条:一眼回答「今日为什么这么决策、系统内部判定有无矛盾、数据是否新鲜」 */}
           <StatusBanner
             status={timingStatus}
-            title={`今日择时判定:${paperPlan.action}`}
-            detail={[
-              bearMode ? "大周期 BEAR · 股票买入权限锁定,维持避险" : "大周期 BULL · 允许股票配置",
-              timingDiverge
-                ? `⚠ LIVE(${liveInMarket ? "持仓" : "空仓"}) 与影子二元(${shadowInMarket ? "持仓" : "空仓"})判定分歧`
-                : "LIVE 与影子择时一致",
-            ].join(" · ")}
+            title={bannerTitle}
+            detail={bannerDetail}
           />
 
           {/* Summary metrics */}
@@ -112,7 +134,7 @@ export default function SignalsPage() {
             <div className="lg:col-span-2 space-y-6">
               <Card
                 title="策略底层择时指标核算与阈值审计 (Indicators & Thresholds)"
-                right={<span className="text-[#88ABDA]">策略版本: illiquidity v3.1</span>}
+                right={<span className="text-[#88ABDA]">部署策略: {readiness ? `${readiness.details.model_admission_track || "illiquidity"} ${readiness.model_version}` : "illiquidity v3.1"}</span>}
               >
                 <div className="overflow-x-auto">
                   <table className="w-full text-[13px]">
@@ -186,15 +208,28 @@ export default function SignalsPage() {
                 <div className="p-3.5 rounded-[8px] bg-bg/50 border border-cardline/40 space-y-2 text-[12px]">
                   <div className="flex justify-between">
                     <span className="text-subink">调仓判定日</span>
-                    <span className="text-ink">否 (is_rebalance_day = False)</span>
+                    <span className="text-ink">
+                      {isStale || isDemoted ? "否 (安全熔断拦截)" : "否 (is_rebalance_day = False)"}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-subink">决策触发成因</span>
-                    <span className="text-warn font-semibold">{paperPlan.action} (继续观望，空仓避险)</span>
+                    <span className={`${isStale || isDemoted ? "text-danger" : "text-warn"} font-semibold`}>
+                      {isStale || isDemoted ? "SAFETY_BREAKER (系统安全熔断)" : `${paperPlan.action} (继续观望，空仓避险)`}
+                    </span>
                   </div>
                   <div className="pt-2 border-t border-cardline/20 text-subink leading-relaxed">
-                    依据系统指令成因，策略检测到 **小盘趋势偏离度为 {(paperPlan.small_index_vs_ma16 * 100).toFixed(2)}%**，未突破 0% 多头临界阈值。
-                    同时 **大周期极性依旧处于负值 (BEAR)**，此时策略触发安全阻尼，交易判定不触发调仓，继续保持国债ETF避险持有状态。
+                    {isStale || isDemoted ? (
+                      <span className="text-danger font-medium">
+                        ⚠️ 警告：当前策略处于降级状态 (未在册) 或信号已过期。
+                        系统已启动安全熔断，此国债避险指引已失效。请勿进行交易跟单或委托单导出。
+                      </span>
+                    ) : (
+                      <>
+                        依据系统指令成因，策略检测到 **小盘趋势偏离度为 {(paperPlan.small_index_vs_ma16 * 100).toFixed(2)}%**，未突破 0% 多头临界阈值。
+                        同时 **大周期极性依旧处于负值 (BEAR)**，此时策略触发安全阻尼，交易判定不触发调仓，继续保持国债ETF避险持有状态。
+                      </>
+                    )}
                   </div>
                 </div>
               </Card>
