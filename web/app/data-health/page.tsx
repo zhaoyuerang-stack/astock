@@ -120,13 +120,13 @@ export default function DataHealthPage() {
 
   const getStatusBadge = (status: string) => {
     const styleMap = {
-      success: "text-[#35D06E] bg-[#35D06E]/10 border-[#35D06E]/20",
-      running: "text-[#3D7BFF] bg-[#3D7BFF]/10 border-[#3D7BFF]/20",
-      lag: "text-[#F6B73C] bg-[#F6B73C]/10 border-[#F6B73C]/20",
-      failed: "text-[#FF5C5C] bg-[#FF5C5C]/10 border-[#FF5C5C]/20",
-      active: "text-[#35D06E] bg-[#35D06E]/10 border-[#35D06E]/20",
-      warning: "text-[#F6B73C] bg-[#F6B73C]/10 border-[#F6B73C]/20",
-      inactive: "text-[#FF5C5C] bg-[#FF5C5C]/10 border-[#FF5C5C]/20",
+      success: "text-ok bg-[#35D06E]/10 border-[#35D06E]/20",
+      running: "text-brand bg-[#3D7BFF]/10 border-[#3D7BFF]/20",
+      lag: "text-warn bg-[#F6B73C]/10 border-[#F6B73C]/20",
+      failed: "text-danger bg-[#FF5C5C]/10 border-[#FF5C5C]/20",
+      active: "text-ok bg-[#35D06E]/10 border-[#35D06E]/20",
+      warning: "text-warn bg-[#F6B73C]/10 border-[#F6B73C]/20",
+      inactive: "text-danger bg-[#FF5C5C]/10 border-[#FF5C5C]/20",
     };
     return (
       <span className={`px-2 py-0.5 rounded text-[10px] border font-bold font-mono ${styleMap[status as keyof typeof styleMap] || ""}`}>
@@ -147,47 +147,47 @@ export default function DataHealthPage() {
       />
 
       {err && (
-        <div className="p-4 bg-[#FF5C5C]/10 border border-[#FF5C5C]/20 rounded-lg text-sm text-[#FF5C5C]">
+        <div className="p-4 bg-[#FF5C5C]/10 border border-[#FF5C5C]/20 rounded-lg text-sm text-danger">
           ⚠️ API 載入出錯: {err}
         </div>
       )}
 
       {/* 1. 數據健康總覽 */}
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-        <div className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg">
-          <div className="text-[12px] text-[#8FA3BF]">最新交易日對齊</div>
+        <div className="p-4 bg-navy border border-line rounded-lg">
+          <div className="text-[12px] text-subink">最新交易日對齊</div>
           <div className="text-2xl font-bold font-mono text-[#E6EDF7] mt-1.5">2026-06-23</div>
           <div className="text-[10px] text-[#5F728A] mt-2 flex items-center gap-1">
             時效狀態: <DataFreshnessBadge daysAgo={0} />
           </div>
         </div>
 
-        <div className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg">
-          <div className="text-[12px] text-[#8FA3BF]">覆蓋股票數</div>
+        <div className="p-4 bg-navy border border-line rounded-lg">
+          <div className="text-[12px] text-subink">覆蓋股票數</div>
           <div className="text-2xl font-bold font-mono text-[#E6EDF7] mt-1.5">{dq ? dq.total : 5320} 只</div>
           <div className="text-[10px] text-[#5F728A] mt-2">A股全宇宙退市/停牌處理</div>
         </div>
 
-        <div className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg">
-          <div className="text-[12px] text-[#8FA3BF]">PIT 數據庫合規率</div>
-          <div className="text-2xl font-bold font-mono text-[#35D06E] mt-1.5">{dq ? pct(dq.clean_ratio, 1) : "99.8%"}</div>
+        <div className="p-4 bg-navy border border-line rounded-lg">
+          <div className="text-[12px] text-subink">PIT 數據庫合規率</div>
+          <div className="text-2xl font-bold font-mono text-ok mt-1.5">{dq ? pct(dq.clean_ratio, 1) : "99.8%"}</div>
           <div className="text-[10px] text-[#5F728A] mt-2">防未來函數披露對齊率</div>
         </div>
 
-        <div className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg">
-          <div className="text-[12px] text-[#8FA3BF]">質量綜合得分</div>
-          <div className="text-2xl font-bold font-mono text-[#35D06E] mt-1.5">98.5 / 100</div>
+        <div className="p-4 bg-navy border border-line rounded-lg">
+          <div className="text-[12px] text-subink">質量綜合得分</div>
+          <div className="text-2xl font-bold font-mono text-ok mt-1.5">98.5 / 100</div>
           <div className="text-[10px] text-[#5F728A] mt-2">已扣除小盤異常跳變扣分</div>
         </div>
 
-        <div className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg">
-          <div className="text-[12px] text-[#8FA3BF]">最新管道延遲</div>
-          <div className="text-2xl font-bold font-mono text-[#F6B73C] mt-1.5">35 分鐘</div>
+        <div className="p-4 bg-navy border border-line rounded-lg">
+          <div className="text-[12px] text-subink">最新管道延遲</div>
+          <div className="text-2xl font-bold font-mono text-warn mt-1.5">35 分鐘</div>
           <div className="text-[10px] text-[#5F728A] mt-2">財務披露爬取延後限制</div>
         </div>
 
-        <div className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg text-center">
-          <div className="text-[11px] text-[#8FA3BF] uppercase font-bold tracking-wider">數據源狀態</div>
+        <div className="p-4 bg-navy border border-line rounded-lg text-center">
+          <div className="text-[11px] text-subink uppercase font-bold tracking-wider">數據源狀態</div>
           <div className="mt-2.5">
             {getStatusBadge("active")}
           </div>
@@ -199,11 +199,11 @@ export default function DataHealthPage() {
       <Card title="數據管道調度流節點監控 (ETL Pipelines Status)">
         <div className="grid grid-cols-2 md:grid-cols-7 gap-4 text-center font-mono">
           {pipelines.map((p) => (
-            <div key={p.node} className="p-3 bg-[#081827] border border-[#1F3550] rounded-lg space-y-1">
-              <div className="text-[10px] text-[#8FA3BF] truncate" title={p.node}>{p.node.split(" ")[0]}</div>
+            <div key={p.node} className="p-3 bg-bg border border-line rounded-lg space-y-1">
+              <div className="text-[10px] text-subink truncate" title={p.node}>{p.node.split(" ")[0]}</div>
               <div className="py-1">{getStatusBadge(p.status)}</div>
               <div className="text-[9px] text-[#5F728A]">完成: {p.completionTime}</div>
-              {p.isDelayed && <div className="text-[8px] text-[#F6B73C] font-bold">⚠️ 延時警告</div>}
+              {p.isDelayed && <div className="text-[8px] text-warn font-bold">⚠️ 延時警告</div>}
             </div>
           ))}
         </div>
@@ -213,7 +213,7 @@ export default function DataHealthPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         <div className="lg:col-span-2">
           <Card title="數據質量審核檢查細則 (PIT Integrity Check Logs)">
-            <div className="text-[11px] text-[#8FA3BF] mb-2 leading-relaxed">
+            <div className="text-[11px] text-subink mb-2 leading-relaxed">
               根據量化鐵律#7：必須明確區分<strong>數據真問題</strong>（如負定價、開盤價高於收盤價等硬性邏輯錯）與<strong>A股正常交易現象</strong>（如新股首日無漲跌停、長期停牌成份股剔除、除權跳空等）。
             </div>
             <DataTable<QualityCheckRow>
@@ -227,27 +227,27 @@ export default function DataHealthPage() {
                   render: (r) => (
                     <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${
                       r.status === "passed"
-                        ? "text-[#35D06E] bg-[#35D06E]/10 border-[#35D06E]/20"
-                        : "text-[#F6B73C] bg-[#F6B73C]/10 border-[#F6B73C]/20"
+                        ? "text-ok bg-[#35D06E]/10 border-[#35D06E]/20"
+                        : "text-warn bg-[#F6B73C]/10 border-[#F6B73C]/20"
                     }`}>
                       {r.status === "passed" ? "PASS" : "CHECK"}
                     </span>
                   ),
                 },
                 { key: "anomalyCount", header: "異常數", align: "right", className: "font-mono text-[#E6EDF7]", render: (r) => r.anomalyCount },
-                { key: "anomalyRatio", header: "比例", align: "right", className: "font-mono text-[#8FA3BF]", render: (r) => r.anomalyRatio },
+                { key: "anomalyRatio", header: "比例", align: "right", className: "font-mono text-subink", render: (r) => r.anomalyRatio },
                 {
                   key: "severity",
                   header: "嚴重度",
                   render: (r) => (
                     <span className={`px-1 rounded text-[9px] font-mono ${
-                      r.severity === "high" ? "text-[#FF5C5C]" : r.severity === "medium" ? "text-[#F6B73C]" : "text-[#8FA3BF]"
+                      r.severity === "high" ? "text-danger" : r.severity === "medium" ? "text-warn" : "text-subink"
                     }`}>
                       {r.severity.toUpperCase()}
                     </span>
                   ),
                 },
-                { key: "comment", header: "判定依據 / 人工 triaging 建議", className: "text-[#8FA3BF] text-[11px] max-w-[200px] truncate", render: (r) => r.comment },
+                { key: "comment", header: "判定依據 / 人工 triaging 建議", className: "text-subink text-[11px] max-w-[200px] truncate", render: (r) => r.comment },
               ]}
             />
           </Card>
@@ -260,7 +260,7 @@ export default function DataHealthPage() {
             getRowKey={(r) => r.source}
             columns={[
               { key: "source", header: "來源渠道", className: "text-[#E6EDF7] font-bold", render: (r) => r.source },
-              { key: "latestDate", header: "最新日期", className: "font-mono text-[#8FA3BF]", render: (r) => r.latestDate },
+              { key: "latestDate", header: "最新日期", className: "font-mono text-subink", render: (r) => r.latestDate },
               { key: "latency", header: "拉取延遲", align: "right", className: "font-mono text-[#E6EDF7]", render: (r) => r.latency },
               {
                 key: "status",
@@ -281,14 +281,14 @@ export default function DataHealthPage() {
           columns={[
             { key: "time", header: "發現時間", className: "font-mono text-[#5F728A]", render: (r) => r.time },
             { key: "domain", header: "業務模塊", className: "text-[#E6EDF7] font-semibold", render: (r) => r.domain },
-            { key: "type", header: "異常類型與描述", className: "text-[#8FA3BF]", render: (r) => r.type },
-            { key: "affected", header: "影響範圍", className: "text-[#8FA3BF] font-mono", render: (r) => r.affected },
+            { key: "type", header: "異常類型與描述", className: "text-subink", render: (r) => r.type },
+            { key: "affected", header: "影響範圍", className: "text-subink font-mono", render: (r) => r.affected },
             {
               key: "severity",
               header: "嚴重度",
               render: (r) => (
                 <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${
-                  r.severity === "high" ? "bg-[#FF5C5C]/10 border-[#FF5C5C]/20 text-[#FF5C5C]" : "bg-[#F6B73C]/10 border-[#F6B73C]/20 text-[#F6B73C]"
+                  r.severity === "high" ? "bg-[#FF5C5C]/10 border-[#FF5C5C]/20 text-danger" : "bg-[#F6B73C]/10 border-[#F6B73C]/20 text-warn"
                 }`}>
                   {r.severity.toUpperCase()}
                 </span>
@@ -298,7 +298,7 @@ export default function DataHealthPage() {
               key: "status",
               header: "修復狀態",
               render: (r) => (
-                <span className={r.status === "resolved" ? "text-[#35D06E] font-bold" : "text-[#FF5C5C] font-bold animate-pulse"}>
+                <span className={r.status === "resolved" ? "text-ok font-bold" : "text-danger font-bold animate-pulse"}>
                   {r.status === "resolved" ? "✓ RESOLVED" : "✗ ACTIVE"}
                 </span>
               ),
@@ -309,7 +309,7 @@ export default function DataHealthPage() {
               render: (r) => (
                 <button
                   onClick={() => toggleResolve(r.id)}
-                  className="px-2 py-0.5 bg-[#0E2238] border border-[#1F3550] hover:border-[#3D7BFF] text-[#3D7BFF] hover:text-[#E6EDF7] text-[11px] rounded transition-colors"
+                  className="px-2 py-0.5 bg-navy border border-line hover:border-brand text-brand hover:text-[#E6EDF7] text-[11px] rounded transition-colors"
                 >
                   {r.status === "resolved" ? "撤銷修復" : "標記修復"}
                 </button>

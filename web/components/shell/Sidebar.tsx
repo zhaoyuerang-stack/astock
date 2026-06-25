@@ -156,7 +156,7 @@ export default function Sidebar() {
   return (
     <aside
       style={{ width }}
-      className="shrink-0 bg-[#081827] border-r border-line/40 text-ink flex flex-col h-screen sticky top-0 font-sans shadow-sm"
+      className="shrink-0 bg-[#161617] border-r border-line/45 text-ink flex flex-col h-screen sticky top-0 font-sans shadow-sm"
     >
       {/* Title Header */}
       <div className="px-5 py-5 border-b border-line/30 flex items-start justify-between gap-2">

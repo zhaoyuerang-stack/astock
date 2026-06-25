@@ -5,26 +5,26 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Dark research terminal palette (Section 4.2)
-        bg: "#06111F",          // Background color
-        navy: "#0E2238",        // Card background
-        line: "#1F3550",        // Border color
-        ink: "#E6EDF7",         // Primary text
-        subink: "#8FA3BF",      // Secondary text
-        weak: "#5F728A",        // Weak text
+        // Apple Premium Dark style colors
+        bg: "#000000",          // Apple pure black page background
+        navy: "#1C1C1E",        // Apple dark secondary card background
+        line: "#2C2C2E",        // Apple border color
+        ink: "#F5F5F7",         // Apple primary active text
+        subink: "#8E8E93",      // Apple secondary gray text
+        weak: "#6E6E73",        // Apple muted gray text
         
-        // State colors
-        ok: "#35D06E",          // Pass / Normal / Gain
-        warn: "#F6B73C",        // Warning / Med Risk
-        danger: "#FF5C5C",      // Fail / High Risk / Drawdown
-        brand: "#3D7BFF",       // Info / Clickable
-        neutral: "#9AA8BD",     // Reference / Neutral
+        // State colors (SF Symbols colors)
+        ok: "#30D158",          // Apple green
+        warn: "#FF9F0A",        // Apple orange
+        danger: "#FF453A",      // Apple red
+        brand: "#0A84FF",       // Apple SF blue
+        neutral: "#8E8E93",     // Apple gray
         
         // Keep compatibility aliases
-        cardline: "#1F3550",    // Border color
-        songshi: "#35D06E",     // Green
-        qielan: "#3D7BFF",      // Blue
-        taishi: "#F6B73C",      // Yellow
+        cardline: "#2C2C2E",    // Border color
+        songshi: "#30D158",     // Green
+        qielan: "#0A84FF",      // Blue
+        taishi: "#FF9F0A",      // Yellow
       },
       borderRadius: { card: "12px" },
     },

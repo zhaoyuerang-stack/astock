@@ -120,7 +120,7 @@ export default function DashboardPage() {
       />
 
       {err && (
-        <div className="p-4 bg-[#FF5C5C]/10 border border-[#FF5C5C]/20 rounded-lg text-sm text-[#FF5C5C]">
+        <div className="p-4 bg-[#FF5C5C]/10 border border-[#FF5C5C]/20 rounded-lg text-sm text-danger">
           ⚠️ API 載入出錯: {err}（請確認 FastAPI 後端已在 8011 埠運行）
         </div>
       )}
@@ -174,7 +174,7 @@ export default function DashboardPage() {
 
       {/* 3. 生產就緒度五項門禁檢查 */}
       <div className="space-y-3">
-        <h3 className="text-sm font-bold text-[#8FA3BF] tracking-wider uppercase">生產就緒度門禁檢查 (Ready-to-Trade Gates)</h3>
+        <h3 className="text-sm font-bold text-subink tracking-wider uppercase">生產就緒度門禁檢查 (Ready-to-Trade Gates)</h3>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <GateCard
             name="1. Governance"
@@ -213,9 +213,9 @@ export default function DashboardPage() {
       <Card title="決策身份指紋 (Spec Hash & Metadata)">
         <div className="flex flex-wrap gap-4 items-center justify-between text-[12px]">
           <div className="flex items-center gap-4">
-            <span className="text-[#8FA3BF]">
+            <span className="text-subink">
               發布狀態：
-              <span className={`font-bold ${readiness?.allowed_to_trade ? "text-[#35D06E]" : "text-[#FF5C5C]"}`}>
+              <span className={`font-bold ${readiness?.allowed_to_trade ? "text-ok" : "text-danger"}`}>
                 {readiness?.allowed_to_trade ? "正式發布" : "已阻塞"}
               </span>
             </span>
@@ -231,13 +231,13 @@ export default function DashboardPage() {
 
       {/* 5. 詳情 Tab 區域 */}
       <div className="space-y-4">
-        <div className="flex border-b border-[#1F3550] gap-2 select-none">
+        <div className="flex border-b border-line gap-2 select-none">
           <button
             onClick={() => setActiveTab("positions")}
             className={`px-4 py-2 text-[13px] font-bold transition-all border-b-2 ${
               activeTab === "positions"
                 ? "border-[#3D7BFF] text-[#E6EDF7]"
-                : "border-transparent text-[#8FA3BF] hover:text-[#E6EDF7]"
+                : "border-transparent text-subink hover:text-[#E6EDF7]"
             }`}
           >
             持倉與交易
@@ -247,7 +247,7 @@ export default function DashboardPage() {
             className={`px-4 py-2 text-[13px] font-bold transition-all border-b-2 ${
               activeTab === "top25"
                 ? "border-[#3D7BFF] text-[#E6EDF7]"
-                : "border-transparent text-[#8FA3BF] hover:text-[#E6EDF7]"
+                : "border-transparent text-subink hover:text-[#E6EDF7]"
             }`}
           >
             Top-25 候選
@@ -257,7 +257,7 @@ export default function DashboardPage() {
             className={`px-4 py-2 text-[13px] font-bold transition-all border-b-2 ${
               activeTab === "filters"
                 ? "border-[#3D7BFF] text-[#E6EDF7]"
-                : "border-transparent text-[#8FA3BF] hover:text-[#E6EDF7]"
+                : "border-transparent text-subink hover:text-[#E6EDF7]"
             }`}
           >
             否決器過濾
@@ -267,7 +267,7 @@ export default function DashboardPage() {
             className={`px-4 py-2 text-[13px] font-bold transition-all border-b-2 ${
               activeTab === "execRisk"
                 ? "border-[#3D7BFF] text-[#E6EDF7]"
-                : "border-transparent text-[#8FA3BF] hover:text-[#E6EDF7]"
+                : "border-transparent text-subink hover:text-[#E6EDF7]"
             }`}
           >
             執行風險
@@ -275,12 +275,12 @@ export default function DashboardPage() {
         </div>
 
         {/* Tab 內容渲染 */}
-        <div className="bg-[#0E2238] border border-[#1F3550] rounded-lg p-4">
+        <div className="bg-navy border border-line rounded-lg p-4">
           {activeTab === "positions" && (
             <div className="space-y-4">
               <div className="flex justify-between items-center text-sm font-semibold text-[#E6EDF7]">
                 <span>當前運行持倉明細 (Current Position Holdings)</span>
-                <span className="text-xs text-[#8FA3BF] font-mono">共 {positionRows.length} 只證券</span>
+                <span className="text-xs text-subink font-mono">共 {positionRows.length} 只證券</span>
               </div>
               <DataTable<typeof positionRows[number]>
                 rows={positionRows}
@@ -290,7 +290,7 @@ export default function DashboardPage() {
                   {
                     key: "code",
                     header: "代碼",
-                    className: "font-mono text-[#3D7BFF] font-semibold",
+                    className: "font-mono text-brand font-semibold",
                     render: (p) => p.code,
                   },
                   {
@@ -303,14 +303,14 @@ export default function DashboardPage() {
                     key: "shares",
                     header: "持有股數",
                     align: "right",
-                    className: "font-mono text-[#8FA3BF]",
+                    className: "font-mono text-subink",
                     render: (p) => p.shares,
                   },
                   {
                     key: "cost",
                     header: "持倉成本",
                     align: "right",
-                    className: "font-mono text-[#8FA3BF]",
+                    className: "font-mono text-subink",
                     render: (p) => p.cost.toFixed(3),
                   },
                   {
@@ -332,7 +332,7 @@ export default function DashboardPage() {
                     header: "持倉盈虧",
                     align: "right",
                     render: (p) => (
-                      <span className={`font-mono font-bold ${p.pnl >= 0 ? "text-[#35D06E]" : "text-[#FF5C5C]"}`}>
+                      <span className={`font-mono font-bold ${p.pnl >= 0 ? "text-ok" : "text-danger"}`}>
                         {p.pnl >= 0 ? "+" : ""}
                         {num(p.pnl, 2)}
                       </span>
@@ -347,7 +347,7 @@ export default function DashboardPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-center text-sm font-semibold text-[#E6EDF7]">
                 <span>今日交易候選名單 (Top-25 Candidates)</span>
-                <span className="text-xs text-[#8FA3BF]">以因子綜合得分倒序排序</span>
+                <span className="text-xs text-subink">以因子綜合得分倒序排序</span>
               </div>
               <DataTable<SignalRow>
                 rows={signalRows}
@@ -361,10 +361,10 @@ export default function DashboardPage() {
                       <span
                         className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
                           r.dir === "BUY"
-                            ? "bg-[#35D06E]/10 border-[#35D06E]/20 text-[#35D06E]"
+                            ? "bg-[#35D06E]/10 border-[#35D06E]/20 text-ok"
                             : r.dir === "SELL"
-                            ? "bg-[#FF5C5C]/10 border-[#FF5C5C]/20 text-[#FF5C5C]"
-                            : "bg-[#9AA8BD]/10 border-[#9AA8BD]/20 text-[#8FA3BF]"
+                            ? "bg-[#FF5C5C]/10 border-[#FF5C5C]/20 text-danger"
+                            : "bg-[#9AA8BD]/10 border-[#9AA8BD]/20 text-subink"
                         }`}
                       >
                         {r.dir}
@@ -374,30 +374,30 @@ export default function DashboardPage() {
                   {
                     key: "code",
                     header: "代碼",
-                    className: "font-mono text-[#3D7BFF]",
+                    className: "font-mono text-brand",
                     render: (r) => r.code,
                   },
                   { key: "name", header: "名稱", className: "text-[#E6EDF7]", render: (r) => r.name },
-                  { key: "industry", header: "行業", className: "text-[#8FA3BF]", render: (r) => r.industry || "—" },
+                  { key: "industry", header: "行業", className: "text-subink", render: (r) => r.industry || "—" },
                   {
                     key: "score",
                     header: "因子得分",
                     align: "right",
-                    className: "font-mono text-[#8FA3BF]",
+                    className: "font-mono text-subink",
                     render: (r) => r.score?.toFixed(4) ?? "—",
                   },
                   {
                     key: "advOccupancy",
                     header: "ADV 占用率",
                     align: "right",
-                    className: "font-mono text-[#8FA3BF]",
+                    className: "font-mono text-subink",
                     render: (r) => r.advOccupancy || "—",
                   },
                   {
                     key: "stStatus",
                     header: "ST 狀態",
                     render: (r) => (
-                      <span className={r.stStatus === "ST" ? "text-[#FF5C5C]" : "text-[#35D06E]"}>
+                      <span className={r.stStatus === "ST" ? "text-danger" : "text-ok"}>
                         {r.stStatus || "正常"}
                       </span>
                     ),
@@ -411,25 +411,25 @@ export default function DashboardPage() {
             <div className="space-y-4">
               <div className="text-sm font-semibold text-[#E6EDF7] mb-2">否決器過濾審計 (Veto Filtering Summary)</div>
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4 py-2">
-                <div className="p-3 bg-[#081827] border border-[#1F3550] rounded-lg text-center">
+                <div className="p-3 bg-bg border border-line rounded-lg text-center">
                   <div className="text-2xl font-bold font-mono text-[#E6EDF7]">325</div>
-                  <div className="text-[11px] text-[#8FA3BF] mt-1">原始候選股票數</div>
+                  <div className="text-[11px] text-subink mt-1">原始候選股票數</div>
                 </div>
-                <div className="p-3 bg-[#081827] border border-[#1F3550] rounded-lg text-center">
-                  <div className="text-2xl font-bold font-mono text-[#FF5C5C]">-67</div>
-                  <div className="text-[11px] text-[#8FA3BF] mt-1">基本面否決 (ROE/扣非)</div>
+                <div className="p-3 bg-bg border border-line rounded-lg text-center">
+                  <div className="text-2xl font-bold font-mono text-danger">-67</div>
+                  <div className="text-[11px] text-subink mt-1">基本面否決 (ROE/扣非)</div>
                 </div>
-                <div className="p-3 bg-[#081827] border border-[#1F3550] rounded-lg text-center">
-                  <div className="text-2xl font-bold font-mono text-[#FF5C5C]">-42</div>
-                  <div className="text-[11px] text-[#8FA3BF] mt-1">流動性過濾 (成交額/ADV)</div>
+                <div className="p-3 bg-bg border border-line rounded-lg text-center">
+                  <div className="text-2xl font-bold font-mono text-danger">-42</div>
+                  <div className="text-[11px] text-subink mt-1">流動性過濾 (成交額/ADV)</div>
                 </div>
-                <div className="p-3 bg-[#081827] border border-[#1F3550] rounded-lg text-center">
-                  <div className="text-2xl font-bold font-mono text-[#FF5C5C]">-191</div>
-                  <div className="text-[11px] text-[#8FA3BF] mt-1">風險特徵否決 (ST/高波動)</div>
+                <div className="p-3 bg-bg border border-line rounded-lg text-center">
+                  <div className="text-2xl font-bold font-mono text-danger">-191</div>
+                  <div className="text-[11px] text-subink mt-1">風險特徵否決 (ST/高波動)</div>
                 </div>
-                <div className="p-3 bg-[#081827] border border-[#1F3550]/80 rounded-lg text-center border-dashed">
-                  <div className="text-2xl font-bold font-mono text-[#35D06E]">25</div>
-                  <div className="text-[11px] text-[#8FA3BF] mt-1">通過後執行名單</div>
+                <div className="p-3 bg-bg border border-line/80 rounded-lg text-center border-dashed">
+                  <div className="text-2xl font-bold font-mono text-ok">25</div>
+                  <div className="text-[11px] text-subink mt-1">通過後執行名單</div>
                 </div>
               </div>
             </div>
@@ -439,24 +439,24 @@ export default function DashboardPage() {
             <div className="space-y-4">
               <div className="text-sm font-semibold text-[#E6EDF7] mb-2">執行可行性與滑點衝擊風險評估</div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="p-4 bg-[#081827] border border-[#1F3550] rounded-lg">
-                  <div className="text-[11px] text-[#8FA3BF]">預計單邊交易滑點</div>
+                <div className="p-4 bg-bg border border-line rounded-lg">
+                  <div className="text-[11px] text-subink">預計單邊交易滑點</div>
                   <div className="text-xl font-bold text-[#E6EDF7] mt-1.5 font-mono">18.5 bps</div>
                   <div className="text-[10px] text-[#5F728A] mt-1">小盤滑點加成已扣除</div>
                 </div>
-                <div className="p-4 bg-[#081827] border border-[#1F3550] rounded-lg">
-                  <div className="text-[11px] text-[#8FA3BF]">預估市場衝擊成本</div>
+                <div className="p-4 bg-bg border border-line rounded-lg">
+                  <div className="text-[11px] text-subink">預估市場衝擊成本</div>
                   <div className="text-xl font-bold text-[#E6EDF7] mt-1.5 font-mono">0.082%</div>
                   <div className="text-[10px] text-[#5F728A] mt-1">基於 ADV 占用率估計</div>
                 </div>
-                <div className="p-4 bg-[#081827] border border-[#1F3550] rounded-lg">
-                  <div className="text-[11px] text-[#8FA3BF]">高擁擠度持倉數量</div>
-                  <div className="text-xl font-bold text-[#F6B73C] mt-1.5 font-mono">3 只</div>
+                <div className="p-4 bg-bg border border-line rounded-lg">
+                  <div className="text-[11px] text-subink">高擁擠度持倉數量</div>
+                  <div className="text-xl font-bold text-warn mt-1.5 font-mono">3 只</div>
                   <div className="text-[10px] text-[#5F728A] mt-1">市值低於 30 億小盤</div>
                 </div>
-                <div className="p-4 bg-[#081827] border border-[#1F3550] rounded-lg">
-                  <div className="text-[11px] text-[#8FA3BF]">執行風險綜合評級</div>
-                  <div className="text-xl font-bold text-[#35D06E] mt-1.5 font-mono">LOW (低)</div>
+                <div className="p-4 bg-bg border border-line rounded-lg">
+                  <div className="text-[11px] text-subink">執行風險綜合評級</div>
+                  <div className="text-xl font-bold text-ok mt-1.5 font-mono">LOW (低)</div>
                   <div className="text-[10px] text-[#5F728A] mt-1">倉位容量充足度 94%</div>
                 </div>
               </div>

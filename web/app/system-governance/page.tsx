@@ -92,9 +92,9 @@ export default function SystemGovernancePage() {
 
   const getLevelBadge = (level: "P0" | "P1" | "P2") => {
     const styleMap = {
-      P0: "bg-[#FF5C5C]/15 text-[#FF5C5C] border-[#FF5C5C]/20 font-bold",
-      P1: "bg-[#F6B73C]/15 text-[#F6B73C] border-[#F6B73C]/20",
-      P2: "bg-[#3D7BFF]/10 text-[#8FA3BF] border-[#1F3550]",
+      P0: "bg-[#FF5C5C]/15 text-danger border-[#FF5C5C]/20 font-bold",
+      P1: "bg-[#F6B73C]/15 text-warn border-[#F6B73C]/20",
+      P2: "bg-[#3D7BFF]/10 text-subink border-line",
     };
     return (
       <span className={`px-2 py-0.5 rounded text-[10px] border font-mono ${styleMap[level]}`}>
@@ -111,99 +111,99 @@ export default function SystemGovernancePage() {
       />
 
       {err && (
-        <div className="p-4 bg-[#FF5C5C]/10 border border-[#FF5C5C]/20 rounded-lg text-sm text-[#FF5C5C]">
+        <div className="p-4 bg-[#FF5C5C]/10 border border-[#FF5C5C]/20 rounded-lg text-sm text-danger">
           ⚠️ API 載入出錯: {err}
         </div>
       )}
 
       {/* 1. 部署與 CI 總覽 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg">
-          <div className="text-[12px] text-[#8FA3BF]">整體部署狀態</div>
-          <div className="text-2xl font-bold font-mono text-[#35D06E] mt-1.5 flex items-center gap-1.5">
+        <div className="p-4 bg-navy border border-line rounded-lg">
+          <div className="text-[12px] text-subink">整體部署狀態</div>
+          <div className="text-2xl font-bold font-mono text-ok mt-1.5 flex items-center gap-1.5">
             <span>🟢 生產就緒</span>
           </div>
           <div className="text-[10px] text-[#5F728A] mt-2">全站 7 項守衛已全部通過</div>
         </div>
 
-        <div className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg">
-          <div className="text-[12px] text-[#8FA3BF]">CI 守衛通過率</div>
-          <div className="text-2xl font-bold font-mono text-[#35D06E] mt-1.5">100.0%</div>
+        <div className="p-4 bg-navy border border-line rounded-lg">
+          <div className="text-[12px] text-subink">CI 守衛通過率</div>
+          <div className="text-2xl font-bold font-mono text-ok mt-1.5">100.0%</div>
           <div className="text-[10px] text-[#5F728A] mt-2">7 項 CI 定期守衛腳本綠色</div>
         </div>
 
-        <div className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg">
-          <div className="text-[12px] text-[#8FA3BF]">部署系統版本</div>
+        <div className="p-4 bg-navy border border-line rounded-lg">
+          <div className="text-[12px] text-subink">部署系統版本</div>
           <div className="text-2xl font-bold font-mono text-[#E6EDF7] mt-1.5">v2.3.0</div>
           <div className="text-[10px] text-[#5F728A] mt-2">
             <HashCopy label="Commit" value="b3d4e5f6a7b8c9d0" />
           </div>
         </div>
 
-        <div className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg">
-          <div className="text-[12px] text-[#8FA3BF]">Registry 一致性</div>
-          <div className="text-2xl font-bold font-mono text-[#35D06E] mt-1.5">100%</div>
+        <div className="p-4 bg-navy border border-line rounded-lg">
+          <div className="text-[12px] text-subink">Registry 一致性</div>
+          <div className="text-2xl font-bold font-mono text-ok mt-1.5">100%</div>
           <div className="text-[10px] text-[#5F728A] mt-2">版本、Spec Hash 鎖定正常</div>
         </div>
       </div>
 
       {/* 2. 架構依賴單向拓撲 (Section 12.5) */}
       <Card title="架構依賴關係拓撲檢查 (Single-Direction Architecture Dependency)">
-        <div className="text-[11px] text-[#8FA3BF] mb-3 leading-relaxed">
+        <div className="text-[11px] text-subink mb-3 leading-relaxed">
           量化引擎合規鐵律：分層依賴關係必須嚴格單向。禁止任何倒灌式反向依賴（例如數據湖引入策略邏輯，或生產層直接引用未中性化因子模版等）。
         </div>
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 bg-[#081827] border border-[#1F3550] rounded-lg font-mono text-center">
-          <div className="flex-1 p-2 bg-[#0E2238] border border-[#35D06E]/40 rounded-lg">
-            <div className="text-[#35D06E] font-bold text-xs">data_lake</div>
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 bg-bg border border-line rounded-lg font-mono text-center">
+          <div className="flex-1 p-2 bg-navy border border-[#35D06E]/40 rounded-lg">
+            <div className="text-ok font-bold text-xs">data_lake</div>
             <div className="text-[9px] text-[#5F728A] mt-1">數據原始沉澱層</div>
           </div>
-          <span className="hidden md:inline text-[#35D06E]">→</span>
+          <span className="hidden md:inline text-ok">→</span>
 
-          <div className="flex-1 p-2 bg-[#0E2238] border border-[#35D06E]/40 rounded-lg">
-            <div className="text-[#35D06E] font-bold text-xs">factors</div>
+          <div className="flex-1 p-2 bg-navy border border-[#35D06E]/40 rounded-lg">
+            <div className="text-ok font-bold text-xs">factors</div>
             <div className="text-[9px] text-[#5F728A] mt-1">因子指標構造層</div>
           </div>
-          <span className="hidden md:inline text-[#35D06E]">→</span>
+          <span className="hidden md:inline text-ok">→</span>
 
-          <div className="flex-1 p-2 bg-[#0E2238] border border-[#35D06E]/40 rounded-lg">
-            <div className="text-[#35D06E] font-bold text-xs">core.engine</div>
+          <div className="flex-1 p-2 bg-navy border border-[#35D06E]/40 rounded-lg">
+            <div className="text-ok font-bold text-xs">core.engine</div>
             <div className="text-[9px] text-[#5F728A] mt-1">統一回測/分析內核</div>
           </div>
-          <span className="hidden md:inline text-[#35D06E]">→</span>
+          <span className="hidden md:inline text-ok">→</span>
 
-          <div className="flex-1 p-2 bg-[#0E2238] border border-[#35D06E]/40 rounded-lg">
-            <div className="text-[#35D06E] font-bold text-xs">strategies/factory</div>
+          <div className="flex-1 p-2 bg-navy border border-[#35D06E]/40 rounded-lg">
+            <div className="text-ok font-bold text-xs">strategies/factory</div>
             <div className="text-[9px] text-[#5F728A] mt-1">策略研發與流水線</div>
           </div>
-          <span className="hidden md:inline text-[#35D06E]">→</span>
+          <span className="hidden md:inline text-ok">→</span>
 
-          <div className="flex-1 p-2 bg-[#0E2238] border border-[#35D06E]/40 rounded-lg">
-            <div className="text-[#35D06E] font-bold text-xs">registry</div>
+          <div className="flex-1 p-2 bg-navy border border-[#35D06E]/40 rounded-lg">
+            <div className="text-ok font-bold text-xs">registry</div>
             <div className="text-[9px] text-[#5F728A] mt-1">策略在冊台帳存檔</div>
           </div>
-          <span className="hidden md:inline text-[#35D06E]">→</span>
+          <span className="hidden md:inline text-ok">→</span>
 
-          <div className="flex-1 p-2 bg-[#0E2238] border border-[#35D06E]/40 rounded-lg">
-            <div className="text-[#35D06E] font-bold text-xs">production</div>
+          <div className="flex-1 p-2 bg-navy border border-[#35D06E]/40 rounded-lg">
+            <div className="text-ok font-bold text-xs">production</div>
             <div className="text-[9px] text-[#5F728A] mt-1">生產信號執行層</div>
           </div>
         </div>
-        <div className="text-[10px] text-[#35D06E] font-bold mt-2 flex items-center gap-1.5">
+        <div className="text-[10px] text-ok font-bold mt-2 flex items-center gap-1.5">
           <span>✓ 系統依賴檢測結果：分層無循環依賴。未檢測到反向 import 倒灌污染。</span>
         </div>
       </Card>
 
       {/* 3. 治理九宮格 */}
       <div className="space-y-3">
-        <h3 className="text-sm font-bold text-[#8FA3BF] tracking-wider uppercase">合規治理九宮格 (Governance 9-Grid Matrix)</h3>
+        <h3 className="text-sm font-bold text-subink tracking-wider uppercase">合規治理九宮格 (Governance 9-Grid Matrix)</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {governanceGrid.map((grid) => (
-            <div key={grid.name} className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg flex flex-col justify-between h-28 hover:border-[#3D7BFF] transition-all">
+            <div key={grid.name} className="p-4 bg-navy border border-line rounded-lg flex flex-col justify-between h-28 hover:border-brand transition-all">
               <div className="flex justify-between items-start">
                 <span className="font-bold text-[12px] text-[#E6EDF7] font-mono leading-tight">{grid.name}</span>
-                <span className="text-[#35D06E] font-bold text-[10px] font-mono">✓ PASS</span>
+                <span className="text-ok font-bold text-[10px] font-mono">✓ PASS</span>
               </div>
-              <p className="text-[11px] text-[#8FA3BF] leading-normal">{grid.desc}</p>
+              <p className="text-[11px] text-subink leading-normal">{grid.desc}</p>
             </div>
           ))}
         </div>
@@ -218,15 +218,15 @@ export default function SystemGovernancePage() {
             {
               key: "script",
               header: "守衛腳本",
-              className: "font-mono text-[#3D7BFF] font-semibold",
+              className: "font-mono text-brand font-semibold",
               render: (r) => r.script,
             },
-            { key: "desc", header: "防護檢驗說明", className: "text-[#8FA3BF] text-[12px]", render: (r) => r.desc },
+            { key: "desc", header: "防護檢驗說明", className: "text-subink text-[12px]", render: (r) => r.desc },
             {
               key: "status",
               header: "結果",
               render: (r) => (
-                <span className="text-[#35D06E] font-bold font-mono">
+                <span className="text-ok font-bold font-mono">
                   ✓ PASS
                 </span>
               ),
@@ -238,7 +238,7 @@ export default function SystemGovernancePage() {
 
       {/* 5. 近期審計事件與 P0/P1/P2 日誌 */}
       <Card title="系統變更審計與安全事件歷史日誌 (System Change Audit Tracker)">
-        <div className="text-[11px] text-[#FF5C5C] font-semibold mb-2">
+        <div className="text-[11px] text-danger font-semibold mb-2">
           * 警告：本系統合規日誌由區塊鏈/不可變文件鏈條鎖定，任何操作者（包括管理員）皆無法刪除或修改歷史條目。
         </div>
         <DataTable<AuditLogEventRow>
@@ -252,15 +252,15 @@ export default function SystemGovernancePage() {
               render: (r) => getLevelBadge(r.level),
             },
             { key: "category", header: "業務類別", className: "font-mono text-[#E6EDF7] w-24", render: (r) => r.category },
-            { key: "event", header: "審核事件與操作說明", className: "text-[#8FA3BF] max-w-[280px] truncate", render: (r) => r.event },
-            { key: "affected", header: "影響範圍", className: "font-mono text-[#8FA3BF]", render: (r) => r.affected },
+            { key: "event", header: "審核事件與操作說明", className: "text-subink max-w-[280px] truncate", render: (r) => r.event },
+            { key: "affected", header: "影響範圍", className: "font-mono text-subink", render: (r) => r.affected },
             { key: "actor", header: "觸發者", className: "font-mono text-[#5F728A]", render: (r) => r.actor },
             {
               key: "result",
               header: "判定/結果",
               className: "font-semibold text-ink",
               render: (r) => (
-                <span className={r.level === "P0" ? "text-[#FF5C5C]" : r.level === "P1" ? "text-[#F6B73C]" : "text-[#E6EDF7]"}>
+                <span className={r.level === "P0" ? "text-danger" : r.level === "P1" ? "text-warn" : "text-[#E6EDF7]"}>
                   {r.result}
                 </span>
               ),

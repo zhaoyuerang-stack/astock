@@ -52,30 +52,30 @@ export default function TopBar() {
   };
 
   return (
-    <header className="h-14 shrink-0 bg-[#081827] border-b border-[#1F3550] flex items-center justify-between px-6 select-none z-30 relative font-sans">
+    <header className="h-14 shrink-0 bg-[#161617] border-b border-line flex items-center justify-between px-6 select-none z-30 relative font-sans">
       {/* Left side: Date & Status Info */}
-      <div className="flex items-center gap-6 text-[12px] text-[#8FA3BF]">
+      <div className="flex items-center gap-6 text-[12px] text-subink">
         <div className="flex items-center gap-1.5">
-          <span className="text-[#5F728A]">今日：</span>
-          <span className="font-bold text-[#E6EDF7] font-mono">{currentDate}</span>
-          <span className="text-[11px] text-[#5F728A]">（星期三）</span>
+          <span className="text-weak">今日：</span>
+          <span className="font-bold text-ink font-mono">{currentDate}</span>
+          <span className="text-[11px] text-weak">（星期三）</span>
         </div>
 
-        <div className="h-3 w-[1px] bg-[#1F3550]" />
+        <div className="h-3 w-[1px] bg-line" />
 
         <div className="flex items-center gap-1.5">
-          <span className="text-[#5F728A]">最新數據：</span>
-          <span className="font-bold text-[#E6EDF7] font-mono">{latestDataDate}</span>
+          <span className="text-weak">最新數據：</span>
+          <span className="font-bold text-ink font-mono">{latestDataDate}</span>
           <span className={`px-2 py-0.5 rounded text-[10px] border font-bold ${getStatusColor()}`}>
             {getStatusLabel()}
           </span>
         </div>
 
-        <div className="h-3 w-[1px] bg-[#1F3550]" />
+        <div className="h-3 w-[1px] bg-line" />
 
         <div className="flex items-center gap-1.5">
-          <span className="text-[#5F728A]">下一次調倉：</span>
-          <span className="font-bold text-[#3D7BFF] font-mono">還有 12 個交易日</span>
+          <span className="text-weak">下一次調倉：</span>
+          <span className="font-bold text-brand font-mono">還有 12 個交易日</span>
         </div>
       </div>
 
@@ -88,14 +88,14 @@ export default function TopBar() {
               setStratOpen(!stratOpen);
               setMoreOpen(false);
             }}
-            className="flex items-center gap-2 px-3 py-1.5 text-[12px] bg-[#0E2238] border border-[#1F3550] hover:border-[#3D7BFF] text-[#E6EDF7] rounded-md transition-all font-mono"
+            className="flex items-center gap-2 px-3 py-1.5 text-[12px] bg-navy border border-line hover:border-brand text-ink rounded-md transition-all font-mono"
           >
             <span>🎯 策略: {selectedStrategyId} {selectedStrategyVersion}</span>
-            <span className="text-[10px] text-[#5F728A]">{stratOpen ? "▲" : "▼"}</span>
+            <span className="text-[10px] text-weak">{stratOpen ? "▲" : "▼"}</span>
           </button>
 
           {stratOpen && (
-            <div className="absolute right-0 mt-1.5 w-52 bg-[#0E2238] border border-[#1F3550] rounded-md shadow-lg py-1 z-40">
+            <div className="absolute right-0 mt-1.5 w-52 bg-navy border border-line rounded-md shadow-lg py-1 z-40">
               {strategyVersions.map((item) => (
                 <button
                   key={item.name}
@@ -103,10 +103,10 @@ export default function TopBar() {
                     setSelectedStrategy(item.id, item.version);
                     setStratOpen(false);
                   }}
-                  className={`w-full text-left px-4 py-2 text-[12px] font-mono hover:bg-[#1F3550] transition-colors ${
+                  className={`w-full text-left px-4 py-2 text-[12px] font-mono hover:bg-line transition-colors ${
                     selectedStrategyId === item.id && selectedStrategyVersion === item.version
-                      ? "text-[#3D7BFF] font-bold"
-                      : "text-[#E6EDF7]"
+                      ? "text-brand font-bold"
+                      : "text-ink"
                   }`}
                 >
                   {item.name}
@@ -123,7 +123,7 @@ export default function TopBar() {
               setMoreOpen(!moreOpen);
               setStratOpen(false);
             }}
-            className="flex items-center justify-center p-1.5 bg-[#0E2238] border border-[#1F3550] hover:border-[#3D7BFF] text-[#8FA3BF] hover:text-[#E6EDF7] rounded-md transition-all"
+            className="flex items-center justify-center p-1.5 bg-navy border border-line hover:border-brand text-subink hover:text-ink rounded-md transition-all"
             title="更多操作"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -137,13 +137,13 @@ export default function TopBar() {
           </button>
 
           {moreOpen && (
-            <div className="absolute right-0 mt-1.5 w-44 bg-[#0E2238] border border-[#1F3550] rounded-md shadow-lg py-1 z-40 text-[12px]">
+            <div className="absolute right-0 mt-1.5 w-44 bg-navy border border-line rounded-md shadow-lg py-1 z-40 text-[12px]">
               <button
                 onClick={() => {
                   setDataStatus(dataStatus === "fresh" ? "stale" : "fresh");
                   setMoreOpen(false);
                 }}
-                className="w-full text-left px-4 py-2 text-[#E6EDF7] hover:bg-[#1F3550] transition-colors"
+                className="w-full text-left px-4 py-2 text-ink hover:bg-line transition-colors"
               >
                 🔄 模擬刷新數據狀態
               </button>
@@ -151,12 +151,12 @@ export default function TopBar() {
                 onClick={() => {
                   window.location.reload();
                 }}
-                className="w-full text-left px-4 py-2 text-[#E6EDF7] hover:bg-[#1F3550] transition-colors"
+                className="w-full text-left px-4 py-2 text-ink hover:bg-line transition-colors"
               >
                 ⚡ 強制重新整理
               </button>
-              <div className="border-t border-[#1F3550] my-1" />
-              <div className="px-4 py-1 text-[10px] text-[#5F728A]">部署ID: deploy_20260624_v1</div>
+              <div className="border-t border-line my-1" />
+              <div className="px-4 py-1 text-[10px] text-weak">部署ID: deploy_20260624_v1</div>
             </div>
           )}
         </div>

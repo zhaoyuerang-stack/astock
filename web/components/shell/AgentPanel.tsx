@@ -145,7 +145,7 @@ export default function AgentPanel() {
   return (
     <aside
       style={{ width }}
-      className="shrink-0 border-l border-line/25 bg-bg h-screen sticky top-0 flex flex-col text-ink shadow-sm"
+      className="shrink-0 border-l border-line bg-[#161617] h-screen sticky top-0 flex flex-col text-ink shadow-sm"
     >
       <div className="px-4 py-4 border-b border-line/30">
         <div className="flex items-center justify-between">

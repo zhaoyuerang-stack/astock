@@ -116,7 +116,7 @@ export default function SignalAuditPage() {
       />
 
       {err && (
-        <div className="p-4 bg-[#FF5C5C]/10 border border-[#FF5C5C]/20 rounded-lg text-sm text-[#FF5C5C]">
+        <div className="p-4 bg-[#FF5C5C]/10 border border-[#FF5C5C]/20 rounded-lg text-sm text-danger">
           ⚠️ API 載入出錯: {err}
         </div>
       )}
@@ -126,36 +126,36 @@ export default function SignalAuditPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-[12px] py-2">
           <div className="space-y-2">
             <div>
-              <span className="text-[#8FA3BF]">信號日期：</span>
+              <span className="text-subink">信號日期：</span>
               <span className="font-bold text-[#E6EDF7] font-mono">{paperPlan?.signal_date || "2026-06-24"}</span>
             </div>
             <div>
-              <span className="text-[#8FA3BF]">大周期狀態：</span>
+              <span className="text-subink">大周期狀態：</span>
               <span className="font-bold text-[#E6EDF7]">{paperPlan?.regime === "bear" ? "🔴 BEAR (避險)" : "🟢 BULL (運行)"}</span>
             </div>
             <div>
-              <span className="text-[#8FA3BF]">建議動作：</span>
-              <span className="text-[#3D7BFF] font-bold">{paperPlan?.action || "—"}</span>
+              <span className="text-subink">建議動作：</span>
+              <span className="text-brand font-bold">{paperPlan?.action || "—"}</span>
             </div>
           </div>
 
           <div className="space-y-2">
             <div>
-              <span className="text-[#8FA3BF]">發布狀態：</span>
+              <span className="text-subink">發布狀態：</span>
               <span className={`px-2 py-0.5 rounded text-[10px] border font-bold ${
                 readiness?.allowed_to_trade
-                  ? "text-[#35D06E] bg-[#35D06E]/10 border-[#35D06E]/20"
-                  : "text-[#FF5C5C] bg-[#FF5C5C]/10 border-[#FF5C5C]/20"
+                  ? "text-ok bg-[#35D06E]/10 border-[#35D06E]/20"
+                  : "text-danger bg-[#FF5C5C]/10 border-[#FF5C5C]/20"
               }`}>
                 {readiness?.allowed_to_trade ? "正式發布" : "已阻塞 (草稿)"}
               </span>
             </div>
             <div>
-              <span className="text-[#8FA3BF]">部署 ID：</span>
+              <span className="text-subink">部署 ID：</span>
               <span className="text-[#E6EDF7] font-mono">deploy_20260624_v1</span>
             </div>
             <div>
-              <span className="text-[#8FA3BF]">策略版本：</span>
+              <span className="text-subink">策略版本：</span>
               <span className="text-[#E6EDF7] font-mono">illiquidity v3.1</span>
             </div>
           </div>
@@ -169,8 +169,8 @@ export default function SignalAuditPage() {
 
       {/* 2. 信號生成流水線 */}
       <div className="space-y-3">
-        <h3 className="text-sm font-bold text-[#8FA3BF] tracking-wider uppercase">信號生成流水線 (Funnel Pipeline)</h3>
-        <div className="bg-[#0E2238] border border-[#1F3550] rounded-lg p-4">
+        <h3 className="text-sm font-bold text-subink tracking-wider uppercase">信號生成流水線 (Funnel Pipeline)</h3>
+        <div className="bg-navy border border-line rounded-lg p-4">
           <PipelineStepper steps={pipelineSteps} />
         </div>
       </div>
@@ -187,7 +187,7 @@ export default function SignalAuditPage() {
           </button>
         }
       >
-        <div className="text-[11px] text-[#8FA3BF] mb-2">點擊行可展開查看詳細因子貢獻分解 (Factor Betas Attribution)</div>
+        <div className="text-[11px] text-subink mb-2">點擊行可展開查看詳細因子貢獻分解 (Factor Betas Attribution)</div>
         <DataTable<CandidateRow>
           rows={candidateRows}
           getRowKey={(r) => r.code}
@@ -196,13 +196,13 @@ export default function SignalAuditPage() {
             {
               key: "rank",
               header: "排名",
-              className: "font-mono font-bold text-[#8FA3BF] w-12",
+              className: "font-mono font-bold text-subink w-12",
               render: (r) => r.rank,
             },
             {
               key: "code",
               header: "代碼",
-              className: "font-mono text-[#3D7BFF]",
+              className: "font-mono text-brand",
               render: (r) => r.code,
             },
             {
@@ -215,7 +215,7 @@ export default function SignalAuditPage() {
               key: "score",
               header: "綜合得分",
               align: "right",
-              className: "font-mono text-[#8FA3BF]",
+              className: "font-mono text-subink",
               render: (r) => r.score.toFixed(4),
             },
             {
@@ -228,14 +228,14 @@ export default function SignalAuditPage() {
             {
               key: "industry",
               header: "行業",
-              className: "text-[#8FA3BF]",
+              className: "text-subink",
               render: (r) => r.industry,
             },
             {
               key: "isSt",
               header: "ST 狀態",
               render: (r) => (
-                <span className={r.isSt ? "text-[#FF5C5C]" : "text-[#35D06E]"}>
+                <span className={r.isSt ? "text-danger" : "text-ok"}>
                   {r.isSt ? "ST" : "正常"}
                 </span>
               ),
@@ -243,7 +243,7 @@ export default function SignalAuditPage() {
             {
               key: "reason",
               header: "核心理由 (Contribution)",
-              className: "text-[#35D06E] font-medium",
+              className: "text-ok font-medium",
               render: (r) => r.reason,
             },
             {
@@ -255,7 +255,7 @@ export default function SignalAuditPage() {
                     e.stopPropagation();
                     setExpandedRow(expandedRow === r.code ? null : r.code);
                   }}
-                  className="text-xs text-[#3D7BFF] hover:underline"
+                  className="text-xs text-brand hover:underline"
                 >
                   {expandedRow === r.code ? "收起" : "下鑽"}
                 </button>
@@ -269,25 +269,25 @@ export default function SignalAuditPage() {
           const matched = candidateRows.find((c) => c.code === expandedRow);
           if (!matched) return null;
           return (
-            <div className="mt-4 p-4 bg-[#081827] border border-[#1F3550] rounded-lg text-xs space-y-3 font-mono animate-fadeIn">
-              <div className="text-sm font-semibold text-[#E6EDF7] border-b border-[#1F3550] pb-1.5 flex justify-between">
+            <div className="mt-4 p-4 bg-bg border border-line rounded-lg text-xs space-y-3 font-mono animate-fadeIn">
+              <div className="text-sm font-semibold text-[#E6EDF7] border-b border-line pb-1.5 flex justify-between">
                 <span>📊 因子分解歸因 — {matched.name} ({matched.code})</span>
-                <button onClick={() => setExpandedRow(null)} className="text-[#FF5C5C] hover:underline text-[10px]">✕ 關閉</button>
+                <button onClick={() => setExpandedRow(null)} className="text-danger hover:underline text-[10px]">✕ 關閉</button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <div className="text-[#8FA3BF]">市值暴露 (Size Beta):</div>
-                  <div className={`text-sm font-bold ${matched.sizeExposure < 0 ? "text-[#35D06E]" : "text-[#FF5C5C]"}`}>
+                  <div className="text-subink">市值暴露 (Size Beta):</div>
+                  <div className={`text-sm font-bold ${matched.sizeExposure < 0 ? "text-ok" : "text-danger"}`}>
                     {matched.sizeExposure} std ({matched.sizeExposure < 0 ? "偏向小盤，溢價高" : "偏向大盤"})
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <div className="text-[#8FA3BF]">估值暴露 (Value Beta):</div>
-                  <div className="text-sm font-bold text-[#3D7BFF]">{matched.valueExposure} std (低估值溢價)</div>
+                  <div className="text-subink">估值暴露 (Value Beta):</div>
+                  <div className="text-sm font-bold text-brand">{matched.valueExposure} std (低估值溢價)</div>
                 </div>
                 <div className="space-y-1">
-                  <div className="text-[#8FA3BF]">動量暴露 (Momentum Beta):</div>
-                  <div className={`text-sm font-bold ${matched.momentumExposure >= 0 ? "text-[#35D06E]" : "text-[#FF5C5C]"}`}>
+                  <div className="text-subink">動量暴露 (Momentum Beta):</div>
+                  <div className={`text-sm font-bold ${matched.momentumExposure >= 0 ? "text-ok" : "text-danger"}`}>
                     {matched.momentumExposure} std
                   </div>
                 </div>
@@ -313,14 +313,14 @@ export default function SignalAuditPage() {
               key: "count",
               header: "異常證券數",
               align: "right",
-              className: "font-mono text-[#F6B73C]",
+              className: "font-mono text-warn",
               render: (r) => r.count,
             },
             {
               key: "ratio",
               header: "占比",
               align: "right",
-              className: "font-mono text-[#8FA3BF]",
+              className: "font-mono text-subink",
               render: (r) => r.ratio,
             },
             {
@@ -333,7 +333,7 @@ export default function SignalAuditPage() {
             {
               key: "action",
               header: "執行備份動作 (Mitigation Action)",
-              className: "text-[#8FA3BF] text-[12px]",
+              className: "text-subink text-[12px]",
               render: (r) => r.action,
             },
           ]}

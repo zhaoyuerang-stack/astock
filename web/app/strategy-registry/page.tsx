@@ -111,32 +111,32 @@ export default function StrategyRegistryPage() {
       />
 
       {err && (
-        <div className="p-4 bg-[#FF5C5C]/10 border border-[#FF5C5C]/20 rounded-lg text-sm text-[#FF5C5C]">
+        <div className="p-4 bg-[#FF5C5C]/10 border border-[#FF5C5C]/20 rounded-lg text-sm text-danger">
           ⚠️ API 載入出錯: {err}
         </div>
       )}
 
       {/* 1. 統計大卡 */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg text-center">
-          <div className="text-[11px] text-[#8FA3BF] uppercase font-bold tracking-wider">總家族數</div>
+        <div className="p-4 bg-navy border border-line rounded-lg text-center">
+          <div className="text-[11px] text-subink uppercase font-bold tracking-wider">總家族數</div>
           <div className="text-2xl font-bold font-mono text-[#E6EDF7] mt-1.5">{totalFamilies}</div>
         </div>
-        <div className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg text-center cursor-pointer hover:border-[#35D06E]" onClick={() => setStatusFilter("ACTIVE")}>
-          <div className="text-[11px] text-[#35D06E] uppercase font-bold tracking-wider">在冊策略 (Active)</div>
-          <div className="text-2xl font-bold font-mono text-[#35D06E] mt-1.5">{activeCount}</div>
+        <div className="p-4 bg-navy border border-line rounded-lg text-center cursor-pointer hover:border-[#35D06E]" onClick={() => setStatusFilter("ACTIVE")}>
+          <div className="text-[11px] text-ok uppercase font-bold tracking-wider">在冊策略 (Active)</div>
+          <div className="text-2xl font-bold font-mono text-ok mt-1.5">{activeCount}</div>
         </div>
-        <div className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg text-center cursor-pointer hover:border-[#3D7BFF]" onClick={() => setStatusFilter("REFERENCE")}>
-          <div className="text-[11px] text-[#3D7BFF] uppercase font-bold tracking-wider">參考策略 (Ref)</div>
-          <div className="text-2xl font-bold font-mono text-[#3D7BFF] mt-1.5">{referenceCount}</div>
+        <div className="p-4 bg-navy border border-line rounded-lg text-center cursor-pointer hover:border-brand" onClick={() => setStatusFilter("REFERENCE")}>
+          <div className="text-[11px] text-brand uppercase font-bold tracking-wider">參考策略 (Ref)</div>
+          <div className="text-2xl font-bold font-mono text-brand mt-1.5">{referenceCount}</div>
         </div>
-        <div className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg text-center cursor-pointer hover:border-[#FF5C5C]" onClick={() => setStatusFilter("FALSIFIED")}>
-          <div className="text-[11px] text-[#FF5C5C] uppercase font-bold tracking-wider">證偽策略 (Falsified)</div>
-          <div className="text-2xl font-bold font-mono text-[#FF5C5C] mt-1.5">{falsifiedCount}</div>
+        <div className="p-4 bg-navy border border-line rounded-lg text-center cursor-pointer hover:border-[#FF5C5C]" onClick={() => setStatusFilter("FALSIFIED")}>
+          <div className="text-[11px] text-danger uppercase font-bold tracking-wider">證偽策略 (Falsified)</div>
+          <div className="text-2xl font-bold font-mono text-danger mt-1.5">{falsifiedCount}</div>
         </div>
-        <div className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg text-center cursor-pointer hover:border-[#9AA8BD]" onClick={() => setStatusFilter("RETIRED")}>
-          <div className="text-[11px] text-[#8FA3BF] uppercase font-bold tracking-wider">退役策略 (Retired)</div>
-          <div className="text-2xl font-bold font-mono text-[#8FA3BF] mt-1.5">{retiredCount}</div>
+        <div className="p-4 bg-navy border border-line rounded-lg text-center cursor-pointer hover:border-[#9AA8BD]" onClick={() => setStatusFilter("RETIRED")}>
+          <div className="text-[11px] text-subink uppercase font-bold tracking-wider">退役策略 (Retired)</div>
+          <div className="text-2xl font-bold font-mono text-subink mt-1.5">{retiredCount}</div>
         </div>
       </div>
 
@@ -145,11 +145,11 @@ export default function StrategyRegistryPage() {
         title="在冊及候選策略清冊"
         right={
           <div className="flex gap-2 items-center">
-            <span className="text-[11px] text-[#8FA3BF]">狀態篩選：</span>
+            <span className="text-[11px] text-subink">狀態篩選：</span>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="text-[11px] bg-[#081827] border border-[#1F3550] text-[#E6EDF7] rounded px-1 py-0.5"
+              className="text-[11px] bg-bg border border-line text-[#E6EDF7] rounded px-1 py-0.5"
             >
               <option value="ALL">全部狀態</option>
               <option value="ACTIVE">在冊 (ACTIVE)</option>
@@ -168,7 +168,7 @@ export default function StrategyRegistryPage() {
             {
               key: "strategy_id",
               header: "策略 ID",
-              className: "font-mono font-bold text-[#3D7BFF]",
+              className: "font-mono font-bold text-brand",
               render: (s) => (
                 <button
                   onClick={() => {
@@ -181,8 +181,8 @@ export default function StrategyRegistryPage() {
                 </button>
               ),
             },
-            { key: "family_name", header: "家族名稱", className: "text-[#8FA3BF]", render: (s) => s.family_name || s.family },
-            { key: "version", header: "版本", className: "font-mono text-[#8FA3BF]", render: (s) => s.version },
+            { key: "family_name", header: "家族名稱", className: "text-subink", render: (s) => s.family_name || s.family },
+            { key: "version", header: "版本", className: "font-mono text-subink", render: (s) => s.version },
             {
               key: "status",
               header: "狀態",
@@ -196,7 +196,7 @@ export default function StrategyRegistryPage() {
               key: "annual",
               header: "年化收益",
               align: "right",
-              className: "font-mono text-[#35D06E]",
+              className: "font-mono text-ok",
               render: (s) => s.metrics?.annual ? `${(s.metrics.annual * 100).toFixed(2)}%` : "16.42%",
             },
             {
@@ -210,14 +210,14 @@ export default function StrategyRegistryPage() {
               key: "maxdd",
               header: "最大回撤",
               align: "right",
-              className: "font-mono text-[#FF5C5C]",
+              className: "font-mono text-danger",
               render: (s) => s.metrics?.maxdd ? `${(s.metrics.maxdd * 100).toFixed(2)}%` : "-12.45%",
             },
             {
               key: "capacity",
               header: "估計容量",
               align: "right",
-              className: "font-mono text-[#8FA3BF]",
+              className: "font-mono text-subink",
               render: (s) => `${s.capacity_m || 50}M`,
             },
             {
@@ -233,14 +233,14 @@ export default function StrategyRegistryPage() {
       {/* 3. 策略詳情下鑽 (病歷卡) */}
       {selectedDetail && (
         <div className="space-y-6">
-          <div className="text-sm font-bold text-[#8FA3BF] tracking-wider uppercase">策略身份證與病歷卡 (Strategy Dossier)</div>
+          <div className="text-sm font-bold text-subink tracking-wider uppercase">策略身份證與病歷卡 (Strategy Dossier)</div>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Col: Metadata & Thesis */}
             <div className="lg:col-span-2 space-y-6">
               {/* ID Card */}
               <Card title={`Dossier: ${selectedDetail.strategy.strategy_id}`}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono text-[#8FA3BF] py-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono text-subink py-2">
                   <div>
                     <div><span className="text-[#5F728A]">策略名稱：</span>{selectedDetail.strategy.family_name || selectedDetail.strategy.family}</div>
                     <div><span className="text-[#5F728A]">所屬家族：</span>{selectedDetail.strategy.family}</div>
@@ -252,7 +252,7 @@ export default function StrategyRegistryPage() {
                     <div><span className="text-[#5F728A]">創建日期：</span>2026-06-15</div>
                     <div><span className="text-[#5F728A]">重大變更：</span>無</div>
                     <div><span className="text-[#5F728A]">文檔鏈接：</span>
-                      <a href="#" className="text-[#3D7BFF] hover:underline">evidence_v3.1.pdf</a>
+                      <a href="#" className="text-brand hover:underline">evidence_v3.1.pdf</a>
                     </div>
                   </div>
                 </div>
@@ -260,7 +260,7 @@ export default function StrategyRegistryPage() {
 
               {/* Hypothesis & Market */}
               <Card title="核心研發假設與經濟學邏輯">
-                <div className="text-[12px] leading-relaxed text-[#8FA3BF] space-y-2">
+                <div className="text-[12px] leading-relaxed text-subink space-y-2">
                   <p>
                     <strong className="text-[#E6EDF7]">核心研發假設：</strong>
                     {selectedDetail.strategy.hypothesis || "小盤非流動性股在大買單衝擊下具有顯著的流動性溢價，本策略通過高頻量化因子捕獲此類錯配溢價。"}
@@ -289,14 +289,14 @@ export default function StrategyRegistryPage() {
                       render: (g) => (
                         <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${
                           g.checked === "已通過"
-                            ? "text-[#35D06E] bg-[#35D06E]/10 border-[#35D06E]/20"
-                            : "text-[#F6B73C] bg-[#F6B73C]/10 border-[#F6B73C]/20"
+                            ? "text-ok bg-[#35D06E]/10 border-[#35D06E]/20"
+                            : "text-warn bg-[#F6B73C]/10 border-[#F6B73C]/20"
                         }`}>
                           {g.checked}
                         </span>
                       ),
                     },
-                    { key: "reason", header: "細節描述與判定證據", className: "text-[#8FA3BF] text-[12px]", render: (g) => g.reason },
+                    { key: "reason", header: "細節描述與判定證據", className: "text-subink text-[12px]", render: (g) => g.reason },
                   ]}
                 />
               </Card>
@@ -306,7 +306,7 @@ export default function StrategyRegistryPage() {
             <div className="space-y-6">
               {/* Lifecycle Timeline */}
               <Card title="策略生命週期進度 (Lifecycle Timeline)">
-                <div className="relative border-l border-[#1F3550] ml-3.5 my-3 pl-4 space-y-4 text-xs font-mono">
+                <div className="relative border-l border-line ml-3.5 my-3 pl-4 space-y-4 text-xs font-mono">
                   <div className="relative">
                     <span className="absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full bg-[#35D06E]" />
                     <div className="text-[#E6EDF7] font-bold">1. 概念構思 (Conception)</div>
@@ -324,22 +324,22 @@ export default function StrategyRegistryPage() {
                   </div>
                   <div className="relative">
                     <span className="absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full bg-[#3D7BFF]" />
-                    <div className="text-[#3D7BFF] font-bold">4. 正式上線 (Production Run)</div>
-                    <div className="text-[#8FA3BF]">2026-06-15 · 當前正在運行中</div>
+                    <div className="text-brand font-bold">4. 正式上線 (Production Run)</div>
+                    <div className="text-subink">2026-06-15 · 當前正在運行中</div>
                   </div>
                 </div>
               </Card>
 
               {/* Limits and Failure Boundaries */}
               <Card title="失效信號與預警邊界 (Failure Boundaries)">
-                <div className="text-xs space-y-2 text-[#8FA3BF]">
-                  <div className="p-2.5 bg-[#081827] border border-[#1F3550] rounded-lg">
-                    <div className="text-[#FF5C5C] font-semibold">回撤極限 (Max Drawdown Limit)</div>
+                <div className="text-xs space-y-2 text-subink">
+                  <div className="p-2.5 bg-bg border border-line rounded-lg">
+                    <div className="text-danger font-semibold">回撤極限 (Max Drawdown Limit)</div>
                     <div className="text-sm font-bold font-mono text-[#E6EDF7] mt-0.5">20.0%</div>
                     <div className="text-[10px] text-[#5F728A] mt-1">若樣本外日次回撤超限則強制退役</div>
                   </div>
-                  <div className="p-2.5 bg-[#081827] border border-[#1F3550] rounded-lg">
-                    <div className="text-[#F6B73C] font-semibold">動量 IC 衰退警戒</div>
+                  <div className="p-2.5 bg-bg border border-line rounded-lg">
+                    <div className="text-warn font-semibold">動量 IC 衰退警戒</div>
                     <div className="text-sm font-bold font-mono text-[#E6EDF7] mt-0.5">Rolling 20D IC &lt; -0.02</div>
                     <div className="text-[10px] text-[#5F728A] mt-1">若因子預測力轉負持續 20 天</div>
                   </div>
@@ -350,10 +350,10 @@ export default function StrategyRegistryPage() {
               <Card title="策略變更與審計日誌 (Audit Log)">
                 <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
                   {auditEvents.map((evt, idx) => (
-                    <div key={idx} className="p-2.5 bg-[#081827] border border-[#1F3550] rounded text-[11px] font-mono space-y-1">
+                    <div key={idx} className="p-2.5 bg-bg border border-line rounded text-[11px] font-mono space-y-1">
                       <div className="flex justify-between text-[#5F728A]">
                         <span>{evt.date}</span>
-                        <span className="text-[#3D7BFF]">{evt.type}</span>
+                        <span className="text-brand">{evt.type}</span>
                       </div>
                       <p className="text-[#E6EDF7] leading-relaxed">{evt.desc}</p>
                       <div className="text-right text-[10px] text-[#5F728A]">觸發: {evt.actor}</div>

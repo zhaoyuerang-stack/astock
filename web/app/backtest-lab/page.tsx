@@ -93,7 +93,7 @@ export default function BacktestLabPage() {
     if (val >= 1.70) return "bg-[#35D06E] text-bg font-bold";
     if (val >= 1.50) return "bg-[#35D06E]/70 text-bg";
     if (val >= 1.30) return "bg-[#3D7BFF]/50 text-ink";
-    return "bg-[#1F3550]/40 text-[#8FA3BF]";
+    return "bg-[#1F3550]/40 text-subink";
   };
 
   // SVG dimensions for Backtest Chart
@@ -108,7 +108,7 @@ export default function BacktestLabPage() {
       />
 
       {err && (
-        <div className="p-4 bg-[#FF5C5C]/10 border border-[#FF5C5C]/20 rounded-lg text-sm text-[#FF5C5C]">
+        <div className="p-4 bg-[#FF5C5C]/10 border border-[#FF5C5C]/20 rounded-lg text-sm text-danger">
           ⚠️ API 載入出錯: {err}
         </div>
       )}
@@ -123,7 +123,7 @@ export default function BacktestLabPage() {
         <QuantMetricCard label="成本後收益 (Net)" value="14.25%" intent="positive" />
       </div>
 
-      <div className="text-[11px] text-[#8FA3BF] font-mono bg-[#0E2238] border border-[#1F3550] px-4 py-2 rounded-lg">
+      <div className="text-[11px] text-subink font-mono bg-navy border border-line px-4 py-2 rounded-lg">
         📅 歷史回測區間：2018-01-01 至 2026-06-23 · 基準對照：中證2000指數 · 成本模式已扣除雙邊 0.47% (佣金/滑點/融资成本)
       </div>
 
@@ -133,12 +133,12 @@ export default function BacktestLabPage() {
           <Card
             title="歷史累計淨值與回撤區域對比 (NAV Curve & Drawdowns)"
             right={
-              <div className="flex gap-1.5 bg-[#081827] p-0.5 rounded border border-[#1F3550]">
+              <div className="flex gap-1.5 bg-bg p-0.5 rounded border border-line">
                 {["1Y", "3Y", "5Y", "ALL"].map((range) => (
                   <button
                     key={range}
                     className={`px-2 py-0.5 text-[10px] font-bold rounded ${
-                      range === "ALL" ? "bg-[#3D7BFF] text-white" : "text-[#8FA3BF] hover:text-[#E6EDF7]"
+                      range === "ALL" ? "bg-[#3D7BFF] text-white" : "text-subink hover:text-[#E6EDF7]"
                     }`}
                   >
                     {range}
@@ -147,7 +147,7 @@ export default function BacktestLabPage() {
               </div>
             }
           >
-            <div className="p-2 border border-[#1F3550]/40 rounded bg-[#06111F]/30">
+            <div className="p-2 border border-line/40 rounded bg-[#06111F]/30">
               <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
                 {/* Benchmark Area / Shading */}
                 <polyline
@@ -198,7 +198,7 @@ export default function BacktestLabPage() {
 
         {/* 3. 回測 vs 真實執行偏差 */}
         <Card title="回測 vs 真實執行口徑偏離 (Execution Demotion Check)">
-          <div className="text-[11px] text-[#8FA3BF] mb-2 leading-relaxed">
+          <div className="text-[11px] text-subink mb-2 leading-relaxed">
             量化回測與實盤交易的定價偏差審計。如果開盤口徑的收益衰退顯著，反映存在較嚴重的隔夜跳空或流動性陷阱。
           </div>
           <DataTable<PerformanceStatsRow>
@@ -206,7 +206,7 @@ export default function BacktestLabPage() {
             getRowKey={(r) => r.metric}
             columns={[
               { key: "metric", header: "核算指標", className: "text-[#E6EDF7] font-semibold", render: (r) => r.metric },
-              { key: "theoretical", header: "理論 (T+1收盤)", align: "right", className: "font-mono text-[#8FA3BF]", render: (r) => r.theoretical },
+              { key: "theoretical", header: "理論 (T+1收盤)", align: "right", className: "font-mono text-subink", render: (r) => r.theoretical },
               { key: "realExecution", header: "真實 (T+1開盤)", align: "right", className: "font-mono text-[#E6EDF7]", render: (r) => r.realExecution },
               {
                 key: "diff",
@@ -215,7 +215,7 @@ export default function BacktestLabPage() {
                 render: (r) => {
                   const isNeg = r.diff.startsWith("-");
                   return (
-                    <span className={`font-mono font-bold ${isNeg ? "text-[#FF5C5C]" : "text-[#35D06E]"}`}>
+                    <span className={`font-mono font-bold ${isNeg ? "text-danger" : "text-ok"}`}>
                       {r.diff}
                     </span>
                   );
@@ -236,11 +236,11 @@ export default function BacktestLabPage() {
           title="參數敏感性熱力圖 (Parameter Platform)"
           right={
             <div className="flex gap-2 items-center text-[11px]">
-              <span className="text-[#8FA3BF]">指標：</span>
+              <span className="text-subink">指標：</span>
               <select
                 value={heatmapMetric}
                 onChange={(e) => setHeatmapMetric(e.target.value as any)}
-                className="bg-[#081827] border border-[#1F3550] text-[#E6EDF7] px-1 py-0.5"
+                className="bg-bg border border-line text-[#E6EDF7] px-1 py-0.5"
               >
                 <option value="sharpe">Sharpe 比率</option>
                 <option value="annual">年化收益</option>
@@ -249,28 +249,28 @@ export default function BacktestLabPage() {
             </div>
           }
         >
-          <div className="text-[11px] text-[#8FA3BF] mb-3 leading-relaxed">
+          <div className="text-[11px] text-subink mb-3 leading-relaxed">
             橫軸為單隻股票最大持倉限制，縱軸為選股因子分位數閾值。穩健的策略應在一個寬廣的綠色「參數高原」中，如果最優點是孤立尖峰，則代表有擬合過度風險。
           </div>
 
-          <div className="border border-[#1F3550]/40 rounded overflow-hidden text-xs">
+          <div className="border border-line/40 rounded overflow-hidden text-xs">
             <table className="w-full text-center border-collapse">
               <thead>
-                <tr className="bg-[#10263D] border-b border-[#1F3550] text-[#8FA3BF] text-[11px]">
-                  <th className="p-2 border-r border-[#1F3550]">閾值 \ 持倉限額</th>
-                  <th className="p-2 border-r border-[#1F3550]">10%</th>
-                  <th className="p-2 border-r border-[#1F3550]">12%</th>
-                  <th className="p-2 border-r border-[#1F3550]">15% (當前)</th>
+                <tr className="bg-[#10263D] border-b border-line text-subink text-[11px]">
+                  <th className="p-2 border-r border-line">閾值 \ 持倉限額</th>
+                  <th className="p-2 border-r border-line">10%</th>
+                  <th className="p-2 border-r border-line">12%</th>
+                  <th className="p-2 border-r border-line">15% (當前)</th>
                   <th className="p-2">20%</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1F3550]/30 font-mono">
                 {heatmapRows.map((row) => (
-                  <tr key={row.threshold} className="border-b border-[#1F3550]/30">
-                    <td className="p-2.5 font-bold bg-[#10263D]/40 text-[#8FA3BF] border-r border-[#1F3550]">{row.threshold}</td>
-                    <td className={`p-2.5 border-r border-[#1F3550]/30 ${getHeatmapColor(row.limit10)}`}>{row.limit10.toFixed(2)}</td>
-                    <td className={`p-2.5 border-r border-[#1F3550]/30 ${getHeatmapColor(row.limit12)}`}>{row.limit12.toFixed(2)}</td>
-                    <td className={`p-2.5 border-r border-[#1F3550]/30 ${getHeatmapColor(row.limit15)}`}>
+                  <tr key={row.threshold} className="border-b border-line/30">
+                    <td className="p-2.5 font-bold bg-[#10263D]/40 text-subink border-r border-line">{row.threshold}</td>
+                    <td className={`p-2.5 border-r border-line/30 ${getHeatmapColor(row.limit10)}`}>{row.limit10.toFixed(2)}</td>
+                    <td className={`p-2.5 border-r border-line/30 ${getHeatmapColor(row.limit12)}`}>{row.limit12.toFixed(2)}</td>
+                    <td className={`p-2.5 border-r border-line/30 ${getHeatmapColor(row.limit15)}`}>
                       {row.limit15.toFixed(2)} ★
                     </td>
                     <td className={`p-2.5 ${getHeatmapColor(row.limit20)}`}>{row.limit20.toFixed(2)}</td>
@@ -287,7 +287,7 @@ export default function BacktestLabPage() {
 
         {/* Segment Performance */}
         <Card title="樣本分段與壓力期表現 (Out-of-Sample Validation)">
-          <div className="flex border-b border-[#1F3550] gap-2 mb-3">
+          <div className="flex border-b border-line gap-2 mb-3">
             {["is", "oos", "wf", "stress"].map((tab) => {
               const labelMap = { is: "樣本內 (IS)", oos: "樣本外 (OOS)", wf: "步進複測 (WF)", stress: "歷史壓力期" };
               return (
@@ -295,7 +295,7 @@ export default function BacktestLabPage() {
                   key={tab}
                   onClick={() => setActiveSegmentTab(tab as any)}
                   className={`px-3 py-1.5 text-xs font-bold border-b-2 transition-all ${
-                    activeSegmentTab === tab ? "border-[#3D7BFF] text-[#E6EDF7]" : "border-transparent text-[#8FA3BF]"
+                    activeSegmentTab === tab ? "border-[#3D7BFF] text-[#E6EDF7]" : "border-transparent text-subink"
                   }`}
                 >
                   {labelMap[tab as keyof typeof labelMap]}
@@ -309,21 +309,21 @@ export default function BacktestLabPage() {
             getRowKey={(r) => r.period}
             columns={[
               { key: "period", header: "回測區間", className: "text-[#E6EDF7] font-bold", render: (r) => r.period },
-              { key: "annual", header: "年化收益", align: "right", className: "font-mono text-[#35D06E]", render: (r) => r.annual },
+              { key: "annual", header: "年化收益", align: "right", className: "font-mono text-ok", render: (r) => r.annual },
               { key: "sharpe", header: "Sharpe", align: "right", className: "font-mono text-[#E6EDF7]", render: (r) => r.sharpe },
-              { key: "maxdd", header: "最大回撤", align: "right", className: "font-mono text-[#FF5C5C]", render: (r) => r.maxdd },
-              { key: "winRate", header: "交易勝率", align: "right", className: "font-mono text-[#8FA3BF]", render: (r) => r.winRate },
+              { key: "maxdd", header: "最大回撤", align: "right", className: "font-mono text-danger", render: (r) => r.maxdd },
+              { key: "winRate", header: "交易勝率", align: "right", className: "font-mono text-subink", render: (r) => r.winRate },
             ]}
           />
 
           {activeSegmentTab === "oos" && (
-            <div className="mt-3 p-2.5 bg-[#35D06E]/5 border border-[#35D06E]/10 rounded text-[11px] text-[#35D06E]">
+            <div className="mt-3 p-2.5 bg-[#35D06E]/5 border border-[#35D06E]/10 rounded text-[11px] text-ok">
               ✓ 樣本外 (OOS) 表現符合安全界限。年化收益 20.55% 相比樣本內 24.12% 衰退比率僅 14.8%，未發生明顯的樣本外崩塌塌陷。
             </div>
           )}
 
           {activeSegmentTab === "stress" && (
-            <div className="mt-3 p-2.5 bg-[#F6B73C]/5 border border-[#F6B73C]/10 rounded text-[11px] text-[#F6B73C]">
+            <div className="mt-3 p-2.5 bg-[#F6B73C]/5 border border-[#F6B73C]/10 rounded text-[11px] text-warn">
               ⚠️ 警示：在 2024 年初微盤股流動性危機爆發期間，組合發生了達 -14.85% 的歷史最大單次回撤，反映該策略在流動性踩踏下的高度脆弱性。
             </div>
           )}
@@ -333,29 +333,29 @@ export default function BacktestLabPage() {
       {/* 5. 交易統計與換手 */}
       <Card title="回測明細交易數據統計 (Trading & Turnover Statistics)">
         <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-xs font-mono text-center py-2">
-          <div className="p-3 bg-[#081827] border border-[#1F3550] rounded">
-            <div className="text-[#8FA3BF] text-[10px]">年化換手率</div>
+          <div className="p-3 bg-bg border border-line rounded">
+            <div className="text-subink text-[10px]">年化換手率</div>
             <div className="text-sm font-bold text-[#E6EDF7] mt-1">324.5%</div>
           </div>
-          <div className="p-3 bg-[#081827] border border-[#1F3550] rounded">
-            <div className="text-[#8FA3BF] text-[10px]">平均持股週期</div>
+          <div className="p-3 bg-bg border border-line rounded">
+            <div className="text-subink text-[10px]">平均持股週期</div>
             <div className="text-sm font-bold text-[#E6EDF7] mt-1">12.5 天</div>
           </div>
-          <div className="p-3 bg-[#081827] border border-[#1F3550] rounded">
-            <div className="text-[#8FA3BF] text-[10px]">交易勝率</div>
-            <div className="text-sm font-bold text-[#35D06E] mt-1">56.4%</div>
+          <div className="p-3 bg-bg border border-line rounded">
+            <div className="text-subink text-[10px]">交易勝率</div>
+            <div className="text-sm font-bold text-ok mt-1">56.4%</div>
           </div>
-          <div className="p-3 bg-[#081827] border border-[#1F3550] rounded">
-            <div className="text-[#8FA3BF] text-[10px]">平均盈虧比</div>
-            <div className="text-sm font-bold text-[#35D06E] mt-1">1.45 : 1</div>
+          <div className="p-3 bg-bg border border-line rounded">
+            <div className="text-subink text-[10px]">平均盈虧比</div>
+            <div className="text-sm font-bold text-ok mt-1">1.45 : 1</div>
           </div>
-          <div className="p-3 bg-[#081827] border border-[#1F3550] rounded">
-            <div className="text-[#8FA3BF] text-[10px]">單票平均收益</div>
+          <div className="p-3 bg-bg border border-line rounded">
+            <div className="text-subink text-[10px]">單票平均收益</div>
             <div className="text-sm font-bold text-[#E6EDF7] mt-1">0.125%</div>
           </div>
-          <div className="p-3 bg-[#081827] border border-[#1F3550] rounded">
-            <div className="text-[#8FA3BF] text-[10px]">交易費用佔比</div>
-            <div className="text-sm font-bold text-[#FF5C5C] mt-1">13.2%</div>
+          <div className="p-3 bg-bg border border-line rounded">
+            <div className="text-subink text-[10px]">交易費用佔比</div>
+            <div className="text-sm font-bold text-danger mt-1">13.2%</div>
           </div>
         </div>
       </Card>

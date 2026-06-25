@@ -146,9 +146,9 @@ export default function PortfolioRiskPage() {
 
   // Helper styles based on risk values
   const getBudgetColor = (pct: number) => {
-    if (pct > 100) return "text-[#FF5C5C]";
-    if (pct > 80) return "text-[#F6B73C]";
-    return "text-[#35D06E]";
+    if (pct > 100) return "text-danger";
+    if (pct > 80) return "text-warn";
+    return "text-ok";
   };
 
   return (
@@ -159,15 +159,15 @@ export default function PortfolioRiskPage() {
       />
 
       {err && (
-        <div className="p-4 bg-[#FF5C5C]/10 border border-[#FF5C5C]/20 rounded-lg text-sm text-[#FF5C5C]">
+        <div className="p-4 bg-[#FF5C5C]/10 border border-[#FF5C5C]/20 rounded-lg text-sm text-danger">
           ⚠️ API 載入出錯: {err}
         </div>
       )}
 
       {/* 1. 風險總覽大卡 */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg text-center">
-          <div className="text-[11px] text-[#8FA3BF] uppercase font-bold tracking-wider">總風險等級</div>
+        <div className="p-4 bg-navy border border-line rounded-lg text-center">
+          <div className="text-[11px] text-subink uppercase font-bold tracking-wider">總風險等級</div>
           <div className="mt-2.5">
             <RiskBadge level={riskReport?.verdict === "超限" ? "high" : "low"} label={riskReport?.verdict ?? "正常"} />
           </div>
@@ -180,58 +180,58 @@ export default function PortfolioRiskPage() {
           unit="CNY"
         />
 
-        <div className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg">
-          <div className="text-[12px] text-[#8FA3BF]">風險預算使用率</div>
+        <div className="p-4 bg-navy border border-line rounded-lg">
+          <div className="text-[12px] text-subink">風險預算使用率</div>
           <div className={`text-2xl font-bold mt-1.5 font-mono ${getBudgetColor(45)}`}>45.2%</div>
           <div className="text-[10px] text-[#5F728A] mt-2">警戒閾值: 80% / 100%</div>
         </div>
 
-        <div className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg">
-          <div className="text-[12px] text-[#8FA3BF]">容量使用率</div>
+        <div className="p-4 bg-navy border border-line rounded-lg">
+          <div className="text-[12px] text-subink">容量使用率</div>
           <div className="text-2xl font-bold mt-1.5 font-mono text-[#E6EDF7]">18.4%</div>
           <div className="text-[10px] text-[#5F728A] mt-2">相較策略容量上限 5000 萬</div>
         </div>
 
-        <div className="p-4 bg-[#0E2238] border border-[#1F3550] rounded-lg">
-          <div className="text-[12px] text-[#8FA3BF]">預估單邊滑點</div>
-          <div className="text-2xl font-bold mt-1.5 font-mono text-[#F6B73C]">18.5 bps</div>
+        <div className="p-4 bg-navy border border-line rounded-lg">
+          <div className="text-[12px] text-subink">預估單邊滑點</div>
+          <div className="text-2xl font-bold mt-1.5 font-mono text-warn">18.5 bps</div>
           <div className="text-[10px] text-[#5F728A] mt-2">包含小盤流動性惩罚</div>
         </div>
       </div>
 
       {/* 2. 六項風險暴露暴露卡 */}
       <div className="space-y-3">
-        <h3 className="text-sm font-bold text-[#8FA3BF] tracking-wider uppercase">風險暴露總覽 (Risk Exposures)</h3>
+        <h3 className="text-sm font-bold text-subink tracking-wider uppercase">風險暴露總覽 (Risk Exposures)</h3>
         <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-          <div className="p-3 bg-[#0E2238] border border-[#1F3550] rounded-lg">
-            <div className="text-[11px] text-[#8FA3BF]">小盤暴露 (Size)</div>
-            <div className="text-lg font-bold text-[#FF5C5C] font-mono mt-1">1.48 std</div>
-            <div className="text-[9px] text-[#FF5C5C]/80 mt-1">高風險暴露</div>
+          <div className="p-3 bg-navy border border-line rounded-lg">
+            <div className="text-[11px] text-subink">小盤暴露 (Size)</div>
+            <div className="text-lg font-bold text-danger font-mono mt-1">1.48 std</div>
+            <div className="text-[9px] text-danger/80 mt-1">高風險暴露</div>
           </div>
-          <div className="p-3 bg-[#0E2238] border border-[#1F3550] rounded-lg">
-            <div className="text-[11px] text-[#8FA3BF]">流動性暴露 (Liq)</div>
-            <div className="text-lg font-bold text-[#F6B73C] font-mono mt-1">-0.82 std</div>
-            <div className="text-[9px] text-[#F6B73C]/80 mt-1">中風險暴露</div>
+          <div className="p-3 bg-navy border border-line rounded-lg">
+            <div className="text-[11px] text-subink">流動性暴露 (Liq)</div>
+            <div className="text-lg font-bold text-warn font-mono mt-1">-0.82 std</div>
+            <div className="text-[9px] text-warn/80 mt-1">中風險暴露</div>
           </div>
-          <div className="p-3 bg-[#0E2238] border border-[#1F3550] rounded-lg">
-            <div className="text-[11px] text-[#8FA3BF]">ST 暴露 (Trash)</div>
-            <div className="text-lg font-bold text-[#35D06E] font-mono mt-1">0.00%</div>
-            <div className="text-[9px] text-[#35D06E]/80 mt-1">安全</div>
+          <div className="p-3 bg-navy border border-line rounded-lg">
+            <div className="text-[11px] text-subink">ST 暴露 (Trash)</div>
+            <div className="text-lg font-bold text-ok font-mono mt-1">0.00%</div>
+            <div className="text-[9px] text-ok/80 mt-1">安全</div>
           </div>
-          <div className="p-3 bg-[#0E2238] border border-[#1F3550] rounded-lg">
-            <div className="text-[11px] text-[#8FA3BF]">行業集中度 (Ind)</div>
-            <div className="text-lg font-bold text-[#35D06E] font-mono mt-1">14.2%</div>
-            <div className="text-[9px] text-[#35D06E]/80 mt-1">安全 (限額 30%)</div>
+          <div className="p-3 bg-navy border border-line rounded-lg">
+            <div className="text-[11px] text-subink">行業集中度 (Ind)</div>
+            <div className="text-lg font-bold text-ok font-mono mt-1">14.2%</div>
+            <div className="text-[9px] text-ok/80 mt-1">安全 (限額 30%)</div>
           </div>
-          <div className="p-3 bg-[#0E2238] border border-[#1F3550] rounded-lg">
-            <div className="text-[11px] text-[#8FA3BF]">單票集中度 (Idio)</div>
-            <div className="text-lg font-bold text-[#35D06E] font-mono mt-1">8.5%</div>
-            <div className="text-[9px] text-[#35D06E]/80 mt-1">安全 (限額 15%)</div>
+          <div className="p-3 bg-navy border border-line rounded-lg">
+            <div className="text-[11px] text-subink">單票集中度 (Idio)</div>
+            <div className="text-lg font-bold text-ok font-mono mt-1">8.5%</div>
+            <div className="text-[9px] text-ok/80 mt-1">安全 (限額 15%)</div>
           </div>
-          <div className="p-3 bg-[#0E2238] border border-[#1F3550] rounded-lg">
-            <div className="text-[11px] text-[#8FA3BF]">換手壓力 (Turnover)</div>
-            <div className="text-lg font-bold text-[#F6B73C] font-mono mt-1">32.4% / 月</div>
-            <div className="text-[9px] text-[#F6B73C]/80 mt-1">中等換手成本</div>
+          <div className="p-3 bg-navy border border-line rounded-lg">
+            <div className="text-[11px] text-subink">換手壓力 (Turnover)</div>
+            <div className="text-lg font-bold text-warn font-mono mt-1">32.4% / 月</div>
+            <div className="text-[9px] text-warn/80 mt-1">中等換手成本</div>
           </div>
         </div>
       </div>
@@ -246,7 +246,7 @@ export default function PortfolioRiskPage() {
             {
               key: "code",
               header: "代碼",
-              className: "font-mono text-[#3D7BFF]",
+              className: "font-mono text-brand",
               render: (r) => r.code,
             },
             {
@@ -266,28 +266,28 @@ export default function PortfolioRiskPage() {
               key: "advUsage",
               header: "ADV 占用率",
               align: "right",
-              className: "font-mono text-[#8FA3BF]",
+              className: "font-mono text-subink",
               render: (r) => r.advUsage,
             },
             {
               key: "liquidityScore",
               header: "流動性得分",
               align: "right",
-              className: "font-mono text-[#8FA3BF]",
+              className: "font-mono text-subink",
               render: (r) => r.liquidityScore.toFixed(2),
             },
             {
               key: "estSlippageBps",
               header: "估計滑點 bps",
               align: "right",
-              className: "font-mono text-[#F6B73C]",
+              className: "font-mono text-warn",
               render: (r) => `${r.estSlippageBps} bps`,
             },
             {
               key: "riskExposure",
               header: "風險Beta暴露",
               align: "right",
-              className: "font-mono text-[#8FA3BF]",
+              className: "font-mono text-subink",
               render: (r) => r.riskExposure.toFixed(2),
             },
             {
@@ -297,15 +297,15 @@ export default function PortfolioRiskPage() {
                 <div className="flex gap-1.5 flex-wrap">
                   {r.riskTags.map((tag) => {
                     const tagStyle = tag === "ST 標的"
-                      ? "text-[#FF5C5C] bg-[#FF5C5C]/10 border-[#FF5C5C]/20"
-                      : "text-[#F6B73C] bg-[#F6B73C]/10 border-[#F6B73C]/20";
+                      ? "text-danger bg-[#FF5C5C]/10 border-[#FF5C5C]/20"
+                      : "text-warn bg-[#F6B73C]/10 border-[#F6B73C]/20";
                     return (
                       <span key={tag} className={`px-1.5 py-0.5 rounded text-[10px] border ${tagStyle}`}>
                         {tag}
                       </span>
                     );
                   })}
-                  {r.riskTags.length === 0 && <span className="text-[#35D06E] text-[10px]">✓ 無異常</span>}
+                  {r.riskTags.length === 0 && <span className="text-ok text-[10px]">✓ 無異常</span>}
                 </div>
               ),
             },
@@ -328,21 +328,21 @@ export default function PortfolioRiskPage() {
             {
               key: "desc",
               header: "情景描述",
-              className: "text-[#8FA3BF] text-[12px] max-w-[360px]",
+              className: "text-subink text-[12px] max-w-[360px]",
               render: (s) => s.desc,
             },
             {
               key: "pnl",
               header: "預估組合損益",
               align: "right",
-              className: "font-mono text-[#FF5C5C] font-semibold",
+              className: "font-mono text-danger font-semibold",
               render: (s) => s.pnl,
             },
             {
               key: "drawdown",
               header: "預估最大回撤",
               align: "right",
-              className: "font-mono text-[#FF5C5C] font-semibold",
+              className: "font-mono text-danger font-semibold",
               render: (s) => s.drawdown,
             },
             {
