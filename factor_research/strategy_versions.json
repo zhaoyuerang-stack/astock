@@ -876,9 +876,16 @@
             "calmar": 0.57,
             "hit": false
           },
-          "status": "在册",
+          "status": "退役",
           "notes": "✅高质量动量对冲样本外（2023-2026）表现良好：超额为正，年化回报 10.86%，夏普比率达到 0.70，展现出在震荡下行市中极强的抗风险与选股阿尔法能力。",
-          "evidence": {},
+          "evidence": {
+            "retirement": {
+              "reason": "已衰退失效 (06-22 9-Gate 审计：回撤较大，WF夏普已趋近于0，超额收益耗尽)",
+              "evidence_refs": [],
+              "retired_at": "2026-06-25T14:44:13.972644+00:00",
+              "actor": "manual_governance"
+            }
+          },
           "nine_gate": {
             "run_date": "2026-06-21",
             "passed_all": false,
@@ -967,9 +974,16 @@
             "calmar": 0.11,
             "hit": false
           },
-          "status": "在册",
+          "status": "退役",
           "notes": "全历史压力测试（2012-2026）：经历多次动量崩塌（Momentum Crash），由于质量和路径平滑度过滤，全历史年化保持为正（+5.33%，夏普 0.39），显著优于原始动量（-13.90%，夏普 -0.67）。",
-          "evidence": {},
+          "evidence": {
+            "retirement": {
+              "reason": "已衰退失效 (06-22 9-Gate 审计：回撤较大，WF夏普已趋近于0，超额收益耗尽)",
+              "evidence_refs": [],
+              "retired_at": "2026-06-25T14:44:13.974235+00:00",
+              "actor": "manual_governance"
+            }
+          },
           "nine_gate": {
             "run_date": "2026-06-21",
             "passed_all": false,
@@ -2163,9 +2177,16 @@
             "calmar": 0.26,
             "hit": false
           },
-          "status": "在册",
+          "status": "退役",
           "notes": "✅样本外测试（2023-2026）表现良好：超额为正，最大回撤 11.3% 控制在 15% 以内，年化调仓降至 3.6 次，与小盘策略相关性 -0.096 负相关，符合第二母策略分流要求。",
-          "evidence": {},
+          "evidence": {
+            "retirement": {
+              "reason": "已衰退失效 (06-22 9-Gate 审计：回撤较大，WF夏普已趋近于0，超额收益耗尽)",
+              "evidence_refs": [],
+              "retired_at": "2026-06-25T14:44:13.975441+00:00",
+              "actor": "manual_governance"
+            }
+          },
           "nine_gate": {
             "run_date": "2026-06-21",
             "passed_all": false,
@@ -2287,9 +2308,16 @@
             "calmar": 0.54,
             "hit": false
           },
-          "status": "在册",
+          "status": "退役",
           "notes": "✅自适应 CPV 惩罚版：样本外（2023-2026）年化提升至 5.66%（超越 Baseline 3.97%），最大回撤控制在 10.53%，成功避开了 2023-2026 年高股息红利央国企的拥挤抱团误伤。",
-          "evidence": {},
+          "evidence": {
+            "retirement": {
+              "reason": "已衰退失效 (06-22 9-Gate 审计：回撤较大，WF夏普已趋近于0，超额收益耗尽)",
+              "evidence_refs": [],
+              "retired_at": "2026-06-25T14:44:13.976591+00:00",
+              "actor": "manual_governance"
+            }
+          },
           "nine_gate": {
             "run_date": "2026-06-21",
             "passed_all": false,
@@ -2380,9 +2408,16 @@
             "calmar": 0.05,
             "hit": false
           },
-          "status": "在册",
+          "status": "退役",
           "notes": "全历史压力测试：将全历史收益从 -3.03% 扭转为 +1.38%（夏普 0.19），且最大回撤由 -48.69% 压缩至 -26.98%，相比 baseline 有巨大的绝对与相对优化。",
-          "evidence": {},
+          "evidence": {
+            "retirement": {
+              "reason": "已衰退失效 (06-22 9-Gate 审计：回撤较大，WF夏普已趋近于0，超额收益耗尽)",
+              "evidence_refs": [],
+              "retired_at": "2026-06-25T14:44:13.977731+00:00",
+              "actor": "manual_governance"
+            }
+          },
           "nine_gate": {
             "run_date": "2026-06-21",
             "passed_all": false,
