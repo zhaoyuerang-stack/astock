@@ -125,7 +125,7 @@ def run_autoresearch_island_search(
     turnover_weight: float = 0.15,
     complexity_weight: float = 0.0,
     orth_weight: float = 0.2,
-    stability_weight: float = 0.5,
+    stability_weight: float = 0.0,  # opt-in:walk-forward 实测未改善 OOS(过拟合多为 regime-break,in-sample 抓不到);代码留作工具
     computation_time_budget: float = 10.0,
     rediscovery_corr: float = 0.5,
     repository: CandidateRepository | None = None,
@@ -216,7 +216,7 @@ def run_autoresearch_walk_forward(
     corr_weight: float = 0.3,
     turnover_weight: float = 0.15,
     orth_weight: float = 0.2,
-    stability_weight: float = 0.5,
+    stability_weight: float = 0.0,  # opt-in:walk-forward 实测未改善 OOS(过拟合多为 regime-break,in-sample 抓不到);代码留作工具
     rediscovery_corr: float = 0.5,
     repository: CandidateRepository | None = None,
     experiment_log=None,
