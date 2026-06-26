@@ -9,6 +9,10 @@ from .validator import validate_candidate_ast
 
 
 _SEEDS = [
+    # 北向资金正交族置顶(打破小盘坍缩):islands 以小 limit 采种,置顶保证 smart-money
+    # 正交维度必进搜索初始种群。smart-money × 趋势 / 质量。
+    ("northbound_accumulation", {"window": 20}, "momentum", {"window": 20}),
+    ("northbound_accumulation", {"window": 20}, "roe", {}),
     ("momentum", {"window": 20}, "volume_ratio", {"window": 5}),
     ("alpha_003", {}, "bp_proxy", {}),
     ("momentum", {"window": 60}, "volatility", {"window": 20}),

@@ -58,6 +58,11 @@ ALLOWED_FACTORS: dict[str, FactorSpec] = {
     "holder_count_chg": FactorSpec("holder_count_chg", {"window": (40, 240)}, ("holder/holdernumber",)),
     "holdertrade_net": FactorSpec("holdertrade_net", {"window": (40, 250)}, ("holder/holdertrade",)),
     "large_order_net_ratio": FactorSpec("large_order_net_ratio", {"window": (3, 60)}, ("moneyflow",)),
+    # 北向资金(沪深股通持仓):L0 验证与 size/流动性正交(残差 IC 不塌、与小盘 corr≈0),
+    # 给搜索空间加上跳出小盘簇的正交维度。
+    "northbound_accumulation": FactorSpec("northbound_accumulation", {"window": (5, 120)}, ("capital/northbound",)),
+    "northbound_hold_level": FactorSpec("northbound_hold_level", {}, ("capital/northbound",)),
+    "northbound_flow_strength": FactorSpec("northbound_flow_strength", {"window": (3, 20)}, ("capital/northbound",)),
 }
 
 ALLOWED_TRANSFORMS = {

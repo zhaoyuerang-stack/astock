@@ -30,6 +30,10 @@ _FACTOR_CALLS = {
     "holder_count_chg": ("factors.shareholder", "holder_count_chg", {"window": "window"}),
     "holdertrade_net": ("factors.shareholder", "holdertrade_net", {"window": "window"}),
     "large_order_net_ratio": ("factors.capital_flow", "large_order_net_ratio", {"window": "window"}),
+    # 北向资金正交族(与 factory.autoresearch.registry.ALLOWED_FACTORS 同步)
+    "northbound_accumulation": ("factors.northbound", "northbound_accumulation", {"window": "window"}),
+    "northbound_hold_level": ("factors.northbound", "northbound_hold_level", {}),
+    "northbound_flow_strength": ("factors.northbound", "northbound_flow_strength", {"window": "window"}),
     "alpha_001": ("factors.alpha101", "alpha_001", {}),
     "alpha_002": ("factors.alpha101", "alpha_002", {}),
     "alpha_003": ("factors.alpha101", "alpha_003", {}),
