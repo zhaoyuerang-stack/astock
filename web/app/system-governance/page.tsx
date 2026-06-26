@@ -7,7 +7,8 @@ import DataTable from "@/components/ui/DataTable";
 import { api } from "@/lib/api";
 import { useAgent } from "@/lib/agentStore";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
-import { HashCopy } from "@/components/ui/QuantComponents";
+import DeploymentTruth from "@/components/governance/DeploymentTruth";
+import type { SystemTruthView } from "@/lib/types";
 
 type CIGuardRow = {
   script: string;
@@ -32,11 +33,13 @@ export default function SystemGovernancePage() {
 
   const [err, setErr] = useState<string | null>(null);
   const [realAuditLogs, setRealAuditLogs] = useState<AuditLogEventRow[]>([]);
+  const [truth, setTruth] = useState<SystemTruthView | null>(null);
 
   const load = useCallback(() => {
     setErr(null);
-    api.audit(40)
-      .then((a) => {
+    Promise.all([api.systemTruth().catch(() => null), api.audit(40)])
+      .then(([st, a]) => {
+        setTruth(st);
         const mapped = a.entries.map((e) => {
           let level: "P0" | "P1" | "P2" = "P2";
           if (e.kind === "control" || e.status?.includes("FAIL") || e.status?.includes("failed")) {
@@ -63,24 +66,35 @@ export default function SystemGovernancePage() {
         });
         setRealAuditLogs(mapped);
 
+        // AI 上下文以真實 /system/truth 為準,絕不灌「生產就緒」假狀態(後端 fail-closed 時必須誠實)。
+        const allowed = st?.production_allowed ?? false;
+        const declared = st?.declared_legs?.[0];
+        const declaredLabel = declared ? `${declared.family}/${declared.version}` : "—";
         setContext({
           page: "system-governance",
           title: "系統治理與合規中心",
-          summary: `整個系統架構健康度：【生產就緒】。CI 守衛通過率 100% (7/7)。架構依賴拓撲無倒灌反向依賴。歷史審計日誌 ${a.total} 條。`,
-          evidence: [
-            "部署狀態: 生產就緒 (deploy_v2.3.0)",
-            "CI 守衛: check_layer_deps.py 等 7 項全數 PASS",
-            "依賴拓撲關係: data(lake) -> factors -> engine -> strategy -> registry -> production",
-            "金庫隔離 (Holdout Compliance): 合規未越界",
-          ],
-          risk: [],
+          summary: st
+            ? `今日是否允許生產:${allowed ? "是" : "否(系統 fail-closed)"}。聲明部署 ${declaredLabel}(清單 status=${st.declared_status});已驗證部署 ${st.verified ? "有" : "無"}。阻斷原因 ${st.blocking_reasons.length} 項。歷史審計日誌 ${a.total} 條。`
+            : `真相層 /system/truth 載入失敗(後端可能未啟動)。不展示任何假狀態。歷史審計日誌 ${a.total} 條。`,
+          evidence: st
+            ? [
+                `production_allowed: ${allowed}`,
+                `declared: ${declaredLabel} (status=${st.declared_status})`,
+                `verified: ${st.verified ? "yes" : `no — ${st.verify_error}`}`,
+                ...st.blocking_reasons.slice(0, 4),
+              ]
+            : ["/system/truth 不可達"],
+          risk:
+            st && !allowed
+              ? ["系統 fail-closed:當前無已驗證可生產部署,聲明部署 ≠ 已驗證部署,不得當 live 對待"]
+              : [],
           recommendation: [
-            "持續監控生產環境的影子跟單一致性",
+            "點開部署證據鏈核對 spec_hash 漂移與註冊狀態根因",
             "每週定期進行一次 Registry 台帳完整性備份",
           ],
           nextActions: [
             "覆核 P0 級告警日誌記錄",
-            "提交本週部署合規性數字簽名證明",
+            allowed ? "提交本週部署合規性數字簽名證明" : "推進阻斷項修復(見阻斷原因清單)",
           ],
         });
       })
@@ -100,17 +114,31 @@ export default function SystemGovernancePage() {
     { script: "data_full_forbidden.py", desc: "禁用幸存者偏差舊緩存（data_full）源審查", status: "passed", lastRun: "07:30" },
   ];
 
-  // 9 Governance Grid cells
-  const governanceGrid = [
-    { name: "數據新鮮度 (Freshness)", desc: "最新價量對齊 A股最新交易日", status: "passed" },
-    { name: "樣本外合規 (OOS Guard)", desc: "金庫隔離期內無未來信息洩漏", status: "passed" },
+  // 9 Governance Grid cells。
+  // 部署身份兩格(Spec Hash 鎖定 / Registry 證據)由真實 /system/truth 驅動,絕不硬編碼綠燈;
+  // 其餘格尚未接入實時源,標 "unknown" 待接入,不再謊報 PASS(見頁尾免責聲明)。
+  type GridStatus = "passed" | "failed" | "unknown";
+  const hasLegs = !!truth && truth.evidence_chain.length > 0;
+  const specHashStatus: GridStatus = !truth
+    ? "unknown"
+    : hasLegs && truth.evidence_chain.every((l) => l.spec_hash_match)
+      ? "passed"
+      : "failed";
+  const registryStatus: GridStatus = !truth
+    ? "unknown"
+    : hasLegs && truth.evidence_chain.every((l) => l.status_deployable)
+      ? "passed"
+      : "failed";
+  const governanceGrid: { name: string; desc: string; status: GridStatus }[] = [
+    { name: "數據新鮮度 (Freshness)", desc: "最新價量對齊 A股最新交易日", status: "unknown" },
+    { name: "樣本外合規 (OOS Guard)", desc: "金庫隔離期內無未來信息洩漏", status: "unknown" },
     { name: "依賴完整性 (Dependencies)", desc: "無循環導入，分層單向鏈合規", status: "passed" },
-    { name: "Spec Hash 鎖定 (Hash Lock)", desc: "生產運行的策略 Spec Hash 不可篡改", status: "passed" },
-    { name: "Registry 證據 (Evidence)", desc: "九門禁審計 PDF 文檔歸檔齊全", status: "passed" },
-    { name: "回滾可行性 (Rollback)", desc: "策略版本退役與回撤熔斷支持一鍵回滾", status: "passed" },
-    { name: "風控閾值合規 (Risk Limits)", desc: "組合單票與小盤暴露限額合規", status: "passed" },
-    { name: "影子運行一致 (Shadow Consistency)", desc: "實盤/紙面跟單交易淨值偏差 < 1.5%", status: "passed" },
-    { name: "發布審批閉環 (Sign-off Loop)", desc: "人工決策簽名歸檔且在 API trace 可追溯", status: "passed" },
+    { name: "Spec Hash 鎖定 (Hash Lock)", desc: "生產運行的策略 Spec Hash 不可篡改", status: specHashStatus },
+    { name: "Registry 證據 (Evidence)", desc: "部署腿註冊狀態可部署且 spec_hash 對齊", status: registryStatus },
+    { name: "回滾可行性 (Rollback)", desc: "策略版本退役與回撤熔斷支持一鍵回滾", status: "unknown" },
+    { name: "風控閾值合規 (Risk Limits)", desc: "組合單票與小盤暴露限額合規", status: "unknown" },
+    { name: "影子運行一致 (Shadow Consistency)", desc: "實盤/紙面跟單交易淨值偏差 < 1.5%", status: "unknown" },
+    { name: "發布審批閉環 (Sign-off Loop)", desc: "人工決策簽名歸檔且在 API trace 可追溯", status: "unknown" },
   ];
 
   // Audit logs events
@@ -147,36 +175,8 @@ export default function SystemGovernancePage() {
         </div>
       )}
 
-      {/* 1. 部署與 CI 總覽 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="p-4 bg-navy border border-line rounded-lg">
-          <div className="text-[12px] text-subink">整體部署狀態</div>
-          <div className="text-2xl font-bold font-mono text-ok mt-1.5 flex items-center gap-1.5">
-            <span>🟢 生產就緒</span>
-          </div>
-          <div className="text-[10px] text-[#5F728A] mt-2">全站 7 項守衛已全部通過</div>
-        </div>
-
-        <div className="p-4 bg-navy border border-line rounded-lg">
-          <div className="text-[12px] text-subink">CI 守衛通過率</div>
-          <div className="text-2xl font-bold font-mono text-ok mt-1.5">100.0%</div>
-          <div className="text-[10px] text-[#5F728A] mt-2">7 項 CI 定期守衛腳本綠色</div>
-        </div>
-
-        <div className="p-4 bg-navy border border-line rounded-lg">
-          <div className="text-[12px] text-subink">部署系統版本</div>
-          <div className="text-2xl font-bold font-mono text-[#E6EDF7] mt-1.5">v2.3.0</div>
-          <div className="text-[10px] text-[#5F728A] mt-2">
-            <HashCopy label="Commit" value="b3d4e5f6a7b8c9d0" />
-          </div>
-        </div>
-
-        <div className="p-4 bg-navy border border-line rounded-lg">
-          <div className="text-[12px] text-subink">Registry 一致性</div>
-          <div className="text-2xl font-bold font-mono text-ok mt-1.5">100%</div>
-          <div className="text-[10px] text-[#5F728A] mt-2">版本、Spec Hash 鎖定正常</div>
-        </div>
-      </div>
+      {/* 1. 部署真相層 (declared / verified / production_allowed + 證據鏈) —— 取代原硬編碼綠燈 */}
+      <DeploymentTruth truth={truth} />
 
       {/* 2. 架構依賴單向拓撲 (Section 12.5) */}
       <Card title="架構依賴關係拓撲檢查 (Single-Direction Architecture Dependency)">
@@ -227,16 +227,29 @@ export default function SystemGovernancePage() {
       {/* 3. 治理九宮格 */}
       <div className="space-y-3">
         <h3 className="text-sm font-bold text-subink tracking-wider uppercase">合規治理九宮格 (Governance 9-Grid Matrix)</h3>
+        <div className="text-[10px] text-[#5F728A] leading-relaxed">
+          部署身份兩格由 <span className="font-mono">/system/truth</span> 實時驅動;標
+          <span className="text-subink font-mono"> ◌ 待接入 </span>
+          的格尚未接入實時源,不代表已通過。
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {governanceGrid.map((grid) => (
-            <div key={grid.name} className="p-4 bg-navy border border-line rounded-lg flex flex-col justify-between h-28 hover:border-brand transition-all">
-              <div className="flex justify-between items-start">
-                <span className="font-bold text-[12px] text-[#E6EDF7] font-mono leading-tight">{grid.name}</span>
-                <span className="text-ok font-bold text-[10px] font-mono">✓ PASS</span>
+          {governanceGrid.map((grid) => {
+            const badge =
+              grid.status === "passed"
+                ? { cls: "text-ok", txt: "✓ PASS" }
+                : grid.status === "failed"
+                  ? { cls: "text-danger", txt: "✗ FAIL" }
+                  : { cls: "text-[#5F728A]", txt: "◌ 待接入" };
+            return (
+              <div key={grid.name} className="p-4 bg-navy border border-line rounded-lg flex flex-col justify-between h-28 hover:border-brand transition-all">
+                <div className="flex justify-between items-start">
+                  <span className="font-bold text-[12px] text-[#E6EDF7] font-mono leading-tight">{grid.name}</span>
+                  <span className={`font-bold text-[10px] font-mono ${badge.cls}`}>{badge.txt}</span>
+                </div>
+                <p className="text-[11px] text-subink leading-normal">{grid.desc}</p>
               </div>
-              <p className="text-[11px] text-subink leading-normal">{grid.desc}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

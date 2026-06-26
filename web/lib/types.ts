@@ -580,3 +580,42 @@ export interface GovernanceView {
   experiments_ledger: Record<string, any>[];
   committees: Record<string, any>[];
 }
+
+// 系统真相层:declared(清单声称在跑) ≠ verified(fail-closed 校验后真正可激活) ≠ production_allowed。
+// 后端 /system/truth,前端只读呈现,不做任何"修正"。
+export interface DeclaredLeg {
+  family: string;
+  version: string;
+  spec_hash: string;
+  role: string;
+}
+
+export interface LegEvidence {
+  family: string;
+  version: string;
+  role: string;
+  declared_spec_hash: string;
+  registry_found: boolean;
+  registry_status: string;
+  registry_spec_hash: string;
+  status_deployable: boolean;
+  spec_hash_match: boolean;
+  blocking_reason: string; // 空字符串 = 该腿无阻断
+}
+
+export interface SystemTruthView {
+  as_of: string;
+  production_allowed: boolean;
+  declared_present: boolean;
+  declared_deployment_id: string;
+  declared_status: string;
+  declared_legs: DeclaredLeg[];
+  verified: boolean;
+  verified_deployment_id: string;
+  verified_legs: DeclaredLeg[];
+  verify_error: string;
+  blocking_reasons: string[];
+  evidence_chain: LegEvidence[];
+  truth_sources: Record<string, string>;
+  readiness: Record<string, any>;
+}

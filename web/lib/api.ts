@@ -35,6 +35,7 @@ import type {
   SystemConfigView,
   TradeReadinessView,
   GovernanceView,
+  SystemTruthView,
 } from "./types";
 
 const BASE =
@@ -259,6 +260,7 @@ export const api = {
   },
   tradeReadiness: () => get<TradeReadinessView>("/trade-readiness"),
   governance: () => get<GovernanceView>("/governance"),
+  systemTruth: () => get<SystemTruthView>("/system/truth"),
   shadowIncubation: () => get<any>("/experiments/shadow-incubation"),
   amountTimingValidation: () => get<any>("/experiments/amount-timing-validation"),
 };
