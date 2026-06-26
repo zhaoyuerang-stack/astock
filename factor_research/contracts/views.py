@@ -726,3 +726,56 @@ class GovernanceView(BaseModel):
     validation_reports: list[dict] = Field(default_factory=list)
     experiments_ledger: list[dict] = Field(default_factory=list)
     committees: list[dict] = Field(default_factory=list)
+
+
+class DeclaredLeg(BaseModel):
+    """部署清单声明的一条腿(原文,未经 fail-closed 校验)。"""
+    family: str = ""
+    version: str = ""
+    spec_hash: str = ""
+    role: str = ""
+
+
+class LegEvidence(BaseModel):
+    """单条声明腿的结构化证据链:声明 vs 注册表逐项对照,可追溯到阻断根因。"""
+    family: str = ""
+    version: str = ""
+    role: str = ""
+    declared_spec_hash: str = ""
+    registry_found: bool = False
+    registry_status: str = ""
+    registry_spec_hash: str = ""
+    status_deployable: bool = False
+    spec_hash_match: bool = False
+    blocking_reason: str = ""  # 空字符串 = 该腿无阻断
+
+
+class SystemTruthView(BaseModel):
+    """系统真相层:把「声明的部署 / 已验证的部署 / 是否允许生产」三态显式分开。
+
+    根 ``CLAUDE.md`` 防自欺纪律:registry 退役 / spec_hash 漂移必须 fail-closed,
+    而不是靠 manifest 里 ``status: active`` 当事实源。本视图让前端/运维/agent 一眼区分:
+    ``declared``(清单声称在跑什么,可能指向已降级版本)
+      ≠ ``verified``(通过 fail-closed 校验后真正可激活的身份,否则为空)
+      ≠ ``production_allowed``(今日数据/治理/decay/paper 全过才放行)。
+
+    本视图不重算任何判定:``readiness`` 内嵌既有唯一权威
+    ``runtime.production_readiness.get_production_readiness`` 的完整结果。
+    """
+    as_of: str = ""
+    production_allowed: bool = False
+    # declared —— 清单原文(可能指向已降级版本)
+    declared_present: bool = False
+    declared_deployment_id: str = ""
+    declared_status: str = ""  # manifest 顶层 status(如 "active")
+    declared_legs: list[DeclaredLeg] = Field(default_factory=list)
+    # verified —— 通过 fail-closed 校验后真正可激活的身份
+    verified: bool = False
+    verified_deployment_id: str = ""
+    verified_legs: list[DeclaredLeg] = Field(default_factory=list)
+    verify_error: str = ""  # verified=False 时的 fail-closed 根因
+    # 证据与阻断
+    blocking_reasons: list[str] = Field(default_factory=list)
+    evidence_chain: list[LegEvidence] = Field(default_factory=list)
+    truth_sources: dict = Field(default_factory=dict)
+    readiness: dict = Field(default_factory=dict)  # 内嵌完整 readiness 闸门

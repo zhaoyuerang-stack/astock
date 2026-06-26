@@ -52,25 +52,97 @@ def _default_registry_lookup(family: str, version: str) -> Optional[dict]:
     return next((v for v in fam.get("versions", []) if v.get("version") == version), None)
 
 
-def _validate_leg(leg: DeploymentLeg, registry_lookup: Callable[[str, str], Optional[dict]]) -> None:
-    rec = registry_lookup(leg.family, leg.version)
+def read_declared_manifest(manifest_path: Path | str = DEFAULT_MANIFEST) -> Optional[dict]:
+    """读「声明的」部署清单原文,**不做 fail-closed 校验**。
+
+    声明态回答「清单声称在跑什么」,不回答「能不能跑」(后者由 ``load_active_deployment``
+    fail-closed 决定)。返回归一化 dict 或 None(清单文件不存在)。供「真相层」并排展示
+    declared vs verified,杜绝把 manifest 里的 ``status: active`` 误读成 live。
+    """
+    path = Path(manifest_path)
+    if not path.exists():
+        return None
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    legs = [
+        {
+            "family": str(rl.get("family", "")),
+            "version": str(rl.get("version", "")),
+            "spec_hash": str(rl.get("spec_hash", "")),
+            "role": str(rl.get("role", "")),
+        }
+        for rl in (manifest.get("legs") or [])
+    ]
+    return {
+        "deployment_id": manifest.get("deployment_id", ""),
+        "environment": manifest.get("environment", ""),
+        "status": manifest.get("status", ""),
+        "portfolio_policy": manifest.get("portfolio_policy") or {},
+        "legs": legs,
+    }
+
+
+def diagnose_leg(
+    leg: dict,
+    *,
+    registry_lookup: Optional[Callable[[str, str], Optional[dict]]] = None,
+) -> dict:
+    """对单条声明腿做「非抛出式」诊断,产出结构化证据(供证据链)。
+
+    与 ``_validate_leg`` **同源判定**(状态可部署性 + spec_hash 一致性,且判定优先级一致),
+    但不抛 ``DeploymentNotReady``,而是把每一步对照结果返回,便于前端逐条展示阻断根因。
+    ``blocking_reason`` 为空字符串表示该腿无阻断。
+    """
+    registry_lookup = registry_lookup or _default_registry_lookup
+    family = str(leg.get("family", ""))
+    version = str(leg.get("version", ""))
+    declared_hash = str(leg.get("spec_hash", ""))
+    out = {
+        "family": family,
+        "version": version,
+        "role": str(leg.get("role", "")),
+        "declared_spec_hash": declared_hash,
+        "registry_found": False,
+        "registry_status": "",
+        "registry_spec_hash": "",
+        "status_deployable": False,
+        "spec_hash_match": False,
+        "blocking_reason": "",
+    }
+    rec = registry_lookup(family, version)
     if rec is None:
-        raise DeploymentNotReady(
-            f"{leg.family}/{leg.version} 不在注册表 —— 不能部署未注册策略")
+        out["blocking_reason"] = f"{family}/{version} 不在注册表 —— 不能部署未注册策略"
+        return out
+    out["registry_found"] = True
     status = rec.get("status")
-    if status not in DEPLOYABLE_STATUSES:
-        raise DeploymentNotReady(
-            f"{leg.family}/{leg.version} 注册状态={status!r} 非可部署({sorted(DEPLOYABLE_STATUSES)});"
+    out["registry_status"] = str(status or "")
+    reg_hash = (rec.get("executable_spec") or {}).get("spec_hash") or ""
+    out["registry_spec_hash"] = reg_hash
+    out["status_deployable"] = status in DEPLOYABLE_STATUSES
+    out["spec_hash_match"] = bool(reg_hash) and reg_hash == declared_hash
+    if not out["status_deployable"]:
+        out["blocking_reason"] = (
+            f"{family}/{version} 注册状态={status!r} 非可部署({sorted(DEPLOYABLE_STATUSES)});"
             f"退役/候选版本不得激活")
-    reg_hash = (rec.get("executable_spec") or {}).get("spec_hash")
-    if not reg_hash:
-        raise DeploymentNotReady(
-            f"{leg.family}/{leg.version} 注册记录缺少 executable_spec.spec_hash;"
+    elif not reg_hash:
+        out["blocking_reason"] = (
+            f"{family}/{version} 注册记录缺少 executable_spec.spec_hash;"
             f"需先迁移到 spec 化身份(Task 19)")
-    if reg_hash != leg.spec_hash:
-        raise DeploymentNotReady(
-            f"{leg.family}/{leg.version} spec_hash 不匹配:清单={leg.spec_hash[:12]} "
+    elif not out["spec_hash_match"]:
+        out["blocking_reason"] = (
+            f"{family}/{version} spec_hash 不匹配:清单={declared_hash[:12]} "
             f"注册={reg_hash[:12]} —— 部署与注册身份漂移")
+    return out
+
+
+def _validate_leg(leg: DeploymentLeg, registry_lookup: Callable[[str, str], Optional[dict]]) -> None:
+    """fail-closed 校验:复用 ``diagnose_leg`` 的同源判定,有阻断即抛。"""
+    diag = diagnose_leg(
+        {"family": leg.family, "version": leg.version,
+         "spec_hash": leg.spec_hash, "role": leg.role},
+        registry_lookup=registry_lookup,
+    )
+    if diag["blocking_reason"]:
+        raise DeploymentNotReady(diag["blocking_reason"])
 
 
 def load_active_deployment(
