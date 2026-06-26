@@ -187,6 +187,30 @@ class IslandSearchResult:
     champions: list[ChampionRecord] = field(default_factory=list)
 
 
+def _style_exposure(panel, style_panels) -> float:
+    """候选因子面板对 size/流动性等风格的暴露 = 平均 |截面 spearman 相关| ∈ [0,1]。
+
+    高值 = 该候选是风格(尤其 size/流动性)的伪装 / blending 把信号拉回小盘流动性簇 →
+    fitness 据此压分,使搜索保持正交。panel 与 style 面板按交集对齐(style 自动截到 panel 日期,
+    walk-forward 下即 ≤cutoff 训练期,size/流动性为当期 PIT 特征、无前瞻泄露)。
+    """
+    import pandas as pd
+
+    vals = []
+    for s in style_panels:
+        sp = s.reindex(index=panel.index, columns=panel.columns)
+        cs = []
+        for t in panel.index:
+            a, b = panel.loc[t], sp.loc[t]
+            if a.notna().sum() > 30 and b.notna().sum() > 30:
+                c = a.corr(b, method="spearman")
+                if pd.notna(c):
+                    cs.append(abs(float(c)))
+        if cs:
+            vals.append(sum(cs) / len(cs))
+    return sum(vals) / len(vals) if vals else 0.0
+
+
 def run_island_search(
     close,
     volume,
@@ -207,9 +231,12 @@ def run_island_search(
     corr_weight: float = 0.0,
     turnover_weight: float = 0.0,
     complexity_weight: float = 0.0,
+    directional: bool = False,
+    orth_weight: float = 0.0,
     computation_time_budget: float = 10.0,
     rediscovery_corr: float = 0.5,
     reference_panels: list | None = None,
+    style_panels: list | None = None,
     behavior_dates: int = 60,
     top_n: int = 25,
     repository=None,
@@ -217,7 +244,11 @@ def run_island_search(
     review_queue=None,
     runners: dict | None = None,
 ) -> IslandSearchResult:
-    """N 岛屿 × G 代进化;适应度 = |ICIR| + novelty_weight×新颖性 − corr_weight×对在册组合相关。
+    """N 岛屿 × G 代进化;适应度 = edge + novelty_weight×新颖性 − corr_weight×对在册组合相关
+    − orth_weight×对 size/流动性风格暴露(§四修法②:把"正交"设为搜索目标,根治 blending 过拟合)。
+    edge = |ICIR|(默认);directional=True 时 edge=max(ICIR,0)只奖正确方向、错号(负 ICIR)归零,
+    根治进化用 neg/翻号刷分。directional=False 且 orth_weight=0 完全向后兼容。
+    style_panels:[size, 流动性] 风格面板(orth_weight>0 时计;size/流动性为当期 PIT 特征,无前瞻)。
 
     reference_panels:在册母策略的因子面板。两种用法:
       - 新颖性(行为距离):候选因子形态与之雷同 → 压分;
@@ -274,7 +305,7 @@ def run_island_search(
 
         # 因子面板算一次,供新颖性(行为距离)与边际(收益相关)共用
         panel = None
-        if novelty_weight > 0 or corr_weight > 0 or turnover_weight > 0:
+        if novelty_weight > 0 or corr_weight > 0 or turnover_weight > 0 or orth_weight > 0:
             try:
                 panel = candidate_factor_panel(candidate.ast, close, volume, behavior_idx)
             except Exception:
@@ -304,13 +335,26 @@ def run_island_search(
         # 重发现硬闸:与在册腿相关 ≥ 阈值 = 该 edge 在册已捕获,**边际为零** →
         # 把 |ICIR| 归零(无论毛 IC 多高都不该霸占冠军席)。corr/turnover 罚仍计入,
         # 使重发现沉到所有真候选之下。WF OOS 发现:0.3 软罚压不住 0.76 IC 的 illiquidity 重发现。
-        edge = abs(float(edge_icir)) if edge_icir is not None else 0.0  # NW 诚实量级
+        # 方向:directional 时只奖正确方向(正 ICIR),错号(负 ICIR)归零——根治进化用
+        # neg/翻号刷分(如 -(holder) 与 holder 同 |ICIR|)。默认 abs(向后兼容,DSL neg 仍可翻正)。
+        if edge_icir is None:
+            edge = 0.0
+        elif directional:
+            edge = max(float(edge_icir), 0.0)
+        else:
+            edge = abs(float(edge_icir))  # NW 诚实量级
         if rediscovery_corr and corr_weight > 0 and ref_returns and corr >= rediscovery_corr:
             edge = 0.0
+        # 正交增量:罚对 size/流动性簇的暴露——blending 若把候选拉回小盘/流动性 → 压分,
+        # 逼搜索保持正交(把"正交"从事后否决变成事中搜索目标)。orth_weight=0 不计(向后兼容)。
+        style_pen = 0.0
+        if orth_weight > 0 and panel is not None and style_panels:
+            style_pen = _style_exposure(panel, style_panels)
         priority_adjustment = float(
             (result.metrics.get("knowledge_gate", {}) or {}).get("priority_adjustment", 1.0)
         )
-        fit = (edge + novelty_weight * nov - corr_weight * corr - turnover_weight * turn - complexity_weight * comp_val) * priority_adjustment
+        fit = (edge + novelty_weight * nov - corr_weight * corr - turnover_weight * turn
+               - complexity_weight * comp_val - orth_weight * style_pen) * priority_adjustment
         memo[candidate.fingerprint] = (fit, result)
         meta[candidate.fingerprint] = (island, generation, float(icir) if icir is not None else 0.0, candidate, nov, corr, turn)
         return fit

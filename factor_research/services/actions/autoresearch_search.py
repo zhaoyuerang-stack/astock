@@ -62,6 +62,24 @@ def active_book_panels(close, volume, amount) -> list:
     return panels
 
 
+def _style_panels(close) -> list:
+    """风格面板 [size(log 流通市值), 流动性(换手率)],供正交增量罚(§四修法②)。
+
+    size/流动性是当期 PIT 特征(daily_basic by_date,无前瞻),reindex 到 close;
+    walk-forward 下 _style_exposure 会按候选面板日期(≤cutoff)自截断,无泄露。算不出则空。
+    """
+    import numpy as np
+
+    try:
+        from lake.load_lake import load_tushare_panel
+        db = load_tushare_panel("daily_basic", close.index, fields=["circ_mv", "turnover_rate"])
+        size = np.log(db["circ_mv"]).reindex(index=close.index, columns=close.columns)
+        liq = db["turnover_rate"].reindex(index=close.index, columns=close.columns)
+        return [size, liq]
+    except Exception:
+        return []
+
+
 def _llm_seeds(islands: int, adapter, repository, experiment_log=None) -> tuple[list, str]:
     """按主题给各岛 LLM 播种;LLM 未配置时退回确定性种子(seeded_by 如实标注)。
 
@@ -106,6 +124,8 @@ def run_autoresearch_island_search(
     corr_weight: float = 0.3,
     turnover_weight: float = 0.15,
     complexity_weight: float = 0.0,
+    directional: bool = True,
+    orth_weight: float = 0.2,
     computation_time_budget: float = 10.0,
     rediscovery_corr: float = 0.5,
     repository: CandidateRepository | None = None,
@@ -125,6 +145,8 @@ def run_autoresearch_island_search(
 
     # 边际适应度:对在册 ACTIVE 组合去相关(伪多样性审计后默认开启)
     reference_panels = active_book_panels(close, volume, amount) if corr_weight > 0 else None
+    # 正交增量罚(§四修法②):对 size/流动性风格暴露压分,逼搜索保持正交、根治 blending 回流
+    style_panels = _style_panels(close) if orth_weight > 0 else None
 
     seeds, seeded_by = ([], "seeds")
     if use_llm:
@@ -145,9 +167,12 @@ def run_autoresearch_island_search(
         corr_weight=corr_weight,
         turnover_weight=turnover_weight,
         complexity_weight=complexity_weight,
+        directional=directional,
+        orth_weight=orth_weight,
         computation_time_budget=computation_time_budget,
         rediscovery_corr=rediscovery_corr,
         reference_panels=reference_panels,
+        style_panels=style_panels,
         repository=repository,
         experiment_log=experiment_log,
         review_queue=review_queue,
@@ -190,6 +215,8 @@ def run_autoresearch_walk_forward(
     novelty_weight: float = 0.25,
     corr_weight: float = 0.3,
     turnover_weight: float = 0.15,
+    directional: bool = True,
+    orth_weight: float = 0.2,
     rediscovery_corr: float = 0.5,
     repository: CandidateRepository | None = None,
     experiment_log=None,
@@ -234,6 +261,10 @@ def run_autoresearch_walk_forward(
         novelty_weight=novelty_weight,
         corr_weight=corr_weight,
         turnover_weight=turnover_weight,
+        directional=directional,
+        orth_weight=orth_weight,
+        # 正交增量罚的风格面板(size/流动性当期 PIT;_style_exposure 按候选 ≤cutoff 日期自截断,无泄露)
+        style_panels=(_style_panels(close) if orth_weight > 0 else None),
         rediscovery_corr=rediscovery_corr,
         experiment_log=experiment_log,
         review_queue=review_queue,
