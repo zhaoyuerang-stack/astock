@@ -85,9 +85,13 @@ def main():
             except Exception as e:
                 print(f"  [persist] {name} 写台账失败(继续,不阻断报告): {e}", file=sys.stderr)
 
-    if not rows:
-        print("无可复测的在册策略(均缺收益序列),跳过。")
-        return
+    # 0 在册(或在册均缺收益序列)时:不再早退留下陈旧报告,而是写一份**诚实空报告**刷新控制面。
+    # 否则在册数降到 0 后,旧报告(可能列着已退役策略)会永久陈旧、误导 PM 交易台的退役监控。
+    # 语义解耦:status=green 表示"无在册策略发生衰减"(0 在册时真),"无 alpha 可用"由 model/入册门
+    # 负责(trade_readiness.model_version=not_registered),decay 门不以已退役策略误报 red。
+    no_registered = not rows
+    if no_registered:
+        print("无在册策略可复测(0 在册或均缺收益序列)——写诚实空报告刷新陈旧控制面,不早退。")
 
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     with open(REPORT, "a") as f:
@@ -99,6 +103,8 @@ def main():
         print(f"⚠️ {len(decayed)} 个在册策略触发衰减信号,建议走 workflow 标退役复核:")
         for name, reasons in decayed:
             print(f"   {name}: {'; '.join(reasons)}")
+    elif no_registered:
+        print("ℹ️ 当前 0 在册策略,无衰减可监控;空报告(status=green, strategies=[])仅刷新陈旧控制面。")
     else:
         print("✅ 全部在册策略健康,无衰减。")
     generated_at = datetime.now(CHINA_TZ).isoformat(timespec="seconds")
@@ -110,6 +116,7 @@ def main():
         "data_fingerprint": current_data_fingerprint(),
         "as_of_date": latest_date,
         "status": "red" if decayed else "green",
+        "no_registered": no_registered,
         "strategies": rows,
     }
     LATEST.parent.mkdir(parents=True, exist_ok=True)
