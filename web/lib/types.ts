@@ -619,3 +619,41 @@ export interface SystemTruthView {
   truth_sources: Record<string, string>;
   readiness: Record<string, any>;
 }
+
+// Alpha 工厂「晋级就绪」驾驶舱(DECISION_COCKPITS 驾驶舱①)。
+// 后端 /experiments/promotion-readiness;前端只读呈现,权威裁决在后端。
+export interface GateDiag {
+  gate: string;
+  name: string;
+  status: "passed" | "failed" | "unknown";
+  actual: string;
+  threshold: string;
+  source_field: string;
+}
+
+export interface CandidateReadiness {
+  family: string;
+  version: string;
+  stage: string;
+  authoritative_verdict: string; // PASSED | FAILED | PENDING | RUN_FAILED
+  audited: boolean;
+  distance_to_register: number;
+  single_blocker: string;
+  marginal_action: string;
+  gate_diag: GateDiag[];
+  info_cluster: string;
+  crowding: number | null; // null = 无相关数据(诚实未知)
+  dsr_p: number | null;
+  pbo: number | null;
+  n_trials: number | null;
+}
+
+export interface PromotionReadinessView {
+  as_of: string;
+  lead_candidate: string;
+  lead_blocker: string;
+  research_steer: string;
+  candidates: CandidateReadiness[];
+  cluster_map: Record<string, any>;
+  truth_sources: Record<string, string>;
+}

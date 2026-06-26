@@ -24,6 +24,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: "研发与台账",
     items: [
+      { href: "/alpha-factory", label: "Alpha 工厂", desc: "候选按距入册排序、唯一卡点门与信息簇拥挤度(晋级就绪驾驶舱)", ready: true, icon: "candidates", modes: ["ops", "rd"] },
       { href: "/strategy-registry", label: "策略台帳", desc: "母策略台账管理、生命周期与九门禁状态", ready: true, icon: "candidates", modes: ["ops", "rd"] },
       { href: "/factor-research", label: "因子研究", desc: "因子库规模、IC 时序、分组单调性与相关性", ready: true, icon: "factors", modes: ["ops", "rd"] },
       { href: "/backtest-lab", label: "回測實驗", desc: "历史回测表现、样本外塌陷与真实口径偏差", ready: true, icon: "backtest", modes: ["ops", "rd"] },
