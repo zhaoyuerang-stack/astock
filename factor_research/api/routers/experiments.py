@@ -15,6 +15,7 @@ from contracts.views import (
     AutoResearchRunResponse,
     FunnelView,
     HypothesisView,
+    PromotionReadinessView,
     RegisteredExperimentView,
     ResearchDraftCreateRequest,
     ResearchDraftUpdateRequest,
@@ -49,6 +50,7 @@ from services.read.autoresearch import (
     autoresearch_review_queue,
 )
 from services.read.experiments import funnel, hypotheses, registered_experiments, research_run_index
+from services.read.promotion_readiness import get_promotion_readiness
 from services.read.research_work_items import get_work_item, list_work_items
 
 router = APIRouter(prefix="/experiments", tags=["experiments"])
@@ -147,6 +149,12 @@ def get_industry_knowledge_graph() -> dict:
 
 def require_action_token(x_action_token: str | None = Header(default=None, alias=ACTION_HEADER)) -> None:
     verify_action_token(x_action_token)
+
+
+@router.get("/promotion-readiness", response_model=PromotionReadinessView)
+def get_promotion_readiness_endpoint() -> PromotionReadinessView:
+    """Alpha 工厂「晋级就绪」驾驶舱:候选按「距入册」排序 + 唯一卡点 + 边际动作 + 拥挤度。"""
+    return get_promotion_readiness()
 
 
 @router.get("/funnel", response_model=FunnelView)

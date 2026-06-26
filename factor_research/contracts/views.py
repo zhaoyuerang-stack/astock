@@ -779,3 +779,49 @@ class SystemTruthView(BaseModel):
     evidence_chain: list[LegEvidence] = Field(default_factory=list)
     truth_sources: dict = Field(default_factory=dict)
     readiness: dict = Field(default_factory=dict)  # 内嵌完整 readiness 闸门
+
+
+class GateDiag(BaseModel):
+    """单门诊断(**派生·非裁决**):从 registry 扁平 nine_gate 字段映射到 9-Gate 各门,
+    定位「卡在哪一门」。权威裁决始终是 ``nine_gate_policy.decide_nine_gate``,本结构只诊断。"""
+    gate: str = ""           # G2_IC / G4_OOS / G8_DSR ...
+    name: str = ""
+    status: str = "unknown"  # passed | failed | unknown(字段缺失)
+    actual: str = ""         # 实际信号值(字符串化,便于前端直显)
+    threshold: str = ""      # 通过阈值
+    source_field: str = ""   # 取自 nine_gate 哪个扁平字段(可追溯)
+
+
+class CandidateReadiness(BaseModel):
+    """一个候选/参考版本的「晋级就绪」诊断行。"""
+    family: str = ""
+    version: str = ""
+    stage: str = ""                       # 台账 status(候选/参考/...)
+    authoritative_verdict: str = ""       # decide_nine_gate().code —— 唯一权威(PASSED/FAILED/PENDING/RUN_FAILED)
+    audited: bool = False                 # nine_gate 是否跑过(空={}=从未审计)
+    distance_to_register: int = 0         # 未过门数;从未审计 = 最大距离(9)
+    single_blocker: str = ""              # 唯一卡点门 + 根因
+    marginal_action: str = ""             # 启发式边际动作(advisory,非裁决)
+    gate_diag: list[GateDiag] = Field(default_factory=list)
+    info_cluster: str = ""                # 信息簇(高相关家族集合)
+    crowding: float | None = None         # 家族对其它家族的最大相关(None=无相关数据)
+    dsr_p: float | None = None
+    pbo: float | None = None
+    n_trials: int | None = None
+
+
+class PromotionReadinessView(BaseModel):
+    """Alpha 工厂「晋级就绪」驾驶舱:回答「下一个该推进哪个候选、卡它的那一个约束是什么」。
+
+    决策导向(``DECISION_COCKPITS.md`` 驾驶舱①):按「距入册」排序而非按收益,
+    指出每个候选的唯一卡点门 + 边际动作 + 信息簇拥挤度。诚实护栏:
+    权威裁决归 ``decide_nine_gate``;逐门诊断仅定位卡点,绝不改写 passed_all;
+    从未审计的版本如实标「需先跑 9-Gate」,不伪造门距。
+    """
+    as_of: str = ""
+    lead_candidate: str = ""              # 最接近入册者
+    lead_blocker: str = ""               # 全台唯一瓶颈(顶部裁决条)
+    research_steer: str = ""             # 研究重心建议(继续/换向)
+    candidates: list[CandidateReadiness] = Field(default_factory=list)
+    cluster_map: dict = Field(default_factory=dict)  # 拥挤度/冗余率/最拥挤簇
+    truth_sources: dict = Field(default_factory=dict)
