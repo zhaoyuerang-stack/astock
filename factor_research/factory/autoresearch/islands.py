@@ -211,6 +211,41 @@ def _style_exposure(panel, style_panels) -> float:
     return sum(vals) / len(vals) if vals else 0.0
 
 
+def _split_stability(panel, forward_ret) -> float:
+    """in-sample 内部二分稳定性 ∈ [0,1]:edge 在训练窗 early/late 两半都成立的程度。
+
+    把 panel 与 forward_ret 的共享日期按**时序**二分,各算截面 rank-IC 均值 ic1/ic2;
+    把两半投影到全样本方向(d=sign(ic1+ic2)),取较弱半 / |全样本| → ∈[0,1]:
+      1 = 两半同样强(稳),0 = 只靠一半或另一半翻号(过拟合签名)。
+    **严格防泄露**:只用传入的(walk-forward 下 ≤cutoff)训练面板,不碰 held-out OOS。
+    日期不足以二分 → 返回 1.0(不罚,证据不足不误伤)。
+    """
+    import pandas as pd
+
+    dates = [t for t in panel.index if t in forward_ret.index]
+    if len(dates) < 8:
+        return 1.0
+    mid = len(dates) // 2
+
+    def _ic_mean(idx):
+        cs = []
+        for t in idx:
+            a, b = panel.loc[t], forward_ret.loc[t]
+            if a.notna().sum() > 20 and b.notna().sum() > 20:
+                c = a.corr(b, method="spearman")
+                if pd.notna(c):
+                    cs.append(float(c))
+        return sum(cs) / len(cs) if cs else 0.0
+
+    ic1, ic2 = _ic_mean(dates[:mid]), _ic_mean(dates[mid:])
+    full = (ic1 + ic2) / 2.0
+    if abs(full) < 1e-9:
+        return 0.0
+    d = 1.0 if full > 0 else -1.0
+    weaker = min(d * ic1, d * ic2)  # 两半投影到全样本方向后的较弱半
+    return max(0.0, min(1.0, weaker / abs(full)))
+
+
 def run_island_search(
     close,
     volume,
@@ -231,8 +266,8 @@ def run_island_search(
     corr_weight: float = 0.0,
     turnover_weight: float = 0.0,
     complexity_weight: float = 0.0,
-    directional: bool = False,
     orth_weight: float = 0.0,
+    stability_weight: float = 0.0,
     computation_time_budget: float = 10.0,
     rediscovery_corr: float = 0.5,
     reference_panels: list | None = None,
@@ -245,9 +280,12 @@ def run_island_search(
     runners: dict | None = None,
 ) -> IslandSearchResult:
     """N 岛屿 × G 代进化;适应度 = edge + novelty_weight×新颖性 − corr_weight×对在册组合相关
-    − orth_weight×对 size/流动性风格暴露(§四修法②:把"正交"设为搜索目标,根治 blending 过拟合)。
-    edge = |ICIR|(默认);directional=True 时 edge=max(ICIR,0)只奖正确方向、错号(负 ICIR)归零,
-    根治进化用 neg/翻号刷分。directional=False 且 orth_weight=0 完全向后兼容。
+    − orth_weight×对 size/流动性风格暴露(§四修法②:把"正交"设为搜索目标)。
+    edge = |ICIR_nw|(NW 重叠校正的诚实绝对量级)。
+    **stability_weight>0(§四②真版,根治 blending 过拟合)**:edge 乘以 in-sample 内部二分稳定性
+    折扣 ∈[0,1]——把训练窗按时序二分 early/late,edge 在两半都成立才保留,只靠一半(过拟合签名)
+    则折扣趋零。**严格防泄露**:只用传入的训练面板(walk-forward 下即 ≤cutoff),绝不碰 held-out OOS。
+    orth_weight=0 且 stability_weight=0 完全向后兼容。
     style_panels:[size, 流动性] 风格面板(orth_weight>0 时计;size/流动性为当期 PIT 特征,无前瞻)。
 
     reference_panels:在册母策略的因子面板。两种用法:
@@ -305,7 +343,7 @@ def run_island_search(
 
         # 因子面板算一次,供新颖性(行为距离)与边际(收益相关)共用
         panel = None
-        if novelty_weight > 0 or corr_weight > 0 or turnover_weight > 0 or orth_weight > 0:
+        if novelty_weight > 0 or corr_weight > 0 or turnover_weight > 0 or orth_weight > 0 or stability_weight > 0:
             try:
                 panel = candidate_factor_panel(candidate.ast, close, volume, behavior_idx)
             except Exception:
@@ -335,16 +373,15 @@ def run_island_search(
         # 重发现硬闸:与在册腿相关 ≥ 阈值 = 该 edge 在册已捕获,**边际为零** →
         # 把 |ICIR| 归零(无论毛 IC 多高都不该霸占冠军席)。corr/turnover 罚仍计入,
         # 使重发现沉到所有真候选之下。WF OOS 发现:0.3 软罚压不住 0.76 IC 的 illiquidity 重发现。
-        # 方向:directional 时只奖正确方向(正 ICIR),错号(负 ICIR)归零——根治进化用
-        # neg/翻号刷分(如 -(holder) 与 holder 同 |ICIR|)。默认 abs(向后兼容,DSL neg 仍可翻正)。
-        if edge_icir is None:
-            edge = 0.0
-        elif directional:
-            edge = max(float(edge_icir), 0.0)
-        else:
-            edge = abs(float(edge_icir))  # NW 诚实量级
+        edge = abs(float(edge_icir)) if edge_icir is not None else 0.0  # NW 诚实绝对量级
         if rediscovery_corr and corr_weight > 0 and ref_returns and corr >= rediscovery_corr:
             edge = 0.0
+        # in-sample 内部二分稳定性折扣(§四②真版,根治 blending 过拟合):edge 在训练窗 early/late
+        # 两半都成立才保留,只靠一半(过拟合签名)则折扣趋零。严格防泄露:只用训练面板(≤cutoff),
+        # 不碰 held-out OOS。stability_weight=0 不计(向后兼容)。
+        if stability_weight > 0 and panel is not None and forward_ret is not None:
+            stab = _split_stability(panel, forward_ret)
+            edge = edge * ((1.0 - stability_weight) + stability_weight * stab)
         # 正交增量:罚对 size/流动性簇的暴露——blending 若把候选拉回小盘/流动性 → 压分,
         # 逼搜索保持正交(把"正交"从事后否决变成事中搜索目标)。orth_weight=0 不计(向后兼容)。
         style_pen = 0.0
