@@ -11,6 +11,7 @@ import { useAgent } from "@/lib/agentStore";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 import { GateCard, QuantMetricCard, HashCopy } from "@/components/ui/QuantComponents";
 import { useAppStore } from "@/lib/appStore";
+import TradeDecision from "@/components/desk/TradeDecision";
 
 type SignalRow = {
   dir: string;
@@ -76,7 +77,7 @@ export default function DashboardPage() {
             `前置就緒度門禁是否通過 (allowed_to_trade): ${tr.allowed_to_trade ? "YES" : "NO"}`,
             `大周期市場制度: ${m.last_action}`,
             `當前模擬盤 NAV: ${pp.nav.toFixed(2)} · 持倉市值: ${pp.position_value.toFixed(0)}元`,
-            `Spec Hash: ${pp.stale_reason || "a1b2c3d4e5f6"}`,
+            `Spec Hash: ${pp.stale_reason || "未提供"}`,
           ] : [
             `當前選定策略: ${selectedStrategyId} ${selectedStrategyVersion}`,
             `生產運行策略: ${activeFamily} ${activeVersion}`,
@@ -113,9 +114,9 @@ export default function DashboardPage() {
         sharesText: b.side === "HOLD" ? "—" : String(b.est_shares),
         notionalText: b.side === "HOLD" ? "—" : num(b.est_notional, 0),
         industry: "债券",
-        score: 1.0,
+        score: undefined,
         advOccupancy: "—",
-        stStatus: "正常",
+        stStatus: "—",
       });
     }
     paperPlan?.plan?.forEach((item) => {
@@ -126,10 +127,10 @@ export default function DashboardPage() {
         refPrice: item.ref_price,
         sharesText: String(item.est_shares),
         notionalText: num(item.est_notional, 0),
-        industry: "信息技术",
-        score: 0.85,
-        advOccupancy: "0.45%",
-        stStatus: "正常",
+        industry: undefined,
+        score: undefined,
+        advOccupancy: "—",
+        stStatus: "—",
       });
     });
   }
@@ -137,7 +138,26 @@ export default function DashboardPage() {
   const positionRows = isProductionStrategy ? (paperPlan?.positions ?? []) : [];
 
   const specHash = strategyDetail?.strategy?.nine_gate?.config_hash || "—";
-  const dataFingerprint = strategyDetail?.strategy?.nine_gate?.dsr_p !== undefined ? "lake_" + (strategyDetail.strategy.nine_gate.config_hash?.slice(0, 12) || "a1b2c3") : "—";
+  const dataFingerprint = strategyDetail?.strategy?.nine_gate?.config_hash
+    ? `lake_${strategyDetail.strategy.nine_gate.config_hash.slice(0, 12)}`
+    : "—";
+  const rawCandidateCount =
+    isProductionStrategy && paperPlan ? String(paperPlan.candidates.length) : "—";
+  const executedSignalCount = isProductionStrategy ? String(signalRows.length) : "—";
+  const statusFromReadiness = (value?: string): "passed" | "warning" | "failed" | "pending" => {
+    if (!isProductionStrategy || !value) return "pending";
+    if (/(不可用|失敗|失败|滯後|滞后|超限|異常|异常|blocked|fail)/i.test(value)) return "failed";
+    if (/(預警|预警|警告|warning|待|unknown)/i.test(value)) return "warning";
+    return "passed";
+  };
+  const riskGateStatus: "passed" | "warning" | "failed" | "pending" =
+    !isProductionStrategy || !riskReport
+      ? "pending"
+      : riskReport.verdict === "超限"
+      ? "failed"
+      : riskReport.verdict === "预警"
+      ? "warning"
+      : "passed";
 
   return (
     <div className="space-y-6">
@@ -165,6 +185,9 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* 0. PM 交易决策(答案先行,全台:今天能否交易 + 绑定原因 + 板凳/解锁路径)*/}
+      <TradeDecision readiness={readiness} />
+
       {/* 1. 交易門禁就緒度總體横幅 */}
       <StatusBanner
         status={isProductionStrategy && readiness?.allowed_to_trade ? "ready" : "blocked"}
@@ -181,12 +204,18 @@ export default function DashboardPage() {
           isProductionStrategy && market && paperPlan
             ? `市場制度：${market.last_action === "空仓观望" ? "熊市避險" : "牛市運行"} · 建議動作：${
                 paperPlan.action
-              } · 目標倉位：${(paperPlan.band_exposure * 100).toFixed(0)}% · 下次調倉：還有 12 個交易日`
+              } · 目標倉位：${(paperPlan.band_exposure * 100).toFixed(0)}%`
             : undefined
         }
       />
 
-      {/* 2. 帳戶核心指標大卡 */}
+      {/* 2. 帳戶核心指標大卡 —— 模拟盘/影子,非 live 实盘 */}
+      <div className="flex items-center gap-2">
+        <h3 className="text-sm font-bold text-subink tracking-wider uppercase">模拟盘账户 (Shadow)</h3>
+        <span className="px-2 py-0.5 rounded text-[10px] border border-[#BF5AF2]/30 text-[#BF5AF2] font-mono">
+          非 live 实盘 · paper
+        </span>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <QuantMetricCard
           label="總淨資產 (NAV)"
@@ -221,32 +250,32 @@ export default function DashboardPage() {
           <GateCard
             name="1. Governance"
             status={isProductionStrategy && readiness ? (readiness.allowed_to_trade ? "passed" : "warning") : "pending"}
-            summary={isProductionStrategy ? "策略正式在冊，未檢測到降級或禁入限制" : "非生產部署，暫無評估"}
-            lastCheckedAt={isProductionStrategy ? "07:30" : "—"}
+            summary={isProductionStrategy && readiness ? `trade_readiness.allowed_to_trade=${readiness.allowed_to_trade}` : "未接入生產門禁結果"}
+            lastCheckedAt="—"
           />
           <GateCard
             name="2. Decay"
-            status={isProductionStrategy ? "passed" : "pending"}
-            summary={isProductionStrategy ? "滾動夏普比率在冊，未觸發因子衰減衰退警戒線" : "非生產部署，暫無評估"}
-            lastCheckedAt={isProductionStrategy ? "07:30" : "—"}
+            status={statusFromReadiness(readiness?.factor_health)}
+            summary={isProductionStrategy && readiness?.factor_health ? readiness.factor_health : "未接入因子健康度結果"}
+            lastCheckedAt="—"
           />
           <GateCard
             name="3. Paper"
-            status={isProductionStrategy ? "passed" : "pending"}
-            summary={isProductionStrategy ? "紙面影子跟單同步正常，淨值/成交偏離在安全邊界" : "非生產部署，暫無評估"}
-            lastCheckedAt={isProductionStrategy ? "07:30" : "—"}
+            status={isProductionStrategy && paperPlan ? (paperPlan.stale ? "warning" : "passed") : "pending"}
+            summary={isProductionStrategy && paperPlan ? (paperPlan.stale ? paperPlan.stale_reason : `生成時間：${paperPlan.generated_at}`) : "未接入紙面交易計畫"}
+            lastCheckedAt="—"
           />
           <GateCard
             name="4. Data"
-            status={isProductionStrategy && readiness?.data_status === "可用" ? "passed" : isProductionStrategy ? "failed" : "pending"}
-            summary={isProductionStrategy ? (readiness?.data_status === "可用" ? "底層 DuckDB 價量與財務更新及時，無負價異常" : "最新價量數據日期滯後") : "非生產部署，暫無評估"}
-            lastCheckedAt={isProductionStrategy ? "07:30" : "—"}
+            status={statusFromReadiness(readiness?.data_status)}
+            summary={isProductionStrategy && readiness?.data_status ? readiness.data_status : "未接入數據可用性結果"}
+            lastCheckedAt="—"
           />
           <GateCard
-            name="5. Trading Day"
-            status={isProductionStrategy ? "passed" : "pending"}
-            summary={isProductionStrategy ? "今日為 A 股交易日，且在開盤競價窗口內" : "非生產部署，暫無評估"}
-            lastCheckedAt={isProductionStrategy ? "07:30" : "—"}
+            name="5. Risk"
+            status={riskGateStatus}
+            summary={isProductionStrategy && riskReport ? `風控 verdict=${riskReport.verdict}` : "未接入風控評估結果"}
+            lastCheckedAt="—"
           />
         </div>
       </div>
@@ -261,7 +290,7 @@ export default function DashboardPage() {
                 {isProductionStrategy ? (readiness?.allowed_to_trade ? "正式發布" : "已阻塞") : "非生產部署"}
               </span>
             </span>
-            <span className="text-[#5F728A]">部署ID: {isProductionStrategy ? "deploy_20260624_v1" : "—"}</span>
+            <span className="text-[#5F728A]">部署ID: —</span>
             <span className="text-[#5F728A]">策略版本: {selectedStrategyId} {selectedStrategyVersion}</span>
           </div>
           <div className="flex items-center gap-3">
@@ -439,8 +468,8 @@ export default function DashboardPage() {
                     key: "stStatus",
                     header: "ST 狀態",
                     render: (r) => (
-                      <span className={r.stStatus === "ST" ? "text-danger" : "text-ok"}>
-                        {r.stStatus || "正常"}
+                      <span className={r.stStatus === "ST" ? "text-danger" : r.stStatus && r.stStatus !== "—" ? "text-ok" : "text-subink"}>
+                        {r.stStatus || "—"}
                       </span>
                     ),
                   },
@@ -454,23 +483,23 @@ export default function DashboardPage() {
               <div className="text-sm font-semibold text-[#E6EDF7] mb-2">否決器過濾審計 (Veto Filtering Summary)</div>
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4 py-2">
                 <div className="p-3 bg-bg border border-line rounded-lg text-center">
-                  <div className="text-2xl font-bold font-mono text-[#E6EDF7]">{isProductionStrategy ? "325" : "—"}</div>
+                  <div className="text-2xl font-bold font-mono text-[#E6EDF7]">{rawCandidateCount}</div>
                   <div className="text-[11px] text-subink mt-1">原始候選股票數</div>
                 </div>
                 <div className="p-3 bg-bg border border-line rounded-lg text-center">
-                  <div className="text-2xl font-bold font-mono text-danger">{isProductionStrategy ? "-67" : "—"}</div>
+                  <div className="text-2xl font-bold font-mono text-subink">—</div>
                   <div className="text-[11px] text-subink mt-1">基本面否決 (ROE/扣非)</div>
                 </div>
                 <div className="p-3 bg-bg border border-line rounded-lg text-center">
-                  <div className="text-2xl font-bold font-mono text-danger">{isProductionStrategy ? "-42" : "—"}</div>
+                  <div className="text-2xl font-bold font-mono text-subink">—</div>
                   <div className="text-[11px] text-subink mt-1">流動性過濾 (成交額/ADV)</div>
                 </div>
                 <div className="p-3 bg-bg border border-line rounded-lg text-center">
-                  <div className="text-2xl font-bold font-mono text-danger">{isProductionStrategy ? "-191" : "—"}</div>
+                  <div className="text-2xl font-bold font-mono text-subink">—</div>
                   <div className="text-[11px] text-subink mt-1">風險特徵否決 (ST/高波動)</div>
                 </div>
                 <div className="p-3 bg-bg border border-line/80 rounded-lg text-center border-dashed">
-                  <div className="text-2xl font-bold font-mono text-ok">{isProductionStrategy ? "25" : "—"}</div>
+                  <div className="text-2xl font-bold font-mono text-ok">{executedSignalCount}</div>
                   <div className="text-[11px] text-subink mt-1">通過後執行名單</div>
                 </div>
               </div>
@@ -483,23 +512,23 @@ export default function DashboardPage() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="p-4 bg-bg border border-line rounded-lg">
                   <div className="text-[11px] text-subink">預計單邊交易滑點</div>
-                  <div className="text-xl font-bold text-[#E6EDF7] mt-1.5 font-mono">{isProductionStrategy ? "18.5 bps" : "—"}</div>
-                  <div className="text-[10px] text-[#5F728A] mt-1">{isProductionStrategy ? "小盤滑點加成已扣除" : "暫無評估"}</div>
+                  <div className="text-xl font-bold text-[#E6EDF7] mt-1.5 font-mono">—</div>
+                  <div className="text-[10px] text-[#5F728A] mt-1">後端未提供滑點估計</div>
                 </div>
                 <div className="p-4 bg-bg border border-line rounded-lg">
                   <div className="text-[11px] text-subink">預估市場衝擊成本</div>
-                  <div className="text-xl font-bold text-[#E6EDF7] mt-1.5 font-mono">{isProductionStrategy ? "0.082%" : "—"}</div>
-                  <div className="text-[10px] text-[#5F728A] mt-1">{isProductionStrategy ? "基於 ADV 占用率估計" : "暫無評估"}</div>
+                  <div className="text-xl font-bold text-[#E6EDF7] mt-1.5 font-mono">—</div>
+                  <div className="text-[10px] text-[#5F728A] mt-1">後端未提供市場衝擊估計</div>
                 </div>
                 <div className="p-4 bg-bg border border-line rounded-lg">
                   <div className="text-[11px] text-subink">高擁擠度持仓數量</div>
-                  <div className="text-xl font-bold text-warn mt-1.5 font-mono">{isProductionStrategy ? "3 只" : "—"}</div>
-                  <div className="text-[10px] text-[#5F728A] mt-1">{isProductionStrategy ? "市值低於 30 億小盤" : "暫無評估"}</div>
+                  <div className="text-xl font-bold text-warn mt-1.5 font-mono">—</div>
+                  <div className="text-[10px] text-[#5F728A] mt-1">後端未提供擁擠度評估</div>
                 </div>
                 <div className="p-4 bg-bg border border-line rounded-lg">
                   <div className="text-[11px] text-subink">執行風險綜合評級</div>
-                  <div className="text-xl font-bold text-ok mt-1.5 font-mono">{isProductionStrategy ? "LOW (低)" : "—"}</div>
-                  <div className="text-[10px] text-[#5F728A] mt-1">{isProductionStrategy ? "倉位容量充足度 94%" : "暫無評估"}</div>
+                  <div className="text-xl font-bold text-ok mt-1.5 font-mono">—</div>
+                  <div className="text-[10px] text-[#5F728A] mt-1">後端未提供綜合評級</div>
                 </div>
               </div>
             </div>
