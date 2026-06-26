@@ -37,6 +37,7 @@ import type {
   GovernanceView,
   SystemTruthView,
   PromotionReadinessView,
+  GateVerdictsView,
 } from "./types";
 
 const BASE =
@@ -263,6 +264,7 @@ export const api = {
   governance: () => get<GovernanceView>("/governance"),
   systemTruth: () => get<SystemTruthView>("/system/truth"),
   promotionReadiness: () => get<PromotionReadinessView>("/experiments/promotion-readiness"),
+  gateVerdicts: () => get<GateVerdictsView>("/governance/gate-verdicts"),
   shadowIncubation: () => get<any>("/experiments/shadow-incubation"),
   amountTimingValidation: () => get<any>("/experiments/amount-timing-validation"),
 };

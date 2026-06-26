@@ -657,3 +657,25 @@ export interface PromotionReadinessView {
   cluster_map: Record<string, any>;
   truth_sources: Record<string, string>;
 }
+
+// 验证闸门②:全注册表逐版本 9-Gate 裁决面。后端 /governance/gate-verdicts。
+export interface GateVerdict {
+  family: string;
+  version: string;
+  stage: string;
+  verdict: string;        // PASSED | FAILED | PENDING | RUN_FAILED(权威)
+  verdict_label: string;
+  audited: boolean;
+  register_blocker: string;
+  gate_diag: GateDiag[];
+  dsr_p: number | null;
+  pbo: number | null;
+  n_trials: number | null;
+}
+
+export interface GateVerdictsView {
+  as_of: string;
+  summary: Record<string, number>;
+  verdicts: GateVerdict[];
+  truth_sources: Record<string, string>;
+}

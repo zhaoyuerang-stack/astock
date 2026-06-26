@@ -8,13 +8,15 @@ import { api } from "@/lib/api";
 import { useAgent } from "@/lib/agentStore";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 import DeploymentTruth from "@/components/governance/DeploymentTruth";
-import type { SystemTruthView } from "@/lib/types";
+import GateVerdicts from "@/components/governance/GateVerdicts";
+import type { SystemTruthView, GateVerdictsView } from "@/lib/types";
 
 type CIGuardRow = {
   script: string;
   desc: string;
-  status: "passed" | "failed";
-  lastRun: string;
+  // 守卫定义于 scripts/ci/,由 test_all.sh 在 CI/本地运行;Web 暂无实时运行结果源,
+  // 故不谎报 PASS —— 一律标 "unknown(待接入)",不硬编码绿灯。
+  status: "passed" | "failed" | "unknown";
   reason?: string;
 };
 
@@ -34,12 +36,18 @@ export default function SystemGovernancePage() {
   const [err, setErr] = useState<string | null>(null);
   const [realAuditLogs, setRealAuditLogs] = useState<AuditLogEventRow[]>([]);
   const [truth, setTruth] = useState<SystemTruthView | null>(null);
+  const [verdicts, setVerdicts] = useState<GateVerdictsView | null>(null);
 
   const load = useCallback(() => {
     setErr(null);
-    Promise.all([api.systemTruth().catch(() => null), api.audit(40)])
-      .then(([st, a]) => {
+    Promise.all([
+      api.systemTruth().catch(() => null),
+      api.audit(40),
+      api.gateVerdicts().catch(() => null),
+    ])
+      .then(([st, a, gv]) => {
         setTruth(st);
+        setVerdicts(gv);
         const mapped = a.entries.map((e) => {
           let level: "P0" | "P1" | "P2" = "P2";
           if (e.kind === "control" || e.status?.includes("FAIL") || e.status?.includes("failed")) {
@@ -103,15 +111,16 @@ export default function SystemGovernancePage() {
 
   useAutoRefresh(load);
 
-  // CI guards list data
+  // CI 守衛清單(定義于 scripts/ci/,由 test_all.sh 運行)。Web 暫無實時運行結果源,
+  // status 一律 "unknown(待接入)" —— 不謊報 PASS、不偽造運行時間。
   const ciGuards: CIGuardRow[] = [
-    { script: "check_layer_deps.py", desc: "分層依賴單向性校驗（防止研究代碼逆向倒灌）", status: "passed", lastRun: "07:30" },
-    { script: "check_lake_writers.py", desc: "數據湖寫入入口唯一性限制校驗", status: "passed", lastRun: "07:30" },
-    { script: "check_no_force_promote.py", desc: "限制強制升級候選策略至在冊的後門校驗", status: "passed", lastRun: "07:30" },
-    { script: "check_registry_evidence.py", desc: "在冊策略對應的九門禁 PDF 證據包完整性校驗", status: "passed", lastRun: "07:30" },
-    { script: "holdout_compliance.py", desc: "金庫隔離合規檢測（防 holdout.start 以後數據洩露）", status: "passed", lastRun: "07:30" },
-    { script: "control_exceptions.py", desc: "風控例外簽發合法合規審計", status: "passed", lastRun: "07:30" },
-    { script: "data_full_forbidden.py", desc: "禁用幸存者偏差舊緩存（data_full）源審查", status: "passed", lastRun: "07:30" },
+    { script: "check_layer_deps.py", desc: "分層依賴單向性校驗（防止研究代碼逆向倒灌）", status: "unknown" },
+    { script: "check_lake_writers.py", desc: "數據湖寫入入口唯一性限制校驗", status: "unknown" },
+    { script: "check_no_force_promote.py", desc: "限制強制升級候選策略至在冊的後門校驗", status: "unknown" },
+    { script: "check_registry_evidence.py", desc: "在冊策略對應的九門禁證據包完整性校驗", status: "unknown" },
+    { script: "check_holdout_compliance.py", desc: "金庫隔離合規檢測（防 holdout.start 以後數據洩露）", status: "unknown" },
+    { script: "check_control_exceptions.py", desc: "風控例外簽發合法合規審計", status: "unknown" },
+    { script: "check_no_legacy_data.py", desc: "禁用幸存者偏差舊緩存（data_full）源審查", status: "unknown" },
   ];
 
   // 9 Governance Grid cells。
@@ -141,13 +150,8 @@ export default function SystemGovernancePage() {
     { name: "發布審批閉環 (Sign-off Loop)", desc: "人工決策簽名歸檔且在 API trace 可追溯", status: "unknown" },
   ];
 
-  // Audit logs events
-  const auditLogs: AuditLogEventRow[] = [
-    { time: "2026-06-24 07:30", level: "P2", category: "CI_RUN", event: "CI 守衛檢測通過，7/7 腳本全部 PASS", affected: "全局代碼庫", actor: "system", result: "正常" },
-    { time: "2026-06-23 10:15", level: "P1", category: "REGISTRY", event: "策略 illiquidity v3.1 重大參數微調審批通過", affected: "strategy_versions.json", actor: "admin", result: "簽名同意" },
-    { time: "2026-06-20 09:30", level: "P0", category: "SECURITY", event: "檢測到嘗試直接寫入 strategy_versions.json (攔截繞過)", affected: "registry_store", actor: "unknown", result: "自動拒絕寫入" },
-    { time: "2026-06-15 14:00", level: "P2", category: "DEPLOY", event: "正式發布部署版本 v2.3.0", affected: "量化主引擎", actor: "admin", result: "部署成功" },
-  ];
+  // 审计日志只来自真实 /settings/audit(realAuditLogs);为空时显示空态,不再硬编码假事件
+  // (原 fallback 含 "v2.3.0 部署成功"/"illiquidity v3.1 审批通过" 等捏造记录,已移除)。
 
   const getLevelBadge = (level: "P0" | "P1" | "P2") => {
     const styleMap = {
@@ -178,7 +182,10 @@ export default function SystemGovernancePage() {
       {/* 1. 部署真相層 (declared / verified / production_allowed + 證據鏈) —— 取代原硬編碼綠燈 */}
       <DeploymentTruth truth={truth} />
 
-      {/* 2. 架構依賴單向拓撲 (Section 12.5) */}
+      {/* 2. 驗證閘門②:9-Gate 逐門裁決(候選能否獨立驗證通過→入冊)*/}
+      <GateVerdicts data={verdicts} />
+
+      {/* 3. 架構依賴單向拓撲 (Section 12.5) */}
       <Card title="架構依賴關係拓撲檢查 (Single-Direction Architecture Dependency)">
         <div className="text-[11px] text-subink mb-3 leading-relaxed">
           量化引擎合規鐵律：分層依賴關係必須嚴格單向。禁止任何倒灌式反向依賴（例如數據湖引入策略邏輯，或生產層直接引用未中性化因子模版等）。
@@ -268,16 +275,22 @@ export default function SystemGovernancePage() {
             { key: "desc", header: "防護檢驗說明", className: "text-subink text-[12px]", render: (r) => r.desc },
             {
               key: "status",
-              header: "結果",
-              render: (r) => (
-                <span className="text-ok font-bold font-mono">
-                  ✓ PASS
-                </span>
-              ),
+              header: "實時結果",
+              render: (r) =>
+                r.status === "passed" ? (
+                  <span className="text-ok font-bold font-mono">✓ PASS</span>
+                ) : r.status === "failed" ? (
+                  <span className="text-danger font-bold font-mono">✗ FAIL</span>
+                ) : (
+                  <span className="text-[#5F728A] font-mono">◌ 待接入</span>
+                ),
             },
-            { key: "lastRun", header: "上次自動運行", className: "font-mono text-[#5F728A]", render: (r) => r.lastRun },
           ]}
         />
+        <div className="text-[10px] text-[#5F728A] mt-2 leading-relaxed">
+          守衛定義于 <span className="font-mono">scripts/ci/</span>,由 <span className="font-mono">test_all.sh</span> 在 CI/本地運行;
+          Web 尚未接入實時運行結果源,故標「待接入」——不謊報 PASS。
+        </div>
       </Card>
 
       {/* 5. 近期審計事件與 P0/P1/P2 日誌 */}
@@ -285,8 +298,11 @@ export default function SystemGovernancePage() {
         <div className="text-[11px] text-danger font-semibold mb-2">
           * 警告：本系統合規日誌由區塊鏈/不可變文件鏈條鎖定，任何操作者（包括管理員）皆無法刪除或修改歷史條目。
         </div>
+        {realAuditLogs.length === 0 && (
+          <div className="text-[12px] text-subink py-2">暂无审计记录(来源 /settings/audit)。</div>
+        )}
         <DataTable<AuditLogEventRow>
-          rows={realAuditLogs.length > 0 ? realAuditLogs : auditLogs}
+          rows={realAuditLogs}
           getRowKey={(r, i) => `${r.time}-${i}`}
           columns={[
             { key: "time", header: "時間", className: "font-mono text-[#5F728A] w-36", render: (r) => r.time },
