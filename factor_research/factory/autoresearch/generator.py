@@ -9,6 +9,10 @@ from .validator import validate_candidate_ast
 
 
 _SEEDS = [
+    # 股东户数正交族置顶(probe 实测最强正交源:原始 ICIR 0.57、OOS 留存 159%、残差去 size/流动后
+    # 87% OOS 不塌)。户数减少=筹码集中=机构吸筹。集中度 × 趋势 / 质量。
+    ("holder_count_chg", {"window": 60}, "momentum", {"window": 20}),
+    ("holder_count_chg", {"window": 60}, "roe", {}),
     # 北向资金正交族置顶(打破小盘坍缩):islands 以小 limit 采种,置顶保证 smart-money
     # 正交维度必进搜索初始种群。smart-money × 趋势 / 质量。
     ("northbound_accumulation", {"window": 20}, "momentum", {"window": 20}),
