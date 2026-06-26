@@ -60,6 +60,7 @@
 | 数据湖     | `factor_research/data_lake/README.md`         | 数据湖结构、字段、落盘规范                                 |
 | 成本      | `factor_research/docs/cost_model.md`          | 交易成本模型、费率、滑点、融资、变更记录                          |
 | 产品      | `WEB_DESIGN.md`                               | Web 端 UI/UX canonical 规格(研究分析平台·九页三栏)         |
+| 决策层     | `DECISION_COCKPITS.md`                        | 前端决策驾驶舱架构:每页服务哪个决策、沿 alpha 生命周期重排(约束 WEB_DESIGN 的页面职责) |
 | 落地      | `Implement.md`                                | 把研究引擎接成 Web 产品的执行计划                           |
 | Web     | `web/CLAUDE.md`                               | Next.js 前端开发纪律、命令、缓存故障处理                      |
 | 决策      | `DECISIONS.md`                                | ADR 决策记录，append-only                          |
