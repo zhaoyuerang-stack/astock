@@ -825,3 +825,29 @@ class PromotionReadinessView(BaseModel):
     candidates: list[CandidateReadiness] = Field(default_factory=list)
     cluster_map: dict = Field(default_factory=dict)  # 拥挤度/冗余率/最拥挤簇
     truth_sources: dict = Field(default_factory=dict)
+
+
+class GateVerdict(BaseModel):
+    """验证闸门(DECISION_COCKPITS 驾驶舱②)的一行:某版本的 9-Gate R2P 裁决。
+
+    决策:这个版本能否独立验证通过 → 入册?权威裁决 = ``decide_nine_gate``(只认 passed_all),
+    逐门诊断(gate_diag)定位卡点(诊断·非裁决)。"""
+    family: str = ""
+    version: str = ""
+    stage: str = ""                       # 台账 status
+    verdict: str = ""                     # PASSED | FAILED | PENDING | RUN_FAILED(权威)
+    verdict_label: str = ""               # 中文展示(审计通过/未通过/待完整审计/审计失败)
+    audited: bool = False
+    register_blocker: str = ""            # 阻挡入册的唯一根因(权威 reasons 优先)
+    gate_diag: list[GateDiag] = Field(default_factory=list)  # 复用逐门诊断结构
+    dsr_p: float | None = None
+    pbo: float | None = None
+    n_trials: int | None = None
+
+
+class GateVerdictsView(BaseModel):
+    """验证闸门②:全注册表逐版本的 9-Gate 裁决面 + 计数概览。"""
+    as_of: str = ""
+    summary: dict = Field(default_factory=dict)  # 按 verdict 计数 + audited 数
+    verdicts: list[GateVerdict] = Field(default_factory=list)
+    truth_sources: dict = Field(default_factory=dict)
