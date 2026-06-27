@@ -42,3 +42,23 @@ def large_order_net_ratio(close, window: int = 5, **_):
     net_large = (buy_large - sell_large).rolling(window).mean()
     ratio = net_large / total.replace(0, np.nan)
     return safe_zscore(mad_clip(ratio.replace([np.inf, -np.inf], np.nan)))
+
+
+def smart_money_divergence(close, window: int = 20, **_):
+    """吸筹背离:特大单(elg)净流入强 × 价格未涨 → 机构于价格疲弱处吸筹。
+
+    线性 large_order_net_ratio 的残差 IC≈0(纯流量水平=size/流动性代理);此构造改测
+    *非线性交互* —— elg 净流入标准分 减 同窗价格收益标准分,只有"流入强但价没涨"才高分。
+    这是 moneyflow 唯一可能携带正交(非 size 代理)信息的构造(量价背离/吸筹)。
+    elg-only:剥离 lg 里混的游资,只留机构尺度净流向。
+    """
+    panels = _load_moneyflow_cache()
+    buy_elg = _align_to_close(panels["buy_elg_amount"], close)
+    sell_elg = _align_to_close(panels["sell_elg_amount"], close)
+    buy_total = sum(_align_to_close(panels[f], close) for f in _BUY)
+    sell_total = sum(_align_to_close(panels[f], close) for f in _SELL)
+    total = (buy_total + sell_total).rolling(window).mean()
+    elg_net = (buy_elg - sell_elg).rolling(window).mean()
+    elg_ratio_z = safe_zscore(mad_clip((elg_net / total.replace(0, np.nan)).replace([np.inf, -np.inf], np.nan)))
+    ret_z = safe_zscore(mad_clip(close.pct_change(window).replace([np.inf, -np.inf], np.nan)))
+    return safe_zscore(mad_clip(elg_ratio_z - ret_z))

@@ -47,6 +47,18 @@ def build_small_cap_amount(prices: PricePanel, params: dict) -> pd.DataFrame:
     return small_cap_factor(prices.amount, window=int(params.get("window", 60)))
 
 
+def build_holder_count_chg(prices: PricePanel, params: dict) -> pd.DataFrame:
+    """股东户数环比变化(状态量): -pct_change(window) → MAD clip → zscore。
+
+    PIT 由 lake.load_lake anndate 对齐内建(T 日只用 T 日前已公告户数,见
+    factors.shareholder)。符号在因子内: 户数减少→筹码集中→因子值高→nlargest 买入,
+    无需 spec 侧再翻转。与 factors.shareholder.holder_count_chg 逐位一致(单一真相)。
+    """
+    from factors.shareholder import holder_count_chg
+
+    return holder_count_chg(prices.close, window=int(params.get("window", 60)))
+
+
 # ────────────────────────── timing builders ──────────────────────────
 # 签名: (prices, params) -> (exposure: pd.Series, diagnostics: dict)
 
@@ -100,6 +112,7 @@ def apply_salience_veto(prices: PricePanel, params: dict):
 FACTOR_BUILDERS: dict[str, Callable] = {
     "amihud_illiquidity": build_amihud_illiquidity,
     "small_cap_amount": build_small_cap_amount,
+    "holder_count_chg": build_holder_count_chg,
 }
 
 TIMING_BUILDERS: dict[str, Callable] = {
