@@ -1496,6 +1496,147 @@ def test_island_fitness_penalizes_complexity():
         assert abs(c.fitness - expected_fit) < 1e-9
 
 
+def test_algebraic_metric_proxy_uses_ast_weights_for_corr_and_turnover():
+    """Phase 1:代数代理用 AST 线性权重估算 corr/turnover,不需要候选级 top-N 模拟。"""
+    from factory.autoresearch.islands import _algebraic_metric_proxy
+
+    ast = {
+        "type": "linear_combo",
+        "terms": [
+            {"factor": "momentum", "params": {"window": 20}, "transforms": ["rank"], "weight": 0.75},
+            {"factor": "volume_ratio", "params": {"window": 5}, "transforms": ["rank"], "weight": 0.25},
+        ],
+        "direction": "negative",
+        "thesis": {"mechanism": "test", "citation": "test"},
+    }
+    corr, turnover = _algebraic_metric_proxy(
+        ast,
+        corr_by_factor={"momentum": 0.80, "volume_ratio": 0.20},
+        turnover_by_factor={"momentum": 0.10, "volume_ratio": 0.50},
+    )
+
+    assert abs(corr - (-0.65)) < 1e-9
+    assert abs(turnover - 0.20) < 1e-9
+
+
+def test_multifidelity_prefilter_rejects_low_ic_before_full_l0():
+    """Phase 2:低保真 |IC| 未达线的候选不进入后续完整 L0 评估池。"""
+    from factory.autoresearch.islands import _multi_fidelity_prefilter
+    from factory.lines.line2_validation.l0_ic_scan import precompute_forward_returns
+
+    close, volume, amount = _synthetic_panel()
+    forward_ret = precompute_forward_returns(close)
+    candidates = [
+        validate_candidate_ast(_candidate(weight=0.50)),
+        validate_candidate_ast(_candidate(weight=0.70)),
+        validate_candidate_ast(_candidate(weight=0.90)),
+    ]
+    calls: list[tuple[float, int | None]] = []
+
+    def fake_l0(hyp, *args, **kwargs):
+        weight = float(hyp.factor_params["ast"]["terms"][0]["weight"])
+        sample_dates = kwargs.get("sample_dates")
+        calls.append((weight, sample_dates))
+        ic_mean_by_weight = {0.50: 0.010, 0.70: 0.030, 0.90: 0.050}
+        icir_by_weight = {0.50: 0.10, 0.70: 0.20, 0.90: 0.80}
+        return Experiment(
+            experiment_id=f"mf-{weight}-{sample_dates}",
+            hypothesis_id=hyp.id,
+            protocol=ExperimentProtocol.L0_IC_SCAN,
+            vintage_id=kwargs.get("vintage_id", "synthetic"),
+            result=ExperimentResult(
+                metrics={
+                    "IC_mean": ic_mean_by_weight[weight],
+                    "ICIR": icir_by_weight[weight],
+                    "ICIR_nw": icir_by_weight[weight],
+                },
+                details={"direction": "long"},
+            ),
+            decision=Decision.PROMOTE,
+            notes="fake",
+        )
+
+    kept = _multi_fidelity_prefilter(
+        candidates,
+        pipe_kw={
+            "close": close,
+            "volume": volume,
+            "amount": amount,
+            "forward_ret": forward_ret,
+            "vintage_id": "synthetic",
+            "runners": {"l0": fake_l0},
+            "repository": None,
+            "experiment_log": None,
+            "review_queue": None,
+            "sample_dates": 120,
+            "computation_time_budget": 10.0,
+        },
+        level1_dates=20,
+        level1_ic_min=0.02,
+        level2_dates=60,
+        level2_keep_ratio=0.5,
+    )
+
+    assert [c.ast["terms"][0]["weight"] for c in kept] == [0.90]
+    assert (0.50, 60) not in calls
+    assert (0.70, 60) in calls and (0.90, 60) in calls
+
+
+def test_dsl_memory_cache_mode_does_not_write_factor_store(monkeypatch=None):
+    """搜索期 memory cache 模式只用内存缓存,不写 canonical factor_store parquet。"""
+    from factors.autoresearch_dsl import clear_factor_cache, compute_dsl_factor
+
+    close, volume, _ = _synthetic_panel(n_days=40, n_stocks=8)
+    ast = {
+        "type": "linear_combo",
+        "terms": [{
+            "factor": "momentum",
+            "params": {"window": 5},
+            "transforms": ["zscore"],
+            "weight": 1.0,
+        }],
+        "direction": "positive",
+        "thesis": {"mechanism": "test", "citation": "test"},
+    }
+    writes = {"count": 0}
+    original_to_parquet = pd.DataFrame.to_parquet
+
+    def spy_to_parquet(self, *args, **kwargs):
+        writes["count"] += 1
+        return original_to_parquet(self, *args, **kwargs)
+
+    pd.DataFrame.to_parquet = spy_to_parquet
+    try:
+        clear_factor_cache()
+        first = compute_dsl_factor(close, volume, ast=ast, cache_mode="memory")
+        second = compute_dsl_factor(close, volume, ast=ast, cache_mode="memory")
+    finally:
+        pd.DataFrame.to_parquet = original_to_parquet
+        clear_factor_cache()
+
+    assert writes["count"] == 0
+    assert first.equals(second)
+
+
+def test_window_mutation_snaps_to_fixed_grid():
+    """窗口变异落到固定网格,避免 window_29/window_38 这类冷缓存爆炸。"""
+    from factory.autoresearch.islands import _snap_window_to_grid
+
+    assert _snap_window_to_grid(29, lo=3, hi=252) == 20
+    assert _snap_window_to_grid(38, lo=3, hi=252) == 40
+    assert _snap_window_to_grid(113, lo=3, hi=252) == 120
+    assert _snap_window_to_grid(500, lo=3, hi=252) == 240
+
+
+def test_run_island_search_defaults_to_thread_backend():
+    """L0 搜索默认 thread backend,避免 ProcessPool 反复 pickle 大 DataFrame。"""
+    import inspect
+    from factory.autoresearch.islands import run_island_search
+
+    sig = inspect.signature(run_island_search)
+    assert sig.parameters["evaluation_backend"].default == "thread"
+
+
 def test_validation_pipeline_computation_time_budget():
     """测试当计算耗时超出预算时，因子被舍弃。"""
     from factory.autoresearch.pipeline import run_validation_pipeline
@@ -1580,5 +1721,10 @@ if __name__ == "__main__":
     test_failure_ledger_aggregates_death_causes_with_evidence_gated_lessons()
     test_llm_generation_injects_failure_ledger_into_prompt()
     test_island_fitness_penalizes_complexity()
+    test_algebraic_metric_proxy_uses_ast_weights_for_corr_and_turnover()
+    test_multifidelity_prefilter_rejects_low_ic_before_full_l0()
+    test_dsl_memory_cache_mode_does_not_write_factor_store()
+    test_window_mutation_snaps_to_fixed_grid()
+    test_run_island_search_defaults_to_thread_backend()
     test_validation_pipeline_computation_time_budget()
     print("✅ Auto Factor Research Engine tests passed")

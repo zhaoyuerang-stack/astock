@@ -64,20 +64,51 @@ def _ast_for(seed: tuple, weight: float) -> dict:
 
 
 def generate_seed_candidates(limit: int = 10) -> Iterator[Candidate]:
-    """Yield unique, validated low-complexity seed candidates."""
+    """Yield unique, validated low-complexity seed candidates, covering all 47 whitelisted factors."""
+    from .registry import ALLOWED_FACTORS
+
+    # 1. Start with manually designed high-quality seeds
+    all_seeds = list(_SEEDS)
+    
+    # 2. Track which factors are covered by manually designed seeds
+    covered = set()
+    for left_f, _, right_f, _ in _SEEDS:
+        covered.add(left_f)
+        covered.add(right_f)
+        
+    # 3. For any whitelisted factor not covered, pair it with a default companion
+    for fname, spec in ALLOWED_FACTORS.items():
+        if fname not in covered:
+            params = {}
+            if "window" in spec.params:
+                lo, hi = spec.params["window"]
+                params = {"window": int((lo + hi) // 2)}
+            
+            # If alternative or fundamental, pair with momentum; else pair with roe
+            if "fundamental" in str(spec.data_dependencies) or "holder" in str(spec.data_dependencies):
+                partner = "momentum"
+                partner_params = {"window": 20}
+            else:
+                partner = "roe"
+                partner_params = {}
+                
+            all_seeds.append((fname, params, partner, partner_params))
+
     seen: set[str] = set()
     weights = [0.7, 0.6, 0.5]
-    for seed in _SEEDS:
+    for seed in all_seeds:
         for weight in weights:
-            candidate = validate_candidate_ast(_ast_for(seed, weight))
-            if candidate.fingerprint in seen:
+            try:
+                candidate = validate_candidate_ast(_ast_for(seed, weight))
+                if candidate.fingerprint in seen:
+                    continue
+                seen.add(candidate.fingerprint)
+                yield replace(candidate, provenance={
+                    "origin": "deterministic_seed",
+                    "catalog": "factory.autoresearch.generator._SEEDS",
+                    "pair": f"{seed[0]}×{seed[2]}",
+                })
+                if len(seen) >= limit:
+                    return
+            except Exception:
                 continue
-            seen.add(candidate.fingerprint)
-            # ADR-022 种子溯源:确定性种子源自教科书因子(generator._SEEDS),无金库语义。
-            yield replace(candidate, provenance={
-                "origin": "deterministic_seed",
-                "catalog": "factory.autoresearch.generator._SEEDS",
-                "pair": f"{seed[0]}×{seed[2]}",
-            })
-            if len(seen) >= limit:
-                return

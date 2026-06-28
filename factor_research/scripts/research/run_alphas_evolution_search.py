@@ -28,12 +28,12 @@ def main():
     review_queue = ReviewQueue()
     experiment_log = ExperimentLog()
 
-    print("\nRunning Island Search with 3 islands, 4 generations, population 6...", flush=True)
+    print("\nRunning Large Scale Island Search with 8 islands, 10 generations, population 12...", flush=True)
     search_res = run_autoresearch_island_search(
-        islands=3,
-        generations=4,
-        population=6,
-        top_k=3,
+        islands=8,
+        generations=10,
+        population=12,
+        top_k=5,
         final_stage="l3",
         use_llm=False,  # Force using our interleaved classic alphas seeds in _SEEDS
         start="2018-01-01",
@@ -43,6 +43,12 @@ def main():
         review_queue=review_queue,
         turnover_weight=0.15,  # Penalize high turnover to tame classic alphas
         corr_weight=0.30,      # Penalize correlation with the existing book
+        use_algebraic_proxies=True,
+        multi_fidelity=True,
+        mf_level1_dates=20,
+        mf_level1_ic_min=0.02,
+        mf_level2_dates=60,
+        mf_level2_keep_ratio=0.5,
     )
 
     print(f"\nSearch complete. Evaluated: {search_res.evaluated}.", flush=True)

@@ -9,6 +9,7 @@ from __future__ import annotations
 import importlib
 import json
 from typing import Any
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -68,8 +69,38 @@ _FACTOR_CALLS = {
     "alpha_055": ("factors.alpha101", "alpha_055", {}),
 }
 
+_BASE_FACTOR_MEM_CACHE: dict = {}
+
+def _get_cache_path(name: str, params: dict) -> Path:
+    from pathlib import Path
+    if not params:
+        filename = f"{name}.parquet"
+    else:
+        param_str = "_".join(f"{k}_{v}" for k, v in sorted(params.items()))
+        filename = f"{name}_{param_str}.parquet"
+    base_dir = Path(__file__).resolve().parents[1] / "data_lake" / "factor_store" / "panels"
+    return base_dir / filename
 
 def _call_factor(name: str, close: pd.DataFrame, volume: pd.DataFrame | None, params: dict) -> pd.DataFrame:
+    # 1. Check in-memory cache first
+    param_key = json.dumps(params, sort_keys=True)
+    mem_key = (name, param_key, id(close))
+    if mem_key in _BASE_FACTOR_MEM_CACHE:
+        return _BASE_FACTOR_MEM_CACHE[mem_key]
+
+    # 2. Check local parquet cache
+    cache_path = _get_cache_path(name, params)
+    if cache_path.exists():
+        try:
+            df = pd.read_parquet(cache_path)
+            # Reindex to ensure strict compatibility with the active close index and columns
+            df = df.reindex(index=close.index, columns=close.columns)
+            _BASE_FACTOR_MEM_CACHE[mem_key] = df
+            return df
+        except Exception:
+            pass
+
+    # 3. Compute factor if not cached
     if name not in _FACTOR_CALLS:
         raise ValueError(f"unknown AutoResearch DSL factor: {name}")
     module_name, fn_name, param_map = _FACTOR_CALLS[name]
@@ -77,19 +108,29 @@ def _call_factor(name: str, close: pd.DataFrame, volume: pd.DataFrame | None, pa
     mapped = {target: params[source] for source, target in param_map.items() if source in params}
 
     if name.startswith("alpha_"):
-        return fn(close, volume, **mapped)
-    if name in {"volume_ratio"}:
+        out = fn(close, volume, **mapped)
+    elif name in {"volume_ratio"}:
         if volume is None:
             raise ValueError(f"{name} requires volume")
         if "long" not in mapped:
             mapped["long"] = max(int(mapped.get("short", 5)) * 4, int(mapped.get("short", 5)) + 1)
-        return fn(volume, **mapped)
-    if name == "illiquidity":
+        out = fn(volume, **mapped)
+    elif name == "illiquidity":
         if volume is None:
             raise ValueError("illiquidity requires volume")
-        return fn(close, volume, **mapped)
-    return fn(close, **mapped)
+        out = fn(close, volume, **mapped)
+    else:
+        out = fn(close, **mapped)
 
+    # 4. Save to parquet cache
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        out.to_parquet(cache_path)
+    except Exception:
+        pass
+
+    _BASE_FACTOR_MEM_CACHE[mem_key] = out
+    return out
 
 def _apply_transform(values: pd.DataFrame, op: str, close: pd.DataFrame | None = None) -> pd.DataFrame:
     if op == "mad_clip":
@@ -137,6 +178,7 @@ def clear_factor_cache() -> None:
     """搜索起点清空面板 memo(隔离不同 run / 不同数据口径)。"""
     _PANEL_CACHE.clear()
     _PANEL_ORDER.clear()
+    _BASE_FACTOR_MEM_CACHE.clear()
 
 
 def _panel_key(ast: dict, close, volume):
@@ -153,7 +195,7 @@ def compute_dsl_factor(
 ) -> pd.DataFrame:
     """Compute a validated AutoResearch linear_combo AST(搜索内 memo 化)。"""
     if ast.get("type") != "linear_combo":
-        raise ValueError(f"unsupported AutoResearch AST type: {ast.get('type')}")
+        raise ValueError("unsupported AutoResearch AST type: " + str(ast.get("type")))
 
     key = _panel_key(ast, close, volume)
     cached = _PANEL_CACHE.get(key)
