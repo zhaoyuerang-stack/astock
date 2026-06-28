@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'f=\"$CLAUDE_PROJECT_DIR/.claude/hooks/guard_pretooluse.py\"; [ -r \"$f\" ] || exit 0; python3 \"$f\"; r=$?; [ \"$r\" = 2 ] && exit 2; exit 0'",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
