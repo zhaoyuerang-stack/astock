@@ -56,6 +56,7 @@
 | 多 Agent | `MULTI_AGENT.md`                              | DeepSeek / Codex / Claude / Antigravity 平台分负载 |
 | 协作底线    | `AGENTS.md`                                   | 跨工具(Codex/Cursor/Antigravity)共读的提交/协作底线       |
 | 执行      | `RUNBOOK.md`                                  | 日常命令、数据更新、信号生成、复测、监控                          |
+| Loop 速查 | `LOOP_QUICK_CALLS.md`                         | Loop OS 可快速调用命令、人工确认边界、禁止速调动作                 |
 | 数据      | `factor_research/docs/data_infrastructure.md` | 数据源、数据湖、接口、超时、代理、质量判定                         |
 | 数据湖     | `factor_research/data_lake/README.md`         | 数据湖结构、字段、落盘规范                                 |
 | 成本      | `factor_research/docs/cost_model.md`          | 交易成本模型、费率、滑点、融资、变更记录                          |

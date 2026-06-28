@@ -624,6 +624,8 @@ class BondInstructionView(BaseModel):
     """债券 ETF 轮动指令卡(P5)。"""
     active: bool = False
     side: str = ""              # BUY | SELL | HOLD | ""
+    authorized: bool = True
+    blocked_reason: str = ""
     code: str = "511010"
     name: str = "国债ETF"
     ref_price: float = 0.0

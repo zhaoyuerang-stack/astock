@@ -18,6 +18,8 @@ os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
 from portfolio import paper_engine as pe  # noqa: E402
+from scripts.ops import paper_trade as pt  # noqa: E402
+from contracts.views import BondInstructionView  # noqa: E402
 
 BOND_PX = 141.0     # ETF 不复权参考价
 STOCK_PX = 10.0
@@ -41,8 +43,15 @@ def _acc(cash=1_000_000.0, positions=None, bond=None):
             "positions": positions or {}, "pending": None, "last_date": None, "bond": bond}
 
 
-BOND = {"enabled": True, "code": "511010", "name": "国债ETF"}
-NO_BOND = {"enabled": False, "code": "511010", "name": "国债ETF"}
+DEFENSIVE_AUTH = {
+    "role": "defensive",
+    "family": "defensive-ma16-bond",
+    "version": "v1.0",
+    "spec_hash": "d" * 64,
+}
+BOND = {"enabled": True, "code": "511010", "name": "国债ETF", "authorization": DEFENSIVE_AUTH}
+NO_BOND = {"enabled": False, "code": "511010", "name": "国债ETF", "authorization": DEFENSIVE_AUTH}
+LEGACY_BOND = {"enabled": True, "code": "511010", "name": "国债ETF"}
 
 
 def test_bear_buys_bond():
@@ -61,6 +70,26 @@ def test_bear_buys_bond():
     assert n2 * (1 + pe.ETF_BUY_COST) > 1_000_000.0
     assert len(trades) == 1 and trades[0][3] == "BUY" and trades[0][1] == "511010"
     print(f"✅ BEAR 稳态:闲置现金整手买入 511010({sh} 份,费率 {pe.ETF_BUY_COST:.2%})")
+
+
+def test_legacy_bond_signal_without_defensive_authorization_is_blocked():
+    acc = _acc()
+    trades, blocked = [], []
+    pe.execute_to_target(acc, "2026-06-11", [], 25, {}, trades, blocked, leverage=0.0, bond=LEGACY_BOND)
+    assert acc.get("bond") is None, "未授权债券轮动不得新建 ETF 仓位"
+    assert trades == []
+    assert blocked == [("买入", "511010", "国债ETF", "defensive overlay 未授权,拒绝债券轮动")]
+    print("✅ legacy bond.enabled 无独立 defensive 授权时 fail-closed")
+
+
+def test_legacy_bond_holding_is_not_sold_without_defensive_authorization():
+    acc = _acc(cash=10_000.0, bond={"code": "511010", "name": "国债ETF", "shares": 7000, "avg_cost": 140.0})
+    trades, blocked = [], []
+    pe.execute_to_target(acc, "2026-06-11", ["600001"], 1, {}, trades, blocked,
+                         leverage=1.0, bond={"enabled": False, "code": "511010", "name": "国债ETF"})
+    assert acc["bond"]["shares"] == 7000, "未授权信号不得触发卖出遗留债券"
+    assert all(t[1] != "511010" for t in trades)
+    print("✅ legacy 债券持仓无独立 defensive 授权时不被当成可执行轮动")
 
 
 def test_bull_sells_bond_then_buys_stocks():
@@ -118,6 +147,75 @@ def test_estimate_bond_order():
     assert sh * BOND_PX * (1 + pe.ETF_BUY_COST) <= 1_000_000.0
     assert pe.estimate_bond_order("2026-06-11", 100.0) is None  # 不足一手
     print(f"✅ estimate_bond_order:{sh} 份 × {ref} = {amt:,.0f}(整手 + 费率约束)")
+
+
+def test_pending_bond_disables_legacy_recommendation_without_authorization():
+    signal = {
+        "rotation": {
+            "recommend_bond": True,
+            "bond_code": "511010",
+            "bond_name": "国债ETF",
+        }
+    }
+    pend = pt.build_pending_bond(signal)
+    assert pend["requested"] is True
+    assert pend["enabled"] is False
+    assert pend["blocked_reason"] == "defensive overlay 未授权,拒绝债券轮动"
+    assert "authorization" not in pend
+
+
+def test_pending_bond_preserves_defensive_authorization():
+    signal = {
+        "rotation": {
+            "recommend_bond": True,
+            "bond_code": "511010",
+            "bond_name": "国债ETF",
+            "defensive_authorization": DEFENSIVE_AUTH,
+        }
+    }
+    pend = pt.build_pending_bond(signal)
+    assert pend["requested"] is True
+    assert pend["enabled"] is True
+    assert pend["authorization"] == DEFENSIVE_AUTH
+
+
+def test_render_card_does_not_recommend_bond_without_authorization():
+    signal = {
+        "date": "2026-06-11",
+        "strategy_version": "v3.1",
+        "in_market": False,
+        "top_n": 25,
+        "small_index_vs_ma16": -0.01,
+        "regime_dist": -0.01,
+        "regime": "bear",
+        "rotation": {
+            "current_regime": "bear",
+            "recommend_bond": False,
+            "bond_code": "",
+            "bond_name": "",
+            "note": "未授权独立 defensive overlay;债券轮动非现行可执行",
+        },
+    }
+    acc = _acc()
+    acc["pending"] = {"bond": pt.build_pending_bond(signal)}
+    card = pt.render_card(
+        "2026-06-11", signal, None, acc, 1_000_000.0, 0.0, [], [], [], {}, None
+    )
+    assert "**建议**: 空仓资金配置" not in card
+    assert "债券轮动非现行可执行" in card
+
+
+def test_bond_instruction_view_exposes_authorization_state():
+    view = BondInstructionView(
+        active=True,
+        side="BLOCKED",
+        code="511010",
+        name="国债ETF",
+        authorized=False,
+        blocked_reason="defensive overlay 未授权,拒绝债券轮动",
+    )
+    assert view.authorized is False
+    assert view.blocked_reason == "defensive overlay 未授权,拒绝债券轮动"
 
 
 if __name__ == "__main__":

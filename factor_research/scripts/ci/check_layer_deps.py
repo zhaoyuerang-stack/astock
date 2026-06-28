@@ -31,6 +31,10 @@ FORBIDDEN_EDGES = [
     # 导致 regime.py/strategy_composer.py 倒灌未被发现;两者已迁出至 factory/。
     ("engine.", ["factors.", "factory.", "strategies.", "scripts.research.", "workflow."]),
     ("scripts.data.", ["factory.", "strategies.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
+    # ops 默认按生产运维入口处理:不得随手倒灌研究/服务/台账层。
+    # 少数已审定的研究编排脚本在 ALLOWED_IMPORT_EXCEPTIONS 中放行;新增例外必须显式留痕。
+    ("scripts.ops.", ["factory.", "workflow.", "scripts.research.", "services.", "research_ledger.",
+                      "strategy_registry.", "knowledge.", "api.", "metasearch."]),
     # knowledge 是纯机制:只依赖 stdlib(+ duck-typed Hypothesis),不得依赖任何业务层
     ("knowledge.", ["core.", "lake.", "factors.", "strategies.", "factory.", "workflow.", "scripts.", "api.", "services."]),
     # 产品接缝(Phase 0):api 是薄 HTTP 层,只能走 services/contracts,不得直碰引擎
@@ -58,6 +62,22 @@ ALLOWED_EXCEPTIONS = {
     ("factors/alpha/search.py", 531),
     ("factors/alpha/search.py", 532),
     ("factors/alpha/search.py", 542),
+}
+
+# 文件 + import 目标级例外:比行号稳定,但仍要求新增桥接显式登记。
+ALLOWED_IMPORT_EXCEPTIONS = {
+    # 研究编排脚本:批量晋级/周度搜索需要桥接 factory → workflow。
+    ("scripts/ops/bulk_promote.py", "factory.autoresearch"),
+    ("scripts/ops/bulk_promote.py", "services.actions.autoresearch"),
+    ("scripts/ops/bulk_promote.py", "workflow.promote"),
+    ("scripts/ops/scheduled_factor_search.py", "services.actions.autoresearch_search"),
+    ("scripts/ops/scheduled_factor_search.py", "factory.autoresearch.repositories"),
+    ("scripts/ops/scheduled_factor_search.py", "research_ledger.ledger"),
+    ("scripts/ops/scheduled_factor_search.py", "factory.autoresearch.models"),
+    ("scripts/ops/scheduled_factor_search.py", "factory.autoresearch.pipeline"),
+    ("scripts/ops/scheduled_factor_search.py", "workflow.from_factory"),
+    # 生产衰减监控:读在册版本并经 attach_decay_check 写回衰减审计字段。
+    ("scripts/ops/decay_monitor.py", "strategy_registry"),
 }
 
 
@@ -161,6 +181,8 @@ def check() -> int:
                     for forbidden in forbidden_targets:
                         if target == forbidden.rstrip(".") or target.startswith(forbidden):
                             if (str(rel), lineno) in ALLOWED_EXCEPTIONS:
+                                continue
+                            if (str(rel), target) in ALLOWED_IMPORT_EXCEPTIONS:
                                 continue
                             violations.append((rel, lineno,
                                 f"import {target} — 违反分层:{source_prefix} 不得依赖该前缀"))

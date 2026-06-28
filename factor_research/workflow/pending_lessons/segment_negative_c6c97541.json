@@ -1,0 +1,13 @@
+{
+  "fingerprint": "c6c97541",
+  "trigger": "Phase_segment_negative",
+  "pattern": "segment 压力 2010-2017",
+  "detail": "Segment 压力 2010-2017 annual=-3.9%",
+  "fix": "Manual review needed.",
+  "hit_count": 1,
+  "first_seen": "2026-06-24",
+  "last_seen": "2026-06-24",
+  "strategies": [
+    "autoresearch_69ede240"
+  ]
+}
