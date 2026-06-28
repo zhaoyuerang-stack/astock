@@ -205,9 +205,19 @@ def run_validation_pipeline(
     stage_order = ["l0", "l1", "l2", "l3"]
     stop_at = stage_order.index(max_stage) if max_stage in stage_order else len(stage_order) - 1
 
+    # Pre-calculate factor panel once at the pipeline level to share across all validation stages (L0, L1, L2, L3)
+    cached_factor = None
+    try:
+        from factory.lines.line2_validation.l1_quick_bt import _resolve_factor_fn, _dispatch_args
+        fn = _resolve_factor_fn(hyp.factor_fn_name)
+        args = _dispatch_args(hyp.data_dependencies, close, volume, amount)
+        cached_factor = fn(*args, **hyp.factor_params)
+    except Exception:
+        pass
+
     for stage in stage_order[: stop_at + 1]:
         if stage == "l0":
-            exp = runners[stage](hyp, close, volume, amount, forward_ret, vintage_id=vintage_id, sample_dates=sample_dates)
+            exp = runners[stage](hyp, close, volume, amount, forward_ret, vintage_id=vintage_id, sample_dates=sample_dates, factor=cached_factor)
             if exp.cost_spent_seconds > computation_time_budget:
                 from dataclasses import replace
                 exp = replace(
@@ -219,15 +229,15 @@ def run_validation_pipeline(
                 hyp = _hyp_with_status(hyp, HypothesisStatus.L0_PASSED)
                 direction = _direction_from_l0(exp)
         elif stage == "l1":
-            exp = runners[stage](hyp, close, volume, amount, direction=direction, vintage_id=vintage_id)
+            exp = runners[stage](hyp, close, volume, amount, direction=direction, vintage_id=vintage_id, factor=cached_factor)
             if exp.decision == Decision.PROMOTE:
                 hyp = _hyp_with_status(hyp, HypothesisStatus.L1_PASSED)
         elif stage == "l2":
-            exp = runners[stage](hyp, close, volume, amount, direction=direction, vintage_id=vintage_id)
+            exp = runners[stage](hyp, close, volume, amount, direction=direction, vintage_id=vintage_id, factor=cached_factor)
             if exp.decision == Decision.PROMOTE:
                 hyp = _hyp_with_status(hyp, HypothesisStatus.L2_PASSED)
         else:
-            exp = runners[stage](hyp, close, volume, amount, direction=direction, vintage_id=vintage_id)
+            exp = runners[stage](hyp, close, volume, amount, direction=direction, vintage_id=vintage_id, factor=cached_factor)
 
         experiments.append(exp)
         status = _status_after_protocol(exp.protocol, exp.decision)

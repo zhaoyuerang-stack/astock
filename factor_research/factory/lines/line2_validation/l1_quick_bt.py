@@ -56,6 +56,7 @@ def run_l1(
     start: str = "2020-01-01",
     top_n: int = 25,
     rebalance_freq: str = "20D",
+    factor: pd.DataFrame | None = None,
 ) -> Experiment:
     """L1 quick backtest.
 
@@ -68,9 +69,10 @@ def run_l1(
     t0 = time.time()
 
     try:
-        fn = _resolve_factor_fn(hyp.factor_fn_name)
-        args = _dispatch_args(hyp.data_dependencies, close, volume, amount)
-        factor = fn(*args, **hyp.factor_params)
+        if factor is None:
+            fn = _resolve_factor_fn(hyp.factor_fn_name)
+            args = _dispatch_args(hyp.data_dependencies, close, volume, amount)
+            factor = fn(*args, **hyp.factor_params)
 
         # 窗口裁剪
         close_w = close.loc[start:]

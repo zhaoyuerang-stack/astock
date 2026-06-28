@@ -70,6 +70,7 @@ def run_l0(
     vintage_id: str,
     sample_dates: Optional[int] = None,
     horizon: int = 20,
+    factor: pd.DataFrame | None = None,
 ) -> Experiment:
     """运行单 Hypothesis 的 L0 IC scan。
 
@@ -81,10 +82,10 @@ def run_l0(
     t0 = time.time()
 
     try:
-        fn = _resolve_factor_fn(hyp.factor_fn_name)
-        args = _dispatch_args(hyp.data_dependencies, close, volume, amount)
-
-        factor = fn(*args, **hyp.factor_params)
+        if factor is None:
+            fn = _resolve_factor_fn(hyp.factor_fn_name)
+            args = _dispatch_args(hyp.data_dependencies, close, volume, amount)
+            factor = fn(*args, **hyp.factor_params)
 
         if sample_dates and sample_dates < len(forward_ret):
             step = len(forward_ret) // sample_dates

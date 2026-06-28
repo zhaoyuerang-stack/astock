@@ -76,6 +76,7 @@ def run_l2(
     start: str = "2018-01-01",
     top_n: int = 25,
     rebalance_freq: str = "20D",
+    factor: pd.DataFrame | None = None,
 ) -> Experiment:
     """L2 multi-regime: 跑同 L1 的 backtest，按 regime 切片报告。"""
     check_f1_economic_thesis(hyp)
@@ -84,9 +85,10 @@ def run_l2(
     t0 = time.time()
 
     try:
-        fn = _resolve_factor_fn(hyp.factor_fn_name)
-        args = _dispatch_args(hyp.data_dependencies, close, volume, amount)
-        factor = fn(*args, **hyp.factor_params)
+        if factor is None:
+            fn = _resolve_factor_fn(hyp.factor_fn_name)
+            args = _dispatch_args(hyp.data_dependencies, close, volume, amount)
+            factor = fn(*args, **hyp.factor_params)
 
         close_w = close.loc[start:]
         prices = PricePanel(
