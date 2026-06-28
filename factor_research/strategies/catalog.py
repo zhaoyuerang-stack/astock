@@ -59,6 +59,15 @@ def build_holder_count_chg(prices: PricePanel, params: dict) -> pd.DataFrame:
     return holder_count_chg(prices.close, window=int(params.get("window", 60)))
 
 
+def build_zero_ret_days(prices: PricePanel, params: dict) -> pd.DataFrame:
+    """Lesmond 零收益(价格停滞)天数,N 日窗。与 Amihud 水平正交的 illiquidity 维度
+    (corr(size)≈0.06,非小盘代理)。委托 factors.microstructure.zero_ret_days(单一真相)。
+    """
+    from factors.microstructure import zero_ret_days
+
+    return zero_ret_days(prices.close, n=int(params.get("window", 60)))
+
+
 # ────────────────────────── timing builders ──────────────────────────
 # 签名: (prices, params) -> (exposure: pd.Series, diagnostics: dict)
 
@@ -113,6 +122,7 @@ FACTOR_BUILDERS: dict[str, Callable] = {
     "amihud_illiquidity": build_amihud_illiquidity,
     "small_cap_amount": build_small_cap_amount,
     "holder_count_chg": build_holder_count_chg,
+    "zero_ret_days": build_zero_ret_days,
 }
 
 TIMING_BUILDERS: dict[str, Callable] = {
