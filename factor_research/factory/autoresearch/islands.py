@@ -9,7 +9,7 @@
   [硬闸] 对在册相关 ≥ rediscovery_corr → |ICIR| 归零(边际为零,不让高 IC 重发现霸榜)
 只奖绩效必然同质坍缩;新颖性填未占领的行为生态位;边际项填组合相关空洞
 (伪多样性审计:在册 5 股票腿 0.76 相关);换手项防"高 IC 高换手在 L1 被成本杀"
-(成本约 12pp/年),并抵消去相关项对反转(高换手)的偏好。冠军可再走更深的 L1~L3。
+(成本约 12pp/年),并抵消去去相关项对反转(高换手)的偏好。冠军可再走更深的 L1~L3。
 
 全程确定性:同 rng_seed + 同数据 → 同搜索轨迹(实验可复现)。
 """
@@ -32,6 +32,12 @@ from .novelty import (
 from .pipeline import run_validation_pipeline
 from .registry import ALLOWED_FACTORS, ALLOWED_TRANSFORMS
 from .validator import DSLValidationError, validate_candidate_ast
+
+
+class _MockRepo:
+    def add(self, *args, **kwargs) -> bool: return True
+    def record(self, *args, **kwargs) -> None: pass
+    def append(self, *args, **kwargs) -> None: pass
 
 
 def ast_expr(ast: dict) -> str:
@@ -143,24 +149,88 @@ def _merge_provenance(parents: list[Candidate]) -> dict:
     return out
 
 
-def _spawn_valid(parents: list[Candidate], rng: random.Random, *, crossover: bool, retries: int = 8) -> Candidate | None:
-    """变异/杂交直到产出一个能过白名单校验的候选;超过重试次数放弃。
+def ast_to_features(ast: dict) -> list[float]:
+    """将 Candidate AST 转换为固定大小的数值特征向量。"""
+    sorted_factors = sorted(ALLOWED_FACTORS.keys())
+    
+    factor_presence = {f: 0.0 for f in sorted_factors}
+    factor_weight = {f: 0.0 for f in sorted_factors}
+    factor_window = {f: 0.0 for f in sorted_factors}
+    
+    total_transforms = 0.0
+    for term in ast.get("terms", []):
+        factor = term.get("factor")
+        if factor in factor_presence:
+            factor_presence[factor] = 1.0
+            factor_weight[factor] += float(term.get("weight", 1.0))
+            window = term.get("params", {}).get("window")
+            if window is not None:
+                factor_window[factor] = float(window)
+            total_transforms += len(term.get("transforms", []))
+            
+    features = []
+    for f in sorted_factors:
+        features.append(factor_presence[f])
+        features.append(factor_weight[f])
+        features.append(factor_window[f])
+        
+    features.append(total_transforms)
+    features.append(float(len(ast.get("terms", []))))
+    direction = 1.0 if ast.get("direction") == "positive" else -1.0
+    features.append(direction)
+    
+    return features
 
-    子代 provenance 从父代血缘继承(_merge_provenance):种子来源溯源不因进化而断链。
+
+def _spawn_valid(
+    parents: list[Candidate],
+    rng: random.Random,
+    *,
+    crossover: bool,
+    retries: int = 8,
+    surrogate_model=None,
+    threshold=None,
+) -> Candidate | None:
+    """变异/杂交直到产出一个能过白名单校验的候选;超过重试次数放弃。
+    如果提供了 surrogate_model，则使用它对候选进行筛选，最多重试 5 次筛选。
     """
-    base_asts = [p.ast for p in parents]
-    prov = _merge_provenance(parents)
-    for _ in range(retries):
-        try:
-            if crossover and len(base_asts) >= 2:
-                pa, pb = rng.sample(base_asts, k=2)
-                ast = crossover_ast(pa, pb, rng)
-            else:
-                ast = mutate_ast(rng.choice(base_asts), rng)
-            return replace(validate_candidate_ast(ast), provenance=prov)
-        except DSLValidationError:
-            continue
-    return None
+    import numpy as np
+
+    last_valid_candidate = None
+    max_surrogate_retries = 5
+
+    for surr_attempt in range(max_surrogate_retries + 1):
+        cand = None
+        base_asts = [p.ast for p in parents]
+        prov = _merge_provenance(parents)
+        for _ in range(retries):
+            try:
+                if crossover and len(base_asts) >= 2:
+                    pa, pb = rng.sample(base_asts, k=2)
+                    ast = crossover_ast(pa, pb, rng)
+                else:
+                    ast = mutate_ast(rng.choice(base_asts), rng)
+                cand = replace(validate_candidate_ast(ast), provenance=prov)
+                break
+            except DSLValidationError:
+                continue
+
+        if cand is None:
+            return last_valid_candidate
+
+        last_valid_candidate = cand
+
+        if surrogate_model is None or threshold is None or surr_attempt == max_surrogate_retries:
+            return cand
+
+        # Predict fitness
+        features = np.array([ast_to_features(cand.ast)])
+        pred_fit = float(surrogate_model.predict(features)[0])
+
+        if pred_fit >= threshold:
+            return cand
+
+    return last_valid_candidate
 
 
 @dataclass
@@ -192,7 +262,7 @@ def _style_exposure(panel, style_panels) -> float:
 
     高值 = 该候选是风格(尤其 size/流动性)的伪装 / blending 把信号拉回小盘流动性簇 →
     fitness 据此压分,使搜索保持正交。panel 与 style 面板按交集对齐(style 自动截到 panel 日期,
-    walk-forward 下即 ≤cutoff 训练期,size/流动性为当期 PIT 特征、无前瞻泄露)。
+    walk-forward 下即 ≤cutoff 训练期,size/流动性为当期 PIT 特真实特征、无前瞻泄露)。
     """
     import pandas as pd
 
@@ -246,6 +316,232 @@ def _split_stability(panel, forward_ret) -> float:
     return max(0.0, min(1.0, weaker / abs(full)))
 
 
+def _ast_factor_weights(ast: dict) -> dict[str, float]:
+    """把线性 AST 压成带方向的基础因子权重向量。
+
+    这是 Phase 1 代数代理的核心输入。rank/zscore/mad_clip 不改变符号;neg 与
+    direction 会翻转符号。代理只用于搜索排序加速,不替代 L0-L3 真实验证。
+    """
+    direction = -1.0 if ast.get("direction") == "negative" else 1.0
+    weights: dict[str, float] = {}
+    for term in ast.get("terms", []):
+        factor = term.get("factor")
+        if not factor:
+            continue
+        sign = direction
+        if "neg" in term.get("transforms", []):
+            sign *= -1.0
+        weights[factor] = weights.get(factor, 0.0) + sign * float(term.get("weight", 1.0))
+    return {k: v for k, v in weights.items() if abs(v) > 1e-12}
+
+
+def _algebraic_metric_proxy(
+    ast: dict,
+    *,
+    corr_by_factor: dict[str, float],
+    turnover_by_factor: dict[str, float],
+) -> tuple[float | None, float | None]:
+    """用基础因子一次性估计表近似候选 corr/turnover。
+
+    corr 使用带符号权重均值,使整体反向候选变成负相关代理;turnover 使用绝对权重
+    均值,因为换手不随多空方向变号。缺少基础因子估计时返回 None,调用方回退到
+    精确 top-N 代理。
+    """
+    weights = _ast_factor_weights(ast)
+
+    corr_num = corr_den = 0.0
+    for factor, weight in weights.items():
+        if factor not in corr_by_factor:
+            continue
+        corr_num += weight * float(corr_by_factor[factor])
+        corr_den += abs(weight)
+    corr = None if corr_den <= 1e-12 else max(-1.0, min(1.0, corr_num / corr_den))
+
+    turn_num = turn_den = 0.0
+    for factor, weight in weights.items():
+        if factor not in turnover_by_factor:
+            continue
+        turn_num += abs(weight) * float(turnover_by_factor[factor])
+        turn_den += abs(weight)
+    turnover = None if turn_den <= 1e-12 else max(0.0, min(1.0, turn_num / turn_den))
+    return corr, turnover
+
+
+def _default_params_for_factor(factor: str) -> dict:
+    spec = ALLOWED_FACTORS[factor]
+    return {
+        name: int((int(lo) + int(hi)) // 2)
+        for name, (lo, hi) in spec.params.items()
+    }
+
+
+def _single_factor_ast(factor: str) -> dict:
+    return {
+        "type": "linear_combo",
+        "terms": [{
+            "factor": factor,
+            "params": _default_params_for_factor(factor),
+            "transforms": ["mad_clip", "zscore", "rank"],
+            "weight": 1.0,
+        }],
+        "direction": "positive",
+        "thesis": {"mechanism": f"{factor} basis proxy", "citation": "algebraic metric proxy"},
+    }
+
+
+def _candidate_factors(candidates: list[Candidate]) -> set[str]:
+    out: set[str] = set()
+    for c in candidates:
+        for term in c.ast.get("terms", []):
+            factor = term.get("factor")
+            if factor in ALLOWED_FACTORS:
+                out.add(factor)
+    return out
+
+
+def _build_algebraic_metric_maps(
+    *,
+    close,
+    volume,
+    forward_ret,
+    behavior_idx,
+    factors: set[str],
+    ref_returns: list,
+    market_ret,
+    top_n: int,
+    need_corr: bool,
+    need_turnover: bool,
+) -> tuple[dict[str, float], dict[str, float]]:
+    """一次性为基础因子建立 corr/turnover 估计表。
+
+    失败的基础因子跳过;候选若引用缺失因子,fitness 会回退到精确 top-N 代理。
+    """
+    corr_by_factor: dict[str, float] = {}
+    turnover_by_factor: dict[str, float] = {}
+    for factor in sorted(factors):
+        try:
+            panel = candidate_factor_panel(_single_factor_ast(factor), close, volume, behavior_idx)
+        except Exception:
+            continue
+        if need_corr and ref_returns:
+            corr_by_factor[factor] = partial_correlation_to_book(
+                topn_long_return(panel, forward_ret, top_n),
+                ref_returns,
+                market_ret,
+            )
+        if need_turnover:
+            turnover_by_factor[factor] = topn_turnover(panel, top_n)
+    return corr_by_factor, turnover_by_factor
+
+
+def _first_l0_metrics(result) -> dict:
+    exps = (result.metrics or {}).get("experiments", [])
+    return (exps[0].get("metrics", {}) or {}) if exps else {}
+
+
+def _multi_fidelity_prefilter(
+    candidates: list[Candidate],
+    *,
+    pipe_kw: dict,
+    level1_dates: int = 20,
+    level1_ic_min: float = 0.02,
+    level2_dates: int = 60,
+    level2_keep_ratio: float = 0.5,
+    trial_counter: list[int] | None = None,
+) -> list[Candidate]:
+    """Phase 2 多保真预筛:20日 IC 挡垃圾,60日 ICIR 保留前部候选。
+
+    预筛结果只决定是否进入完整 L0,不写真实 repository/experiment_log/review_queue,
+    也不替代后续 L0-L3 验证。
+    """
+    if not candidates:
+        return []
+
+    screen_kw = dict(pipe_kw)
+    screen_kw.pop("sample_dates", None)
+    screen_kw["repository"] = _MockRepo()
+    screen_kw["experiment_log"] = _MockRepo()
+    screen_kw["review_queue"] = _MockRepo()
+
+    level1: list[Candidate] = []
+    fallback: list[tuple[float, Candidate]] = []
+    for c in candidates:
+        result = run_validation_pipeline(c, max_stage="l0", sample_dates=level1_dates, **screen_kw)
+        if trial_counter is not None:
+            trial_counter[0] += 1
+        metrics = _first_l0_metrics(result)
+        ic = abs(float(metrics.get("IC_mean", metrics.get("rank_ic_mean", 0.0)) or 0.0))
+        fallback.append((ic, c))
+        if ic >= level1_ic_min:
+            level1.append(c)
+    if not level1:
+        return [max(fallback, key=lambda x: x[0])[1]]
+
+    scored: list[tuple[float, Candidate]] = []
+    for c in level1:
+        result = run_validation_pipeline(c, max_stage="l0", sample_dates=level2_dates, **screen_kw)
+        if trial_counter is not None:
+            trial_counter[0] += 1
+        metrics = _first_l0_metrics(result)
+        score = abs(float(metrics.get("ICIR_nw", metrics.get("ICIR", 0.0)) or 0.0))
+        scored.append((score, c))
+    scored.sort(key=lambda x: x[0], reverse=True)
+
+    import math
+
+    keep = max(1, int(math.ceil(len(scored) * max(0.0, min(1.0, level2_keep_ratio)))))
+    return [c for _, c in scored[:keep]]
+
+
+def _candidates_pending_evaluation(
+    islands: list[list[Candidate]],
+    *,
+    memo: dict,
+    pre_evaluated_results: dict,
+    multi_fidelity: bool,
+    pipe_kw: dict,
+    level1_dates: int,
+    level1_ic_min: float,
+    level2_dates: int,
+    level2_keep_ratio: float,
+    trial_counter: list[int] | None = None,
+) -> list[Candidate]:
+    pending: list[Candidate] = []
+    for i, pop in enumerate(islands):
+        old = [
+            c for c in pop
+            if c.fingerprint in memo or c.fingerprint in pre_evaluated_results
+        ]
+        new = [
+            c for c in pop
+            if c.fingerprint not in memo and c.fingerprint not in pre_evaluated_results
+        ]
+        if multi_fidelity:
+            kept = _multi_fidelity_prefilter(
+                new,
+                pipe_kw=pipe_kw,
+                level1_dates=level1_dates,
+                level1_ic_min=level1_ic_min,
+                level2_dates=level2_dates,
+                level2_keep_ratio=level2_keep_ratio,
+                trial_counter=trial_counter,
+            )
+            if not old and not kept and new:
+                kept = [new[0]]
+            islands[i] = old + kept
+            pending.extend(kept)
+        else:
+            pending.extend(new)
+    seen: set[str] = set()
+    unique: list[Candidate] = []
+    for c in pending:
+        if c.fingerprint in seen:
+            continue
+        seen.add(c.fingerprint)
+        unique.append(c)
+    return unique
+
+
 def run_island_search(
     close,
     volume,
@@ -268,6 +564,12 @@ def run_island_search(
     complexity_weight: float = 0.0,
     orth_weight: float = 0.0,
     stability_weight: float = 0.0,
+    use_algebraic_proxies: bool = False,
+    multi_fidelity: bool = False,
+    mf_level1_dates: int = 20,
+    mf_level1_ic_min: float = 0.02,
+    mf_level2_dates: int = 60,
+    mf_level2_keep_ratio: float = 0.5,
     computation_time_budget: float = 10.0,
     rediscovery_corr: float = 0.5,
     reference_panels: list | None = None,
@@ -280,7 +582,7 @@ def run_island_search(
     runners: dict | None = None,
 ) -> IslandSearchResult:
     """N 岛屿 × G 代进化;适应度 = edge + novelty_weight×新颖性 − corr_weight×对在册组合相关
-    − orth_weight×对 size/流动性风格暴露(§四修法②:把"正交"设为搜索目标)。
+    - orth_weight×对 size/流动性风格暴露(§四修法②:把"正交"设为搜索目标)。
     edge = |ICIR_nw|(NW 重叠校正的诚实绝对量级)。
     **stability_weight>0(§四②真版,根治 blending 过拟合)**:edge 乘以 in-sample 内部二分稳定性
     折扣 ∈[0,1]——把训练窗按时序二分 early/late,edge 在两半都成立才保留,只靠一半(过拟合签名)
@@ -298,7 +600,7 @@ def run_island_search(
     from factors.autoresearch_dsl import clear_factor_cache
     clear_factor_cache()
 
-    seeds = list(seeds) if seeds else list(generate_seed_candidates(limit=max(n_islands * 2, 4)))
+    seeds = list(seeds) if seeds else list(generate_seed_candidates(limit=max(n_islands * population, 150)))
     pipe_kw = dict(
         close=close, volume=volume, amount=amount, forward_ret=forward_ret,
         vintage_id=vintage_id, repository=repository, experiment_log=experiment_log,
@@ -308,6 +610,7 @@ def run_island_search(
 
     memo: dict[str, tuple[float, object]] = {}  # fingerprint -> (fitness, result)
     evaluated = 0
+    prefilter_trials = [0]
 
     # 行为档案:已评估候选的因子面板,新颖性 = 与(档案 + 外部参考池)的最近邻距离。
     # 面板即传入的(walk-forward 下已截断的)训练面板,行为距离只用历史。
@@ -321,6 +624,21 @@ def run_island_search(
         ref_returns = [topn_long_return(r, forward_ret, top_n) for r in refs]
         # 根因#2:市场代理 = 全市场等权前向收益,供 partial_correlation_to_book 扣共同暴露
         market_ret = forward_ret.mean(axis=1)
+    proxy_corr_by_factor: dict[str, float] = {}
+    proxy_turnover_by_factor: dict[str, float] = {}
+    if use_algebraic_proxies and ((corr_weight > 0 and ref_returns) or turnover_weight > 0):
+        proxy_corr_by_factor, proxy_turnover_by_factor = _build_algebraic_metric_maps(
+            close=close,
+            volume=volume,
+            forward_ret=forward_ret,
+            behavior_idx=behavior_idx,
+            factors=_candidate_factors(seeds),
+            ref_returns=ref_returns,
+            market_ret=market_ret,
+            top_n=top_n,
+            need_corr=corr_weight > 0,
+            need_turnover=turnover_weight > 0,
+        )
 
     pre_evaluated_results: dict[str, object] = {}
 
@@ -341,27 +659,41 @@ def run_island_search(
         # NW 后三项才平衡。ICIR_nw 缺失时退回 raw(见 l0_ic_scan.py)。
         edge_icir = _m0.get("ICIR_nw", icir)
 
-        # 因子面板算一次,供新颖性(行为距离)与边际(收益相关)共用
+        proxy_corr = proxy_turn = None
+        if use_algebraic_proxies:
+            proxy_corr, proxy_turn = _algebraic_metric_proxy(
+                candidate.ast,
+                corr_by_factor=proxy_corr_by_factor,
+                turnover_by_factor=proxy_turnover_by_factor,
+            )
+
+        # 因子面板算一次,供新颖性(行为距离)与边际(收益相关)共用。
+        # 若代数代理覆盖了 corr/turnover,则不为这两项生成候选级 top-N 面板。
         panel = None
-        if novelty_weight > 0 or corr_weight > 0 or turnover_weight > 0 or orth_weight > 0 or stability_weight > 0:
+        needs_exact_corr = corr_weight > 0 and ref_returns and proxy_corr is None
+        needs_exact_turn = turnover_weight > 0 and proxy_turn is None
+        if novelty_weight > 0 or needs_exact_corr or needs_exact_turn or orth_weight > 0 or stability_weight > 0:
             try:
                 panel = candidate_factor_panel(candidate.ast, close, volume, behavior_idx)
             except Exception:
                 panel = None  # 算不出因子 → 不奖不罚(L0 同样会废掉它)
+
+        # 缓存 candidate 用于特征提取
+        meta[candidate.fingerprint] = (island, generation, float(icir) if icir is not None else 0.0, candidate, 0.0, 0.0, 0.0)
 
         nov = 0.0
         if novelty_weight > 0 and panel is not None:
             nov = novelty_score(panel, refs + list(archive.values()))
             archive[candidate.fingerprint] = panel
 
-        corr = 0.0
-        if corr_weight > 0 and panel is not None and ref_returns:
+        corr = float(proxy_corr) if proxy_corr is not None else 0.0
+        if needs_exact_corr and panel is not None:
             corr = partial_correlation_to_book(
                 topn_long_return(panel, forward_ret, top_n), ref_returns, market_ret,
             )
 
-        turn = 0.0
-        if turnover_weight > 0 and panel is not None:
+        turn = float(proxy_turn) if proxy_turn is not None else 0.0
+        if needs_exact_turn and panel is not None:
             turn = topn_turnover(panel, top_n)
 
         # Complexity penalty
@@ -372,7 +704,7 @@ def run_island_search(
 
         # 重发现硬闸:与在册腿相关 ≥ 阈值 = 该 edge 在册已捕获,**边际为零** →
         # 把 |ICIR| 归零(无论毛 IC 多高都不该霸占冠军席)。corr/turnover 罚仍计入,
-        # 使重发现沉到所有真候选之下。WF OOS 发现:0.3 软罚压不住 0.76 IC 的 illiquidity 重发现。
+        # 使重发现稳稳沉在所有真候选之下。
         edge = abs(float(edge_icir)) if edge_icir is not None else 0.0  # NW 诚实绝对量级
         if rediscovery_corr and corr_weight > 0 and ref_returns and corr >= rediscovery_corr:
             edge = 0.0
@@ -382,7 +714,7 @@ def run_island_search(
         if stability_weight > 0 and panel is not None and forward_ret is not None:
             stab = _split_stability(panel, forward_ret)
             edge = edge * ((1.0 - stability_weight) + stability_weight * stab)
-        # 正交增量:罚对 size/流动性簇的暴露——blending 若把候选拉回小盘/流动性 → 压分,
+        # 正交增量:罚对 size/流动性风格暴露——blending 若把候选拉回小盘/流动性 → 压分,
         # 逼搜索保持正交(把"正交"从事后否决变成事中搜索目标)。orth_weight=0 不计(向后兼容)。
         style_pen = 0.0
         if orth_weight > 0 and panel is not None and style_panels:
@@ -393,6 +725,7 @@ def run_island_search(
         fit = (edge + novelty_weight * nov - corr_weight * corr - turnover_weight * turn
                - complexity_weight * comp_val - orth_weight * style_pen) * priority_adjustment
         memo[candidate.fingerprint] = (fit, result)
+        # 更新完整的 meta
         meta[candidate.fingerprint] = (island, generation, float(icir) if icir is not None else 0.0, candidate, nov, corr, turn)
         return fit
 
@@ -403,7 +736,8 @@ def run_island_search(
     for i in range(n_islands):
         rng = random.Random(rng_seed + i)
         pop: dict[str, Candidate] = {}
-        base = [seeds[(i + k * n_islands) % len(seeds)] for k in range(2)]
+        base_count = max(1, min(len(seeds) // n_islands, population - 1))
+        base = [seeds[(i + k * n_islands) % len(seeds)] for k in range(base_count)]
         for c in base:
             pop.setdefault(c.fingerprint, c)
         stall = 0
@@ -426,28 +760,92 @@ def run_island_search(
                 migrants[i] = None
 
         # 2. Batch pre-evaluate all new candidates in parallel
-        candidates_to_eval = [c for pop in islands for c in pop if c.fingerprint not in memo and c.fingerprint not in pre_evaluated_results]
+        candidates_to_eval = _candidates_pending_evaluation(
+            islands,
+            memo=memo,
+            pre_evaluated_results=pre_evaluated_results,
+            multi_fidelity=multi_fidelity,
+            pipe_kw=pipe_kw,
+            level1_dates=mf_level1_dates,
+            level1_ic_min=mf_level1_ic_min,
+            level2_dates=mf_level2_dates,
+            level2_keep_ratio=mf_level2_keep_ratio,
+            trial_counter=prefilter_trials,
+        )
         if candidates_to_eval:
-            from concurrent.futures import ThreadPoolExecutor
-            num_workers = min(len(candidates_to_eval), 8)
-            with ThreadPoolExecutor(max_workers=num_workers) as executor:
-                jobs = {executor.submit(run_validation_pipeline, c, max_stage="l0", **pipe_kw): c for c in candidates_to_eval}
-                for fut in jobs:
-                    c = jobs[fut]
-                    try:
-                        pre_evaluated_results[c.fingerprint] = fut.result()
-                    except Exception as e:
-                        print(f"[!] Error pre-evaluating candidate {c.fingerprint[:8]}: {e}")
+            if runners:
+                from concurrent.futures import ThreadPoolExecutor
+                num_workers = min(len(candidates_to_eval), 8)
+                with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                    jobs = {executor.submit(run_validation_pipeline, c, max_stage="l0", **pipe_kw): c for c in candidates_to_eval}
+                    for fut in jobs:
+                        c = jobs[fut]
+                        try:
+                            pre_evaluated_results[c.fingerprint] = fut.result()
+                        except Exception as e:
+                            print(f"[!] Error pre-evaluating candidate {c.fingerprint[:8]}: {e}")
+            else:
+                from concurrent.futures import ProcessPoolExecutor
+                num_workers = min(len(candidates_to_eval), 8)
+                proc_pipe_kw = pipe_kw.copy()
+                proc_pipe_kw["repository"] = _MockRepo()
+                proc_pipe_kw["experiment_log"] = _MockRepo()
+                proc_pipe_kw["review_queue"] = _MockRepo()
+                with ProcessPoolExecutor(max_workers=num_workers) as executor:
+                    jobs = {executor.submit(run_validation_pipeline, c, max_stage="l0", **proc_pipe_kw): c for c in candidates_to_eval}
+                    for fut in jobs:
+                        c = jobs[fut]
+                        try:
+                            res = fut.result()
+                            pre_evaluated_results[c.fingerprint] = res
+                            # Parent writes to real repositories
+                            if repository:
+                                repository.add(c)
+                                from .models import CandidateStatus
+                                updated = c.with_status(res.status, res.reason)
+                                repository.record(updated)
+                                if res.status == CandidateStatus.PROMOTED_TO_REVIEW and review_queue:
+                                    review_queue.add(updated, res)
+                            if experiment_log:
+                                experiment_log.append(res)
+                        except Exception as e:
+                            print(f"[!] Error pre-evaluating candidate {c.fingerprint[:8]}: {e}")
 
         # 3. Evaluate and breed next generation
         for i, pop in enumerate(islands):
             ranked = sorted(pop, key=lambda c: fitness(c, i, gen), reverse=True)
+            
+            # Fit/refit surrogate model dynamically using evaluated candidates so far
+            surrogate_model = None
+            surrogate_threshold = None
+            evaluated_pairs = []
+            for fp, (fit, _) in memo.items():
+                if fp in meta:
+                    candidate = meta[fp][3]
+                    evaluated_pairs.append((candidate.ast, fit))
+
+            if len(evaluated_pairs) >= 15:
+                import numpy as np
+                from sklearn.linear_model import Ridge
+                X_train = np.array([ast_to_features(ast) for ast, _ in evaluated_pairs])
+                y_train = np.array([fit for _, fit in evaluated_pairs])
+                reg = Ridge(alpha=10.0)
+                reg.fit(X_train, y_train)
+                surrogate_model = reg
+                surrogate_threshold = float(np.percentile(y_train, 25))
+
             elites = ranked[: max(1, elite)]
             # 下一代 = 精英 + 精英变异/杂交后代
             nxt: dict[str, Candidate] = {c.fingerprint: c for c in elites}
             stall = 0
             while len(nxt) < population and stall < population * 4:
-                child = _spawn_valid(elites, rngs[i], crossover=rngs[i].random() < 0.3)
+                child = _spawn_valid(
+                    elites,
+                    rngs[i],
+                    crossover=rngs[i].random() < 0.3,
+                    surrogate_model=surrogate_model,
+                    threshold=surrogate_threshold,
+                )
                 if child is None or child.fingerprint in nxt:
                     stall += 1
                     continue
@@ -459,18 +857,56 @@ def run_island_search(
             migrants[(i + 1) % n_islands] = best
 
     # Batch pre-evaluate final remaining candidates
-    candidates_to_eval = [c for pop in islands for c in pop if c.fingerprint not in memo and c.fingerprint not in pre_evaluated_results]
+    candidates_to_eval = _candidates_pending_evaluation(
+        islands,
+        memo=memo,
+        pre_evaluated_results=pre_evaluated_results,
+        multi_fidelity=multi_fidelity,
+        pipe_kw=pipe_kw,
+        level1_dates=mf_level1_dates,
+        level1_ic_min=mf_level1_ic_min,
+        level2_dates=mf_level2_dates,
+        level2_keep_ratio=mf_level2_keep_ratio,
+        trial_counter=prefilter_trials,
+    )
     if candidates_to_eval:
-        from concurrent.futures import ThreadPoolExecutor
-        num_workers = min(len(candidates_to_eval), 8)
-        with ThreadPoolExecutor(max_workers=num_workers) as executor:
-            jobs = {executor.submit(run_validation_pipeline, c, max_stage="l0", **pipe_kw): c for c in candidates_to_eval}
-            for fut in jobs:
-                c = jobs[fut]
-                try:
-                    pre_evaluated_results[c.fingerprint] = fut.result()
-                except Exception as e:
-                    print(f"[!] Error pre-evaluating candidate {c.fingerprint[:8]}: {e}")
+        if runners:
+            from concurrent.futures import ThreadPoolExecutor
+            num_workers = min(len(candidates_to_eval), 8)
+            with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                jobs = {executor.submit(run_validation_pipeline, c, max_stage="l0", **pipe_kw): c for c in candidates_to_eval}
+                for fut in jobs:
+                    c = jobs[fut]
+                    try:
+                        pre_evaluated_results[c.fingerprint] = fut.result()
+                    except Exception as e:
+                        print(f"[!] Error pre-evaluating candidate {c.fingerprint[:8]}: {e}")
+        else:
+            from concurrent.futures import ProcessPoolExecutor
+            num_workers = min(len(candidates_to_eval), 8)
+            proc_pipe_kw = pipe_kw.copy()
+            proc_pipe_kw["repository"] = _MockRepo()
+            proc_pipe_kw["experiment_log"] = _MockRepo()
+            proc_pipe_kw["review_queue"] = _MockRepo()
+            with ProcessPoolExecutor(max_workers=num_workers) as executor:
+                jobs = {executor.submit(run_validation_pipeline, c, max_stage="l0", **proc_pipe_kw): c for c in candidates_to_eval}
+                for fut in jobs:
+                    c = jobs[fut]
+                    try:
+                        res = fut.result()
+                        pre_evaluated_results[c.fingerprint] = res
+                        # Parent writes to real repositories
+                        if repository:
+                            repository.add(c)
+                            from .models import CandidateStatus
+                            updated = c.with_status(res.status, res.reason)
+                            repository.record(updated)
+                            if res.status == CandidateStatus.PROMOTED_TO_REVIEW and review_queue:
+                                review_queue.add(updated, res)
+                        if experiment_log:
+                            experiment_log.append(res)
+                    except Exception as e:
+                        print(f"[!] Error pre-evaluating candidate {c.fingerprint[:8]}: {e}")
 
     # 收最后一代的遗漏评估
     for i, pop in enumerate(islands):
@@ -478,12 +914,50 @@ def run_island_search(
             fitness(c, i, generations - 1)
 
     ranked_all = sorted(memo.items(), key=lambda kv: kv[1][0], reverse=True)[:top_k]
+    final_results = {}
+    if final_stage != "l0" and ranked_all:
+        final_candidates = [meta[fp][3] for fp, _ in ranked_all]
+        if runners:
+            from concurrent.futures import ThreadPoolExecutor
+            num_workers = min(len(final_candidates), 8)
+            with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                jobs = {executor.submit(run_validation_pipeline, c, max_stage=final_stage, **pipe_kw): c.fingerprint for c in final_candidates}
+                for fut in jobs:
+                    fp = jobs[fut]
+                    try:
+                        final_results[fp] = fut.result()
+                    except Exception as e:
+                        print(f"[!] Error in final stage evaluation for {fp[:8]}: {e}")
+        else:
+            from concurrent.futures import ProcessPoolExecutor
+            num_workers = min(len(final_candidates), 8)
+            proc_pipe_kw = pipe_kw.copy()
+            proc_pipe_kw["repository"] = _MockRepo()
+            proc_pipe_kw["experiment_log"] = _MockRepo()
+            proc_pipe_kw["review_queue"] = _MockRepo()
+            with ProcessPoolExecutor(max_workers=num_workers) as executor:
+                jobs = {executor.submit(run_validation_pipeline, c, max_stage=final_stage, **proc_pipe_kw): c for c in final_candidates}
+                for fut in jobs:
+                    c = jobs[fut]
+                    try:
+                        res = fut.result()
+                        final_results[c.fingerprint] = res
+                        if repository:
+                            repository.add(c)
+                            from .models import CandidateStatus
+                            updated = c.with_status(res.status, res.reason)
+                            repository.record(updated)
+                            if res.status == CandidateStatus.PROMOTED_TO_REVIEW and review_queue:
+                                review_queue.add(updated, res)
+                        if experiment_log:
+                            experiment_log.append(res)
+                    except Exception as e:
+                        print(f"[!] Error in final stage evaluation for {c.fingerprint[:8]}: {e}")
+
     champions: list[ChampionRecord] = []
     for fp, (fit, l0_result) in ranked_all:
         island, gen, icir, candidate, nov, corr, turn = meta[fp]
-        result = l0_result
-        if final_stage != "l0":
-            result = run_validation_pipeline(candidate, max_stage=final_stage, **pipe_kw)
+        result = final_results.get(fp, l0_result)
         from factory.autoresearch.complexity import compute_complexity
         comp_report = compute_complexity(candidate)
         champions.append(ChampionRecord(
@@ -494,4 +968,4 @@ def run_island_search(
             provenance=dict(candidate.provenance or {}),
             complexity=float(comp_report.score),
         ))
-    return IslandSearchResult(evaluated=evaluated, champions=champions)
+    return IslandSearchResult(evaluated=evaluated + prefilter_trials[0], champions=champions)
