@@ -36,6 +36,23 @@ def price_position(close: pd.DataFrame, n: int = 60) -> pd.DataFrame:
     return safe_zscore(mad_clip(-pos))
 
 
+def zero_ret_days(close: pd.DataFrame, n: int = 60) -> pd.DataFrame:
+    """N 日内零收益(价格停滞)天数 —— Lesmond 流动性/低关注代理。
+
+    Mechanism: 收盘价不变(零日收益)= 当日无有效价格发现 = 流动性差/被忽视;
+    Lesmond(1999) 零收益天数是经典 illiquidity 代理。**与 Amihud 水平正交**
+    (实测 corr(size)≈0.06,非小盘代理;去 Amihud 残差仍 0.018/OOS ICIR 0.57),
+    增量于现有 illiquidity 核心 —— 这是它能 tilt 小盘核心真分散的根因。
+    Positive = 近 N 日停滞天数多 → 流动性/低关注溢价(预期正超额)。
+
+    注:一字板涨跌停日收益为 ±10%(非零),不计入;停牌=NaN 不计入(只数已上市日)。
+    """
+    listed = close.notna()
+    ret = close.pct_change(fill_method=None)
+    stale = (ret.abs() < 1e-6) & listed
+    return safe_zscore(mad_clip(stale.rolling(n).sum().replace([np.inf, -np.inf], np.nan)))
+
+
 def vol_breakout(volume: pd.DataFrame, short: int = 5, long: int = 20) -> pd.DataFrame:
     """量比突破 (vol_ratio shorted/long) z-scored.
 

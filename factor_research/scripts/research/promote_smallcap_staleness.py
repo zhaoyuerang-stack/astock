@@ -18,6 +18,7 @@ import pandas as pd  # noqa: E402
 
 from factors.utils import safe_zscore, mad_clip  # noqa: E402
 from factors.small_cap import small_cap_factor, small_cap_timing  # noqa: E402
+from factors.microstructure import zero_ret_days  # noqa: E402 —— canonical 因子
 
 FAMILY = "small-cap-staleness"
 VERSION = "v1.0"
@@ -34,15 +35,9 @@ def _z(df):
     return safe_zscore(mad_clip(df.replace([np.inf, -np.inf], np.nan)))
 
 
-def _zero_ret(close):
-    listed = close.notna()
-    ret = close.pct_change(fill_method=None)
-    return _z((ret.abs().lt(1e-6) & listed).rolling(WIN).sum())
-
-
 def factor_builder(close, volume, amount, dates):
     core = _z(small_cap_factor(amount, window=WIN))
-    zr = _zero_ret(close)
+    zr = zero_ret_days(close, n=WIN)  # canonical 因子(factors.microstructure)
     return _z(core + LAMBDA * zr)
 
 
