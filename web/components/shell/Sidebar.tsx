@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { NAV_GROUPS } from "@/lib/nav";
 import { useWorkspaceStore } from "@/lib/workspaceStore";
 import { useLayoutStore } from "@/lib/layoutStore";
+import { useAppStore } from "@/lib/appStore";
 
 function SidebarIcon({ name }: { name: string }) {
   switch (name) {
@@ -90,6 +91,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { mode, setMode } = useWorkspaceStore();
+  const { latestDataDate, selectedStrategyId, selectedStrategyVersion } = useAppStore();
 
   // URL-driven auto mode synchronization (e.g. bookmarks or back/forward buttons)
   useEffect(() => {
@@ -257,10 +259,9 @@ export default function Sidebar() {
       
       {/* Footer Status */}
       <div className="px-5 py-3.5 border-t border-line/30 text-[11px] text-subink/80 bg-jilan/25 font-mono space-y-1 bg-opacity-5 border-opacity-50">
-        <div>當前用戶：researcher</div>
-        <div>當前策略：illiquidity v3.1</div>
-        <div>系統版本：v2.3.0</div>
-        <div>數據日期：2026-06-23</div>
+        <div>當前策略：{selectedStrategyId ? `${selectedStrategyId} ${selectedStrategyVersion}` : "—"}</div>
+        <div>系統版本：—</div>
+        <div>數據日期：{latestDataDate}</div>
       </div>
     </aside>
   );

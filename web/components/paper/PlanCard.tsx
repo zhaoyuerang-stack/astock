@@ -21,11 +21,23 @@ function SideTag({ side }: { side: string }) {
 
 export default function PlanCard({ plan }: { plan: TradePlanView }) {
   const bear = plan.regime === "bear";
+  const isStale = plan.stale;
+  const bond = plan.bond;
+  const isBondUnauthorized = bond?.authorized === false || bond?.side === "BLOCKED";
+  const isBondNonExecutable = isStale || isBondUnauthorized;
+  const staleSignalDate = plan.last_exec_signal_date || plan.signal_date || plan.account_date || "—";
+  const bondSideText =
+    bond?.side === "BUY" ? "买入" : bond?.side === "SELL" ? "卖出" : bond?.side === "HOLD" ? "持有" : bond?.side || "—";
 
   return (
     <div className="space-y-4">
-      {plan.stale && (
-        <div className="card text-sm text-warn border border-warn/30">⚠️ {plan.stale_reason}</div>
+      {isStale && (
+        <div className="card text-sm text-warn border border-warn/30">
+          <div className="font-semibold">冻结历史信号: 非现行可执行</div>
+          <div className="text-[12px] text-subink mt-1">
+            {plan.stale_reason || "纸面信号已过期"}。以下内容仅代表模拟盘历史状态,不得作为当前交易指引。
+          </div>
+        </div>
       )}
 
       <div className="card text-[12px] text-subink flex flex-wrap gap-x-4 gap-y-1">
@@ -35,31 +47,58 @@ export default function PlanCard({ plan }: { plan: TradePlanView }) {
       </div>
 
       {/* 债券轮动指令卡(P5)—— 最醒目位 */}
-      {plan.bond?.active && (
-        <div className={`card border-2 ${bear ? "border-danger/40" : "border-ok/40"}`}>
+      {bond?.active && (
+        <div className={`card border-2 ${isBondNonExecutable ? "border-warn/40" : bear ? "border-danger/40" : "border-ok/40"}`}>
           <div className="flex items-center gap-2 mb-2">
-            <span className={`text-sm font-semibold ${bear ? "text-danger" : "text-ok"}`}>
-              🔄 Regime 轮动:{bear ? "BEAR" : "BULL"}({(plan.regime_dist * 100).toFixed(2)}%)
+            <span className={`text-sm font-semibold ${isBondNonExecutable ? "text-warn" : bear ? "text-danger" : "text-ok"}`}>
+              {isBondUnauthorized
+                ? "未授权 defensive overlay: 非现行可执行"
+                : isStale
+                ? "冻结历史信号: 非现行可执行"
+                : `Regime 轮动:${bear ? "BEAR" : "BULL"}(${(plan.regime_dist * 100).toFixed(2)}%)`}
             </span>
-            <SideTag side={plan.bond.side} />
+            {isBondNonExecutable ? (
+              <span className="inline-block px-1.5 py-0.5 rounded text-[11px] font-medium bg-warn/10 text-warn">
+                {isBondUnauthorized ? "未授权" : `历史${bondSideText}`}
+              </span>
+            ) : (
+              <SideTag side={bond.side} />
+            )}
           </div>
           <div className="text-sm text-ink">
-            {plan.bond.side === "BUY" && (
-              <>次日将全部闲置资金买入 <b>{plan.bond.code} {plan.bond.name}</b>
-                {plan.bond.est_shares > 0 && (
-                  <> ≈ <b>{plan.bond.est_shares}</b> 份 × {plan.bond.ref_price.toFixed(3)} = <b>{fmt(plan.bond.est_notional)}</b> 元</>
+            {isBondNonExecutable ? (
+              <div className="space-y-1">
+                <div>
+                  {isBondUnauthorized
+                    ? `${bond.code} ${bond.name} 缺少独立 defensive overlay 授权,非现行可执行。`
+                    : `${bond.code} ${bond.name} 的${bondSideText}状态来自 ${staleSignalDate} 信号,非现行可执行。`}
+                </div>
+                <div className="text-[12px] text-subink">
+                  {isBondUnauthorized
+                    ? (bond.blocked_reason || "defensive overlay 未授权,拒绝债券轮动")
+                    : `当前显示的 ${bond.shares_held} 份持仓和 ${bond.est_shares} 份估算只代表模拟盘遗留状态。`}
+                </div>
+              </div>
+            ) : (
+              <>
+                {bond.side === "BUY" && (
+                  <>次日将全部闲置资金买入 <b>{bond.code} {bond.name}</b>
+                    {bond.est_shares > 0 && (
+                      <> ≈ <b>{bond.est_shares}</b> 份 × {bond.ref_price.toFixed(3)} = <b>{fmt(bond.est_notional)}</b> 元</>
+                    )}
+                  </>
+                )}
+                {bond.side === "SELL" && (
+                  <>次日开盘卖出全部 <b>{bond.code} {bond.name}</b> {bond.shares_held} 份
+                    ≈ <b>{fmt(bond.est_notional)}</b> 元,资金买回股票</>
+                )}
+                {bond.side === "HOLD" && (
+                  <>继续持有 <b>{bond.code} {bond.name}</b> {bond.shares_held} 份(闲置现金不足一手)</>
                 )}
               </>
             )}
-            {plan.bond.side === "SELL" && (
-              <>次日开盘卖出全部 <b>{plan.bond.code} {plan.bond.name}</b> {plan.bond.shares_held} 份
-                ≈ <b>{fmt(plan.bond.est_notional)}</b> 元,资金买回股票</>
-            )}
-            {plan.bond.side === "HOLD" && (
-              <>继续持有 <b>{plan.bond.code} {plan.bond.name}</b> {plan.bond.shares_held} 份(闲置现金不足一手)</>
-            )}
           </div>
-          <div className="text-[11px] text-subink mt-1.5">{plan.bond.note}</div>
+          <div className="text-[11px] text-subink mt-1.5">{bond.note}</div>
         </div>
       )}
 
@@ -67,7 +106,9 @@ export default function PlanCard({ plan }: { plan: TradePlanView }) {
       <div className="card">
         <div className="text-sm font-medium mb-2">📋 今日成交/受阻({plan.account_date || plan.signal_date})</div>
         {plan.executed.length === 0 ? (
-          <div className="text-[13px] text-subink">今日无成交({plan.action || "—"})。</div>
+          <div className="text-[13px] text-subink">
+            {isStale ? `历史模拟盘无成交记录(${plan.action || "—"}),非现行可执行。` : `今日无成交(${plan.action || "—"})。`}
+          </div>
         ) : (
           <table className="w-full text-[13px]">
             <thead>
@@ -110,11 +151,17 @@ export default function PlanCard({ plan }: { plan: TradePlanView }) {
 
       {/* 明日计划 */}
       <div className="card">
-        <div className="text-sm font-medium mb-1">📅 明日计划(本日 {plan.signal_date} 信号 → 次日执行)</div>
-        <div className="text-[11px] text-subink mb-2">参考价 = 信号日收盘;实际按 T+1 收盘价模式成交,停牌/一字板会被跳过。</div>
+        <div className="text-sm font-medium mb-1">
+          {isStale ? `历史计划(${plan.signal_date} 信号已过期)` : `📅 明日计划(本日 ${plan.signal_date} 信号 → 次日执行)`}
+        </div>
+        <div className="text-[11px] text-subink mb-2">
+          {isStale
+            ? "以下仅为历史模拟盘计划留痕,不得作为当前 T+1 执行依据。"
+            : "参考价 = 信号日收盘;实际按 T+1 收盘价模式成交,停牌/一字板会被跳过。"}
+        </div>
         {plan.plan.length === 0 ? (
           <div className="text-[13px] text-subink">
-            股票腿无调仓{plan.bond?.active ? "(轮动指令见上方卡片)" : ",空仓观望"}。
+            股票腿无调仓{bond?.active ? (isStale ? "(历史轮动状态见上方卡片)" : "(轮动指令见上方卡片)") : ",空仓观望"}。
           </div>
         ) : (
           <table className="w-full text-[13px]">

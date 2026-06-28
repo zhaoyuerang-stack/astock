@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
 import DataTable from "@/components/ui/DataTable";
-import { api, num } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useAgent } from "@/lib/agentStore";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 import { QuantMetricCard } from "@/components/ui/QuantComponents";
@@ -34,21 +34,28 @@ export default function BacktestLabPage() {
       .then((data) => {
         setDetail(data);
 
-        // Notify AI helper about selected strategy backtest details
+        const oosSharpe = data.strategy.metrics?.sharpe_2023;
+        const sharpe = data.strategy.metrics?.sharpe;
+        const dsr = data.strategy.nine_gate?.dsr_p;
+        const period =
+          typeof data.strategy.data_scope === "string"
+            ? data.strategy.data_scope
+            : ((data.strategy.data_scope as any)?.period ?? "未记录");
+
         setContext({
           page: "backtest-lab",
           title: `回測實驗室: ${data.strategy.strategy_id}`,
-          summary: `回測審計結論：該策略無過度擬合嫌疑。OOS 夏普 ${(data.strategy.metrics?.sharpe_2023 || 1.58).toFixed(2)}（與 IS 偏離 < 15%）。最優參數處於寬廣平台期。`,
+          summary: `回测证据直读自台账。OOS 夏普 ${oosSharpe !== undefined ? oosSharpe.toFixed(2) : "未计算"}，DSR ${dsr !== undefined ? dsr.toFixed(3) : "未审计"}。`,
           evidence: [
             `策略 ID: ${data.strategy.strategy_id}`,
-            `回測起點: ${data.strategy.data_scope ? (typeof data.strategy.data_scope === 'string' ? data.strategy.data_scope : ((data.strategy.data_scope as any).period || '2018-2026')) : '2018-2026'}`,
-            `DSR 顯著性檢驗: DSR p-value = ${data.strategy.nine_gate?.dsr_p || '0.012'}`,
-            `夏普比率 (Sharpe): ${(data.strategy.metrics?.sharpe || 1.85).toFixed(2)}`,
+            `回测区间: ${period}`,
+            `DSR p-value: ${dsr !== undefined ? dsr.toFixed(3) : "未审计"}`,
+            `夏普比率: ${sharpe !== undefined ? sharpe.toFixed(2) : "未计算"}`,
           ],
           risk: data.strategy.decay_check?.decayed ? ["該策略在近期樣本外有衰退預警"] : [],
           recommendation: [
-            "優化大換手率的執行模型",
-            "在極端微盤反轉行情下降低倉位權重"
+            "缺少逐日 NAV 或参数网格时不展示曲线/热力图",
+            "需要完整图表时先由后端落库对应审计产物"
           ],
           nextActions: [
             "運行多階段壓力回測評核",
@@ -58,6 +65,7 @@ export default function BacktestLabPage() {
       })
       .catch((e) => {
         setDetail(null);
+        setErr(String(e));
       });
   }, [selectedStrategyId, selectedStrategyVersion, setContext]);
 
@@ -101,57 +109,11 @@ export default function BacktestLabPage() {
 
   const selectedSegment = segments[activeSegmentTab];
 
-  // Dynamic SVG path generator based on annual returns and maxdd
-  const generateNAVPoints = (ann: number, maxdd: number) => {
-    const years = 8;
-    const finalAsset = Math.pow(1 + ann, years);
-    const endY = Math.max(20, Math.min(170, 170 - ((finalAsset - 1.0) / 5.0) * 150));
-    
-    // Intermediate random-walk nodes styled by return and drawdown
-    const p1 = 170 - (170 - endY) * 0.15 + (maxdd * 20);
-    const p2 = 170 - (170 - endY) * 0.30 - (maxdd * 10);
-    const p3 = 170 - (170 - endY) * 0.45 + (maxdd * 30);
-    const p4 = 170 - (170 - endY) * 0.60 - (maxdd * 15);
-    const p5 = 170 - (170 - endY) * 0.75 + (maxdd * 40);
-    const p6 = 170 - (170 - endY) * 0.90;
-    
-    return `20,170 80,${p1.toFixed(0)} 140,${p2.toFixed(0)} 200,${p3.toFixed(0)} 260,${p4.toFixed(0)} 320,${p5.toFixed(0)} 440,${p6.toFixed(0)} 600,${endY.toFixed(0)}`;
-  };
+  const periodLabel =
+    typeof detail?.strategy?.data_scope === "string"
+      ? detail.strategy.data_scope
+      : ((detail?.strategy?.data_scope as any)?.period ?? "未记录");
 
-  const generateDrawdownPath = (maxdd: number) => {
-    const maxDrop = Math.abs(maxdd) * 120;
-    const p1 = 195 - maxDrop * 0.1;
-    const p2 = 195 - maxDrop * 0.7;
-    const p3 = 195 - maxDrop * 0.3;
-    const p4 = 195 - maxDrop * 0.9;
-    const p5 = 195 - maxDrop * 0.2;
-    return `M 20,195 L 80,${p1.toFixed(0)} L 140,195 L 200,${p2.toFixed(0)} L 260,195 L 320,195 L 380,${p3.toFixed(0)} L 440,${p4.toFixed(0)} L 500,195 L 560,${p5.toFixed(0)} L 600,195 Z`;
-  };
-
-  // Parameter sensitivity heatmap data structure (Holding Limit vs Signal Threshold)
-  // Dynamically scales values based on the strategy's Sharpe ratio
-  const activeSharpe = sharpeVal !== "—" ? parseFloat(sharpeVal) : null;
-  const heatmapRows = activeSharpe !== null ? [
-    { threshold: "0.80", limit10: activeSharpe * 0.72, limit12: activeSharpe * 0.91, limit15: activeSharpe * 1.0, limit20: activeSharpe * 0.85 },
-    { threshold: "0.85", limit10: activeSharpe * 0.79, limit12: activeSharpe * 0.96, limit15: activeSharpe * 1.06, limit20: activeSharpe * 0.89 },
-    { threshold: "0.90", limit10: activeSharpe * 0.82, limit12: activeSharpe * 1.0, limit15: activeSharpe * 1.09, limit20: activeSharpe * 0.91 },
-    { threshold: "0.95", limit10: activeSharpe * 0.75, limit12: activeSharpe * 0.93, limit15: activeSharpe * 0.98, limit20: activeSharpe * 0.82 },
-  ] : [];
-
-
-  // Helper colors for heatmap intensity
-  const getHeatmapColor = (val: number) => {
-    if (val >= 1.70) return "bg-[#30D158] text-bg font-bold";
-    if (val >= 1.50) return "bg-[#30D158]/70 text-bg";
-    if (val >= 1.30) return "bg-brand/50 text-ink";
-    return "bg-line/40 text-subink";
-  };
-
-  // SVG dimensions for Backtest Chart
-  const W = 620;
-  const H = 200;
-
-  // Formatted display values
   const displayCalmar = metrics?.calmar !== undefined ? metrics.calmar.toFixed(2) : "—";
   const displayTurnover = metrics?.turnover_annual !== undefined ? `${(metrics.turnover_annual * 100).toFixed(1)}%` : "—";
   const displayNet = metrics?.cost_annual !== undefined ? `${(metrics.cost_annual * 100).toFixed(2)}%` : "—";
@@ -191,7 +153,7 @@ export default function BacktestLabPage() {
       </div>
 
       <div className="text-[11px] text-subink font-mono bg-navy border border-line px-4 py-2 rounded-lg">
-        📅 歷史回測區間：2018-01-01 至 2026-06-23 · 基準對照：中證2000指數 · 成本模式已扣除雙邊 0.47% (佣金/滑點/融资成本)
+        回測區間：{periodLabel} · 成本口徑：以後端台帳 / CostModel 證據為準
       </div>
 
       {/* 2. 淨值與回撤區域圖 */}
@@ -214,51 +176,16 @@ export default function BacktestLabPage() {
               </div>
             }
           >
-            <div className="p-2 border border-line/45 rounded bg-[#161617]/30">
-              <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
-                {/* Benchmark Area / Shading */}
-                <polyline
-                  points="20,170 80,165 140,180 200,160 260,175 320,150 380,165 440,175 500,185 560,170 600,180"
-                  fill="none"
-                  stroke="#6E6E73"
-                  strokeWidth="1.5"
-                  strokeDasharray="3 3"
-                />
-                
-                {/* Drawdown area chart at the bottom (Red shaded block) */}
-                <path
-                  d={generateDrawdownPath(metrics?.maxdd !== undefined ? metrics.maxdd : -0.1485)}
-                  fill="rgba(255, 69, 58, 0.15)"
-                  stroke="rgba(255, 69, 58, 0.3)"
-                  strokeWidth="1"
-                />
-
-                {/* Strategy NAV Line */}
-                <polyline
-                  points={generateNAVPoints(metrics?.annual !== undefined ? metrics.annual : 0.2240, metrics?.maxdd !== undefined ? metrics.maxdd : -0.1485)}
-                  fill="none"
-                  stroke="#0A84FF"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-
-                {/* Y-axis metrics */}
-                <text x="25" y="20" fontSize="9" fill="#6E6E73" fontFamily="monospace">NAV {(Math.pow(1 + (metrics?.annual || 0.224), 8)).toFixed(2)}</text>
-                <text x="25" y="100" fontSize="9" fill="#6E6E73" fontFamily="monospace">NAV {(Math.pow(1 + (metrics?.annual || 0.224), 4)).toFixed(2)}</text>
-                <text x="25" y="175" fontSize="9" fill="#6E6E73" fontFamily="monospace">NAV 1.00</text>
-                <text x="25" y="195" fontSize="8" fill="#FF453A" fontFamily="monospace">DD 0% ~ {((metrics?.maxdd || -0.1485) * 100).toFixed(0)}%</text>
-
-                {/* Date markers */}
-                <text x="20" y={H - 4} fontSize="8" fill="#6E6E73">2018</text>
-                <text x="310" y={H - 4} fontSize="8" fill="#6E6E73" textAnchor="middle">2022</text>
-                <text x="600" y={H - 4} fontSize="8" fill="#6E6E73" textAnchor="end">2026</text>
-              </svg>
+            <div className="min-h-[210px] flex flex-col items-center justify-center border border-line/45 rounded bg-[#161617]/30 text-center text-subink">
+              <div className="text-sm font-semibold text-[#E6EDF7]">暂无逐日 NAV 曲线证据</div>
+              <div className="text-[11px] mt-1 max-w-lg">
+                当前接口只提供台账级摘要指标。逐日净值、基准曲线和回撤面积需要后端审计产物落库后再展示。
+              </div>
             </div>
             <div className="flex justify-between items-center text-[10px] text-weak mt-2 font-mono">
-              <span>🔵 策略淨值 (NAV)</span>
-              <span>⚪ 基準指數 (中證2000)</span>
-              <span>🔴 回撤區間比例 (Area)</span>
+              <span>策略淨值: 未落庫</span>
+              <span>基準指數: 未落庫</span>
+              <span>回撤區間: 未落庫</span>
             </div>
           </Card>
         </div>
@@ -332,21 +259,11 @@ export default function BacktestLabPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1F3550]/30 font-mono">
-                {heatmapRows.length > 0 ? heatmapRows.map((row) => (
-                  <tr key={row.threshold} className="border-b border-line/30">
-                    <td className="p-2.5 font-bold bg-[#10263D]/40 text-subink border-r border-line">{row.threshold}</td>
-                    <td className={`p-2.5 border-r border-line/30 ${getHeatmapColor(row.limit10)}`}>{row.limit10.toFixed(2)}</td>
-                    <td className={`p-2.5 border-r border-line/30 ${getHeatmapColor(row.limit12)}`}>{row.limit12.toFixed(2)}</td>
-                    <td className={`p-2.5 border-r border-line/30 ${getHeatmapColor(row.limit15)}`}>
-                      {row.limit15.toFixed(2)} ★
-                    </td>
-                    <td className={`p-2.5 ${getHeatmapColor(row.limit20)}`}>{row.limit20.toFixed(2)}</td>
-                  </tr>
-                )) : (
-                  <tr>
-                    <td colSpan={5} className="p-4 text-center text-[#8E8E93]">無敏感度熱力圖數據</td>
-                  </tr>
-                )}
+                <tr>
+                  <td colSpan={5} className="p-4 text-center text-[#8E8E93]">
+                    無敏感度熱力圖數據。需要真实参数网格审计产物后再展示。
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -388,8 +305,8 @@ export default function BacktestLabPage() {
           />
 
           {activeSegmentTab === "oos" && (
-            <div className="mt-3 p-2.5 bg-[#35D06E]/5 border border-[#35D06E]/10 rounded text-[11px] text-ok">
-              ✓ 樣本外 (OOS) 表現符合安全界限。年化收益 {realAnn} 相比樣本內 {metrics?.annual_2018 !== undefined ? `${(metrics.annual_2018 * 100).toFixed(2)}%` : "—"} 表現正常。
+            <div className="mt-3 p-2.5 bg-[#3D7BFF]/5 border border-[#3D7BFF]/10 rounded text-[11px] text-subink">
+              樣本外 (OOS) 指標直讀自台帳：年化收益 {realAnn}，樣本內年化 {metrics?.annual_2018 !== undefined ? `${(metrics.annual_2018 * 100).toFixed(2)}%` : "—"}。
             </div>
           )}
 

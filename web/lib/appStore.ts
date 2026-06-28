@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type DataStatus = "fresh" | "stale" | "error";
+export type DataStatus = "fresh" | "stale" | "error" | "unknown";
 
 interface AppState {
   currentDate: string;
@@ -16,11 +16,11 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
-  currentDate: "2026-06-24", // Default as per doc
-  latestDataDate: "2026-06-23",
+  currentDate: "—",
+  latestDataDate: "—",
   selectedStrategyId: "illiquidity",
   selectedStrategyVersion: "v3.1",
-  dataStatus: "fresh",
+  dataStatus: "unknown",
 
   setCurrentDate: (currentDate) => set({ currentDate }),
   setLatestDataDate: (latestDataDate) => set({ latestDataDate }),

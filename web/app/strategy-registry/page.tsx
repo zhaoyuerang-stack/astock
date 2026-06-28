@@ -35,64 +35,67 @@ function getNineGatesList(ng?: any) {
   const robustPassed = ng.gate4_verdict === "PASS" || ng.passed_all;
   const execPassed = ng.cost_decay_rate !== undefined && ng.cost_decay_rate < 1.5;
   const capacityPassed = ng.gate7_verdict === "PASS";
+  const riskPassed = ng.cvar_95 !== undefined && ng.var_95 !== undefined;
+  const financePassed = ng.bull_sharpe !== undefined || ng.bear_sharpe !== undefined;
+  const auditPassed = Boolean(ng.config_hash || ng.reproducibility_hash || ng.spec_hash);
 
   return [
     {
       name: "1. 數據完整性 (Data)",
-      checked: dataPassed ? "已通過" : "警告",
-      reason: ng.psr !== undefined ? `歷史與即時數據覆蓋率正常 (PSR = ${formatPct(ng.psr)})` : "無數據完整性指標",
+      checked: ng.psr !== undefined ? (dataPassed ? "已通過" : "警告") : "未審計",
+      reason: ng.psr !== undefined ? `PSR = ${formatPct(ng.psr)}` : "無數據完整性指標",
     },
     {
       name: "2. 因子有效性 (Alpha)",
-      checked: alphaPassed ? "已通過" : "警告",
+      checked: ng.nw_icir !== undefined ? (alphaPassed ? "已通過" : "警告") : "未審計",
       reason: ng.nw_icir !== undefined
-        ? `中性化 NW-ICIR = ${formatNum(ng.nw_icir, 3)}, 因子勝率 = ${formatPct(ng.ic_win_rate, 1)}%`
+        ? `中性化 NW-ICIR = ${formatNum(ng.nw_icir, 3)}, 因子勝率 = ${formatPct(ng.ic_win_rate, 1)}`
         : "無有效性指標",
     },
     {
       name: "3. 邏輯合理性 (Logic)",
-      checked: "已通過",
-      reason: "因子暴露背後的經濟學原理合規，符合擁擠溢價",
+      checked: ng.logic_review ? "已通過" : "未審計",
+      reason: ng.logic_review || "無邏輯合理性審計記錄",
     },
     {
       name: "4. 回測穩健性 (Robust)",
-      checked: robustPassed ? "已通過" : "警告",
+      checked: ng.pbo !== undefined || ng.gate4_verdict !== undefined ? (robustPassed ? "已通過" : "警告") : "未審計",
       reason: ng.pbo !== undefined
-        ? `PBO = ${formatPct(ng.pbo, 1)} (風險级别: ${ng.pbo_risk || "中"}), CV夏普 = ${formatNum(ng.cv_sharpe)}`
+        ? `PBO = ${formatPct(ng.pbo, 1)} (風險级别: ${ng.pbo_risk || "—"}), CV夏普 = ${formatNum(ng.cv_sharpe)}`
         : "無穩健性指標",
     },
     {
       name: "5. 交易可執行性 (Exec)",
-      checked: execPassed ? "已通過" : "警告",
+      checked: ng.cost_decay_rate !== undefined ? (execPassed ? "已通過" : "警告") : "未審計",
       reason: ng.cost_decay_rate !== undefined
-        ? `滑點估計模型完整，成本衰退率 = ${formatNum(ng.cost_decay_rate)}x`
+        ? `成本衰退率 = ${formatNum(ng.cost_decay_rate)}x`
         : "無交易可執行性指標",
     },
     {
       name: "6. 風險可控性 (Risk)",
-      checked: "已通過",
-      reason: ng.cvar_95 !== undefined
+      checked: riskPassed ? "已通過" : "未審計",
+      reason: riskPassed
         ? `CVaR(95%) = ${formatPct(ng.cvar_95)}, VaR(95%) = ${formatPct(ng.var_95)}`
-        : "風險指標均在合理範圍內",
+        : "無風險指標",
     },
     {
       name: "7. 容量與衝擊 (Capacity)",
-      checked: capacityPassed ? "已通過" : "警告",
+      checked: ng.capacity_limit_aum !== undefined || ng.gate7_verdict !== undefined ? (capacityPassed ? "已通過" : "警告") : "未審計",
       reason: ng.capacity_limit_aum !== undefined
-        ? `估計容量上限 = ${formatNum(ng.capacity_limit_aum / 1000000, 0)}M, 衝擊滑點敏感性在安全邊界`
+        ? `估計容量上限 = ${formatNum(ng.capacity_limit_aum / 1000000, 0)}M`
         : "未完成容量模型估計",
     },
     {
       name: "8. 經濟學意義 (Finance)",
-      checked: "已通過",
-      reason: ng.bull_sharpe !== undefined
+      checked: financePassed ? "已通過" : "未審計",
+      reason: financePassed
         ? `具有特徵行為 (Bull Sharpe: ${formatNum(ng.bull_sharpe)} / Bear Sharpe: ${formatNum(ng.bear_sharpe)})`
-        : "非單純統計學擬合，具有宏觀及微觀交易者行為特徵",
+        : "無經濟學意義審計記錄",
     },
     {
       name: "9. 文檔與可複現性 (Audit)",
-      checked: "已通過",
-      reason: "對齊 Spec Hash 二進制可一鍵在沙盒複現",
+      checked: auditPassed ? "已通過" : "未審計",
+      reason: auditPassed ? `Spec Hash: ${ng.config_hash || ng.reproducibility_hash || ng.spec_hash}` : "無可複現性證據",
     },
   ];
 }
@@ -238,8 +241,8 @@ export default function StrategyRegistryPage() {
       step4TextColor = "text-ok";
     }
 
-    const reviewDate = s.decay_check?.checked_at ? s.decay_check.checked_at.slice(0, 10) : "2026-06-15";
-    const yearMonth = reviewDate.slice(0, 8);
+    const reviewDate = s.decay_check?.checked_at ? s.decay_check.checked_at.slice(0, 10) : "—";
+    const yearMonth = reviewDate !== "—" ? reviewDate.slice(0, 8) : "—";
 
     return (
       <div className="relative border-l border-line ml-3.5 my-3 pl-4 space-y-4 text-xs font-mono">
@@ -411,15 +414,15 @@ export default function StrategyRegistryPage() {
                     <div><span className="text-[#6E6E73]">策略名稱：</span>{selectedDetail.strategy.family_name || selectedDetail.strategy.family}</div>
                     <div><span className="text-[#6E6E73]">所屬家族：</span>{selectedDetail.strategy.family}</div>
                     <div><span className="text-[#6E6E73]">版本代號：</span>{selectedDetail.strategy.version}</div>
-                    <div><span className="text-[#6E6E73]">創建作者：</span>researcher</div>
+                    <div><span className="text-[#6E6E73]">創建作者：</span>{(selectedDetail.strategy as any).author || "—"}</div>
                   </div>
                   <div>
-                    <div><span className="text-[#6E6E73]">負責人員：</span>researcher</div>
-                    <div><span className="text-[#6E6E73]">創建日期：</span>{selectedDetail.strategy.decay_check?.checked_at ? selectedDetail.strategy.decay_check.checked_at.slice(0, 10) : "2026-06-15"}</div>
-                    <div><span className="text-[#6E6E73]">重大變更：</span>無</div>
-                    <div><span className="text-[#6E6E73]">文檔鏈接：</span>
-                      <a href="#" className="text-[#0A84FF] hover:underline">evidence_{selectedDetail.strategy.version}.pdf</a>
-                    </div>
+                    <div><span className="text-[#6E6E73]">負責人員：</span>{(selectedDetail.strategy as any).owner || "—"}</div>
+                    <div><span className="text-[#6E6E73]">創建日期：</span>{(selectedDetail.strategy as any).created_at ? String((selectedDetail.strategy as any).created_at).slice(0, 10) : "—"}</div>
+                    <div><span className="text-[#6E6E73]">重大變更：</span>{(selectedDetail.strategy as any).change_summary || "—"}</div>
+                    <div><span className="text-[#6E6E73]">文檔鏈接：</span>{(selectedDetail.strategy as any).evidence_url ? (
+                      <a href={(selectedDetail.strategy as any).evidence_url} className="text-[#0A84FF] hover:underline">evidence</a>
+                    ) : "—"}</div>
                   </div>
                 </div>
               </Card>

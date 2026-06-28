@@ -12,7 +12,6 @@ export default function TopBar() {
     selectedStrategyId,
     selectedStrategyVersion,
     setSelectedStrategy,
-    setDataStatus,
   } = useAppStore();
 
   const [stratOpen, setStratOpen] = useState(false);
@@ -38,15 +37,7 @@ export default function TopBar() {
           }))
         );
       })
-      .catch(() => {
-        // Fallback static list
-        setStrategyVersions([
-          { id: "illiquidity", version: "v3.1", name: "illiquidity v3.1" },
-          { id: "illiquidity", version: "v3.0", name: "illiquidity v3.0" },
-          { id: "size-earnings", version: "v1.0", name: "size-earnings v1.0" },
-          { id: "roc-yc", version: "v1.0", name: "roc-yc v1.0" },
-        ]);
-      });
+      .catch(() => setStrategyVersions([]));
   }, []);
 
   const getStatusColor = () => {
@@ -82,7 +73,6 @@ export default function TopBar() {
         <div className="flex items-center gap-1.5">
           <span className="text-weak">今日：</span>
           <span className="font-bold text-ink font-mono">{currentDate}</span>
-          <span className="text-[11px] text-weak">（星期三）</span>
         </div>
 
         <div className="h-3 w-[1px] bg-line" />
@@ -95,12 +85,6 @@ export default function TopBar() {
           </span>
         </div>
 
-        <div className="h-3 w-[1px] bg-line" />
-
-        <div className="flex items-center gap-1.5">
-          <span className="text-weak">下一次調倉：</span>
-          <span className="font-bold text-brand font-mono">還有 12 個交易日</span>
-        </div>
       </div>
 
       {/* Right side: Strategy Selector & More Actions */}
@@ -120,22 +104,26 @@ export default function TopBar() {
 
           {stratOpen && (
             <div className="absolute right-0 mt-1.5 w-52 bg-navy border border-line rounded-md shadow-lg py-1 z-40">
-              {strategyVersions.map((item) => (
-                <button
-                  key={item.name}
-                  onClick={() => {
-                    setSelectedStrategy(item.id, item.version);
-                    setStratOpen(false);
-                  }}
-                  className={`w-full text-left px-4 py-2 text-[12px] font-mono hover:bg-line transition-colors ${
-                    selectedStrategyId === item.id && selectedStrategyVersion === item.version
-                      ? "text-brand font-bold"
-                      : "text-ink"
-                  }`}
-                >
-                  {item.name}
-                </button>
-              ))}
+              {strategyVersions.length > 0 ? (
+                strategyVersions.map((item) => (
+                  <button
+                    key={item.name}
+                    onClick={() => {
+                      setSelectedStrategy(item.id, item.version);
+                      setStratOpen(false);
+                    }}
+                    className={`w-full text-left px-4 py-2 text-[12px] font-mono hover:bg-line transition-colors ${
+                      selectedStrategyId === item.id && selectedStrategyVersion === item.version
+                        ? "text-brand font-bold"
+                        : "text-ink"
+                    }`}
+                  >
+                    {item.name}
+                  </button>
+                ))
+              ) : (
+                <div className="px-4 py-2 text-[12px] text-subink">暫無策略版本</div>
+              )}
             </div>
           )}
         </div>
@@ -164,23 +152,12 @@ export default function TopBar() {
             <div className="absolute right-0 mt-1.5 w-44 bg-navy border border-line rounded-md shadow-lg py-1 z-40 text-[12px]">
               <button
                 onClick={() => {
-                  setDataStatus(dataStatus === "fresh" ? "stale" : "fresh");
-                  setMoreOpen(false);
-                }}
-                className="w-full text-left px-4 py-2 text-ink hover:bg-line transition-colors"
-              >
-                🔄 模擬刷新數據狀態
-              </button>
-              <button
-                onClick={() => {
                   window.location.reload();
                 }}
                 className="w-full text-left px-4 py-2 text-ink hover:bg-line transition-colors"
               >
                 ⚡ 強制重新整理
               </button>
-              <div className="border-t border-line my-1" />
-              <div className="px-4 py-1 text-[10px] text-weak">部署ID: deploy_20260624_v1</div>
             </div>
           )}
         </div>

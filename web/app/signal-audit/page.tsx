@@ -59,15 +59,16 @@ export default function SignalAuditPage() {
         const activeFamily = (sc?.strategy?.family as string) || "illiquidity";
         const activeVersion = (sc?.strategy?.version as string) || "v3.1";
         const isProd = selectedStrategyId === activeFamily && selectedStrategyVersion === activeVersion;
+        const hasCurrentExecutableSignal = isProd && !pp.stale && tr.allowed_to_trade;
 
         setContext({
           page: "signal-audit",
           title: "信號審計系統",
           summary: isProd 
-            ? `當前信號審計：${tr.allowed_to_trade ? "【通過】" : "【攔截】"}。已鎖定 Spec Hash: ${specHash}。`
+            ? `當前信號審計：${hasCurrentExecutableSignal ? "【通過】" : "【非现行可执行】"}。已鎖定 Spec Hash: ${specHash}。`
             : `當前策略為非運行生產策略。生產運行中主策略為: ${activeFamily} ${activeVersion}。`,
           evidence: isProd ? [
-            `信號發布狀態: ${tr.allowed_to_trade ? "正式發布" : "草稿/阻塞"}`,
+            `信號發布狀態: ${hasCurrentExecutableSignal ? "正式發布" : pp.stale ? `stale/阻塞: ${pp.stale_reason}` : "草稿/阻塞"}`,
             `選股管道漏斗: ${pp.candidates?.length ?? 0} 只候選 -> ${pp.plan?.length ?? 0} 只交易項目`,
             `大週期狀態: ${pp.regime || "—"}`,
             `數據集指紋: ${reproducibility?.data_snapshot ? "git_" + reproducibility.git_commit : "—"}`,
@@ -76,12 +77,12 @@ export default function SignalAuditPage() {
             `生產運行策略: ${activeFamily} ${activeVersion}`,
             `此非生產策略無每日實盤信號生成`,
           ],
-          risk: isProd ? (tr.allowed_to_trade ? [] : ["信號生成的數據指紋不一致，已觸發一致性阻尼攔截"]) : [],
+          risk: isProd ? (hasCurrentExecutableSignal ? [] : [pp.stale ? "纸面信号已过期,非现行可执行" : "信號生成被生產門禁攔截"]) : [],
           recommendation: isProd 
-            ? ["核對在冊代碼版本的 Git commit 標籤", "執行信號重新生成校驗"]
+            ? (hasCurrentExecutableSignal ? ["核對在冊代碼版本的 Git commit 標籤", "執行信號重新生成校驗"] : ["不要按此信號下單", "先解除 stale/門禁阻塞再恢復展示執行清單"])
             : ["如需查看實盤信號與審計，請在下拉選單切換至生產主策略"],
           nextActions: isProd 
-            ? ["前往「系統治理」下載本次審計證據包", "比對回測口徑與真實執行偏差"]
+            ? (hasCurrentExecutableSignal ? ["前往「系統治理」下載本次審計證據包", "比對回測口徑與真實執行偏差"] : ["前往「今日操作台」查看阻塞原因", "等待新信號或調整部署清單"])
             : ["前往「策略實驗室」或「因子研究」查看該策略的歷史回測與九門禁審計指標"],
         });
       })
@@ -93,16 +94,37 @@ export default function SignalAuditPage() {
   const activeFamily = (systemConfig?.strategy?.family as string) || "illiquidity";
   const activeVersion = (systemConfig?.strategy?.version as string) || "v3.1";
   const isProductionStrategy = selectedStrategyId === activeFamily && selectedStrategyVersion === activeVersion;
+  const hasCurrentExecutableSignal =
+    isProductionStrategy && !!paperPlan && !paperPlan.stale && !!readiness?.allowed_to_trade;
+  const nonExecutableSignalReason =
+    isProductionStrategy && paperPlan?.stale
+      ? "信号已过期,非现行可执行"
+      : isProductionStrategy && readiness && !readiness.allowed_to_trade
+      ? "生产门禁已拦截,非现行可执行"
+      : "当前无现行可执行信号";
+  const suggestedActionText = isProductionStrategy
+    ? paperPlan?.stale
+      ? "信号已过期,非现行可执行"
+      : readiness?.allowed_to_trade
+      ? (paperPlan?.action || "—")
+      : "生产门禁已拦截,非现行可执行"
+    : "—";
+  const releaseStatusText = paperPlan?.stale ? "已阻塞 (stale)" : readiness?.allowed_to_trade ? "正式發布" : "已阻塞 (草稿)";
 
   // Steps for PipelineStepper derived dynamically
   const candidatesCount = paperPlan?.candidates?.length ?? 0;
   const planCount = paperPlan?.plan?.length ?? 0;
 
-  const pipelineSteps = isProductionStrategy ? [
+  const pipelineSteps = hasCurrentExecutableSignal ? [
     { name: "1. 原始候選池", count: "—", desc: "A股全市場覆蓋", status: "completed" as const },
     { name: "2. 否決器過濾", count: "—", desc: "排除 ST / 高風險", status: "completed" as const },
     { name: "3. 因子打分排序", count: candidatesCount > 0 ? `${candidatesCount} 只` : "—", desc: "策略選股成員", status: "active" as const },
     { name: "4. 執行調倉計劃", count: planCount > 0 ? `${planCount} 只` : "—", desc: "當前調倉執行項", status: planCount > 0 ? ("completed" as const) : ("pending" as const) },
+  ] : isProductionStrategy ? [
+    { name: "1. 原始候選池", count: "—", desc: nonExecutableSignalReason, status: "warning" as const },
+    { name: "2. 否決器過濾", count: "—", desc: nonExecutableSignalReason, status: "warning" as const },
+    { name: "3. 因子打分排序", count: "—", desc: nonExecutableSignalReason, status: "warning" as const },
+    { name: "4. 執行調倉計劃", count: "—", desc: nonExecutableSignalReason, status: "warning" as const },
   ] : [
     { name: "1. 原始候選池", count: "—", desc: "A股全市場覆蓋", status: "pending" as const },
     { name: "2. 否決器過濾", count: "—", desc: "排除 ST / 高風險", status: "pending" as const },
@@ -112,7 +134,7 @@ export default function SignalAuditPage() {
 
   // Candidates list mapping dynamically
   const candidateRows: CandidateRow[] = [];
-  if (isProductionStrategy) {
+  if (hasCurrentExecutableSignal) {
     if (paperPlan?.plan && paperPlan.plan.length > 0) {
       paperPlan.plan.forEach((item, index) => {
         const isStAsset = item.name.includes("ST") || item.name.includes("*ST");
@@ -158,7 +180,7 @@ export default function SignalAuditPage() {
     return `${((count / totalCandidates) * 100).toFixed(1)}%`;
   };
 
-  const executionRisks = isProductionStrategy ? [
+  const executionRisks = hasCurrentExecutableSignal ? [
     { 
       riskType: "漲停買不進", 
       count: getRiskCount("涨停"), 
@@ -188,10 +210,10 @@ export default function SignalAuditPage() {
       action: "正常" 
     },
   ] : [
-    { riskType: "漲停買不進", count: "—", ratio: "—", amount: "—", action: "非生產運行策略，不執行評估" },
-    { riskType: "跌停賣不出", count: "—", ratio: "—", amount: "—", action: "非生產運行策略，不執行評估" },
-    { riskType: "停牌 / 臨時停牌", count: "—", ratio: "—", amount: "—", action: "非生產運行策略，不執行評估" },
-    { riskType: "一字板限制", count: "—", ratio: "—", amount: "—", action: "非生產運行策略，不執行評估" },
+    { riskType: "漲停買不進", count: "—", ratio: "—", amount: "—", action: isProductionStrategy ? nonExecutableSignalReason : "非生產運行策略，不執行評估" },
+    { riskType: "跌停賣不出", count: "—", ratio: "—", amount: "—", action: isProductionStrategy ? nonExecutableSignalReason : "非生產運行策略，不執行評估" },
+    { riskType: "停牌 / 臨時停牌", count: "—", ratio: "—", amount: "—", action: isProductionStrategy ? nonExecutableSignalReason : "非生產運行策略，不執行評估" },
+    { riskType: "一字板限制", count: "—", ratio: "—", amount: "—", action: isProductionStrategy ? nonExecutableSignalReason : "非生產運行策略，不執行評估" },
   ];
 
   const dataScope = strategyDetail?.strategy?.data_scope;
@@ -233,17 +255,21 @@ export default function SignalAuditPage() {
           <div className="space-y-2">
             <div>
               <span className="text-[#8E8E93]">信號日期：</span>
-              <span className="font-bold text-[#F5F5F7] font-mono">{isProductionStrategy ? (paperPlan?.signal_date || "2026-06-24") : "—"}</span>
+              <span className="font-bold text-[#F5F5F7] font-mono">{isProductionStrategy ? (paperPlan?.signal_date || "—") : "—"}</span>
             </div>
             <div>
               <span className="text-[#8E8E93]">大周期狀態：</span>
               <span className="font-bold text-[#F5F5F7]">
-                {isProductionStrategy ? (paperPlan?.regime === "bear" ? "🔴 BEAR (避險)" : "🟢 BULL (運行)") : "—"}
+                {isProductionStrategy
+                  ? paperPlan?.stale
+                    ? `历史状态 ${paperPlan?.regime === "bear" ? "BEAR" : "BULL"}(非现行可执行)`
+                    : (paperPlan?.regime === "bear" ? "🔴 BEAR (避險)" : "🟢 BULL (運行)")
+                  : "—"}
               </span>
             </div>
             <div>
               <span className="text-[#8E8E93]">建議動作：</span>
-              <span className="text-[#0A84FF] font-bold">{isProductionStrategy ? (paperPlan?.action || "—") : "—"}</span>
+              <span className="text-[#0A84FF] font-bold">{suggestedActionText}</span>
             </div>
           </div>
 
@@ -252,11 +278,11 @@ export default function SignalAuditPage() {
               <span className="text-[#8E8E93]">發布狀態：</span>
               {isProductionStrategy ? (
                 <span className={`px-2 py-0.5 rounded text-[10px] border font-bold ${
-                  readiness?.allowed_to_trade
+                  hasCurrentExecutableSignal
                     ? "text-[#30D158] bg-[#30D158]/10 border-[#30D158]/20"
                     : "text-[#FF453A] bg-[#FF453A]/10 border-[#FF453A]/20"
                 }`}>
-                  {readiness?.allowed_to_trade ? "正式發布" : "已阻塞 (草稿)"}
+                  {releaseStatusText}
                 </span>
               ) : (
                 <span className="px-2 py-0.5 rounded text-[10px] border font-bold text-[#8E8E93] bg-[#8E8E93]/10 border-[#8E8E93]/20">
@@ -267,7 +293,7 @@ export default function SignalAuditPage() {
             <div>
               <span className="text-[#8E8E93]">部署 ID：</span>
               <span className="text-[#F5F5F7] font-mono">
-                {isProductionStrategy ? `deploy_${paperPlan?.signal_date ? paperPlan.signal_date.replace(/-/g, "") : "20260624"}_${selectedStrategyVersion}` : "—"}
+                {isProductionStrategy ? `deploy_${paperPlan?.signal_date ? paperPlan.signal_date.replace(/-/g, "") : "unknown"}_${selectedStrategyVersion}` : "—"}
               </span>
             </div>
             <div>
@@ -307,7 +333,7 @@ export default function SignalAuditPage() {
         <DataTable<CandidateRow>
           rows={candidateRows}
           getRowKey={(r) => r.code}
-          empty={isProductionStrategy ? "當前無執行清單數據" : "非運行中生產策略無即時交易信號數據。請切換至生產主策略以查看信號審計。"}
+          empty={isProductionStrategy ? nonExecutableSignalReason : "非運行中生產策略無即時交易信號數據。請切換至生產主策略以查看信號審計。"}
           columns={[
             {
               key: "rank",

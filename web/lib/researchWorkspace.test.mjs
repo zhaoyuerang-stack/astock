@@ -40,15 +40,15 @@ test("research lifecycle subpages and detail routes exist", () => {
     "app/experiments/runs/page.tsx",
     "app/experiments/reviews/page.tsx",
     "app/experiments/[kind]/[id]/page.tsx",
-    "app/factors/[family]/[version]/page.tsx",
+    "app/factor-research/page.tsx",
+    "app/strategy-registry/page.tsx",
   ]) {
     assert.equal(fs.existsSync(path.join(ROOT, relative)), true, `${relative} must exist`);
   }
 });
 
-test("factor page reads registry versions only and no longer loads the factor noise pool", () => {
-  const source = fs.readFileSync(path.join(ROOT, "app/factors/page.tsx"), "utf8");
-  assert.doesNotMatch(source, /api\.factors/);
+test("factor research page does not load legacy factor noise pool", () => {
+  const source = fs.readFileSync(path.join(ROOT, "app/factor-research/page.tsx"), "utf8");
   assert.doesNotMatch(source, /noisePool/);
-  assert.match(source, /api\.strategies/);
+  assert.match(source, /api\.factors/);
 });

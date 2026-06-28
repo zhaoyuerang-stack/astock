@@ -57,24 +57,30 @@ export default function DashboardPage() {
         setSystemConfig(sc);
         setStrategyDetail(sd);
 
-        const actionTip = pp.bond
-          ? (pp.bond.side === "HOLD" ? `继续持有 ${pp.bond.name}` : `${pp.bond.side} ${pp.bond.name}`)
-          : pp.plan?.length > 0
-          ? `${pp.plan[0].action} ${pp.plan[0].name}`
-          : "今日无交易信号";
-
         const activeFamily = (sc?.strategy?.family as string) || "illiquidity";
         const activeVersion = (sc?.strategy?.version as string) || "v3.1";
         const isProd = selectedStrategyId === activeFamily && selectedStrategyVersion === activeVersion;
+        const hasCurrentExecutablePlan = isProd && !pp.stale && tr.allowed_to_trade;
+        const blockedActionTip = pp.stale
+          ? "纸面信号已过期,非现行可执行"
+          : !tr.allowed_to_trade
+          ? "生产门禁已拦截,无可执行交易指令"
+          : "";
+        const actionTip = blockedActionTip || (pp.bond
+          ? (pp.bond.side === "HOLD" ? `继续持有 ${pp.bond.name}` : `${pp.bond.side} ${pp.bond.name}`)
+          : pp.plan?.length > 0
+          ? `${pp.plan[0].action} ${pp.plan[0].name}`
+          : "今日无交易信号");
 
         setContext({
           page: "dashboard",
           title: "今日操作台",
           summary: isProd 
-            ? `今日交易就绪度：${tr.allowed_to_trade ? "【已就绪】" : "【已拦截】"}。建议决策动作：${actionTip}。大周期極性：${m.last_action}。`
+            ? `今日交易就绪度：${hasCurrentExecutablePlan ? "【已就绪】" : "【已拦截/非现行可执行】"}。建议决策动作：${actionTip}。大周期極性：${m.last_action}。`
             : `當前策略為非運行生產策略。今日操作台數據（實盤）僅對生產主策略 ${activeFamily} ${activeVersion} 開放。`,
           evidence: isProd ? [
             `前置就緒度門禁是否通過 (allowed_to_trade): ${tr.allowed_to_trade ? "YES" : "NO"}`,
+            `纸面信号是否过期 (paperPlan.stale): ${pp.stale ? "YES" : "NO"}`,
             `大周期市場制度: ${m.last_action}`,
             `當前模擬盤 NAV: ${pp.nav.toFixed(2)} · 持倉市值: ${pp.position_value.toFixed(0)}元`,
             `Spec Hash: ${pp.stale_reason || "未提供"}`,
@@ -83,12 +89,12 @@ export default function DashboardPage() {
             `生產運行策略: ${activeFamily} ${activeVersion}`,
             `實盤運行數據已被安全隔离展示`,
           ],
-          risk: isProd && !tr.allowed_to_trade ? ["生產門禁檢查失敗，今日交易流程已自動攔截"] : [],
+          risk: isProd && !hasCurrentExecutablePlan ? ["生產門禁或纸面信号时效未通过，今日交易流程已自動攔截"] : [],
           recommendation: isProd 
-            ? (tr.allowed_to_trade ? ["對齊目標倉位進行下單執行", "關注小盤流動性滑點衝擊"] : ["進入系統治理頁排查失敗守衛", "檢查數據日期與 Spec Hash 一致性"])
+            ? (hasCurrentExecutablePlan ? ["對齊目標倉位進行下單執行", "關注小盤流動性滑點衝擊"] : ["不要按当前 paper/signal 下单", "进入系统治理页排查部署、数据与信号时效"])
             : ["切換至生產主策略以查看實盤信號和交易決策"],
           nextActions: isProd 
-            ? (tr.allowed_to_trade ? ["簽發今日交易指令單", "監控持倉組合敞口偏離"] : ["手動更新數據源", "覆核策略台帳在冊版本"])
+            ? (hasCurrentExecutablePlan ? ["簽發今日交易指令單", "監控持倉組合敞口偏離"] : ["刷新数据并生成新信号", "覆核策略台帳在冊版本"])
             : ["前往「策略實驗室」查看選定策略的回測明細"],
         });
       })
@@ -100,10 +106,12 @@ export default function DashboardPage() {
   const activeFamily = (systemConfig?.strategy?.family as string) || "illiquidity";
   const activeVersion = (systemConfig?.strategy?.version as string) || "v3.1";
   const isProductionStrategy = selectedStrategyId === activeFamily && selectedStrategyVersion === activeVersion;
+  const hasCurrentExecutablePlan =
+    isProductionStrategy && !!paperPlan && !paperPlan.stale && !!readiness?.allowed_to_trade;
 
   // Normalize signals for Top-25 Candidates representation
   const signalRows: SignalRow[] = [];
-  if (isProductionStrategy) {
+  if (hasCurrentExecutablePlan) {
     if (paperPlan?.bond) {
       const b = paperPlan.bond;
       signalRows.push({
@@ -142,8 +150,16 @@ export default function DashboardPage() {
     ? `lake_${strategyDetail.strategy.nine_gate.config_hash.slice(0, 12)}`
     : "—";
   const rawCandidateCount =
-    isProductionStrategy && paperPlan ? String(paperPlan.candidates.length) : "—";
-  const executedSignalCount = isProductionStrategy ? String(signalRows.length) : "—";
+    hasCurrentExecutablePlan ? String(paperPlan.candidates.length) : "—";
+  const executedSignalCount = hasCurrentExecutablePlan ? String(signalRows.length) : "—";
+  const actionDetail =
+    isProductionStrategy && paperPlan
+      ? paperPlan.stale
+        ? "非现行可执行(纸面信号已过期)"
+        : readiness?.allowed_to_trade
+        ? paperPlan.action
+        : "生产门禁已拦截,无可执行交易指令"
+      : "—";
   const statusFromReadiness = (value?: string): "passed" | "warning" | "failed" | "pending" => {
     if (!isProductionStrategy || !value) return "pending";
     if (/(不可用|失敗|失败|滯後|滞后|超限|異常|异常|blocked|fail)/i.test(value)) return "failed";
@@ -190,11 +206,13 @@ export default function DashboardPage() {
 
       {/* 1. 交易門禁就緒度總體横幅 */}
       <StatusBanner
-        status={isProductionStrategy && readiness?.allowed_to_trade ? "ready" : "blocked"}
+        status={hasCurrentExecutablePlan ? "ready" : "blocked"}
         title={
-          isProductionStrategy && readiness
-            ? readiness.allowed_to_trade
+          isProductionStrategy && readiness && paperPlan
+            ? hasCurrentExecutablePlan
               ? "今日交易門禁：已就緒 (允許交易)"
+              : paperPlan.stale
+              ? "今日交易門禁：被攔截 (信号过期)"
               : "今日交易門禁：被攔截 (BLOCKED)"
             : isProductionStrategy
             ? "今日交易門禁：載入中…"
@@ -203,7 +221,7 @@ export default function DashboardPage() {
         detail={
           isProductionStrategy && market && paperPlan
             ? `市場制度：${market.last_action === "空仓观望" ? "熊市避險" : "牛市運行"} · 建議動作：${
-                paperPlan.action
+                actionDetail
               } · 目標倉位：${(paperPlan.band_exposure * 100).toFixed(0)}%`
             : undefined
         }
@@ -423,7 +441,13 @@ export default function DashboardPage() {
               <DataTable<SignalRow>
                 rows={signalRows}
                 getRowKey={(r, i) => `${r.code}-${i}`}
-                empty={isProductionStrategy ? "今日無候選股票信號" : "非運行中生產策略無即時交易信號。請切換至生產主策略。"}
+                empty={
+                  isProductionStrategy && paperPlan?.stale
+                    ? "纸面信号已过期,非现行可执行。"
+                    : isProductionStrategy
+                    ? "今日無現行可執行交易信號"
+                    : "非運行中生產策略無即時交易信號。請切換至生產主策略。"
+                }
                 columns={[
                   {
                     key: "dir",

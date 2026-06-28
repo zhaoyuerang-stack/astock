@@ -494,6 +494,8 @@ export interface PaperPlanItem {
 export interface BondInstructionView {
   active: boolean;
   side: "BUY" | "SELL" | "HOLD" | string;
+  authorized?: boolean;
+  blocked_reason?: string;
   code: string;
   name: string;
   ref_price: number;
