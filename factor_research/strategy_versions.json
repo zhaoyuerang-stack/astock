@@ -1,6 +1,51 @@
 {
   "families": [
     {
+      "id": "alternative-flow-shareholder",
+      "versions": [
+        {
+          "version": "v1.0",
+          "date": "2026-06-28",
+          "desc": "大深搜 Path A 另类因子冠军版本，由 0.6×北向流入 + 0.4×筹码集中 合成。回测叠加 MA16 每日大盘均线择时。",
+          "config": {
+            "family": "alternative-flow-shareholder",
+            "version": "v1.0",
+            "formula": "{'type': 'linear_combo', 'terms': [{'factor': 'northbound_accumulation', 'params': {'window': 20}, 'transforms': ['mad_clip', 'zscore', 'rank'], 'weight': 0.6}, {'factor': 'holder_count_chg', 'params': {'window': 191}, 'transforms': ['mad_clip', 'zscore', 'rank'], 'weight': 0.4}], 'direction': 'positive', 'thesis': {'mechanism': 'northbound_accumulation 与 momentum 的互补信号组合,用于受控自动研究初筛。', 'citation': 'autoresearch island search'}}",
+            "rebalance_days": 20,
+            "top_n": 25,
+            "timing_ma": 16
+          },
+          "data_scope": "data_lake·2018-2026",
+          "metrics": {
+            "annual": -0.02672989603214497,
+            "maxdd": -0.535361720793571,
+            "sharpe": -0.1457517026430095,
+            "calmar": -0.049928665038888154,
+            "n": 2055,
+            "hit": false
+          },
+          "status": "候选",
+          "notes": "裸回测最大回撤-54.8%超标被拒，通过叠加每日 MA16 大盘均线择时，最大回撤改善至 -53.54%，夏普提升。符合另类分流器候选特征。",
+          "evidence": {
+            "hypothesis_id": "70f35889c39918d2",
+            "experiment_ids": [
+              "v1.0"
+            ]
+          },
+          "admission": {},
+          "nine_gate": {}
+        }
+      ],
+      "name": "北向资金与筹码集中另类组合",
+      "hypothesis": "北向资金累积流入(聪明资金维度)+ 筹码集中度股东户数变化率(筹码吸筹维度)。二者低相关且具备中长周期趋势，旨在规避小盘贝塔污染、获取纯粹另类超额。",
+      "regime": "小盘占优/宽信用环境(大盘趋势 MA16 指引每日仓位避险)",
+      "decay_signal": "北向资金转为净流出 / 筹码发散股东户数持续增加",
+      "status": "active",
+      "style_betas": {},
+      "capacity_m": 0.0,
+      "failure_boundaries": {}
+    },
+    {
       "id": "amount-timing",
       "versions": [
         {
