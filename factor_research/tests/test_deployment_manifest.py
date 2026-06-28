@@ -4,9 +4,13 @@ import json
 import pytest
 
 from runtime.deployment import (
+    DEFAULT_MANIFEST,
     Deployment,
+    DeploymentLeg,
     DeploymentNotReady,
+    defensive_authorization,
     load_active_deployment,
+    read_declared_manifest,
 )
 
 GOOD_HASH = "a" * 64
@@ -86,6 +90,38 @@ def test_unregistered_leg_blocks(tmp_path):
     bad = [{"family": "ghost", "version": "v9", "spec_hash": GOOD_HASH, "role": "equity_alpha"}]
     with pytest.raises(DeploymentNotReady):
         load_active_deployment(_manifest(tmp_path, legs=bad), registry_lookup=_registry())
+
+
+def test_default_manifest_does_not_declare_invalid_active_deployment():
+    """Default manifest may be paused, but active must mean mechanically loadable."""
+    declared = read_declared_manifest(DEFAULT_MANIFEST)
+    assert declared is not None
+    if declared["status"] == "active":
+        load_active_deployment(DEFAULT_MANIFEST)
+
+
+def test_defensive_authorization_is_absent_without_defensive_leg(tmp_path):
+    dep = load_active_deployment(_manifest(tmp_path), registry_lookup=_registry())
+    assert defensive_authorization(dep) is None
+
+
+def test_defensive_authorization_exports_independent_leg_identity():
+    dep = Deployment(
+        deployment_id="test-prod",
+        environment="production",
+        status="active",
+        portfolio_policy={"type": "regime_rotation"},
+        legs=(
+            DeploymentLeg("illiquidity", "v3.1", GOOD_HASH, "equity_alpha"),
+            DeploymentLeg("defensive-ma16-bond", "v1.0", OTHER_HASH, "defensive"),
+        ),
+    )
+    assert defensive_authorization(dep) == {
+        "role": "defensive",
+        "family": "defensive-ma16-bond",
+        "version": "v1.0",
+        "spec_hash": OTHER_HASH,
+    }
 
 
 if __name__ == "__main__":

@@ -4,8 +4,9 @@
 流程：①增量更新数据 → ②质量校验 → ③生成择时信号 → ④持仓清单
       → ⑤调仓判断(距上次≥20交易日) → ⑥保存 signals/YYYY-MM-DD.json
 
-策略: illiquidity v3.1 (AmihudIlliq |ret|/amount + Salience Veto 30% + PureTrend MA16 Band 择时 + 511010 国债ETF 轮动)
-      已全区间压力测试(2010-2026): +37.8%/-11.9%/2.12
+策略: 由 deployments/production.json 声明的已验证 deployment legs 决定。
+      国债 ETF 轮动只有在部署清单存在独立 role=defensive 腿时才会生成可执行指令;
+      MA16 / regime 信号不得从已降级 alpha 主腿隐式继承为 defensive overlay。
 
 
 用法：python3 run_daily.py            # 完整流程(含联网更新数据)
@@ -30,6 +31,7 @@ from app_config.settings import get_settings
 from runtime.production_readiness import get_production_readiness
 from runtime.deployment import (
     DeploymentNotReady,
+    defensive_authorization,
     load_active_deployment,
     load_deployed_strategy_spec,
 )
@@ -123,6 +125,26 @@ def decide_action(trade_dates, last_date, in_market, state, *, rebalance_days=RE
     return False, f"距上次调仓 {gap} 交易日 (<{rebalance_days})，维持原仓位", "维持原仓位"
 
 
+def build_rotation_payload(regime: str, defensive_auth: dict | None) -> dict:
+    has_defensive = defensive_auth is not None
+    payload = {
+        "current_regime": regime,
+        "recommend_stocks": regime == "bull",
+        "recommend_bond": regime == "bear" and has_defensive,
+        "bond_code": "511010" if has_defensive else "",
+        "bond_name": "国债ETF" if has_defensive else "",
+        "bond_allocation": "全部闲置资金" if has_defensive else "",
+        "note": (
+            "BEAR时全部现金买511010; BULL时卖光511010并按Band exposure买回股票"
+            if has_defensive
+            else "未授权独立 defensive overlay;债券轮动非现行可执行"
+        ),
+    }
+    if defensive_auth is not None:
+        payload["defensive_authorization"] = defensive_auth
+    return payload
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-update", action="store_true")
@@ -209,12 +231,11 @@ def main():
           f"{'🟢持仓' if in_market else '🔴空仓观望'}")
 
     # 轮动信号
-    defensive_leg = next(
-        (leg for leg in deployment.legs if leg.role == "defensive"),
-        None,
-    )
-    if regime == "bear" and defensive_leg is not None:
+    defensive_auth = defensive_authorization(deployment)
+    if regime == "bear" and defensive_auth is not None:
         print(f"  ⚠️ BEAR regime → 建议: 空仓资金配置 511010 国债ETF")
+    elif regime == "bear":
+        print("  ⛔ BEAR regime → 未授权独立 defensive overlay,不生成国债轮动指令")
     else:
         print(f"  ℹ️ BULL regime → 按 Band exposure 配置 illiq 股票")
 
@@ -266,15 +287,7 @@ def main():
         # ── Regime + 轮动 (2026-06-08) ──
         "regime": regime,                                  # "bull" | "bear"
         "regime_dist": round(float(regime_dist), 4),       # shifted dist (防未来函数)
-        "rotation": {
-            "current_regime": regime,
-            "recommend_stocks": regime == "bull",           # bull→按 band_exposure 配置 illiq
-            "recommend_bond": regime == "bear" and defensive_leg is not None,
-            "bond_code": "511010" if defensive_leg is not None else "",
-            "bond_name": "国债ETF" if defensive_leg is not None else "",
-            "bond_allocation": "全部闲置资金",               # bear=100%现金→债券
-            "note": "BEAR时全部现金买511010; BULL时卖光511010并按Band exposure买回股票",
-        },
+        "rotation": build_rotation_payload(regime, defensive_auth),
         # ── SHADOW: Binary timing (2026-06-07 Band 接替后保留对比) ──
         "binary_in_market_shadow": binary_in_market,
         "base_in_market": base_in_market,                  # binary 原始
@@ -324,7 +337,7 @@ def main():
     print(f"  操作      : {signal['action']}")
     if in_market:
         print(f"  持仓({len(holdings)}只): {', '.join(holdings[:12])}{' ...' if len(holdings)>12 else ''}")
-    if regime == "bear" and defensive_leg is not None:
+    if regime == "bear" and defensive_auth is not None:
         print(f"  💡 建议   : 空仓资金配置 511010 国债ETF")
     if persist_result["published"]:
         print(f"  Readiness : 已放行")

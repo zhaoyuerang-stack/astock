@@ -202,3 +202,16 @@ def load_deployed_strategy_spec(leg: DeploymentLeg):
             f"{leg.family}/{leg.version} executable spec body hash mismatch"
         )
     return spec
+
+
+def defensive_authorization(deployment: Deployment) -> dict | None:
+    """返回当前部署中独立 defensive leg 的授权身份;没有则不授权债券轮动。"""
+    leg = next((item for item in deployment.legs if item.role == "defensive"), None)
+    if leg is None:
+        return None
+    return {
+        "role": leg.role,
+        "family": leg.family,
+        "version": leg.version,
+        "spec_hash": leg.spec_hash,
+    }

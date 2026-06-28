@@ -43,6 +43,26 @@ NAV_FP = PAPER / "nav.csv"
 RAW = ROOT / "data_lake/price/daily_raw"
 
 
+def defensive_bond_authorized(bond: dict | None) -> bool:
+    """债券轮动必须有独立 defensive leg 身份,不能只继承 alpha 主腿信号。"""
+    if not bond:
+        return False
+    auth = bond.get("authorization") or {}
+    return (
+        auth.get("role") == "defensive"
+        and bool(str(auth.get("family") or "").strip())
+        and bool(str(auth.get("version") or "").strip())
+        and bool(str(auth.get("spec_hash") or "").strip())
+    )
+
+
+def bond_authorization_block(bond: dict | None) -> tuple[str, str, str, str]:
+    code = (bond or {}).get("code", "511010")
+    name = (bond or {}).get("name", "国债ETF")
+    side = "买入" if (bond or {}).get("enabled") else "卖出"
+    return (side, code, name, "defensive overlay 未授权,拒绝债券轮动")
+
+
 # ── 价格:全部不复权(daily_raw)──
 def _raw(code):
     fp = RAW / f"{code}.parquet"
@@ -246,7 +266,13 @@ def execute_to_target(acc, date, target, top_n, names, trades, blocked, leverage
     """
     if leverage is None:
         leverage = LEVERAGE
-    bond_enabled = bool(bond and bond.get("enabled"))
+    bond_authorized = defensive_bond_authorized(bond)
+    bond_requested = bool(bond and bond.get("enabled"))
+    bond_enabled = bool(bond_requested and bond_authorized)
+    if bond is not None and not bond_authorized:
+        has_legacy_holding = bool((acc.get("bond") or {}).get("shares"))
+        if bond_requested or has_legacy_holding:
+            blocked.append(bond_authorization_block(bond))
     target = set(target)
     # 1. 卖出:持仓中不在 target 的(掉出名单),用 date 开盘价
     for code in list(acc["positions"]):
@@ -264,7 +290,7 @@ def execute_to_target(acc, date, target, top_n, names, trades, blocked, leverage
                        round(price, 3), round(notional, 2), round(cost, 2), round(acc["cash"], 2)])
     # 2. 轮动关闭(BULL)且持有债券 → 先卖光 ETF,资金回笼供买股
     held = acc.get("bond")
-    if held and held.get("shares") and not bond_enabled:
+    if held and held.get("shares") and not bond_enabled and bond_authorized:
         price = get_etf_fill(held["code"], date)
         if price is None:
             blocked.append(("卖出", held["code"], held.get("name", held["code"]), "ETF 当日无数据,卖不出"))

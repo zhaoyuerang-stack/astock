@@ -29,6 +29,8 @@ from portfolio.paper_engine import (
     NAV_FP,
     SIGNALS,
     TRADES_FP,
+    bond_authorization_block,
+    defensive_bond_authorized,
     estimate_basket,
     estimate_bond_order,
     get_etf_close,
@@ -131,7 +133,8 @@ def trade_plan() -> TradePlanView:
     held = acc.get("bond") or {}
     bond_code = pend_bond.get("code") or held.get("code") or "511010"
     bond_name = pend_bond.get("name") or held.get("name") or "国债ETF"
-    if pend_bond.get("enabled"):
+    bond_authorized = defensive_bond_authorized(pend_bond)
+    if pend_bond.get("enabled") and bond_authorized:
         cash_avail = max(0.0, acc.get("cash", 0.0) + sells_est - buys_est)
         est = estimate_bond_order(date, cash_avail, bond_code)
         side = "HOLD" if held.get("shares") and not est else "BUY"
@@ -143,7 +146,16 @@ def trade_plan() -> TradePlanView:
             est_notional=round(est[2], 2) if est else 0.0,
             shares_held=int(held.get("shares") or 0),
             note="BEAR:次日将全部闲置资金买入国债ETF;切回 BULL 时卖出换回股票")
-    elif held.get("shares"):
+    elif pend_bond.get("requested") and not bond_authorized:
+        reason = pend_bond.get("blocked_reason") or bond_authorization_block(pend_bond)[3]
+        ref = get_etf_close(bond_code, date) or held.get("avg_cost", 0.0)
+        bond_view = BondInstructionView(
+            active=True, side="BLOCKED", authorized=False, blocked_reason=reason,
+            code=bond_code, name=bond_name,
+            ref_price=round(ref, 3), est_shares=0, est_notional=0.0,
+            shares_held=int(held.get("shares") or 0),
+            note=f"{reason};该债券轮动非现行可执行")
+    elif held.get("shares") and bond_authorized:
         ref = get_etf_close(bond_code, date) or held.get("avg_cost", 0.0)
         bond_view = BondInstructionView(
             active=True, side="SELL", code=bond_code, name=bond_name,
@@ -151,6 +163,15 @@ def trade_plan() -> TradePlanView:
             est_notional=round(held["shares"] * ref, 2),
             shares_held=int(held["shares"]),
             note="BULL:次日开盘卖出全部国债ETF,资金买回股票")
+    elif held.get("shares"):
+        reason = bond_authorization_block(pend_bond or held)[3]
+        ref = get_etf_close(bond_code, date) or held.get("avg_cost", 0.0)
+        bond_view = BondInstructionView(
+            active=True, side="BLOCKED", authorized=False, blocked_reason=reason,
+            code=bond_code, name=bond_name,
+            ref_price=round(ref, 3), est_shares=0, est_notional=0.0,
+            shares_held=int(held["shares"]),
+            note=f"遗留债券持仓无独立 defensive 授权;不生成买卖指令。{reason}")
 
     latest_td = _latest_trading_day()
     stale = bool(latest_td and date and date < latest_td)

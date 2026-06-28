@@ -28,6 +28,7 @@ from portfolio.paper_engine import (  # noqa: E402
     INIT_CAPITAL, LEVERAGE, BUY_COST, SELL_COST, ETF_BUY_COST, ETF_SELL_COST, SIGNALS,
     load_names, load_account, save_account, append_trades, upsert_nav,
     execute_to_target, valuation, estimate_basket, estimate_bond_order, get_close,
+    defensive_bond_authorized,
 )
 
 OBSIDIAN = Path("/Users/kiki/Personal Wiki/30.output/A股v2.0模拟盘")
@@ -40,6 +41,26 @@ def fmt(x):
 def read_decay():
     dp = ROOT / "reports/decay_status.json"
     return json.loads(dp.read_text()) if dp.exists() else None
+
+
+def build_pending_bond(signal):
+    """从信号构造 pending bond 指令;无独立 defensive 授权时 fail-closed。"""
+    rot = signal.get("rotation", {}) or {}
+    requested = bool(rot.get("recommend_bond"))
+    pend_bond = {
+        "requested": requested,
+        "enabled": requested,
+        "code": rot.get("bond_code", "511010"),
+        "name": rot.get("bond_name", "国债ETF"),
+    }
+    auth = rot.get("defensive_authorization")
+    if isinstance(auth, dict) and auth:
+        pend_bond["authorization"] = auth
+    if not defensive_bond_authorized(pend_bond):
+        pend_bond["enabled"] = False
+        if requested:
+            pend_bond["blocked_reason"] = "defensive overlay 未授权,拒绝债券轮动"
+    return pend_bond
 
 
 def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocked, names, exec_from):
@@ -100,9 +121,15 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocke
             lines += [f"**🔄 债券轮动(BEAR)**:次日闲置资金买入 {pend_bond.get('code','511010')} "
                       f"{pend_bond.get('name','国债ETF')} ≈ {sh} 份 × {ref:.3f} = {fmt(est_amt)}"
                       f"(参考价=今收,费率 {ETF_BUY_COST:.2%})", ""]
+    elif pend_bond.get("requested") and pend_bond.get("blocked_reason"):
+        lines += [f"**🔄 债券轮动(BEAR)**: {pend_bond['blocked_reason']}。该信号非现行可执行。", ""]
     elif acc.get("bond") and (acc["bond"] or {}).get("shares"):
-        lines += [f"**🔄 债券轮动(BULL)**:次日开盘卖出全部 {acc['bond']['code']} "
-                  f"{acc['bond'].get('name','国债ETF')} {acc['bond']['shares']} 份,资金买回股票", ""]
+        if defensive_bond_authorized(pend_bond):
+            lines += [f"**🔄 债券轮动(BULL)**:次日开盘卖出全部 {acc['bond']['code']} "
+                      f"{acc['bond'].get('name','国债ETF')} {acc['bond']['shares']} 份,资金买回股票", ""]
+        else:
+            lines += [f"**🔄 债券遗留持仓**:{acc['bond']['code']} "
+                      f"{acc['bond'].get('name','国债ETF')} {acc['bond']['shares']} 份无独立 defensive 授权,不生成买卖指令。", ""]
 
     lines += [
         "## 💰 账户", "", "| 指标 | 值 |", "|--|--|",
@@ -161,12 +188,17 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocke
             f"  > 偏离度=小盘指数相对MA16的距离. >0=BULL(趋势向上), ≤0=BEAR(趋势向下).",
             f"  > 数据来源: 最新交易日 {signal['date']} 收盘价, T日只用T-1日数据(shifted,防未来函数).",
         ]
-        if regime == "bear":
+        if regime == "bear" and rotation.get("recommend_bond"):
             lines += [
                 f"- 💡 **建议**: 空仓资金配置 **{rotation.get('bond_code', '511010')} {rotation.get('bond_name', '国债ETF')}**",
                 f"  > 回测验证: BEAR期间债券年化+2.7% vs 现金0%, 10年累计多赚592万(AmihudIlliq).",
                 f"- 买入方式: 和买股票一样, 代码 {rotation.get('bond_code', '511010')}, 股票账户直接交易",
                 "- 切换回 BULL 时卖出债券, 买回 illiq 股票",
+            ]
+        elif regime == "bear":
+            lines += [
+                "- ⛔ **债券轮动非现行可执行**: 未授权独立 defensive overlay,不生成 511010 买入指令。",
+                f"  > {rotation.get('note', 'defensive overlay 未授权,拒绝债券轮动')}",
             ]
         else:
             lines += [
@@ -294,11 +326,8 @@ def main():
         target = signal["holdings"] if signal["in_market"] else []
         pend_leverage = float(signal.get("band_exposure",
                                           signal.get("leverage", LEVERAGE))) if target else 0.0
-        # 债券轮动指令(P5):BEAR → 次日闲置资金买国债ETF;BULL → 次日先卖光ETF再买股
-        rot = signal.get("rotation", {}) or {}
-        pend_bond = {"enabled": bool(rot.get("recommend_bond")),
-                     "code": rot.get("bond_code", "511010"),
-                     "name": rot.get("bond_name", "国债ETF")}
+        # 债券轮动指令:必须带独立 defensive 授权;旧信号只会记录 requested,不会执行。
+        pend_bond = build_pending_bond(signal)
         acc["pending"] = {
             "signal_date": date,
             "target": target,
