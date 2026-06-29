@@ -412,6 +412,238 @@
       "failure_boundaries": {}
     },
     {
+      "id": "autoresearch_6332599c",
+      "versions": [
+        {
+          "version": "v1.0",
+          "date": "2026-06-28",
+          "desc": "autoresearch_6332599c vv1.0 — auto-registered via workflow",
+          "config": {
+            "top_n": 25,
+            "rebalance_days": 20,
+            "leverage": 1.25,
+            "buy_cost": 0.00225,
+            "sell_cost": 0.00275,
+            "financing_rate": 0.065,
+            "ast": {
+              "type": "linear_combo",
+              "terms": [
+                {
+                  "factor": "holder_count_chg",
+                  "params": {
+                    "window": 80
+                  },
+                  "transforms": [
+                    "mad_clip",
+                    "zscore",
+                    "rank",
+                    "regime_gate"
+                  ],
+                  "weight": 0.6
+                }
+              ],
+              "direction": "positive",
+              "neutralize": [
+                "size"
+              ],
+              "transforms": [
+                "error_feedback_correction"
+              ],
+              "execution": {
+                "portfolio_size": 25,
+                "rebalance_freq": "40D",
+                "smoothing_window": 10
+              },
+              "thesis": {
+                "mechanism": "Co-evolved Evolved Strategy: 筹码低频吸筹集中度特征 + 10日平滑与40日低频调仓 + 误差修正反向传播反馈环",
+                "citation": "Evolved in Joint Search + Prehoc Backpropagation"
+              }
+            },
+            "factor_fn_name": "factors.autoresearch_dsl.compute_dsl_factor",
+            "factor_params": {
+              "ast": {
+                "type": "linear_combo",
+                "terms": [
+                  {
+                    "factor": "holder_count_chg",
+                    "params": {
+                      "window": 80
+                    },
+                    "transforms": [
+                      "mad_clip",
+                      "zscore",
+                      "rank",
+                      "regime_gate"
+                    ],
+                    "weight": 0.6
+                  }
+                ],
+                "direction": "positive",
+                "neutralize": [
+                  "size"
+                ],
+                "transforms": [
+                  "error_feedback_correction"
+                ],
+                "execution": {
+                  "portfolio_size": 25,
+                  "rebalance_freq": "40D",
+                  "smoothing_window": 10
+                },
+                "thesis": {
+                  "mechanism": "Co-evolved Evolved Strategy: 筹码低频吸筹集中度特征 + 10日平滑与40日低频调仓 + 误差修正反向传播反馈环",
+                  "citation": "Evolved in Joint Search + Prehoc Backpropagation"
+                }
+              }
+            },
+            "data_dependencies": [
+              "holder/holdernumber",
+              "price/close"
+            ],
+            "cost": {
+              "buy": 0.00225,
+              "sell": 0.00275,
+              "financing_rate": 0.065
+            }
+          },
+          "data_scope": {
+            "source": "data_lake",
+            "period": "2010-2026",
+            "survivorship_bias": false,
+            "wf_validated": false,
+            "phase1_audited": true,
+            "reproducibility": {
+              "date": "2026-06-28",
+              "git_commit": "e926c8cd7",
+              "python": "3.13.3",
+              "dependencies": {
+                "pandas": "3.0.3",
+                "numpy": "2.2.6",
+                "scipy": "1.17.1"
+              },
+              "data_snapshot": "{\"daily_all.parquet\": \"2026-06-26\", \"daily_raw_all.parquet\": \"2026-06-28\", \"fundamental_batch.parquet\": \"2026-06-02\"}",
+              "engine": "core.engine.BacktestEngine"
+            },
+            "holdout": {}
+          },
+          "metrics": {
+            "annual_2018": -0.0242,
+            "maxdd_2018": -0.3716,
+            "sharpe_2018": -0.115,
+            "annual_2010": 0.1036,
+            "maxdd_2010": -0.4461,
+            "sharpe_2010": 0.3947,
+            "annual": -0.0242,
+            "maxdd": -0.3716,
+            "sharpe": -0.115,
+            "calmar": -0.065,
+            "hit": false,
+            "wf_annual": 0.0803,
+            "wf_maxdd": -0.6395,
+            "wf_sharpe": 0.3372
+          },
+          "status": "候选",
+          "notes": "Workflow Phase 1-3 validated. WF: +8.0% ann / -64.0% dd.",
+          "evidence": {
+            "hypothesis_id": "d17adfabb99eab96",
+            "experiment_ids": []
+          },
+          "admission": {},
+          "nine_gate": {
+            "wf_sharpe": 0.3372038438987097,
+            "wf_annual": 0.08026218060817743,
+            "wf_positive_windows": 5,
+            "wf_total_windows": 11,
+            "wf_verdict": "FAIL"
+          },
+          "executable_spec": {
+            "spec": {
+              "family": "autoresearch_6332599c",
+              "version": "v1.0",
+              "universe": {
+                "type": "small_cap"
+              },
+              "data": {
+                "dependencies": [
+                  "holder/holdernumber",
+                  "price/close"
+                ]
+              },
+              "factor": {
+                "type": "factors.autoresearch_dsl.compute_dsl_factor",
+                "shift": 1,
+                "params": {
+                  "ast": {
+                    "type": "linear_combo",
+                    "terms": [
+                      {
+                        "factor": "holder_count_chg",
+                        "params": {
+                          "window": 80
+                        },
+                        "transforms": [
+                          "mad_clip",
+                          "zscore",
+                          "rank",
+                          "regime_gate"
+                        ],
+                        "weight": 0.6
+                      }
+                    ],
+                    "direction": "positive",
+                    "neutralize": [
+                      "size"
+                    ],
+                    "transforms": [
+                      "error_feedback_correction"
+                    ],
+                    "execution": {
+                      "portfolio_size": 25,
+                      "rebalance_freq": "40D",
+                      "smoothing_window": 10
+                    },
+                    "thesis": {
+                      "mechanism": "Co-evolved Evolved Strategy: 筹码低频吸筹集中度特征 + 10日平滑与40日低频调仓 + 误差修正反向传播反馈环",
+                      "citation": "Evolved in Joint Search + Prehoc Backpropagation"
+                    }
+                  }
+                }
+              },
+              "selection": {
+                "top_n": 25,
+                "rebalance_days": 40
+              },
+              "timing": {
+                "type": "factors.small_cap.small_cap_timing",
+                "params": {
+                  "ma_window": 16
+                }
+              },
+              "policy": {
+                "veto": "none"
+              },
+              "execution": {
+                "portfolio_size": 25,
+                "rebalance_freq": "40D",
+                "smoothing_window": 10,
+                "fill": "T_PLUS_1_CLOSE",
+                "cost_model": "A_SHARE_STANDARD_V1"
+              }
+            },
+            "spec_hash": "0d12a939ab0993208070121d5d17a146a32caa58a9448f3bc5847479385aa739"
+          }
+        }
+      ],
+      "name": "autoresearch_6332599c",
+      "hypothesis": "Co-evolved Evolved Strategy: 筹码低频吸筹集中度特征 + 10日平滑与40日低频调仓 + 误差修正反向传播反馈环",
+      "regime": "",
+      "decay_signal": "",
+      "status": "active",
+      "style_betas": {},
+      "capacity_m": 0.0,
+      "failure_boundaries": {}
+    },
+    {
       "id": "autoresearch_8de70997",
       "versions": [
         {
