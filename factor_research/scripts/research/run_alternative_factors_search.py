@@ -92,6 +92,7 @@ def main():
         mf_level1_ic_min=0.02,
         mf_level2_dates=60,
         mf_level2_keep_ratio=0.5,
+        regime_aware=True,
     )
 
     print(f"\nSearch complete. Evaluated: {search_res.evaluated}.", flush=True)

@@ -143,6 +143,7 @@ def run_autoresearch_island_search(
     amount=None,
     forward_ret=None,
     vintage_id: str | None = None,
+    regime_aware: bool = False,
 ) -> AutoResearchIslandSearchResponse:
     if close is None or volume is None or amount is None or forward_ret is None:
         close, volume, amount, forward_ret = _load_validation_data(start)
@@ -188,6 +189,7 @@ def run_autoresearch_island_search(
         repository=repository,
         experiment_log=experiment_log,
         review_queue=review_queue,
+        regime_aware=regime_aware,
     )
     # §5.1 chokepoint:每次真实搜索都记账,honest_n_trials 据此惩罚 DSR。所有 orchestrator
     # 调用者(scheduled_factor_search / research 脚本)经此自动累计,不靠各 caller 自觉——
