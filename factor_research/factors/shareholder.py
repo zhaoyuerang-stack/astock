@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 
 from factors.utils import mad_clip, safe_zscore
+from factors.registry import register_factor
 
 _LAKE = Path(__file__).resolve().parent.parent / "data_lake"
 
@@ -33,6 +34,8 @@ def _align_to_close(panel: pd.DataFrame, close: pd.DataFrame) -> pd.DataFrame:
     return out[common].reindex(columns=close.columns)
 
 
+@register_factor("holder_count_chg", params={"window": (20, 120)},
+                 data=("holder/holdernumber",), input="close", arg_map={"window": "window"})
 def holder_count_chg(close, window: int = 60, **_):
     """股东户数环比变化,负号:户数减少 → 筹码集中 → 因子值升高(买入)。"""
     panel = _align_to_close(_load_holdernumber_cache(), close)

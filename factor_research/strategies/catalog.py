@@ -47,25 +47,8 @@ def build_small_cap_amount(prices: PricePanel, params: dict) -> pd.DataFrame:
     return small_cap_factor(prices.amount, window=int(params.get("window", 60)))
 
 
-def build_holder_count_chg(prices: PricePanel, params: dict) -> pd.DataFrame:
-    """股东户数环比变化(状态量): -pct_change(window) → MAD clip → zscore。
-
-    PIT 由 lake.load_lake anndate 对齐内建(T 日只用 T 日前已公告户数,见
-    factors.shareholder)。符号在因子内: 户数减少→筹码集中→因子值高→nlargest 买入,
-    无需 spec 侧再翻转。与 factors.shareholder.holder_count_chg 逐位一致(单一真相)。
-    """
-    from factors.shareholder import holder_count_chg
-
-    return holder_count_chg(prices.close, window=int(params.get("window", 60)))
-
-
-def build_zero_ret_days(prices: PricePanel, params: dict) -> pd.DataFrame:
-    """Lesmond 零收益(价格停滞)天数,N 日窗。与 Amihud 水平正交的 illiquidity 维度
-    (corr(size)≈0.06,非小盘代理)。委托 factors.microstructure.zero_ret_days(单一真相)。
-    """
-    from factors.microstructure import zero_ret_days
-
-    return zero_ret_days(prices.close, n=int(params.get("window", 60)))
+# holder_count_chg / zero_ret_days / smart_money_divergence 等 close-based 因子的 builder
+# 不再手写 —— 由 @register_factor 自动生成(见文件末 _autoregister_builders)。
 
 
 # ────────────────────────── timing builders ──────────────────────────
@@ -119,10 +102,10 @@ def apply_salience_veto(prices: PricePanel, params: dict):
 
 
 FACTOR_BUILDERS: dict[str, Callable] = {
+    # 特殊签名(input≠close 或非平凡构造)的 builder 手写;close-based 因子由
+    # @register_factor 自动补(见末尾 _autoregister_builders)。手工优先,自动补缺。
     "amihud_illiquidity": build_amihud_illiquidity,
     "small_cap_amount": build_small_cap_amount,
-    "holder_count_chg": build_holder_count_chg,
-    "zero_ret_days": build_zero_ret_days,
 }
 
 TIMING_BUILDERS: dict[str, Callable] = {
@@ -155,3 +138,27 @@ def resolve_policy_builder(name: str) -> Callable:
         return POLICY_BUILDERS[name]
     except KeyError:
         raise UnsupportedStrategyComponent(f"未知 policy veto={name!r}(可选: {sorted(POLICY_BUILDERS)})")
+
+
+# ── @register_factor 自动接线(PULL,单向依赖合规 strategies→factors)──
+def _autoregister_builders() -> None:
+    """从 factors.registry.FACTOR_REGISTRY 为每个 close-based 因子自动生成
+    (prices, params) -> DataFrame 的 builder,补进 FACTOR_BUILDERS(手工优先 setdefault)。
+    消除"新因子要手写 catalog builder"这一处机械接线。"""
+    from factors.registry import discover
+
+    def _make(rec):
+        def build(prices: PricePanel, params: dict) -> pd.DataFrame:
+            kwargs = {rec.arg_map.get(k, k): (int(params[k]) if isinstance(params[k], (int, float))
+                                              else params[k])
+                      for k in rec.params if k in params}
+            return rec.fn(getattr(prices, rec.input), **kwargs)
+        build.__name__ = f"build_{rec.name}"
+        build.__doc__ = f"auto @register_factor → {rec.fn.__module__}.{rec.fn.__name__}"
+        return build
+
+    for name, rec in discover().items():
+        FACTOR_BUILDERS.setdefault(name, _make(rec))
+
+
+_autoregister_builders()

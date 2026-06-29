@@ -69,6 +69,14 @@ _FACTOR_CALLS = {
     "alpha_055": ("factors.alpha101", "alpha_055", {}),
 }
 
+# ── @register_factor 自动接线: factors 层登记的因子自动补进 DSL 调用表(手工优先)──
+# 同层 factors→factors;新因子 @register_factor 后这里自动出现,无需手改。
+from factors.registry import discover as _discover_factors  # noqa: E402
+
+for _name, _rec in _discover_factors().items():
+    _FACTOR_CALLS.setdefault(_name, (_rec.fn.__module__, _rec.fn.__name__, dict(_rec.arg_map)))
+
+
 _BASE_FACTOR_MEM_CACHE: dict = {}
 _ROOT = Path(__file__).resolve().parents[1]
 _SOURCE_DATA_PATHS = (

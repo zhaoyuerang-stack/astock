@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from factors.utils import mad_clip, safe_zscore
+from factors.registry import register_factor
 
 _BUY = ["buy_sm_amount", "buy_md_amount", "buy_lg_amount", "buy_elg_amount"]
 _SELL = ["sell_sm_amount", "sell_md_amount", "sell_lg_amount", "sell_elg_amount"]
@@ -44,6 +45,8 @@ def large_order_net_ratio(close, window: int = 5, **_):
     return safe_zscore(mad_clip(ratio.replace([np.inf, -np.inf], np.nan)))
 
 
+@register_factor("smart_money_divergence", params={"window": (5, 60)},
+                 data=("moneyflow",), input="close", arg_map={"window": "window"})
 def smart_money_divergence(close, window: int = 20, **_):
     """吸筹背离:特大单(elg)净流入强 × 价格未涨 → 机构于价格疲弱处吸筹。
 

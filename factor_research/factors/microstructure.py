@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from factors.utils import mad_clip, safe_zscore
+from factors.registry import register_factor
 
 
 def short_reversal(close: pd.DataFrame, n: int = 5) -> pd.DataFrame:
@@ -36,6 +37,8 @@ def price_position(close: pd.DataFrame, n: int = 60) -> pd.DataFrame:
     return safe_zscore(mad_clip(-pos))
 
 
+@register_factor("zero_ret_days", params={"window": (10, 120)},
+                 data=("price/close",), input="close", arg_map={"window": "n"})
 def zero_ret_days(close: pd.DataFrame, n: int = 60) -> pd.DataFrame:
     """N 日内零收益(价格停滞)天数 —— Lesmond 流动性/低关注代理。
 

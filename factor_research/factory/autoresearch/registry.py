@@ -65,6 +65,15 @@ ALLOWED_FACTORS: dict[str, FactorSpec] = {
     "northbound_flow_strength": FactorSpec("northbound_flow_strength", {"window": (3, 20)}, ("capital/northbound",)),
 }
 
+# ── @register_factor 自动接线: 只有显式 searchable=True 的因子才进搜索白名单 ──
+# "工厂搜不搜某因子"是研究判断(扩搜索宇宙改变确定性搜索行为),故 opt-in 不自动。
+# 手工条目优先(setdefault);单向依赖合规 factory→factors。
+from factors.registry import discover as _discover_factors  # noqa: E402
+
+for _name, _rec in _discover_factors().items():
+    if _rec.searchable:
+        ALLOWED_FACTORS.setdefault(_name, FactorSpec(_name, dict(_rec.params), _rec.data))
+
 ALLOWED_TRANSFORMS = {
     "mad_clip",
     "zscore",
