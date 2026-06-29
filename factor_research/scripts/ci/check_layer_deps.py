@@ -40,7 +40,9 @@ FORBIDDEN_EDGES = [
     # 产品接缝(Phase 0):api 是薄 HTTP 层,只能走 services/contracts,不得直碰引擎
     ("api.", ["core.", "lake.", "factors.", "strategies.", "factory.", "workflow.",
               "engine.", "metasearch.", "knowledge.", "scripts."]),
-    # services 是受控接缝(有意允许 import 引擎),但不得反向依赖 api
+    # services 是受控接缝(有意允许 import 引擎),但不得反向依赖 api。
+    # read 是只读查询面,不得调用 actions 写入/执行面;actions 可按需读 read 视图。
+    ("services.read.", ["services.actions."]),
     ("services.", ["api."]),
     # contracts 是纯 DTO 叶子:只依赖 pydantic + stdlib,不得依赖任何业务层
     ("contracts.", ["core.", "lake.", "factors.", "strategies.", "factory.", "workflow.",
