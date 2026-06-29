@@ -952,6 +952,8 @@ def test_novelty_scores_behavioral_distance_not_syntax():
     """新颖性按行为算:克隆(含反向克隆)被识别为冗余,行为不同的因子得高分。"""
     from factory.autoresearch.novelty import candidate_factor_panel, novelty_score, sample_behavior_dates
 
+    from factors.autoresearch_dsl import clear_factor_cache
+    clear_factor_cache()
     close, volume, _ = _synthetic_panel()
     dates = sample_behavior_dates(close.index, 60)
     assert len(dates) <= 60 and dates[-1] == close.index[-1]
@@ -1188,7 +1190,7 @@ def test_l0_reports_nw_corrected_icir():
     hyp = ast_to_hypothesis(validate_candidate_ast(_candidate()))  # QUEUED,run_l0 入口要求
     exp = run_l0(hyp, close, volume, amount, forward_ret, vintage_id="nw-test")
     assert exp.result.error is None, exp.result.error
-    assert "ICIR_nw" in exp.result.metrics and "ICIR" in exp.result.metrics  # 两口径并存
+    assert "ICIR_nw" in exp.result.metrics and "ICIR" in exp.result.metrics
     assert exp.result.details.get("ic_ir_nw") is not None
 
 
@@ -1624,7 +1626,7 @@ def test_dsl_memory_cache_mode_does_not_write_factor_store(monkeypatch=None):
     assert first.equals(second)
 
 
-def test_dsl_memory_cache_mode_does_not_read_factor_store(monkeypatch):
+def test_dsl_memory_cache_mode_does_not_read_factor_store(monkeypatch=None):
     """搜索期 memory cache 模式不读 canonical factor_store parquet,避免旧盘缓存污染当前面板。"""
     from factors.autoresearch_dsl import clear_factor_cache, compute_dsl_factor
 
@@ -1642,18 +1644,94 @@ def test_dsl_memory_cache_mode_does_not_read_factor_store(monkeypatch):
     }
 
     clear_factor_cache()
-    monkeypatch.setattr(Path, "exists", lambda self: True)
 
     def fail_read_parquet(*args, **kwargs):
         raise AssertionError("memory cache mode should not read parquet factor_store")
 
-    monkeypatch.setattr(pd, "read_parquet", fail_read_parquet)
+    old_exists = Path.exists
+    old_read_parquet = pd.read_parquet
+    if monkeypatch is not None:
+        monkeypatch.setattr(Path, "exists", lambda self: True)
+        monkeypatch.setattr(pd, "read_parquet", fail_read_parquet)
+    else:
+        Path.exists = lambda self: True
+        pd.read_parquet = fail_read_parquet
     try:
         factor = compute_dsl_factor(close, volume, ast=ast, cache_mode="memory")
     finally:
+        if monkeypatch is None:
+            Path.exists = old_exists
+            pd.read_parquet = old_read_parquet
         clear_factor_cache()
 
     assert factor.shape == close.shape
+
+
+def test_dsl_disk_cache_key_uses_price_daily_all_mtime(monkeypatch=None):
+    """磁盘缓存 key 必须跟真实 price/daily_all.parquet 版本走,避免数据湖重写后读旧面板。"""
+    import factors.autoresearch_dsl as dsl
+
+    assert dsl._SOURCE_DATA_PATHS[0].as_posix().endswith("data_lake/price/daily_all.parquet")
+
+    old_source_data_mtime = dsl._source_data_mtime
+    try:
+        if monkeypatch is not None:
+            monkeypatch.setattr(dsl, "_source_data_mtime", lambda: 111)
+        else:
+            dsl._source_data_mtime = lambda: 111
+        first = dsl._get_cache_path("momentum", {"window": 5})
+        if monkeypatch is not None:
+            monkeypatch.setattr(dsl, "_source_data_mtime", lambda: 222)
+        else:
+            dsl._source_data_mtime = lambda: 222
+        second = dsl._get_cache_path("momentum", {"window": 5})
+    finally:
+        if monkeypatch is None:
+            dsl._source_data_mtime = old_source_data_mtime
+
+    assert "_mt111" in first.name
+    assert "_mt222" in second.name
+    assert first != second
+
+
+def test_dsl_disk_cache_ignores_non_overlapping_panel():
+    """磁盘缓存文件存在但股票/日期不匹配时必须重算,不能把无交集缓存 reindex 成空信号。"""
+    import factors.autoresearch_dsl as dsl
+
+    close, volume, _ = _synthetic_panel(n_days=40, n_stocks=8)
+    ast = {
+        "type": "linear_combo",
+        "terms": [{
+            "factor": "momentum",
+            "params": {"window": 5},
+            "transforms": ["zscore"],
+            "weight": 1.0,
+        }],
+        "direction": "positive",
+        "thesis": {"mechanism": "test", "citation": "test"},
+    }
+
+    with tempfile.TemporaryDirectory() as td:
+        cache_path = Path(td) / "bad_cache.parquet"
+        bad = pd.DataFrame(
+            999.0,
+            index=pd.bdate_range("1999-01-01", periods=5),
+            columns=["NO_OVERLAP"],
+        )
+        bad.to_parquet(cache_path)
+
+        old_get_cache_path = dsl._get_cache_path
+        try:
+            dsl.clear_factor_cache()
+            dsl._get_cache_path = lambda name, params: cache_path
+            factor = dsl.compute_dsl_factor(close, volume, ast=ast, cache_mode="disk")
+        finally:
+            dsl._get_cache_path = old_get_cache_path
+            dsl.clear_factor_cache()
+
+    assert factor.shape == close.shape
+    assert factor.notna().to_numpy().any()
+    assert factor.abs().sum().sum() > 0
 
 
 def test_window_mutation_snaps_to_fixed_grid():
@@ -1762,6 +1840,9 @@ if __name__ == "__main__":
     test_algebraic_metric_proxy_uses_ast_weights_for_corr_and_turnover()
     test_multifidelity_prefilter_rejects_low_ic_before_full_l0()
     test_dsl_memory_cache_mode_does_not_write_factor_store()
+    test_dsl_memory_cache_mode_does_not_read_factor_store(None)
+    test_dsl_disk_cache_key_uses_price_daily_all_mtime(None)
+    test_dsl_disk_cache_ignores_non_overlapping_panel()
     test_window_mutation_snaps_to_fixed_grid()
     test_run_island_search_defaults_to_thread_backend()
     test_validation_pipeline_computation_time_budget()

@@ -263,6 +263,10 @@ def _spawn_valid(
         if surrogate_model is None or threshold is None or surr_attempt == max_surrogate_retries:
             return cand
 
+        # Epsilon-Greedy Random Exploration (15% probability to bypass surrogate model screening)
+        if rng.random() < 0.15:
+            return cand
+
         # Predict fitness
         features = np.array([ast_to_features(cand.ast)])
         pred_fit = float(surrogate_model.predict(features)[0])

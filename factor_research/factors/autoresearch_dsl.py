@@ -70,35 +70,59 @@ _FACTOR_CALLS = {
 }
 
 _BASE_FACTOR_MEM_CACHE: dict = {}
+_ROOT = Path(__file__).resolve().parents[1]
+_SOURCE_DATA_PATHS = (
+    _ROOT / "data_lake" / "price" / "daily_all.parquet",
+    _ROOT / "data_lake" / "daily_all.parquet",
+)
+
+
+def _source_data_mtime() -> int:
+    for source_path in _SOURCE_DATA_PATHS:
+        try:
+            if source_path.exists():
+                return int(source_path.stat().st_mtime)
+        except OSError:
+            continue
+    return 0
+
 
 def _get_cache_path(name: str, params: dict) -> Path:
-    from pathlib import Path
+    mtime = _source_data_mtime()
     if not params:
-        filename = f"{name}.parquet"
+        filename = f"{name}_mt{mtime}.parquet"
     else:
         param_str = "_".join(f"{k}_{v}" for k, v in sorted(params.items()))
-        filename = f"{name}_{param_str}.parquet"
-    base_dir = Path(__file__).resolve().parents[1] / "data_lake" / "factor_store" / "panels"
+        filename = f"{name}_{param_str}_mt{mtime}.parquet"
+    base_dir = _ROOT / "data_lake" / "factor_store" / "panels"
     return base_dir / filename
 
 def _call_factor(name: str, close: pd.DataFrame, volume: pd.DataFrame | None, params: dict, cache_mode: str = "disk") -> pd.DataFrame:
+    mtime = _source_data_mtime()
+
     # 1. Check in-memory cache first
     param_key = json.dumps(params, sort_keys=True)
-    mem_key = (name, param_key, id(close))
+    mem_key = (name, param_key, id(close), mtime)
     if mem_key in _BASE_FACTOR_MEM_CACHE:
         return _BASE_FACTOR_MEM_CACHE[mem_key]
 
     # 2. Check local parquet cache unless caller requested pure in-memory mode.
-    cache_path = _get_cache_path(name, params)
-    if cache_mode != "memory" and cache_path.exists():
-        try:
-            df = pd.read_parquet(cache_path)
-            # Reindex to ensure strict compatibility with the active close index and columns
-            df = df.reindex(index=close.index, columns=close.columns)
-            _BASE_FACTOR_MEM_CACHE[mem_key] = df
-            return df
-        except Exception:
-            pass
+    # If cache_mode is 'memory', bypass disk reading completely (Task 1652 test requirement)
+    if cache_mode != "memory":
+        cache_path = _get_cache_path(name, params)
+        if cache_path.exists():
+            try:
+                cached = pd.read_parquet(cache_path)
+                if cached.index.intersection(close.index).empty or cached.columns.intersection(close.columns).empty:
+                    raise ValueError("cached factor panel does not overlap active panel")
+                # Reindex to ensure strict compatibility with the active close index and columns
+                df = cached.reindex(index=close.index, columns=close.columns)
+                if not df.notna().to_numpy().any():
+                    raise ValueError("cached factor panel has no valid values for active panel")
+                _BASE_FACTOR_MEM_CACHE[mem_key] = df
+                return df
+            except Exception:
+                pass
 
     # 3. Compute factor if not cached
     if name not in _FACTOR_CALLS:
