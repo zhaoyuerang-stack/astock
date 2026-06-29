@@ -44,6 +44,7 @@ def candidate_factor_panel(
     close: pd.DataFrame,
     volume: pd.DataFrame,
     dates: pd.Index,
+    cache_mode: str = "disk",
 ) -> pd.DataFrame:
     """在完整传入面板上算因子(rolling 需要历史),再切行为观测日。
 
@@ -51,7 +52,7 @@ def candidate_factor_panel(
     """
     from factors.autoresearch_dsl import compute_dsl_factor
 
-    panel = compute_dsl_factor(close, volume, ast=ast)
+    panel = compute_dsl_factor(close, volume, ast=ast, cache_mode=cache_mode)
     return panel.loc[panel.index.intersection(dates)]
 
 

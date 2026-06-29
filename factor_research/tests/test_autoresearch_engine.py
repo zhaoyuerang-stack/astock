@@ -959,7 +959,7 @@ def test_novelty_scores_behavioral_distance_not_syntax():
     assert len(dates) <= 60 and dates[-1] == close.index[-1]
 
     base_ast = _candidate()
-    base = candidate_factor_panel(base_ast, close, volume, dates)
+    base = candidate_factor_panel(base_ast, close, volume, dates, cache_mode="memory")
 
     # 空参考池:未知即新颖
     assert novelty_score(base, []) == 1.0
@@ -967,7 +967,7 @@ def test_novelty_scores_behavioral_distance_not_syntax():
     assert novelty_score(base, [base]) < 1e-6
 
     # 反向克隆:|spearman| 仍为 1(方向无关),只是持仓不再重叠 → 仍判低新颖
-    flipped = candidate_factor_panel({**base_ast, "direction": "negative"}, close, volume, dates)
+    flipped = candidate_factor_panel({**base_ast, "direction": "negative"}, close, volume, dates, cache_mode="memory")
     nov_flipped = novelty_score(flipped, [base])
 
     # 行为不同的因子(波动率)应明显比反向克隆新颖
@@ -978,7 +978,7 @@ def test_novelty_scores_behavioral_distance_not_syntax():
         "direction": "positive",
         "thesis": {"mechanism": "低波动异象测试因子。", "citation": "test"},
     }
-    vol = candidate_factor_panel(vol_ast, close, volume, dates)
+    vol = candidate_factor_panel(vol_ast, close, volume, dates, cache_mode="memory")
     nov_vol = novelty_score(vol, [base])
     assert nov_vol > nov_flipped
     assert nov_vol > 0.5
@@ -1133,7 +1133,7 @@ def test_island_fitness_penalizes_correlation_to_book():
                 "terms": [{"factor": "momentum", "params": {"window": 20},
                            "transforms": ["mad_clip", "zscore", "rank"], "weight": 1.0}],
                 "thesis": {"mechanism": "在册动量腿。", "citation": "test"}}
-    book_panel = candidate_factor_panel(book_ast, close, volume, close.index)
+    book_panel = candidate_factor_panel(book_ast, close, volume, close.index, cache_mode="memory")
 
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
@@ -1215,7 +1215,7 @@ def test_rediscovery_gate_zeros_edge_above_corr_threshold():
                 "terms": [{"factor": "momentum", "params": {"window": 20},
                            "transforms": ["mad_clip", "zscore", "rank"], "weight": 1.0}],
                 "thesis": {"mechanism": "在册动量腿。", "citation": "test"}}
-    book_panel = candidate_factor_panel(book_ast, close, volume, close.index)
+    book_panel = candidate_factor_panel(book_ast, close, volume, close.index, cache_mode="memory")
 
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
