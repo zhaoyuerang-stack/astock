@@ -85,6 +85,20 @@ _SOURCE_DATA_PATHS = (
 )
 
 
+def _data_signature(close: pd.DataFrame) -> tuple:
+    """Generate a highly efficient structural signature of close DataFrame to avoid id(close) collisions."""
+    if isinstance(close, pd.DataFrame) and not close.empty:
+        return (
+            len(close.index),
+            close.index[0],
+            close.index[-1],
+            len(close.columns),
+            close.columns[0],
+            close.columns[-1]
+        )
+    return (0, None, None, 0, None, None)
+
+
 def _source_data_mtime() -> int:
     for source_path in _SOURCE_DATA_PATHS:
         try:
@@ -105,12 +119,13 @@ def _get_cache_path(name: str, params: dict) -> Path:
     base_dir = _ROOT / "data_lake" / "factor_store" / "panels"
     return base_dir / filename
 
+
 def _call_factor(name: str, close: pd.DataFrame, volume: pd.DataFrame | None, params: dict, cache_mode: str = "disk") -> pd.DataFrame:
     mtime = _source_data_mtime()
 
     # 1. Check in-memory cache first
     param_key = json.dumps(params, sort_keys=True)
-    mem_key = (name, param_key, id(close), mtime)
+    mem_key = (name, param_key, _data_signature(close), mtime)
     if mem_key in _BASE_FACTOR_MEM_CACHE:
         return _BASE_FACTOR_MEM_CACHE[mem_key]
 
@@ -257,7 +272,7 @@ def clear_factor_cache() -> None:
 def _panel_key(ast: dict, close, volume):
     body = {k: v for k, v in ast.items() if k != "thesis"}  # direction 参与=带符号
     h = _hashlib.sha256(json.dumps(body, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:16]
-    return (h, id(close), volume is not None)
+    return (h, _data_signature(close), volume is not None)
 
 
 def compute_dsl_factor(
