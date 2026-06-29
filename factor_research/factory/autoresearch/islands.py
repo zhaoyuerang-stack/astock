@@ -293,6 +293,8 @@ class ChampionRecord:
     turnover: float = 0.0
     provenance: dict = field(default_factory=dict)  # ADR-022 种子溯源(随冠军透出供审视/晋级)
     complexity: float = 0.0
+    regime_icirs: dict[str, float] = field(default_factory=dict)
+    ast: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -625,6 +627,7 @@ def run_island_search(
     review_queue=None,
     runners: dict | None = None,
     evaluation_backend: str = "thread",
+    regime_aware: bool = False,
 ) -> IslandSearchResult:
     """N 岛屿 × G 代进化;适应度 = edge + novelty_weight×新颖性 − corr_weight×对在册组合相关
     - orth_weight×对 size/流动性风格暴露(§四修法②:把"正交"设为搜索目标)。
@@ -786,9 +789,54 @@ def run_island_search(
         style_pen = 0.0
         if orth_weight > 0 and panel is not None and style_panels:
             style_pen = _style_exposure(panel, style_panels)
+
+        # Define 3 historical regimes:
+        # Regime 1 (Small-cap Crash): 2024-01-02 to 2024-02-08
+        # Regime 2 (Value/Large-cap Rotation): 2024-04-01 to 2024-09-30
+        # Regime 3 (Normal/Bull Market): 2023-01-02 to 2023-12-31
+        icir1 = icir2 = icir3 = 0.0
+        if forward_ret is not None:
+            from factors.autoresearch_dsl import compute_dsl_factor
+            try:
+                factor_panel = compute_dsl_factor(close, volume, ast=candidate.ast, cache_mode="disk")
+            except Exception:
+                factor_panel = None
+
+            def _get_regime_icir(start_dt: str, end_dt: str) -> float:
+                if factor_panel is None:
+                    return 0.0
+                r_idx = forward_ret.index[(forward_ret.index >= start_dt) & (forward_ret.index <= end_dt)]
+                common_idx = factor_panel.index.intersection(r_idx)
+                if len(common_idx) < 5:
+                    return 0.0
+                from engine.factor_analysis import calc_ic
+                try:
+                    ic_slice = calc_ic(factor_panel.loc[common_idx], forward_ret.loc[common_idx], method="rank").dropna()
+                    if len(ic_slice) < 5:
+                        return 0.0
+                    mean_val = ic_slice.mean()
+                    std_val = ic_slice.std()
+                    if std_val <= 1e-8:
+                        return 0.0
+                    return float(mean_val / std_val)
+                except Exception:
+                    return 0.0
+
+            icir1 = _get_regime_icir("2024-01-02", "2024-02-08")
+            icir2 = _get_regime_icir("2024-04-01", "2024-09-30")
+            icir3 = _get_regime_icir("2023-01-02", "2023-12-31")
+
+        regime_meta[candidate.fingerprint] = {
+            "regime_1": icir1,
+            "regime_2": icir2,
+            "regime_3": icir3,
+        }
+
         priority_adjustment = float(
             (result.metrics.get("knowledge_gate", {}) or {}).get("priority_adjustment", 1.0)
         )
+        if regime_aware:
+            edge = min(abs(icir1), abs(icir2), abs(icir3))
         fit = (edge + novelty_weight * nov - corr_weight * corr - turnover_weight * turn
                - complexity_weight * comp_val - orth_weight * style_pen) * priority_adjustment
         memo[candidate.fingerprint] = (fit, result)
@@ -797,6 +845,7 @@ def run_island_search(
         return fit
 
     meta: dict[str, tuple[int, int, float, Candidate, float, float, float]] = {}
+    regime_meta: dict[str, dict[str, float]] = {}
 
     # 初始化:种子轮转分配 + 变异补满
     islands: list[list[Candidate]] = []
@@ -1055,6 +1104,8 @@ def run_island_search(
             novelty=nov, fitness=fit, corr_to_book=corr, turnover=turn,
             provenance=dict(candidate.provenance or {}),
             complexity=float(comp_report.score),
+            regime_icirs=regime_meta.get(fp, {}),
+            ast=candidate.ast,
         ))
     return IslandSearchResult(evaluated=evaluated + prefilter_trials[0], champions=champions)
 
