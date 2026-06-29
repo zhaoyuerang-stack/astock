@@ -66,29 +66,30 @@ def mutate_ast(ast: dict, rng: random.Random) -> dict:
     """对 AST 施加 1~2 个白名单内的随机变异,返回新 dict(不改原对象)。"""
     out = copy.deepcopy(ast)
     terms = out.get("terms", [])
-    ops = ["window", "weight", "swap_factor", "direction", "transform"]
+    ops = ["window", "weight", "swap_factor", "direction", "transform", "execution"]
     if len(terms) < 3:
         ops.append("add_term")
     if len(terms) > 1:
         ops.append("drop_term")
 
     for op in rng.sample(ops, k=rng.choice([1, 2])):
-        t = rng.choice(terms)
-        if op == "window":
+        # Avoid picking a term if the mutation only modifies global execution parameters
+        t = rng.choice(terms) if terms else None
+        if op == "window" and t is not None:
             spec = ALLOWED_FACTORS.get(t["factor"])
             if spec and "window" in spec.params:
                 lo, hi = spec.params["window"]
                 cur = int(t.get("params", {}).get("window", lo))
                 t.setdefault("params", {})["window"] = max(int(lo), min(int(hi), int(cur * rng.uniform(0.5, 2.0)) or int(lo)))
-        elif op == "weight":
+        elif op == "weight" and t is not None:
             t["weight"] = round(max(-2.0, min(2.0, float(t.get("weight", 1.0)) * rng.uniform(0.5, 1.5) * rng.choice([1, 1, -1]))), 2) or 0.3
-        elif op == "swap_factor":
+        elif op == "swap_factor" and t is not None:
             name = rng.choice(sorted(ALLOWED_FACTORS))
             t["factor"] = name
             t["params"] = _random_params(ALLOWED_FACTORS[name], rng)
         elif op == "direction":
             out["direction"] = "negative" if out.get("direction", "positive") == "positive" else "positive"
-        elif op == "transform":
+        elif op == "transform" and t is not None:
             pool = sorted(ALLOWED_TRANSFORMS)
             tr = list(t.get("transforms", []))
             if tr and rng.random() < 0.5:
@@ -100,8 +101,16 @@ def mutate_ast(ast: dict, rng: random.Random) -> dict:
             t["transforms"] = tr
         elif op == "add_term":
             terms.append(_random_term(rng))
-        elif op == "drop_term":
+        elif op == "drop_term" and t is not None:
             terms.remove(rng.choice(terms))
+        elif op == "execution":
+            exec_params = out.setdefault("execution", {})
+            exec_params["portfolio_size"] = rng.choice([15, 25, 35, 50])
+            exec_params["rebalance_freq"] = rng.choice(["5D", "10D", "20D", "40D"])
+            if rng.random() < 0.5:
+                exec_params["smoothing_window"] = rng.choice([5, 10, 20])
+            else:
+                exec_params.pop("smoothing_window", None)
 
     mech = str(out.get("thesis", {}).get("mechanism", "")) or "岛屿搜索变异候选"
     out["thesis"] = {"mechanism": mech, "citation": "autoresearch island search"}
@@ -109,19 +118,35 @@ def mutate_ast(ast: dict, rng: random.Random) -> dict:
 
 
 def crossover_ast(a: dict, b: dict, rng: random.Random) -> dict:
-    """各取部分 terms 杂交;thesis 标注双亲机制。"""
+    """各取部分 terms 杂交;thesis 标注双亲机制并融合执行参数。"""
     pool = copy.deepcopy(a.get("terms", [])) + copy.deepcopy(b.get("terms", []))
     k = min(len(pool), rng.choice([1, 2, 2, 3]))
     terms = rng.sample(pool, k=k)
     mech_a = str(a.get("thesis", {}).get("mechanism", ""))[:40]
     mech_b = str(b.get("thesis", {}).get("mechanism", ""))[:40]
-    return {
+
+    # ── [Crossover Execution Settings] ──
+    exec_a = a.get("execution", {})
+    exec_b = b.get("execution", {})
+    execution = {}
+    if exec_a or exec_b:
+        execution["portfolio_size"] = rng.choice([exec_a.get("portfolio_size"), exec_b.get("portfolio_size")])
+        execution["rebalance_freq"] = rng.choice([exec_a.get("rebalance_freq"), exec_b.get("rebalance_freq")])
+        smooth = rng.choice([exec_a.get("smoothing_window"), exec_b.get("smoothing_window")])
+        if smooth is not None:
+            execution["smoothing_window"] = smooth
+        execution = {k: v for k, v in execution.items() if v is not None}
+
+    out = {
         "type": "linear_combo",
         "terms": terms,
         "direction": rng.choice([a.get("direction", "positive"), b.get("direction", "positive")]),
         "thesis": {"mechanism": f"杂交: {mech_a} × {mech_b}" or "岛屿搜索杂交候选",
                    "citation": "autoresearch island search"},
     }
+    if execution:
+        out["execution"] = execution
+    return out
 
 
 def _merge_provenance(parents: list[Candidate]) -> dict:
@@ -152,11 +177,11 @@ def _merge_provenance(parents: list[Candidate]) -> dict:
 def ast_to_features(ast: dict) -> list[float]:
     """将 Candidate AST 转换为固定大小的数值特征向量。"""
     sorted_factors = sorted(ALLOWED_FACTORS.keys())
-    
+
     factor_presence = {f: 0.0 for f in sorted_factors}
     factor_weight = {f: 0.0 for f in sorted_factors}
     factor_window = {f: 0.0 for f in sorted_factors}
-    
+
     total_transforms = 0.0
     for term in ast.get("terms", []):
         factor = term.get("factor")
@@ -167,18 +192,33 @@ def ast_to_features(ast: dict) -> list[float]:
             if window is not None:
                 factor_window[factor] = float(window)
             total_transforms += len(term.get("transforms", []))
-            
+
     features = []
     for f in sorted_factors:
         features.append(factor_presence[f])
         features.append(factor_weight[f])
         features.append(factor_window[f])
-        
+
     features.append(total_transforms)
     features.append(float(len(ast.get("terms", []))))
     direction = 1.0 if ast.get("direction") == "positive" else -1.0
     features.append(direction)
-    
+
+    # ── [Evolved Execution Features] ──
+    exec_params = ast.get("execution", {})
+    port_size = float(exec_params.get("portfolio_size", 25)) / 100.0
+    features.append(port_size)
+
+    freq_str = str(exec_params.get("rebalance_freq", "20D"))
+    try:
+        freq_days = float(freq_str.replace("D", "").replace("W", ""))
+    except ValueError:
+        freq_days = 20.0
+    features.append(freq_days / 100.0)
+
+    smooth_w = float(exec_params.get("smoothing_window", 0)) / 100.0
+    features.append(smooth_w)
+
     return features
 
 
@@ -580,6 +620,7 @@ def run_island_search(
     experiment_log=None,
     review_queue=None,
     runners: dict | None = None,
+    evaluation_backend: str = "thread",
 ) -> IslandSearchResult:
     """N 岛屿 × G 代进化;适应度 = edge + novelty_weight×新颖性 − corr_weight×对在册组合相关
     - orth_weight×对 size/流动性风格暴露(§四修法②:把"正交"设为搜索目标)。
@@ -599,6 +640,28 @@ def run_island_search(
     # 因子面板 memo 搜索内有效:清空以隔离上一次 run / 不同数据口径(防陈旧命中)
     from factors.autoresearch_dsl import clear_factor_cache
     clear_factor_cache()
+
+    # 0. Load historical lessons (系统级反向传播机制预温)
+    historical_lessons = []
+    try:
+        from factory.autoresearch.repositories import ExperimentLog, CandidateRepository, CandidateDecision
+        exp_repo = ExperimentLog()
+        cand_repo = CandidateRepository()
+        ast_map = {c.fingerprint: c.ast for c in cand_repo.all()}
+        for eval_res in exp_repo.iter_all():
+            ast = ast_map.get(eval_res.fingerprint)
+            if ast is not None:
+                fit_score = 0.0
+                if eval_res.decision == CandidateDecision.PROMOTE:
+                    # Look at metrics
+                    l0_m = eval_res.metrics.get("experiments", [{}])[0].get("metrics", {})
+                    fit_score = float(l0_m.get("ICIR", 0.1))
+                elif eval_res.decision == CandidateDecision.DISCARD:
+                    fit_score = -0.5
+                historical_lessons.append((ast, fit_score))
+        print(f"[*] Loaded {len(historical_lessons)} historical lessons for surrogate model pre-warming.")
+    except Exception as e:
+        print(f"[!] Failed to load historical lessons: {e}")
 
     seeds = list(seeds) if seeds else list(generate_seed_candidates(limit=max(n_islands * population, 150)))
     pipe_kw = dict(
@@ -773,7 +836,7 @@ def run_island_search(
             trial_counter=prefilter_trials,
         )
         if candidates_to_eval:
-            if runners:
+            if evaluation_backend == "thread" or runners is not None:
                 from concurrent.futures import ThreadPoolExecutor
                 num_workers = min(len(candidates_to_eval), 8)
                 with ThreadPoolExecutor(max_workers=num_workers) as executor:
@@ -814,11 +877,11 @@ def run_island_search(
         # 3. Evaluate and breed next generation
         for i, pop in enumerate(islands):
             ranked = sorted(pop, key=lambda c: fitness(c, i, gen), reverse=True)
-            
+
             # Fit/refit surrogate model dynamically using evaluated candidates so far
             surrogate_model = None
             surrogate_threshold = None
-            evaluated_pairs = []
+            evaluated_pairs = list(historical_lessons)  # Pre-warm with all historical lessons!
             for fp, (fit, _) in memo.items():
                 if fp in meta:
                     candidate = meta[fp][3]
@@ -856,6 +919,17 @@ def run_island_search(
             best = max(pop, key=lambda c: memo.get(c.fingerprint, (0.0, None))[0])
             migrants[(i + 1) % n_islands] = best
 
+        # Print progress of this generation (持续迭代效果可视化)
+        all_evaluated_fits = []
+        for pop in islands:
+            for c in pop:
+                fit_val = memo.get(c.fingerprint, (0.0, None))[0]
+                all_evaluated_fits.append(fit_val)
+        if all_evaluated_fits:
+            max_fit = max(all_evaluated_fits)
+            mean_fit = sum(all_evaluated_fits) / len(all_evaluated_fits)
+            print(f"[Evolution Progress] Generation {gen:02d} completed. Max Fitness: {max_fit:.4f}, Mean Fitness: {mean_fit:.4f}", flush=True)
+
     # Batch pre-evaluate final remaining candidates
     candidates_to_eval = _candidates_pending_evaluation(
         islands,
@@ -870,7 +944,7 @@ def run_island_search(
         trial_counter=prefilter_trials,
     )
     if candidates_to_eval:
-        if runners:
+        if evaluation_backend == "thread" or runners is not None:
             from concurrent.futures import ThreadPoolExecutor
             num_workers = min(len(candidates_to_eval), 8)
             with ThreadPoolExecutor(max_workers=num_workers) as executor:
@@ -917,17 +991,27 @@ def run_island_search(
     final_results = {}
     if final_stage != "l0" and ranked_all:
         final_candidates = [meta[fp][3] for fp, _ in ranked_all]
-        if runners:
+        if evaluation_backend == "thread" or runners is not None:
             from concurrent.futures import ThreadPoolExecutor
             num_workers = min(len(final_candidates), 8)
             with ThreadPoolExecutor(max_workers=num_workers) as executor:
-                jobs = {executor.submit(run_validation_pipeline, c, max_stage=final_stage, **pipe_kw): c.fingerprint for c in final_candidates}
+                jobs = {executor.submit(run_validation_pipeline, c, max_stage=final_stage, **pipe_kw): c for c in final_candidates}
                 for fut in jobs:
-                    fp = jobs[fut]
+                    c = jobs[fut]
                     try:
-                        final_results[fp] = fut.result()
+                        res = fut.result()
+                        final_results[c.fingerprint] = res
+                        if repository:
+                            repository.add(c)
+                            from .models import CandidateStatus
+                            updated = c.with_status(res.status, res.reason)
+                            repository.record(updated)
+                            if res.status == CandidateStatus.PROMOTED_TO_REVIEW and review_queue:
+                                review_queue.add(updated, res)
+                        if experiment_log:
+                            experiment_log.append(res)
                     except Exception as e:
-                        print(f"[!] Error in final stage evaluation for {fp[:8]}: {e}")
+                        print(f"[!] Error in final stage evaluation for {c.fingerprint[:8]}: {e}")
         else:
             from concurrent.futures import ProcessPoolExecutor
             num_workers = min(len(final_candidates), 8)
@@ -969,3 +1053,11 @@ def run_island_search(
             complexity=float(comp_report.score),
         ))
     return IslandSearchResult(evaluated=evaluated + prefilter_trials[0], champions=champions)
+
+
+def _snap_window_to_grid(w: int | float, lo: int, hi: int) -> int:
+    """Clamps a window parameter w and snaps it to the nearest standard trading grid point."""
+    GRID = [5, 10, 20, 40, 60, 120, 240]
+    w_clamped = max(lo, min(hi, int(w)))
+    nearest = min(GRID, key=lambda x: abs(x - w_clamped))
+    return nearest

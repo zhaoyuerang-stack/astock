@@ -100,7 +100,11 @@ def main():
     print(f"{'Fingerprint':<12} {'Island':<6} {'Gen':<4} {'ICIR':<8} {'Fitness':<8} {'Turnover':<8} {'Formula'}", flush=True)
     print("-" * 80, flush=True)
     for c in search_res.champions:
-        print(f"{c.fingerprint[:12]:<12} {c.island:<6} {c.generation:<4} {c.icir:>+7.4f} {c.fitness:>7.4f} {c.turnover:>7.4f} {c.expr}", flush=True)
+        cand = repository.get(c.fingerprint)
+        exec_str = ""
+        if cand and "execution" in cand.ast:
+            exec_str = f" [Exec: {cand.ast['execution']}]"
+        print(f"{c.fingerprint[:12]:<12} {c.island:<6} {c.generation:<4} {c.icir:>+7.4f} {c.fitness:>7.4f} {c.turnover:>7.4f} {c.expr}{exec_str}", flush=True)
     print("-" * 80, flush=True)
 
 
