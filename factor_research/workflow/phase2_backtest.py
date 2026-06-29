@@ -67,6 +67,24 @@ def build_rebalance_weights(factor, close, top_n=25, rebalance_days=20):
         weights[effective] = pd.Series(1.0 / top_n, index=f.nlargest(top_n).index)
     return weights
 
+def build_rebalance_weights_offset(factor, close, top_n=25, rebalance_days=20, offset=0):
+    fdates = factor.dropna(how="all").index.intersection(close.index)
+    if len(fdates) < 50:
+        return {}
+    weights = {}
+    for rd in list(fdates[offset::rebalance_days]):
+        pos = close.index.get_loc(rd)
+        if pos + 1 >= len(close.index):
+            continue
+        effective = close.index[pos + 1]
+        f = factor.loc[rd].dropna()
+        active = close.loc[rd].dropna().index
+        f = f.reindex(active).dropna()
+        if len(f) < top_n:
+            continue
+        weights[effective] = pd.Series(1.0 / top_n, index=f.nlargest(top_n).index)
+    return weights
+
 
 def run_segment(close, volume, amount, weights, timing, leverage, cost_model):
     """Run a single backtest segment and return metrics."""
@@ -186,6 +204,35 @@ class Phase2Runner:
         # ── OOS/IS decay ──
         decay_check = self._check_decay(segments)
 
+        # ── Offset sensitivity (多偏移扰动测试) ──
+        mask_is = (trade_dates >= pd.Timestamp(IS_SEG[1])) & (trade_dates <= pd.Timestamp(IS_SEG[2]))
+        c_is = close.loc[mask_is]
+        v_is = volume.loc[mask_is]
+        a_is = amount.loc[mask_is]
+        t_is = timing.loc[mask_is] if timing is not None else None
+
+        offset_1_weights = build_rebalance_weights_offset(factor, close, self.top_n, self.rebalance, offset=1)
+        w_offset_1 = {dt: ws for dt, ws in offset_1_weights.items() if dt in c_is.index}
+        res_o1 = run_segment(c_is, v_is, a_is, w_offset_1, t_is, self.leverage, self.base_cost)
+
+        offset_2_weights = build_rebalance_weights_offset(factor, close, self.top_n, self.rebalance, offset=2)
+        w_offset_2 = {dt: ws for dt, ws in offset_2_weights.items() if dt in c_is.index}
+        res_o2 = run_segment(c_is, v_is, a_is, w_offset_2, t_is, self.leverage, self.base_cost)
+
+        base_annual = segments.get(IS_SEG[0], {}).get("annual", 0.0)
+        offset_fail = False
+        if base_annual > 0:
+            if res_o1["annual"] < -0.05 or res_o2["annual"] < -0.05:
+                offset_fail = True
+            if res_o1["annual"] < 0.2 * base_annual or res_o2["annual"] < 0.2 * base_annual:
+                offset_fail = True
+        offset_check = {
+            "base_annual": float(base_annual),
+            "offset_1_annual": float(res_o1["annual"]),
+            "offset_2_annual": float(res_o2["annual"]),
+            "verdict": "FAIL" if offset_fail else "PASS"
+        }
+
         report = {
             "family": self.family,
             "config": self.config,
@@ -193,6 +240,7 @@ class Phase2Runner:
             "cost_sensitivity": cost_check,
             "correlation": corr_check,
             "oos_is_decay": decay_check,
+            "offset_sensitivity": offset_check,
             "timestamp": str(pd.Timestamp.now()),
         }
 

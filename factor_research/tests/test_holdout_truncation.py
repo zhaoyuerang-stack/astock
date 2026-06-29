@@ -57,6 +57,9 @@ def test_phase2_segments_never_touch_vault(monkeypatch):
     oos_label = next(k for k in segs if k.startswith("OOS"))
     assert str((BOUNDARY - pd.Timedelta(days=1)).year) in oos_label, \
         f"OOS 标签未反映金库截断: {oos_label!r}"
+    assert report["offset_sensitivity"]["verdict"] in {"PASS", "FAIL"}
+    assert "offset_1_annual" in report["offset_sensitivity"]
+    assert "offset_2_annual" in report["offset_sensitivity"]
 
 
 def test_phase3_windows_never_test_vault_years(monkeypatch):

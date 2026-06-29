@@ -367,6 +367,50 @@ class Phase4Register:
         metrics = self._build_metrics(phase2_data, phase3_data)
         config = self._build_config(phase2_data)
 
+        # Build ExecutableStrategySpec dynamically (Task 6)
+        from core.strategy_spec import ExecutableStrategySpec
+        ast = config.get("ast", {})
+        execution = ast.get("execution", {})
+        try:
+            rebal_str = str(execution.get("rebalance_freq", config.get("rebalance_days", 20)))
+            rebal_days = int(rebal_str.replace("D", "").replace("W", ""))
+        except ValueError:
+            rebal_days = 20
+
+        strategy_spec = ExecutableStrategySpec(
+            family=self.family,
+            version=self.version,
+            universe={"type": "small_cap"},
+            data={
+                "dependencies": list(config.get("data_dependencies", ["price/close"]))
+            },
+            factor={
+                "type": config.get("factor_fn_name", "factors.autoresearch_dsl.compute_dsl_factor"),
+                "shift": 1,
+                "params": config.get("factor_params", {})
+            },
+            selection={
+                "top_n": int(execution.get("portfolio_size", config.get("top_n", 25))),
+                "rebalance_days": rebal_days
+            },
+            timing={
+                "type": "factors.small_cap.small_cap_timing",
+                "params": {"ma_window": 16}
+            },
+            policy={
+                "veto": "none"
+            },
+            execution={
+                "portfolio_size": int(execution.get("portfolio_size", config.get("top_n", 25))),
+                "rebalance_freq": str(execution.get("rebalance_freq", "20D")),
+                "smoothing_window": int(execution.get("smoothing_window", 0)),
+                "fill": "T_PLUS_1_CLOSE",
+                "cost_model": "A_SHARE_STANDARD_V1"
+            }
+        )
+        spec_dict = strategy_spec.to_dict()
+        spec_hash = strategy_spec.spec_hash
+
         # Write to registry
         try:
             from strategy_registry import register_family, register
@@ -423,6 +467,8 @@ class Phase4Register:
                 ),
                 evidence=self._build_evidence(hypothesis_id, evidence_experiment_ids, seed_provenance),
                 nine_gate=ng_summary,
+                spec=spec_dict,
+                spec_hash=spec_hash,
             )
             print(f"  Registered: {self.family}/{self.version}", flush=True)
             return RegistrationReport(
@@ -487,6 +533,30 @@ class Phase4Register:
         # Phase 3: WF FAIL?
         if (p3 or {}).get("aggregate", {}).get("verdict") == "FAIL":
             return "Phase 3 WF aggregate FAIL"
+
+        # Phase 2: offset sensitivity FAIL?
+        if (p2 or {}).get("offset_sensitivity", {}).get("verdict") == "FAIL":
+            return "Phase 2 offset sensitivity FAIL (调仓偏移过拟合)"
+
+        # Physical Half-Life Constraint
+        config = self._build_config(p2)
+        ast = config.get("ast", {})
+        execution = ast.get("execution", {})
+        rebalance_days = config.get("rebalance_days", 20)
+        try:
+            rebal_str = str(execution.get("rebalance_freq", rebalance_days))
+            rebal_days = int(rebal_str.replace("D", "").replace("W", ""))
+        except ValueError:
+            rebal_days = rebalance_days
+
+        windows = []
+        for term in ast.get("terms", []):
+            win = term.get("params", {}).get("window")
+            if win:
+                windows.append(int(win))
+        max_win = max(windows) if windows else 20
+        if rebal_days > 2.0 * max_win:
+            return f"Execution rebalance_days={rebal_days} exceeds 2x of factor's max window={max_win} (僵尸持仓避滑点过拟合)"
 
         return None
 
