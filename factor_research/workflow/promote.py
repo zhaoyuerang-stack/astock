@@ -122,7 +122,13 @@ def promote_spec(spec, version="v1.0", warmup_start="2010-01-01",
 
     # ── [可选] 边际评级 → ACTIVE/SHADOW ──
     if run_marginal and report.registered:
-        _run_marginal(spec, report)
+        if getattr(report, "status", "") == "在册":
+            _run_marginal(spec, report)
+        else:
+            print(
+                f"[marginal] 跳过: phase4 status={getattr(report, 'status', '')!r} 非在册",
+                flush=True,
+            )
 
     return report
 
