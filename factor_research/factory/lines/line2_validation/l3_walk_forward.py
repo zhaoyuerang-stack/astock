@@ -96,16 +96,46 @@ def run_l3(
             factor = fn(*args, **hyp.factor_params)
 
         close_w = close.loc[start:]
+        amount_w = amount.loc[start:]
+
+        # Check if the candidate has timing_gate or execution specified in its AST
+        timing_series = None
+        ast = hyp.factor_params.get("ast", {}) if isinstance(hyp.factor_params, dict) else {}
+
+        # 1. Parse Timing Gate Overlay
+        timing_gate = ast.get("timing_gate")
+        if timing_gate:
+            ma_window = timing_gate.get("ma_window", 16)
+            volume_rank_threshold = timing_gate.get("volume_rank_threshold", 0.5)
+            from core.overlays.moving_average_overlay import MovingAverageOverlay
+            overlay = MovingAverageOverlay(
+                ma_window=ma_window,
+                volume_rank_threshold=volume_rank_threshold
+            )
+            timing_series = overlay.exposure_series(close_w, amount_w)
+
+        # 2. Parse Evolved Execution parameters
+        exec_params = ast.get("execution", {})
+        actual_top_n = int(exec_params.get("portfolio_size", top_n))
+        actual_rebalance = str(exec_params.get("rebalance_freq", rebalance_freq))
+
+        # Apply factor smoothing window if defined
+        factor_w = factor.reindex(close_w.index)
+        smooth_w = exec_params.get("smoothing_window")
+        if smooth_w:
+            factor_w = factor_w.rolling(int(smooth_w), min_periods=1).mean()
+
         prices = PricePanel(
             close=close_w,
             volume=volume.loc[start:],
-            amount=amount.loc[start:],
+            amount=amount_w,
         )
         signal = Signal(
-            factor=factor.reindex(close_w.index),
-            top_n=top_n,
+            factor=factor_w,
+            top_n=actual_top_n,
             direction=int(direction),
-            rebalance_freq=rebalance_freq,
+            rebalance_freq=actual_rebalance,
+            timing=timing_series,
             family="l3_walk_forward",
             version=hyp.id[:8],
         )
