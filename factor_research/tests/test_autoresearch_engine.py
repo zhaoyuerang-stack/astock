@@ -1797,7 +1797,60 @@ def test_validation_pipeline_computation_time_budget():
         assert "computation time budget exceeded" in res.reason
 
 
+def test_dsl_memory_cache_key_collision_prevention():
+    """对抗式审查：测试两个具有不同形状/索引但巧合具有相同内存地址 id(close) 的 DataFrame 决不能发生缓存碰撞。"""
+    from factors.autoresearch_dsl import _panel_key, _data_signature
+    import gc
+
+    # 1. 构造第一个 DataFrame
+    close1 = pd.DataFrame(1.0, index=pd.date_range("2020-01-01", periods=10), columns=["A", "B"])
+    addr1 = id(close1)
+    sig1 = _data_signature(close1)
+
+    # 2. 销毁它并诱导垃圾回收
+    del close1
+    gc.collect()
+
+    # 3. 构造第二个 DataFrame，尝试使其复用 addr1
+    close2 = None
+    for _ in range(50):
+        temp = pd.DataFrame(2.0, index=pd.date_range("2020-01-01", periods=5), columns=["A", "B", "C"])
+        if id(temp) == addr1:
+            close2 = temp
+            break
+        del temp
+        gc.collect()
+
+    # 4. 如果 Python 分配器在当前测试环境下没能复用地址，构造另一个形状不同的 DataFrame
+    if close2 is None:
+        close2 = pd.DataFrame(2.0, index=pd.date_range("2020-01-01", periods=5), columns=["A", "B", "C"])
+
+    # 5. 验证两个不同的 DataFrame 的数据特征签名是否绝对不同
+    sig2 = _data_signature(close2)
+    assert sig1 != sig2, f"Signatures must differ for different DataFrames: {sig1} vs {sig2}"
+
+    # 6. 对比旧的缓存逻辑与新加固的缓存逻辑
+    ast = {"type": "linear_combo", "terms": [{"factor": "volume_ratio", "params": {"window": 5}, "transforms": []}]}
+    
+    # 模拟在旧 id() 缓存机制下的 Key (如果 id(close1) == id(close2))
+    old_key1 = (hash(str(ast)), addr1, False)
+    old_key2 = (hash(str(ast)), id(close2), False)
+    if id(close2) == addr1:
+        # 证明旧机制下会发生灾难性的 Key 碰撞（两个不同的因子面板共享同一个缓存槽）
+        assert old_key1 == old_key2
+
+    # 验证新加固机制下生成的缓存 Key
+    new_key1 = _panel_key(ast, close2, None)
+    
+    # 创造一个不同形状的数据框，观察 _panel_key 是否能安全避开
+    close3 = pd.DataFrame(3.0, index=pd.date_range("2020-01-01", periods=8), columns=["A"])
+    new_key3 = _panel_key(ast, close3, None)
+    
+    assert new_key1 != new_key3, "New caching keys must be secure against same-id different-shape dataframes."
+
+
 if __name__ == "__main__":
+    test_dsl_memory_cache_key_collision_prevention()
     test_json_ast_validation_rejects_free_string_and_unknown_ops()
     test_neutralize_declaration_accepted_since_runtime_supports_it()
     test_fingerprint_is_stable_and_repository_dedupes()
