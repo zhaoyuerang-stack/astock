@@ -81,16 +81,16 @@ def _get_cache_path(name: str, params: dict) -> Path:
     base_dir = Path(__file__).resolve().parents[1] / "data_lake" / "factor_store" / "panels"
     return base_dir / filename
 
-def _call_factor(name: str, close: pd.DataFrame, volume: pd.DataFrame | None, params: dict) -> pd.DataFrame:
+def _call_factor(name: str, close: pd.DataFrame, volume: pd.DataFrame | None, params: dict, cache_mode: str = "disk") -> pd.DataFrame:
     # 1. Check in-memory cache first
     param_key = json.dumps(params, sort_keys=True)
     mem_key = (name, param_key, id(close))
     if mem_key in _BASE_FACTOR_MEM_CACHE:
         return _BASE_FACTOR_MEM_CACHE[mem_key]
 
-    # 2. Check local parquet cache
+    # 2. Check local parquet cache unless caller requested pure in-memory mode.
     cache_path = _get_cache_path(name, params)
-    if cache_path.exists():
+    if cache_mode != "memory" and cache_path.exists():
         try:
             df = pd.read_parquet(cache_path)
             # Reindex to ensure strict compatibility with the active close index and columns
@@ -123,11 +123,12 @@ def _call_factor(name: str, close: pd.DataFrame, volume: pd.DataFrame | None, pa
         out = fn(close, **mapped)
 
     # 4. Save to parquet cache
-    try:
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        out.to_parquet(cache_path)
-    except Exception:
-        pass
+    if cache_mode != "memory":
+        try:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            out.to_parquet(cache_path)
+        except Exception:
+            pass
 
     _BASE_FACTOR_MEM_CACHE[mem_key] = out
     return out
@@ -160,6 +161,46 @@ def _apply_transform(values: pd.DataFrame, op: str, close: pd.DataFrame | None =
         bear_dates = common_idx[~bull_mask.loc[common_idx]]
         out.loc[bear_dates] = 0.0
         return out
+    if op == "fundamental_veto":
+        if close is None:
+            raise ValueError("fundamental_veto requires close price panel")
+        from factors.fundamental import _load_fundamental_cache, _align_to_close
+        fund = _load_fundamental_cache()
+        roe_panel = _align_to_close(fund["roe"], close)
+        npy_panel = _align_to_close(fund["net_profit_yoy"], close)
+        # Veto stocks with negative/low ROE (<= 0.0%) or crashing earnings growth (< -30%)
+        veto_mask = (roe_panel <= 0.0) | (npy_panel < -30.0)
+        out = values.copy()
+        out[veto_mask] = np.nan
+        return out
+    if op == "salience_veto":
+        if close is None:
+            raise ValueError("salience_veto requires close price panel")
+        # Overheating proxy: 5-day return volatility divided by 60-day return volatility
+        ret = close.pct_change(fill_method=None)
+        vol_5d = ret.rolling(5).std()
+        vol_60d = ret.rolling(60).std()
+        vol_ratio = vol_5d / (vol_60d + 1e-10)
+        # Veto top 5% most volatile stocks in the cross-section
+        overheated_mask = vol_ratio.rank(axis=1, pct=True) > 0.95
+        out = values.copy()
+        out[overheated_mask] = np.nan
+        return out
+    if op == "error_feedback_correction":
+        if close is None:
+            raise ValueError("error_feedback_correction requires close price panel")
+        # 1. Calculate stock returns
+        ret = close.pct_change(fill_method=None)
+        # 2. Identify factor's historical signals (we shift values by 1 day to align with holding period)
+        # For simplicity, we assume values > 0 are buy signals
+        signal_held = (values.shift(1) > 0).astype(float)
+        # 3. Calculate realized losses: signal_held * min(0, return)
+        realized_loss = signal_held * ret.clip(upper=0.0)
+        # 4. Accumulate rolling losses over the past 20 days (the rebalance window)
+        rolling_loss = realized_loss.rolling(20, min_periods=1).sum().fillna(0.0)
+        # 5. Correct the factor values: subtract/penalize based on rolling realized loss (feedback gain = 2.0)
+        corrected = values + 2.0 * rolling_loss
+        return corrected
     raise ValueError(f"unknown AutoResearch DSL transform: {op}")
 
 
@@ -192,6 +233,7 @@ def compute_dsl_factor(
     volume: pd.DataFrame | None = None,
     *,
     ast: dict[str, Any],
+    cache_mode: str = "disk",
 ) -> pd.DataFrame:
     """Compute a validated AutoResearch linear_combo AST(搜索内 memo 化)。"""
     if ast.get("type") != "linear_combo":
@@ -204,7 +246,7 @@ def compute_dsl_factor(
 
     out = pd.DataFrame(0.0, index=close.index, columns=close.columns)
     for term in ast.get("terms", []):
-        values = _call_factor(term["factor"], close, volume, term.get("params", {}))
+        values = _call_factor(term["factor"], close, volume, term.get("params", {}), cache_mode=cache_mode)
         values = values.reindex(index=close.index, columns=close.columns)
         for op in term.get("transforms", []):
             values = _apply_transform(values, op, close=close)
@@ -213,6 +255,80 @@ def compute_dsl_factor(
     if ast.get("direction") == "negative":
         out = -out
     out = out.replace([np.inf, -np.inf], np.nan)
+
+    # Apply root-level AST transforms on the combined out panel
+    for op in ast.get("transforms", []):
+        out = _apply_transform(out, op, close=close)
+
+    # 1. Apply Size & Industry Style Neutralization (事前特征中性化)
+    neutralize_opts = ast.get("neutralize", [])
+    if neutralize_opts:
+        from lake.load_lake import load_daily_basic_panel, load_fundamental_panel
+        neut_size = "size" in neutralize_opts
+        neut_industry = "industry" in neutralize_opts
+
+        log_size = None
+        if neut_size:
+            db_basic = load_daily_basic_panel(close.index, fields=["total_mv"])
+            total_mv = db_basic.get("total_mv", pd.DataFrame())
+            if total_mv.empty:
+                # Fallback to rolling amount
+                total_mv = close.mul(volume, fill_value=0.0).rolling(60).mean()
+            log_size = np.log(total_mv.replace(0, np.nan))
+
+        industry = None
+        if neut_industry:
+            db_fund = load_fundamental_panel(close.index, fields=["industry"])
+            industry = db_fund.get("industry", pd.DataFrame())
+
+        # Pre-align variables to close index/columns to compile numpy matrices
+        log_size_aligned = log_size.reindex(index=close.index, columns=close.columns) if log_size is not None else None
+        industry_aligned = industry.reindex(index=close.index, columns=close.columns).fillna("Unknown") if industry is not None else None
+
+        # Prepare arrays
+        out_arr = out.values.copy()
+        log_size_arr = log_size_aligned.values if log_size_aligned is not None else None
+
+        ind_dummies_arrs = []
+        if industry_aligned is not None:
+            unique_industries = sorted(list(set(np.unique(industry_aligned.values))))
+            if "Unknown" in unique_industries:
+                unique_industries.remove("Unknown")
+            for ind_name in unique_industries:
+                dummy_panel = (industry_aligned == ind_name).astype(float)
+                ind_dummies_arrs.append(dummy_panel.values)
+
+        # Fast cross-sectional regression in pure numpy
+        for i in range(len(close.index)):
+            y = out_arr[i]
+            valid_mask = ~np.isnan(y)
+            if log_size_arr is not None:
+                valid_mask &= ~np.isnan(log_size_arr[i])
+
+            n_valid = np.sum(valid_mask)
+            if n_valid < 30:
+                continue
+
+            X_cols = [np.ones(n_valid)]
+            if log_size_arr is not None:
+                X_cols.append(log_size_arr[i, valid_mask])
+            for dummy_arr in ind_dummies_arrs:
+                X_cols.append(dummy_arr[i, valid_mask])
+
+            X_clean = np.column_stack(X_cols)
+            y_clean = y[valid_mask]
+
+            try:
+                coef, _, _, _ = np.linalg.lstsq(X_clean, y_clean, rcond=None)
+                resids = y_clean - X_clean @ coef
+                out_arr[i, valid_mask] = resids
+            except Exception:
+                continue
+
+        # Re-construct DataFrame and Z-score to restore scaling
+        out = pd.DataFrame(out_arr, index=close.index, columns=close.columns)
+        out = out.replace([np.inf, -np.inf], np.nan)
+        out = (out.sub(out.mean(axis=1), axis=0)).div(out.std(axis=1) + 1e-10, axis=0)
 
     _PANEL_CACHE[key] = out
     _PANEL_ORDER.append(key)

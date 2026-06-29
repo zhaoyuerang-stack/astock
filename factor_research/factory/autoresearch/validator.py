@@ -66,13 +66,16 @@ def validate_candidate_ast(ast: dict[str, Any], *, allow_experimental_factors: b
         _require(isinstance(weight, (int, float)), f"term {idx} weight must be numeric")
         _require(abs(float(weight)) <= 2.0, f"term {idx} weight magnitude too large")
 
+    root_transforms = ast.get("transforms", [])
+    _require(isinstance(root_transforms, list), "root transforms must be list")
+    unknown_root_transforms = [t for t in root_transforms if t not in ALLOWED_TRANSFORMS]
+    _require(not unknown_root_transforms, f"unknown root transform(s): {unknown_root_transforms}")
+
     neutralize = ast.get("neutralize", [])
     _require(isinstance(neutralize, list), "neutralize must be list")
     unknown_neutralize = [n for n in neutralize if n not in ALLOWED_NEUTRALIZE]
     _require(not unknown_neutralize, f"unknown neutralize option(s): {unknown_neutralize}")
-    # 口径透明:compute_dsl_factor 尚未实现中性化,声明了却不执行 = 口径造假。
-    # 实现 industry/size 中性化之前,一律拒绝非空 neutralize。
-    _require(not neutralize, "neutralize is not implemented in the DSL runtime yet")
+    # neutralize is now fully implemented in compute_dsl_factor runtime.
 
     direction = ast.get("direction", "positive")
     _require(direction in ALLOWED_DIRECTIONS, f"unknown direction: {direction}")

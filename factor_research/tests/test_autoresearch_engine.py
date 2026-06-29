@@ -84,16 +84,22 @@ def test_json_ast_validation_rejects_free_string_and_unknown_ops():
     except DSLValidationError as e:
         assert "transform" in str(e)
 
+    bad_root = _candidate()
+    bad_root["transforms"] = ["python_eval"]
+    try:
+        validate_candidate_ast(bad_root)
+        raise AssertionError("unknown root-level transform should be rejected")
+    except DSLValidationError as e:
+        assert "root transform" in str(e)
 
-def test_neutralize_declaration_rejected_until_runtime_supports_it():
-    # compute_dsl_factor 尚未实现中性化;声明了却不执行 = 口径不透明,必须拒绝。
+
+def test_neutralize_declaration_accepted_since_runtime_supports_it():
+    # neutralize is now fully supported in compute_dsl_factor runtime and validator.
     ast = _candidate()
     ast["neutralize"] = ["industry"]
-    try:
-        validate_candidate_ast(ast)
-        raise AssertionError("non-empty neutralize should be rejected")
-    except DSLValidationError as e:
-        assert "neutralize" in str(e)
+    # This should be validated successfully without raising any DSLValidationError
+    candidate = validate_candidate_ast(ast)
+    assert candidate.ast.get("neutralize") == ["industry"]
 
 
 def test_fingerprint_is_stable_and_repository_dedupes():
@@ -1245,7 +1251,7 @@ def test_walk_forward_search_truncates_train_and_scores_oos_after_cutoff():
     cutoff_ts = pd.Timestamp(cutoff)
     seen = {"train_calls": 0, "oos_windows": []}
 
-    def spy_l0(hyp, c, v, a, forward_ret, vintage_id, sample_dates=None):
+    def spy_l0(hyp, c, v, a, forward_ret, vintage_id, sample_dates=None, **kwargs):
         if "|train" in vintage_id:
             seen["train_calls"] += 1
             assert c.index.max() <= cutoff_ts
@@ -1256,7 +1262,7 @@ def test_walk_forward_search_truncates_train_and_scores_oos_after_cutoff():
         else:
             assert forward_ret.index.min() > cutoff_ts
             seen["oos_windows"].append((forward_ret.index.min(), forward_ret.index.max()))
-        return run_l0(hyp, c, v, a, forward_ret, vintage_id=vintage_id, sample_dates=sample_dates)
+        return run_l0(hyp, c, v, a, forward_ret, vintage_id=vintage_id, sample_dates=sample_dates, **kwargs)
 
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
@@ -1618,6 +1624,38 @@ def test_dsl_memory_cache_mode_does_not_write_factor_store(monkeypatch=None):
     assert first.equals(second)
 
 
+def test_dsl_memory_cache_mode_does_not_read_factor_store(monkeypatch):
+    """搜索期 memory cache 模式不读 canonical factor_store parquet,避免旧盘缓存污染当前面板。"""
+    from factors.autoresearch_dsl import clear_factor_cache, compute_dsl_factor
+
+    close, volume, _ = _synthetic_panel(n_days=40, n_stocks=8)
+    ast = {
+        "type": "linear_combo",
+        "terms": [{
+            "factor": "momentum",
+            "params": {"window": 5},
+            "transforms": ["zscore"],
+            "weight": 1.0,
+        }],
+        "direction": "positive",
+        "thesis": {"mechanism": "test", "citation": "test"},
+    }
+
+    clear_factor_cache()
+    monkeypatch.setattr(Path, "exists", lambda self: True)
+
+    def fail_read_parquet(*args, **kwargs):
+        raise AssertionError("memory cache mode should not read parquet factor_store")
+
+    monkeypatch.setattr(pd, "read_parquet", fail_read_parquet)
+    try:
+        factor = compute_dsl_factor(close, volume, ast=ast, cache_mode="memory")
+    finally:
+        clear_factor_cache()
+
+    assert factor.shape == close.shape
+
+
 def test_window_mutation_snaps_to_fixed_grid():
     """窗口变异落到固定网格,避免 window_29/window_38 这类冷缓存爆炸。"""
     from factory.autoresearch.islands import _snap_window_to_grid
@@ -1683,7 +1721,7 @@ def test_validation_pipeline_computation_time_budget():
 
 if __name__ == "__main__":
     test_json_ast_validation_rejects_free_string_and_unknown_ops()
-    test_neutralize_declaration_rejected_until_runtime_supports_it()
+    test_neutralize_declaration_accepted_since_runtime_supports_it()
     test_fingerprint_is_stable_and_repository_dedupes()
     test_fingerprint_semantic_equivalence()
     test_candidate_generator_produces_unique_valid_ast_batch()

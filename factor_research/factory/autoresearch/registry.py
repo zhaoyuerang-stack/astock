@@ -74,6 +74,9 @@ ALLOWED_TRANSFORMS = {
     "rolling_mean",
     "rolling_std",
     "regime_gate",
+    "fundamental_veto",
+    "salience_veto",
+    "error_feedback_correction",
 }
 
 ALLOWED_NEUTRALIZE = {"industry", "size"}
