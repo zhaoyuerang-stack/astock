@@ -28,6 +28,24 @@ def main():
     review_queue = ReviewQueue()
     experiment_log = ExperimentLog()
 
+    # Strictly isolate search data from holdout boundary (ADR-021) to prevent leakage
+    from strategies.small_cap import load_price_panels
+    from governance.holdout import boundary, assert_search_clean
+    from factory.lines.line2_validation.l0_ic_scan import precompute_forward_returns
+    
+    start_date = "2018-01-01"
+    HOLDOUT = boundary()
+    
+    print(f"Loading prices and truncating to < {HOLDOUT.date()} to protect holdout...")
+    close, volume, amount = load_price_panels(start_date)
+    
+    close = close.loc[close.index < HOLDOUT]
+    volume = volume.loc[volume.index < HOLDOUT]
+    amount = amount.loc[amount.index < HOLDOUT]
+    
+    assert_search_clean(close.index[-1], label="Alphas Evolution Search")
+    forward_ret = precompute_forward_returns(close)
+
     print("\nRunning Large Scale Island Search with 8 islands, 10 generations, population 12...", flush=True)
     search_res = run_autoresearch_island_search(
         islands=8,
@@ -36,7 +54,7 @@ def main():
         top_k=5,
         final_stage="l3",
         use_llm=False,  # Force using our interleaved classic alphas seeds in _SEEDS
-        start="2018-01-01",
+        start=start_date,
         sample_dates=120,
         repository=repository,
         experiment_log=experiment_log,
@@ -49,6 +67,10 @@ def main():
         mf_level1_ic_min=0.02,
         mf_level2_dates=60,
         mf_level2_keep_ratio=0.5,
+        close=close,
+        volume=volume,
+        amount=amount,
+        forward_ret=forward_ret,
     )
 
     print(f"\nSearch complete. Evaluated: {search_res.evaluated}.", flush=True)
