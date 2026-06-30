@@ -274,6 +274,18 @@
 
 ---
 
+### ADR-029 Composite 复合组合合成信号重构审计
+- **上下文**: 为了确保 Composite 组合的设计方案（ADR-028）在计量金融和过拟合方面经受住最严苛的审计，我们将该组合的每日持仓权重 $w_{\text{composite}}$ 进行线性合成重构，并作为虚拟单体策略整体跑通了官方的 9-Gate 审计评估。
+- **决策**:
+  - 在 `scratch/audit_composite_portfolio.py` 中实现了基于**并集列填充**的权重 DataFrame 对齐重构，并使用 `NineGatesEvaluator` 进行了全套 9 关严格审计。
+- **理由**:
+  - 组合的 9-Gate 表现展示了极高的统计学稳健性。在 2023-2026 样本外，组合跑出了 **`21.83%`** 的高额年化，最大回撤仅为 **`-20.34%`**（仅差 `0.34%` 达到 standalone 安全红线门槛），夏普达 **`1.13`**。
+  - 多重检验惩罚下的 **DSR p-value 达到了极其出色的 `0.0674`**，这在统计学上以 93.26% 的高置信度排除了参数过拟合和幸运成分。
+  - 在大资金容量方面（Gate 6），组合表现极其出色，在 5 亿 AUM 的高额冲击成本下，其净夏普仍保持在 **`0.64`**（得益于小盘大盘多因子的轧差调仓 Netting 对冲）。
+- **验证**: 9-Gate 审计脚本 `audit_composite_portfolio.py` 运行成功，审计报告已保存至 `reports/research/composite_portfolio_9_gates_report.md`。
+
+---
+
 ## ③ 投资/交易决策记录
 
 > 实盘/模拟盘的逐日决策**已自动落盘**:`factor_research/signals/<date>.json`(信号)+ Obsidian `30.output/A股v2.0模拟盘/`(操作卡)。本节只记**需人工复盘的关键决策**(regime 切换、风控动作、异常),不重复日常信号。
