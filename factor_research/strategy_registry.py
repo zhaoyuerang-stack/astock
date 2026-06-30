@@ -481,9 +481,12 @@ def show():
         print("  " + "-" * 100)
         for v in fam["versions"]:
             m, ds = v.get("metrics", {}), v.get("data_scope", {})
-            source = ds.get("source", "unknown")
-            period = ds.get("period", "unknown")
-            scope = f"{source}·{period}{'·幸存者偏差' if ds.get('survivorship_bias') else ''}"
+            if isinstance(ds, str):
+                scope = ds
+            else:
+                source = ds.get("source", "unknown")
+                period = ds.get("period", "unknown")
+                scope = f"{source}·{period}{'·幸存者偏差' if ds.get('survivorship_bias') else ''}"
             print(f"  {v['version']:<6}{scope:<26}{m.get('annual', 0.0):>7.1%}{m.get('maxdd', 0.0):>8.1%}"
                   f"{m.get('sharpe', 0.0):>6.2f}{'✅' if m.get('hit') else '❌':>5}{v.get('status',''):>6}  {v.get('notes','')}")
             ev = v.get("evidence") or {}

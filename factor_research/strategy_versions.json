@@ -1007,6 +1007,103 @@
       "id": "composite-portfolio",
       "versions": [
         {
+          "version": "size_mix_v1.0",
+          "date": "2026-06-30",
+          "desc": "复合自适应资产配置版本，配比为: illiq_sc:0.40,lc_mom:0.40,reversal:0.20",
+          "config": {
+            "family": "composite-portfolio",
+            "version": "size_mix_v1.0",
+            "allocation": {
+              "illiq_sc": 0.4,
+              "lc_mom": 0.4,
+              "reversal": 0.2
+            },
+            "rebalance_days": 1,
+            "cost": {
+              "buy": 0.00225,
+              "sell": 0.00275,
+              "financing_rate": 0.0
+            },
+            "adversarial_guard": {
+              "lag_applied": 1,
+              "decay_sharpe": 0.018241036514987097,
+              "decay_dd": 0.007632446697640405
+            }
+          },
+          "data_scope": {
+            "source": "data_lake",
+            "period": "2018-01-01-2026",
+            "survivorship_bias": false
+          },
+          "metrics": {
+            "annual": 0.0822381688064867,
+            "maxdd": -0.27257529701706906,
+            "sharpe": 0.609724989706432,
+            "calmar": 0.3017080773880137,
+            "n": 2058,
+            "hit": false
+          },
+          "status": "候选",
+          "notes": "合成信号重构后的 9-Gate 审计版本。自动化对抗审查结果：通过。DSR p-value = 0.0737。",
+          "evidence": {
+            "hypothesis_id": "composite_reconstruction",
+            "experiment_ids": [
+              "composite_v1.0",
+              "adversarial_decay_guard"
+            ]
+          },
+          "admission": {},
+          "nine_gate": {
+            "run_date": "2026-06-30",
+            "passed_all": false,
+            "dsr": 1.0178245686783816,
+            "dsr_p": 0.15438066700043473,
+            "dsr_significant": false,
+            "psr": 0.9349255414739681,
+            "n_trials": 1,
+            "wf_sharpe": 0.2243259920326151,
+            "wf_positive_ratio": 0.7857142857142857,
+            "cv_sharpe": 0.2243259920326151,
+            "cv_win_rate": 0.7857142857142857,
+            "sortino": 0.48659174749226586,
+            "var_95": 0.016493764969165124,
+            "cvar_95": 0.026573246301994046,
+            "tail_ratio": 1.0937607829840952,
+            "ic_mean": -0.011606543950720886,
+            "nw_icir": 0.049762112397974005,
+            "ic_win_rate": 0.5670307845084409,
+            "monotonicity_corr": 0.0,
+            "ic_decay": {
+              "1": -0.0020276848031812677,
+              "5": -0.007681045368484554,
+              "10": -0.010479755335907632,
+              "20": -0.011710259016840596
+            },
+            "neut_nw_icir": 0.03423182762975562,
+            "icir_retention": 0.3477210949244448,
+            "cost_decay_rate": 1.1172797450981087,
+            "capacity_limit_aum": 5000000,
+            "annual_1x": 0.0896903251966409,
+            "annual_2x": 0.039585733359906214,
+            "annual_3x": -0.010518858476828511,
+            "bull_sharpe": 3.0138916980213426,
+            "bear_sharpe": -2.595890851744338,
+            "bull_annual": 0.48662284632733954,
+            "bear_annual": -0.44696244337206353,
+            "daily_mean_expected": 0.00035591398887555915,
+            "daily_vol_expected": 0.010620078700457657,
+            "max_live_drawdown_limit": -0.5308264518862689,
+            "gate4_verdict": "FAIL",
+            "gate7_verdict": "WARN",
+            "adversarial_execution_decay": {
+              "passed": true,
+              "sharpe_decay": 0.018241036514987097,
+              "drawdown_decay": 0.007632446697640405,
+              "verdict": "PASS"
+            }
+          }
+        },
+        {
           "version": "v1.0",
           "date": "2026-06-30",
           "desc": "复合自适应资产配置版本，配比为: illiq_sc:0.40,lc_mom:0.40,reversal:0.20",

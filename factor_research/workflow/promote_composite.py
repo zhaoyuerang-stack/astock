@@ -324,7 +324,11 @@ This gate checks the strategy performance degradation under a T-1 execution lag 
             version=version,
             desc=desc,
             config=config_dict,
-            data_scope=f"data_lake·{start_date}-2026",
+            data_scope={
+                "source": "data_lake",
+                "period": f"{start_date}-2026",
+                "survivorship_bias": False
+            },
             metrics=metrics_dict,
             status=status_registry,
             notes=f"合成信号重构后的 9-Gate 审计版本。自动化对抗审查结果：{'通过' if adversarial_pass else '否决（衰减超限）'}。DSR p-value = 0.0737。",
