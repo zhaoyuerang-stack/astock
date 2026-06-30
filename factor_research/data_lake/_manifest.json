@@ -1,8 +1,8 @@
 {
-  "_updated": "2026-06-27T04:30:28",
+  "_updated": "2026-06-30T04:30:41",
   "_version": "2.0",
   "price_daily": {
-    "last_check": "2026-06-27",
+    "last_check": "2026-06-30",
     "updated": 0,
     "added_delisted": 0,
     "compact": "skipped"
@@ -21,7 +21,10 @@
     "path": "data_lake/price/daily_raw"
   },
   "fundamental": {
-    "last_check": "2026-06-27"
+    "last_check": "2026-06-30",
+    "new_periods": [
+      "20260630"
+    ]
   },
   "capital_margin": {
     "last_check": "2026-06-05",
@@ -62,12 +65,12 @@
     "list_date": "data_lake/meta/list_date.parquet"
   },
   "data_vintage": {
-    "stamped_at": "2026-06-26T17:30:07",
-    "last_date": "2026-06-26",
+    "stamped_at": "2026-06-29T17:31:27",
+    "last_date": "2026-06-29",
     "shape": [
-      4000,
+      4001,
       5207
     ],
-    "fingerprint": "f6f09d03c544"
+    "fingerprint": "52ac2d5e5397"
   }
 }

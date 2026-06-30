@@ -2634,38 +2634,47 @@
             "admission_caveat": "本版本 standalone 准入依据为 L2 复合(含 MA16 择时 + 国债轮动)绩效,非裸因子单体表现;裸因子年化13.8%/回撤-59.78%(hit=False)不达标。择时是合法风控 overlay,但其回撤控制不应记为因子 alpha。DSR/PBO 因 trial_count_unknown 暂不可计算,不构成统计显著性证据。"
           },
           "nine_gate": {
-            "status": "SKIP",
+            "run_date": "2026-06-30",
             "passed_all": false,
-            "layers": {
-              "L0_factor_only": {
-                "annual": 0.1383,
-                "sharpe": 0.543,
-                "maxdd": -0.5978,
-                "hit": false
-              },
-              "L1_plus_MA16_timing": {
-                "annual": 0.1817,
-                "sharpe": 1.094,
-                "maxdd": -0.1906,
-                "hit": true
-              },
-              "L2_plus_bond_full": {
-                "annual": 0.207,
-                "sharpe": 1.241,
-                "maxdd": -0.1754,
-                "hit": true
-              }
+            "dsr": -1.7308475019498417,
+            "dsr_p": 0.9582605164751884,
+            "dsr_significant": false,
+            "psr": 2.9545481372442753e-19,
+            "n_trials": 1,
+            "wf_sharpe": -0.2957639209463088,
+            "wf_positive_ratio": 0.2857142857142857,
+            "cv_sharpe": -0.2957639209463088,
+            "cv_win_rate": 0.2857142857142857,
+            "sortino": -1.5553430050132742,
+            "var_95": 0.0035019841269841264,
+            "cvar_95": 0.007096759966870746,
+            "tail_ratio": 0.5235228516026884,
+            "ic_mean": -0.00016314642568085038,
+            "nw_icir": 0.003411021693146175,
+            "ic_win_rate": 0.4779021803182086,
+            "monotonicity_corr": 0.0,
+            "ic_decay": {
+              "1": -0.0019735003132581096,
+              "5": -0.0003962092065686485,
+              "10": 0.0008657399733204063,
+              "20": -8.028024944314326e-05
             },
-            "dsr_p": null,
-            "pbo": null,
-            "reasons": [
-              "L0 裸因子不达标准入门槛(年化13.83% 但回撤-59.78%,hit=False)——standalone 资格事实上靠 L1 MA16 择时 + L2 国债轮动覆盖",
-              "governance.trial_ledger.honest_n_trials(\"industry-neglect-rotation\")==0(predates ledger)→ DSR/PBO 不可信计算,不得伪造地板值(铁律,Task 11)",
-              "台账登记的 metrics(年化21.27%/回撤-17.54%)是 L2 复合,非裸因子单体表现"
-            ],
-            "run_date": "2026-06-29",
-            "gate2_verdict": "SKIP",
-            "gate2_details": "行业级因子: 行业级因子，需独立审计框架"
+            "neut_nw_icir": 0.0,
+            "icir_retention": 0.0,
+            "cost_decay_rate": 1.0,
+            "capacity_limit_aum": 5000000,
+            "annual_1x": -0.10730376922515093,
+            "annual_2x": -0.2368667512302923,
+            "annual_3x": -0.36642973323543376,
+            "bull_sharpe": -2.13676539823854,
+            "bear_sharpe": -2.6571861432334414,
+            "bull_annual": -0.09779921095486106,
+            "bear_annual": -0.12146596664780904,
+            "daily_mean_expected": -0.0004258086080363132,
+            "daily_vol_expected": 0.002881715488895061,
+            "max_live_drawdown_limit": -1.1674511240306784,
+            "gate4_verdict": "FAIL",
+            "gate7_verdict": "FAIL"
           },
           "admission": {},
           "dsr_demotion": {
