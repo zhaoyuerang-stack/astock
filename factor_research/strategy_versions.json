@@ -1023,6 +1023,11 @@
               "buy": 0.00225,
               "sell": 0.00275,
               "financing_rate": 0.0
+            },
+            "adversarial_guard": {
+              "lag_applied": 1,
+              "decay_sharpe": 0.061354561274589825,
+              "decay_dd": 0.03416911128205935
             }
           },
           "data_scope": "data_lake·2023-01-01-2026",
@@ -1035,11 +1040,12 @@
             "hit": true
           },
           "status": "候选",
-          "notes": "合成信号重构后的 9-Gate 审计归档版本。多重检验 p-value = 0.0674，容量 AUM 达 5 亿以上。",
+          "notes": "合成信号重构后的 9-Gate 审计版本。自动化对抗审查结果：通过。DSR p-value = 0.0737。",
           "evidence": {
             "hypothesis_id": "composite_reconstruction",
             "experiment_ids": [
-              "composite_v1.0"
+              "composite_v1.0",
+              "adversarial_decay_guard"
             ]
           },
           "admission": {},
@@ -1085,9 +1091,12 @@
             "max_live_drawdown_limit": -0.3652986619671907,
             "gate4_verdict": "FAIL",
             "gate7_verdict": "WARN",
-            "status": "PERSISTED",
-            "strategy": "composite-portfolio",
-            "version": "v1.0"
+            "adversarial_execution_decay": {
+              "passed": true,
+              "sharpe_decay": 0.061354561274589825,
+              "drawdown_decay": 0.03416911128205935,
+              "verdict": "PASS"
+            }
           }
         }
       ],
