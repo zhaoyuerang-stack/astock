@@ -1004,6 +1004,103 @@
       "failure_boundaries": {}
     },
     {
+      "id": "composite-portfolio",
+      "versions": [
+        {
+          "version": "v1.0",
+          "date": "2026-06-30",
+          "desc": "复合自适应资产配置版本，配比为: illiq_sc:0.40,lc_mom:0.40,reversal:0.20",
+          "config": {
+            "family": "composite-portfolio",
+            "version": "v1.0",
+            "allocation": {
+              "illiq_sc": 0.4,
+              "lc_mom": 0.4,
+              "reversal": 0.2
+            },
+            "rebalance_days": 1,
+            "cost": {
+              "buy": 0.00225,
+              "sell": 0.00275,
+              "financing_rate": 0.0
+            }
+          },
+          "data_scope": "data_lake·2023-01-01-2026",
+          "metrics": {
+            "annual": 0.17808401603317922,
+            "maxdd": -0.18918264093020287,
+            "sharpe": 1.150184253367279,
+            "calmar": 0.9413338092625614,
+            "n": 843,
+            "hit": true
+          },
+          "status": "候选",
+          "notes": "合成信号重构后的 9-Gate 审计归档版本。多重检验 p-value = 0.0674，容量 AUM 达 5 亿以上。",
+          "evidence": {
+            "hypothesis_id": "composite_reconstruction",
+            "experiment_ids": [
+              "composite_v1.0"
+            ]
+          },
+          "admission": {},
+          "nine_gate": {
+            "run_date": "2026-06-30",
+            "passed_all": false,
+            "dsr": 1.448530716913953,
+            "dsr_p": 0.07373434089006714,
+            "dsr_significant": false,
+            "psr": 0.9747027270251256,
+            "n_trials": 1,
+            "wf_sharpe": 0.2243259920326151,
+            "wf_positive_ratio": 0.7857142857142857,
+            "cv_sharpe": 0.2243259920326151,
+            "cv_win_rate": 0.7857142857142857,
+            "sortino": 1.0619834878332466,
+            "var_95": 0.018567904488510048,
+            "cvar_95": 0.02950707667696535,
+            "tail_ratio": 1.1626723394080685,
+            "ic_mean": -0.011606543950720886,
+            "nw_icir": 0.049762112397974005,
+            "ic_win_rate": 0.5670307845084409,
+            "monotonicity_corr": 0.0,
+            "ic_decay": {
+              "1": -0.0020276848031812677,
+              "5": -0.007681045368484554,
+              "10": -0.010479755335907632,
+              "20": -0.011710259016840596
+            },
+            "neut_nw_icir": 0.03423182762975562,
+            "icir_retention": 0.3477210949244448,
+            "cost_decay_rate": 0.6761782826696895,
+            "capacity_limit_aum": 2000000000,
+            "annual_1x": 0.2078778551541667,
+            "annual_2x": 0.13759660960256523,
+            "annual_3x": 0.0673153640509638,
+            "bull_sharpe": 4.150288791023286,
+            "bear_sharpe": -2.7790027740431476,
+            "bull_annual": 0.7558206664506791,
+            "bear_annual": -0.5527226477786692,
+            "daily_mean_expected": 0.0008249121236276457,
+            "daily_vol_expected": 0.012191279741670938,
+            "max_live_drawdown_limit": -0.3652986619671907,
+            "gate4_verdict": "FAIL",
+            "gate7_verdict": "WARN",
+            "status": "PERSISTED",
+            "strategy": "composite-portfolio",
+            "version": "v1.0"
+          }
+        }
+      ],
+      "name": "多策略自适应防守复合组合",
+      "hypothesis": "小盘非流动性(压舱石) ＋ 大盘动量(双阀风控) ＋ 另类反转(双阀风控)的三因子复合资产配置，旨在达成低回撤、稳夏普的生产级组合。",
+      "regime": "全局混合政权(底仓长效持仓，卫星及对冲腿根据双阀门控自动启停避险)",
+      "decay_signal": "底仓因子衰退，或整体最大滚动回撤突破 -30%",
+      "status": "active",
+      "style_betas": {},
+      "capacity_m": 0.0,
+      "failure_boundaries": {}
+    },
+    {
       "id": "d-le-sc-hedged",
       "versions": [
         {

@@ -90,7 +90,8 @@ def run_pipeline(version: str, allocation_str: str, persist: bool = False, start
         timing_a = timing_a.reindex(close.index).ffill().fillna(0.0)
         
         w_a = sig_a_base._resolve_weights(prices).reindex(close.index).ffill().fillna(0.0)
-        w_a_timed = w_a.mul(timing_a, axis=0)
+        # Apply strict T-1 lag to style timing
+        w_a_timed = w_a.mul(timing_a.shift(1).fillna(0.0), axis=0)
         weight_dfs.append(w_a_timed * alloc["illiq_sc"])
         
     # Strategy 2: lc_mom
@@ -114,7 +115,8 @@ def run_pipeline(version: str, allocation_str: str, persist: bool = False, start
             panic_leverage=0.2,
             smoothing_window=5
         )
-        w_b_timed = b_weights.mul(timing_b, axis=0)
+        # Apply strict T-1 lag to dual-valve timing
+        w_b_timed = b_weights.mul(timing_b.shift(1).fillna(1.0), axis=0)
         weight_dfs.append(w_b_timed * alloc["lc_mom"])
         
     # Strategy 3: reversal
@@ -136,7 +138,8 @@ def run_pipeline(version: str, allocation_str: str, persist: bool = False, start
             panic_leverage=0.2,
             smoothing_window=5
         )
-        w_c_timed = c_weights.mul(timing_c, axis=0)
+        # Apply strict T-1 lag to dual-valve timing
+        w_c_timed = c_weights.mul(timing_c.shift(1).fillna(1.0), axis=0)
         weight_dfs.append(w_c_timed * alloc["reversal"])
         
     # -----------------------------------------------------------------------
