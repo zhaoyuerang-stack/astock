@@ -1422,14 +1422,15 @@
           },
           "data_scope": {
             "source": "data_lake",
-            "period": "2023-2026",
+            "period": "2023-2024",
             "survivorship_bias": false
           },
           "metrics": {
-            "annual": 0.1086,
-            "maxdd": -0.1906,
-            "sharpe": 0.7,
-            "calmar": 0.57,
+            "annual": -0.0943,
+            "maxdd": -0.5398,
+            "sharpe": -0.2552,
+            "calmar": -0.1748,
+            "n": 484,
             "hit": false
           },
           "status": "退役",
@@ -1520,14 +1521,15 @@
           },
           "data_scope": {
             "source": "data_lake",
-            "period": "2012-2026",
+            "period": "2012-2024",
             "survivorship_bias": false
           },
           "metrics": {
-            "annual": 0.0533,
-            "maxdd": -0.4795,
-            "sharpe": 0.39,
-            "calmar": 0.11,
+            "annual": -0.0118,
+            "maxdd": -0.9585,
+            "sharpe": -0.0268,
+            "calmar": -0.0123,
+            "n": 3156,
             "hit": false
           },
           "status": "退役",
@@ -2757,14 +2759,15 @@
           },
           "data_scope": {
             "source": "data_lake",
-            "period": "2023-2026",
+            "period": "2023-2024",
             "survivorship_bias": false
           },
           "metrics": {
-            "annual": 0.0297,
-            "maxdd": -0.1131,
-            "sharpe": 0.33,
-            "calmar": 0.26,
+            "annual": -0.0993,
+            "maxdd": -0.239,
+            "sharpe": -0.9501,
+            "calmar": -0.4157,
+            "n": 484,
             "hit": false
           },
           "status": "退役",
@@ -2908,14 +2911,15 @@
           },
           "data_scope": {
             "source": "data_lake",
-            "period": "2023-2026",
+            "period": "2023-2024",
             "survivorship_bias": false
           },
           "metrics": {
-            "annual": 0.0566,
-            "maxdd": -0.1053,
-            "sharpe": 0.58,
-            "calmar": 0.54,
+            "annual": 0.0579,
+            "maxdd": -0.2362,
+            "sharpe": 0.3721,
+            "calmar": 0.2453,
+            "n": 484,
             "hit": false
           },
           "status": "退役",
@@ -3298,7 +3302,7 @@
           },
           "data_scope": {
             "source": "data_lake",
-            "period": "2018-2026",
+            "period": "2018-2024",
             "survivorship_bias": false,
             "wf_validated": true,
             "wf_period": "2022-2025",
@@ -3307,20 +3311,12 @@
             "wf_sharpe": 1.16
           },
           "metrics": {
-            "annual": 0.151,
-            "maxdd": -0.183,
-            "sharpe": 1.05,
-            "calmar": 0.82,
-            "hit": true,
-            "annual_2018": 0.151,
-            "maxdd_2018": -0.183,
-            "sharpe_2018": 1.05,
-            "annual_2023": 0.11,
-            "maxdd_2023": -0.111,
-            "sharpe_2023": 0.79,
-            "annual_2010": 0.158,
-            "maxdd_2010": -0.237,
-            "sharpe_2010": 1.08
+            "annual": 0.0871,
+            "maxdd": -0.3069,
+            "sharpe": 0.4804,
+            "calmar": 0.2837,
+            "n": 1698,
+            "hit": false
           },
           "status": "参考",
           "notes": "✅WF存活(+19.0%/-19.5%/夏普1.16,3/4年正)。NPY熊市缓冲(2022 λ=0.7→+23%)，size牛市弹性(2024-25 λ=1.0→+37/+46%)。VolTarget压IS回撤-18.3%。OOS回撤仅-11.1%。压力回撤-23.7%主因2015(+146%后崩)。换手~30x。",
@@ -3600,25 +3596,17 @@
           },
           "data_scope": {
             "source": "data_lake",
-            "period": "2018-2026",
+            "period": "2018-2024",
             "survivorship_bias": false,
             "warmup": "2010 预热切片"
           },
           "metrics": {
-            "annual": 0.2593,
-            "maxdd": -0.1943,
-            "sharpe": 1.69,
-            "calmar": 1.33,
-            "hit": true,
-            "annual_2018": 0.2593,
-            "maxdd_2018": -0.1943,
-            "sharpe_2018": 1.69,
-            "annual_2023": 0.2968,
-            "maxdd_2023": -0.1411,
-            "sharpe_2023": 1.9,
-            "annual_2010": 0.2736,
-            "maxdd_2010": -0.3052,
-            "sharpe_2010": 1.46
+            "annual": 0.121,
+            "maxdd": -0.2193,
+            "sharpe": 0.6625,
+            "calmar": 0.5516,
+            "n": 1699,
+            "hit": false
           },
           "status": "参考",
           "notes": "✅2026-06-14 重测:旧值 22.2%/夏普1.38 陈旧,早于引擎迁移(5b4e2a90b)+start窗口语义(053d93441);同口径(2010切2018)重测=25.9%/1.69(+3.7pp,maxdd-19.4%≈旧-20%)。688 amount bug 修复后显式排除科创板(exclude_star;纳入不增alpha还降夏普1.85→1.65)。容量~2千万小资金可实盘。OOS 29.7%/1.90、压力(含15年股灾)27.4%/-30.5%。",
