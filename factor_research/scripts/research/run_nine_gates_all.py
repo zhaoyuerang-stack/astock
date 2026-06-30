@@ -351,21 +351,37 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
         else:
             raise ValueError(f"Unknown strategy name: {strategy_name}")
 
-    # Extract returned components
+    # Extract returned components first
     close = res["close"]
     volume = res.get("volume")
-    if volume is None:
-        volume = pd.DataFrame(1000.0, index=close.index, columns=close.columns)
     amount = res.get("amount")
-    if amount is None:
-        amount = volume * 100 * close
-
-    prices = PricePanel(close=close, volume=volume, amount=amount)
-    factor = res["factor"]
-    scheduled = res["scheduled_weights"]
+    
+    # Strictly truncate at holdout boundary (< 2025-01-01) to eliminate holdout pollution in OOS/WF metrics (ADR-021)
+    from governance.holdout import boundary
+    b = boundary()
+    
+    close_tr = close.loc[close.index < b]
+    volume_tr = volume.loc[volume.index < b] if volume is not None else None
+    amount_tr = amount.loc[amount.index < b] if amount is not None else None
+    
+    if volume_tr is None:
+        volume_tr = pd.DataFrame(1000.0, index=close_tr.index, columns=close_tr.columns)
+    if amount_tr is None:
+        amount_tr = volume_tr * 100 * close_tr
+        
+    prices = PricePanel(close=close_tr, volume=volume_tr, amount=amount_tr)
+    factor = res["factor"].loc[res["factor"].index < b]
+    
+    if isinstance(res["scheduled_weights"], dict):
+        scheduled = {k: v for k, v in res["scheduled_weights"].items() if k < b}
+    else:
+        scheduled = res["scheduled_weights"].loc[res["scheduled_weights"].index < b]
+        
     timing = res.get("timing")
+    if timing is not None:
+        timing = timing.loc[timing.index < b]
 
-    print(f"  Execution complete. Loaded {close.shape[1]} stocks x {close.shape[0]} dates.")
+    print(f"  Execution complete. Truncated to < {b.date()} to protect holdout. Loaded {close_tr.shape[1]} stocks x {close_tr.shape[0]} dates.")
 
     # 2. Build Signal
     signal = Signal(
