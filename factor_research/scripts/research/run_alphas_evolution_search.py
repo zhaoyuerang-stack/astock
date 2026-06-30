@@ -71,6 +71,7 @@ def main():
         volume=volume,
         amount=amount,
         forward_ret=forward_ret,
+        regime_aware=True,
     )
 
     print(f"\nSearch complete. Evaluated: {search_res.evaluated}.", flush=True)
