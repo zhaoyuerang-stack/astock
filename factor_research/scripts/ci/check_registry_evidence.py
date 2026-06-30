@@ -27,7 +27,14 @@ DSR_ALPHA = 0.05  # standalone 准入要求 DSR 多重测试惩罚下显著(dsr_
 # 已知病灶基线(2026-06 回扫发现,grandfather 待 workflow 处置;**修复后须从此处移除**)。
 # 守卫只对「新」违规 exit 1;下列项仅打印为待处置警告,不阻塞。处置清单见
 # scratch/illiq_largecap_governance_DRAFT.md(退役/补审/降级)。
-PENDING_REMEDIATION: dict[str, str] = {}
+PENDING_REMEDIATION: dict[str, str] = {
+    # 2026-06-30 对抗性审查发现:composite-portfolio v1.0 / size_mix_v1.0 均含 3 个配比分量
+    # 却写 n_trials=1(R-EVIDENCE-001 ④ 低报),DSR 多重测试惩罚被骗松。台账受 R-REG-001 保护
+    # (不可手改),须走 register/promote_composite 重审如实计入搜索自由度后从此处移除。
+    # 跟踪:TASKS.md「composite-portfolio n_trials 诚实重审」。两版皆 status=候选、未部署,故基线警告不阻塞。
+    "EV4-trials:composite-portfolio/v1.0": "待 register 重审计入真实搜索自由度",
+    "EV4-trials:composite-portfolio/size_mix_v1.0": "待 register 重审计入真实搜索自由度",
+}
 # 已修复并移除(ADR-017 处置,2026-06):
 #   G1:illiquidity,illiquidity-large-cap —— illiq-large-cap/v1.0 已退役 + nine_gate 重写为
 #       INVALIDATED_EVIDENCE_PLAGIARIZED,原照抄 IC 块归档于 evidence.archived_invalid_nine_gate。
@@ -66,8 +73,33 @@ def extract_versions(ledger: dict) -> list[dict]:
                 "track": adm.get("track"),
                 "nine_gate": ng,
                 "evidence": v.get("evidence") or {},
+                "config": v.get("config") or {},
             })
     return rows
+
+
+def find_understated_trials(rows: list[dict]) -> list[tuple[str, str]]:
+    """R-EVIDENCE-001 ④:组合/混合版本 n_trials 不得低于其配比分量数(机械下界)。
+
+    组合版本的搜索自由度至少含「各子策略各自的搜索 + 配比网格 + 任何择时/熔断参数」,
+    故 n_trials < 分量数 = 必然漏报搜索自由度、骗松 DSR 多重测试惩罚。
+    这是 *下界*,不是真实自由度:过了此门也仅说明没把 n_trials 写成 1 这种显式造假,
+    真实自由度仍须 register 重审如实计入。与 status 无关——候选也不许带造假证据值
+    (R-EVIDENCE-001 不限定 standalone;低报的 n_trials 会随降级/回流污染后续判断)。
+    """
+    out = []
+    for r in rows:
+        alloc = (r.get("config") or {}).get("allocation")
+        if not isinstance(alloc, dict) or len(alloc) < 2:
+            continue
+        n = r["nine_gate"].get("n_trials")
+        if isinstance(n, (int, float)) and not isinstance(n, bool) and n < len(alloc):
+            tag = f"{r['family']}/{r['version']}"
+            out.append((f"EV4-trials:{tag}",
+                        f"[④ n_trials 低报] {tag} 组合含 {len(alloc)} 个配比分量但 n_trials={n} — "
+                        f"低于分量数即必然漏报搜索自由度(配比网格/择时熔断参数/子策略搜索),"
+                        f"DSR 多重测试惩罚被骗松;须按真实搜索自由度重算 n_trials(走 register 重审)"))
+    return out
 
 
 def _ic_sig(ng: dict) -> str | None:
@@ -132,7 +164,9 @@ def check(ledger: dict | None = None) -> int:
     if ledger is None:
         ledger = json.loads(LEDGER.read_text())
     rows = extract_versions(ledger)
-    all_v = find_cross_family_ic_copies(rows) + find_standalone_evidence_gaps(rows)
+    all_v = (find_cross_family_ic_copies(rows)
+             + find_standalone_evidence_gaps(rows)
+             + find_understated_trials(rows))
     keys = {k for k, _ in all_v}
 
     new_v = [(k, m) for k, m in all_v if k not in PENDING_REMEDIATION]

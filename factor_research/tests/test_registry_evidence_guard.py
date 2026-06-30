@@ -5,7 +5,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.ci.check_registry_evidence import (
-    extract_versions, find_cross_family_ic_copies, find_standalone_evidence_gaps, check,
+    extract_versions, find_cross_family_ic_copies, find_standalone_evidence_gaps,
+    find_understated_trials, check,
 )
 
 IC_A = {"ic_mean": 0.078, "nw_icir": 0.126, "ic_decay": {"1": 0.02}}
@@ -90,6 +91,39 @@ def test_dsr_insignificant_diversifier_not_flagged():
              "nine_gate": dict(IC_B, dsr_p=0.9)}]},
     ])
     assert find_standalone_evidence_gaps(extract_versions(led)) == []
+
+
+def test_understated_trials_composite_flagged():
+    # 组合含 3 分量却 n_trials=1 → EV4 低报违规(composite-portfolio v1.0 型),与 status 无关
+    led = _ledger([
+        {"id": "composite-portfolio", "status": "候选", "versions": [
+            {"version": "v1.0", "admission": {"track": None},
+             "config": {"allocation": {"a": 0.4, "b": 0.4, "c": 0.2}},
+             "nine_gate": {"n_trials": 1, "dsr_p": 0.07}}]},
+    ])
+    v = find_understated_trials(extract_versions(led))
+    assert len(v) == 1 and v[0][0].startswith("EV4-trials:") and "低报" in v[0][1]
+
+
+def test_trials_at_floor_not_flagged():
+    # n_trials 达到分量数下界 → 不报(下界过门;真实自由度仍须 register 如实计)
+    led = _ledger([
+        {"id": "composite-portfolio", "status": "候选", "versions": [
+            {"version": "v1.0", "admission": {"track": None},
+             "config": {"allocation": {"a": 0.5, "b": 0.5}},
+             "nine_gate": {"n_trials": 2}}]},
+    ])
+    assert find_understated_trials(extract_versions(led)) == []
+
+
+def test_no_allocation_not_trials_checked():
+    # 非组合版本(无 allocation)→ 不进 EV4 检查,n_trials=1 合法
+    led = _ledger([
+        {"id": "famX", "status": "候选", "versions": [
+            {"version": "v1.0", "admission": {"track": None},
+             "config": {}, "nine_gate": {"n_trials": 1}}]},
+    ])
+    assert find_understated_trials(extract_versions(led)) == []
 
 
 def test_clean_ledger_passes():
