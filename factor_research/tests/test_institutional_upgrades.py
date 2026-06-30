@@ -26,7 +26,7 @@ from portfolio.cost_aware_rebalance import CostAwareRebalancer
 
 from research_ledger.ledger import LedgerEntry, ResearchLedger
 from capacity.dollar_capacity import estimate_dollar_capacity
-from execution.order_simulator import OrderSimulator
+from execution._deprecated_order_simulator import OrderSimulator
 from reporting.performance_attribution import attribute_returns
 
 
