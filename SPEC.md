@@ -10,6 +10,7 @@
 ## 架构(自下而上;✅已建 / ⏳进行中 / ○未建)
 1. **数据基础设施** `data_lake` ✅ — 全市场+全历史+含退市股的最全口径。
 2. **统一回测内核** `core/` ✅ — `core.engine.BacktestEngine` 是**唯一**回测权威(`data_lake` 加载 + 因子/择时 + 真实买卖成本 + 融资成本 + 指标),生产与研究单一事实源。旧 `core.backtest` 兼容层已退场(`core/_deprecated_backtest.py.bak`),全仓迁移到 canonical 路径。
+   - **执行契约(口径权威,实盘决策前以此为准)**:成交口径 = **T+1 收盘**(`Signal.execution_timing="T_PLUS_1_CLOSE"`)——决策日 T 的权重在下一交易日 T+1 收盘建仓、从其再次日起赚,无当日成交、无未来函数;引擎对任何其他 `execution_timing` **硬报错**。比 `回测执行现实核对清单.md` C 组理想的 T+1 开盘/VWAP 晚一档(不构成未来函数,但冲击/滑点建模须按收盘口径);`raw_open` 开盘成交未实现,要做须新增 `T_PLUS_1_OPEN` 分支 + 立 ADR。机械化断言见 `factor_research/tests/test_execution_reality.py`。
 3. **策略工厂** ⏳ — 已建确定性网格、最小 NSGA-II、生态位搜索、review audit、孵化池、岛屿编排、扩展非小盘价量因子池、fundamental 正交因子池、fundamental 因子工程升级、两融资金面因子池和孵化池自进化;下一步围绕弱候选做本地规则化持续进化 + 自动证伪(过拟合/幸存者偏差/特定行情);**按母策略隔离进化(岛屿模型,见下「防同质化」)**。当前小规模搜索尚未产出 ≥2 个通过预审的非 small-cap 低相关候选。
 4. **有效策略管理** ✅台账 / ○监控 — 母策略两层台账,跟踪 有效/衰减/退役。
 5. **中央调度层** ✅/⏳ — launchd 四件套已建:daily-update / weekly-maintenance / api(:8011) / web(:3000) 常驻;event-driven 编排仍待建:数据就绪 / 市场状态切换 / 失效信号触发 → 启动或停用对应母策略/组合。
