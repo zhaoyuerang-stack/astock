@@ -6,11 +6,52 @@ entrypoint must be used.
 from __future__ import annotations
 
 from contracts.agent_control import ActionDecision, AgentAction
+from services.read.artifact_inventory import get_artifact_inventory
 
 
-def _target_starts(target: str, prefixes: tuple[str, ...]) -> bool:
-    clean = target.lstrip("./")
-    return clean.startswith(prefixes)
+# Canonical formal-evidence sources beyond the artifact areas (governance/registry).
+_EVIDENCE_ALLOWED_EXTRA = {"workflow", "registry", "research_ledger"}
+_REGISTRY_EVIDENCE_FILES = {"strategy_versions.json", "strategy_families.json"}
+
+
+def _path_segments(target: str) -> set[str]:
+    """Normalize a target into lowercase path segments.
+
+    Case-insensitive, separator-agnostic (``/`` and ``\\``), and drops empty /
+    ``.`` / ``..`` segments so a forbidden area is caught anywhere in the path,
+    not just as a leading prefix.
+    """
+    raw = target.lower().replace("\\", "/")
+    return {seg for seg in raw.split("/") if seg not in ("", ".", "..")}
+
+
+def _evidence_verdict(target: str) -> tuple[bool, str, str | None]:
+    """Decide if ``target`` may be treated as a formal evidence source.
+
+    Forbidden areas win over everything (fail-safe), and unknown paths are
+    rejected (positive whitelist / fail-closed) so scratch-derived data cannot
+    be laundered into evidence by relocating or re-casing the path.
+    """
+    inventory = {p.name: p for p in get_artifact_inventory()}
+    forbidden = {name for name, p in inventory.items() if not p.formal_evidence_allowed}
+    allowed = {name for name, p in inventory.items() if p.formal_evidence_allowed}
+    allowed |= _EVIDENCE_ALLOWED_EXTRA
+
+    segments = _path_segments(target)
+    if segments & forbidden:
+        return (
+            False,
+            "Scratch, results, and logs are not formal evidence sources.",
+            "workflow/registry/reports/research_ledger",
+        )
+    if (segments & allowed) or (segments & {f.lower() for f in _REGISTRY_EVIDENCE_FILES}):
+        return (True, "Target is within a known formal-evidence area.", None)
+    return (
+        False,
+        "Formal evidence must come from a known evidence area "
+        "(data_lake/reports/signals/paper/workflow/registry/research_ledger).",
+        "workflow/registry/reports/research_ledger",
+    )
 
 
 def can_agent_do(
@@ -76,20 +117,13 @@ def can_agent_do(
         )
 
     if action == AgentAction.USE_FORMAL_EVIDENCE:
-        if _target_starts(target, ("scratch/", "results/", "logs/")):
-            return ActionDecision(
-                allowed=False,
-                action=action,
-                target=target,
-                reason="Scratch, results, and logs are not formal evidence sources.",
-                required_entrypoint="workflow/registry/reports/research_ledger",
-            )
+        allowed, reason, entrypoint = _evidence_verdict(target)
         return ActionDecision(
-            allowed=True,
+            allowed=allowed,
             action=action,
             target=target,
-            reason="Target is not a known forbidden evidence path.",
-            required_entrypoint=None,
+            reason=reason,
+            required_entrypoint=entrypoint,
         )
 
     if action == AgentAction.ARCHIVE_MODULE:
