@@ -14,7 +14,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
-from factors.veto import loser_veto_reversal
+from factors.veto import loser_veto_reversal, salience_covariance_veto
+from policy.candidate_filters import loser_reversal_filter
+from factors.illiquidity_components import salience_covariance_score
 from scripts.research.veto_filter_marginal import (
     register_loser_veto_observation,
     run_marginal_veto_protocol,
@@ -229,6 +231,38 @@ def test_pipeline_marks_veto_review_candidate_on_l1_death():
     print("✅ pipeline marks dead-but-informative candidates for veto review")
 
 
+def test_loser_reversal_filter_matches_legacy_veto_score():
+    dates = pd.date_range("2024-01-01", periods=80, freq="B")
+    close = pd.DataFrame(
+        {
+            "DEATH": [10.0 - i * 0.01 for i in range(80)],
+            "SAFE": [10.0 + i * 0.04 for i in range(80)],
+            "MID": [10.0 + i * 0.01 for i in range(80)],
+        },
+        index=dates,
+    )
+    pd.testing.assert_frame_equal(
+        loser_reversal_filter(close, lookback=20, vol_window=20),
+        loser_veto_reversal(close, lookback=20, vol_window=20),
+    )
+
+
+def test_salience_covariance_score_matches_legacy_veto_component():
+    dates = pd.date_range("2024-01-01", periods=60, freq="B")
+    close = pd.DataFrame(
+        {
+            "A": [10.0 + i * 0.02 for i in range(60)],
+            "B": [12.0 - i * 0.01 for i in range(60)],
+            "C": [8.0 + i * 0.03 for i in range(60)],
+        },
+        index=dates,
+    )
+    pd.testing.assert_frame_equal(
+        salience_covariance_score(close),
+        salience_covariance_veto(close),
+    )
+
+
 if __name__ == "__main__":
     test_veto_filter_excludes_death_bucket_before_top_n_and_refills()
     test_loser_veto_reversal_returns_safe_high_death_low_panel()
@@ -236,4 +270,6 @@ if __name__ == "__main__":
     test_register_loser_veto_observation_uses_observation_status_and_host_config()
     test_l1_discard_with_strong_l0_routes_to_veto_review()
     test_pipeline_marks_veto_review_candidate_on_l1_death()
+    test_loser_reversal_filter_matches_legacy_veto_score()
+    test_salience_covariance_score_matches_legacy_veto_component()
     print("\n🎉 VetoFilter tests passed!")
