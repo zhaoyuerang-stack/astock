@@ -10,7 +10,11 @@ import numpy as np
 import pandas as pd
 
 from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from factors.small_cap import small_cap_factor, small_cap_timing
+from factors.small_cap import (  # noqa: F401  small_cap_timing re-exported for back-compat
+    small_cap_exposure_signal,
+    small_cap_factor,
+    small_cap_timing,
+)
 from factors.utils import safe_zscore, mad_clip
 from lake.load_lake import load_prices, load_raw_close
 from lake.units import implied_amount
@@ -124,7 +128,7 @@ def run_small_cap_strategy(config=StrategyConfig()):
         prices = PricePanel(close=close, volume=volume, amount=amount, raw_close=raw)
 
     factor = small_cap_factor(amount, config.size_window)
-    timing, small_nav, timing_dist = small_cap_timing(close, amount, config.timing_ma)
+    timing, small_nav, timing_dist = small_cap_exposure_signal(close, amount, config.timing_ma)
     scheduled = build_rebalance_weights(factor, close, config.top_n, config.rebalance_days)
 
     engine_config = BacktestConfig(
