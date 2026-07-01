@@ -75,3 +75,15 @@ test("factor research page does not ship static evidence charts", () => {
     /324\.5%|12\.5 天|18\.5 bps|22\.40%|-8\.65%|42\.1%|Newey-West 校正已啟用/
   );
 });
+
+test("dashboard wires the trust-calibration banner from the backend (no fake)", () => {
+  const dashboard = read("app/dashboard/page.tsx");
+  // 首屏必须实际拉取并渲染信任校准视图,而非硬编码一个横幅。
+  assert.match(dashboard, /api\.trustCalibration\(\)/);
+  assert.match(dashboard, /<TrustCalibration\s+data=\{trust\}/);
+
+  const component = read("components/governance/TrustCalibration.tsx");
+  // banner_status 必须透传自后端,禁止在展示层重算/硬编码 status。
+  assert.match(component, /status=\{data\.banner_status\}/);
+  assert.doesNotMatch(component, /status="(ready|blocked|attention)"/);
+});

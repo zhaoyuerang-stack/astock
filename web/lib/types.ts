@@ -681,3 +681,43 @@ export interface GateVerdictsView {
   verdicts: GateVerdict[];
   truth_sources: Record<string, string>;
 }
+
+// 信任校准首屏(over-trust 防护带)。后端 = services.read.trust_calibration。
+// 前端只读呈现:banner_status 直接喂给 StatusBanner,禁止在展示层重算/上调裁绿。
+export type TrustBannerStatus = "ready" | "attention" | "blocked" | "neutral";
+
+export interface TrustSignal {
+  key: string;                       // overfit_guard | oos_regime | audit_coverage | holdout | decay_watch
+  label: string;
+  status: "ok" | "attention" | "blocked" | "info";
+  evidence: string;
+  authority: string;
+}
+
+export interface TrustStrategyRow {
+  family: string;
+  version: string;
+  stage: string;
+  verdict: string;                   // PASSED | FAILED | PENDING | RUN_FAILED(权威)
+  verdict_label: string;
+  audited: boolean;
+  dsr_p: number | null;
+  dsr_significant: boolean | null;
+  bull_sharpe: number | null;
+  bear_sharpe: number | null;
+  wf_sharpe: number | null;
+  decay_thesis: string;              // §7.1 论点·非实时
+  failure_thesis: string;            // §7.1 论点·非实时
+  trust_note: string;
+}
+
+export interface TrustCalibrationView {
+  as_of: string;
+  banner_status: TrustBannerStatus;
+  headline: string;
+  detail: string;
+  signals: TrustSignal[];
+  strategies: TrustStrategyRow[];
+  truth_sources: Record<string, string>;
+  honesty: string;
+}

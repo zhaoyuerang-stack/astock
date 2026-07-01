@@ -6,12 +6,13 @@ import Card from "@/components/ui/Card";
 import StatusBanner from "@/components/ui/StatusBanner";
 import DataTable from "@/components/ui/DataTable";
 import { api, num, pct } from "@/lib/api";
-import type { TradePlanView, TradeReadinessView, RiskReport, MarketStateView, SystemConfigView, StrategyDetailView } from "@/lib/types";
+import type { TradePlanView, TradeReadinessView, RiskReport, MarketStateView, SystemConfigView, StrategyDetailView, TrustCalibrationView } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 import { GateCard, QuantMetricCard, HashCopy } from "@/components/ui/QuantComponents";
 import { useAppStore } from "@/lib/appStore";
 import TradeDecision from "@/components/desk/TradeDecision";
+import TrustCalibration from "@/components/governance/TrustCalibration";
 
 type SignalRow = {
   dir: string;
@@ -36,6 +37,7 @@ export default function DashboardPage() {
   const [riskReport, setRiskReport] = useState<RiskReport | null>(null);
   const [systemConfig, setSystemConfig] = useState<SystemConfigView | null>(null);
   const [strategyDetail, setStrategyDetail] = useState<StrategyDetailView | null>(null);
+  const [trust, setTrust] = useState<TrustCalibrationView | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"positions" | "top25" | "filters" | "execRisk">("positions");
 
@@ -47,15 +49,17 @@ export default function DashboardPage() {
       api.paperPlan(),
       api.risk(),
       api.systemConfig(),
-      api.strategyDetail(selectedStrategyId, selectedStrategyVersion)
+      api.strategyDetail(selectedStrategyId, selectedStrategyVersion),
+      api.trustCalibration()
     ])
-      .then(([m, tr, pp, rk, sc, sd]) => {
+      .then(([m, tr, pp, rk, sc, sd, tc]) => {
         setMarket(m);
         setReadiness(tr);
         setPaperPlan(pp);
         setRiskReport(rk);
         setSystemConfig(sc);
         setStrategyDetail(sd);
+        setTrust(tc);
 
         const activeFamily = (sc?.strategy?.family as string) || "illiquidity";
         const activeVersion = (sc?.strategy?.version as string) || "v3.1";
@@ -181,6 +185,9 @@ export default function DashboardPage() {
         title="今日操作台"
         desc="全天候交易信號、生產就緒度門禁與今日持倉狀態 (Today's Operations Desk)"
       />
+
+      {/* 首屏 0. 信任校准 —— 看 KPI 前先看「该不该信这个池子」(over-trust 防护带,系统级) */}
+      <TrustCalibration data={trust} />
 
       {err && (
         <div className="p-4 bg-[#FF5C5C]/10 border border-[#FF5C5C]/20 rounded-lg text-sm text-danger">
