@@ -123,6 +123,33 @@ Every other `test_all.sh` entry (including all pytest entries, `test_agent_loop`
 `test_moving_average_overlay`, and the network entries) passes. No renamed symbol
 throws anywhere in the suite.
 
+### Systematic per-file sweep (upgrades the manual walk above)
+
+All **101** `test_*.py` files (excluding `scratch`/`archive`/`__pycache__`) were run
+individually via `pytest` (collection errors surface refactor breakage; script-style
+files without `test_` functions fall back to direct execution). Each failure was
+classified with **symbol-regression given priority** so a refactor bug cannot hide
+behind a data failure:
+
+| Bucket | Count |
+|---|---|
+| PASS | 91 |
+| DATA / env (empty lake, missing price/fundamental/lookup data) | 7 |
+| OTHER (content/stochastic assertions, non-symbol) | 3 |
+| TIMEOUT | 0 |
+| **SYMBOL regression (refactor-caused)** | **0** |
+
+The 3 OTHER were traceback-inspected and confirmed non-symbol: `test_agent_knowledge`
+(missing runtime knowledge text), `test_agent_skills` (stock name→code lookup returns
+`None` — missing lookup data), `test_autoresearch_engine` (stochastic
+`result.champions` / `corr_to_book` assertion). Notably `test_autoresearch_engine`
+runs its search config with `"transforms": ["mad_clip", "zscore", "rank"]` and reaches
+the downstream assertion without any transform-resolution error — positive evidence
+that the **preserved DSL name `"zscore"` still resolves** through the real pipeline.
+
+Conclusion: **0 symbol regressions across the entire test tree**; every failure is a
+pre-existing empty-lake / data / stochastic condition, not this refactor.
+
 ## Deviation From Plan (Recorded)
 
 Plan Task 7 Step 3 said to change `strategies/small_cap.py` import to
