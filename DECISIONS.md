@@ -286,6 +286,17 @@
 
 ---
 
+### ADR-030 Agent 控制平面（操作层）落地并写入宪法
+- **上下文**: 系统已具备数据/因子/回测/入册/守卫等确定性能力，但 agent 缺一套结构化入口去"知道模块状态、读产物边界、判断某动作是否越权"，只能自由翻仓库，易误把 `scratch/` 当正式证据、直写 `strategy_versions.json`/数据湖、或绕过 workflow 晋级。更关键：新建的操作层若不从单一入口 `CLAUDE.md` 指向，按接手 90 秒协议 agent 根本发现不了。
+- **决策**:
+  1. 新增只读控制平面 `services.read.{module_inventory,artifact_inventory,action_policy,strategy_lifecycle}` + 安全编排包装 `services.actions.agent_tasks`（不执行高风险变更，只组装事实+策略）+ 只读 `/agent-control/*` API；为每个顶层模块建 `MODULE_STATUS.md`，`scripts/ci/check_module_status.py` 守卫其完整性并接入 `test_all.sh`。
+  2. `action_policy` 经对抗性审查加固：正式证据拦截从「大小写敏感前缀匹配」改为「大小写不敏感 + 路径规范化 + 任意路径段匹配 + 正向白名单(fail-closed)」，堵住 8/9 绕过（`Scratch/`、绝对路径、`data/scratch/x`、反斜杠等）。禁区/允许集从 `artifact_inventory.formal_evidence_allowed` 派生，单一真相。
+  3. `CLAUDE.md §2` 增补 agent 操作层 / 技能剧本文档路由 + "Agent 操作层(控制平面)入口"子章，明确读事实 / 选动作 / 边界。
+- **理由**: 让 agent 走受控入口而非乱翻仓库，把"scratch 非证据、禁直写台账/数据湖、晋级只走 workflow、部署需人批"变成机器可读的 `can_agent_do` 决策。本层定位为 **advisory(建议)**：`can_agent_do` 只答"该不该"，挡不住绕过它直接写文件——真正强制仍是 §16 确定性 CI 守卫 + `strategy_registry.register` 唯一写入口。契合"宁可多写守卫，不要靠自觉"，故宪法明写本层不是护栏。
+- **验证**: 9 个定向测试（`test_agent_*`/`test_module_*`/`test_strategy_*`）+ `check_module_status` + `check_layer_deps` 全绿；对抗矩阵 8/9 绕过已全部 BLOCKED，合法证据区（`reports/`、`strategy_versions.json`）放行、未知路径 fail-closed。全量 `test_all.sh` 仍在既有 `test_engine.py` 数据缺口（本 worktree `data_lake` 无 parquet）处中止，非本次回归。
+
+---
+
 ## ③ 投资/交易决策记录
 
 > 实盘/模拟盘的逐日决策**已自动落盘**:`factor_research/signals/<date>.json`(信号)+ Obsidian `30.output/A股v2.0模拟盘/`(操作卡)。本节只记**需人工复盘的关键决策**(regime 切换、风控动作、异常),不重复日常信号。

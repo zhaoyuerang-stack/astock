@@ -1,8 +1,13 @@
 # STATUS — 当前进度
 
-> 更新:2026-06-29。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
+> 更新:2026-07-01。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
+
+**2026-07-01(Agent 控制平面落地并写入宪法)**：
+  · **操作层**：新增 agent 受控入口——`services.read.{module_inventory,artifact_inventory,action_policy,strategy_lifecycle}` 结构化读事实 + `services.actions.agent_tasks` 安全包装 + `/agent-control/*` 只读 API + `scripts/ci/check_module_status.py` 守卫（已接入 `test_all.sh`）；为每个顶层模块补 `MODULE_STATUS.md`。
+  · **对抗加固**：`action_policy` 经对抗审查修一处真安全洞——正式证据拦截由「大小写敏感前缀匹配」改为「大小写不敏感 + 规范化 + 任意路径段 + 正向白名单(fail-closed)」，堵住 8/9 绕过；并明确本层为 advisory，强制仍靠 §16 CI 守卫 + `register` 唯一写入口。
+  · **写入宪法**：`CLAUDE.md §2` 接入 agent 操作层入口 + 技能剧本文档路由，让 agent 从单一入口即可发现并正确使用这套 skill/工具（见 `DECISIONS.md` ADR-030）。
 
 **2026-06-30(量的二阶优化、双阀风控与多策略组合融合)**：
   · **量的二阶与双阀风控**：测试了由“一阶价格趋势开关”（NAV MA40）与“二阶量能加速度熔断器”（Volume Acceleration）融合的双阀风控模型。在大盘动量上实现了年化 `14.76%`，回撤大幅压缩至 `-40.40%`，夏普暴涨 +40% 至 `0.66` 的卓越改进。

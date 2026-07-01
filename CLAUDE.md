@@ -66,6 +66,8 @@
 | Web     | `web/CLAUDE.md`                               | Next.js 前端开发纪律、命令、缓存故障处理                      |
 | 决策      | `DECISIONS.md`                                | ADR 决策记录，append-only                          |
 | 经验      | `LESSONS.md`                                  | 踩坑、故障、修复经验、接口血泪铁律细节                           |
+| Agent 操作层 | `factor_research/docs/agent_operating_model.md` | Agent 如何用 skill/工具:分层操作模型(读事实/选动作/禁越权)、控制平面入口 |
+| Agent 技能   | `factor_research/docs/agent_skills/`            | 技能剧本(data-health / factor-audit / candidate-promote / production-readiness / module-cleanup) |
 | 归档      | `docs/archive/`                               | 已完成或废弃方案，只作历史参考，不作实现依据                        |
 
 消歧规则：
@@ -76,6 +78,12 @@
 * 冲突时优先级：`CLAUDE.md` > `SPEC.md` > `STATUS.md` > 其他文档 > archive。
 
 **source-of-truth 约定**(防止重复规则改一处忘多处)：本文 §4/§8/§10 等"摘要"以专章/子文档为唯一真相 —— 成本数值唯一权威 = `core/engine.py::CostModel`(文档面 `cost_model.md`)；9-Gate 细节唯一真相 = `LOOP_ENGINEERING.md`；守卫现状唯一真相 = `scripts/ci/` 实际脚本(§16 表是其索引)。
+
+**Agent 操作层(控制平面)入口**：任何 AI/Agent 操作 `factor_research` 应经受控**读事实 / 选动作**入口，而非自由乱翻仓库（详见 [`agent_operating_model.md`](factor_research/docs/agent_operating_model.md)）：
+
+* **读事实**：`services.read.module_inventory`（模块状态/角色/边界，源 各模块 `MODULE_STATUS.md`）、`services.read.artifact_inventory`（各产物区读/写/是否可作正式证据）、`services.read.strategy_lifecycle`（family/version 生命周期与允许/禁止动作）、及既有 `services.read.*`。
+* **选动作**：写台账 / 写数据湖 / 晋级 / 部署 / 用某路径作正式证据**前，先问** `services.read.action_policy.can_agent_do(action, target)` —— 它判允/拒并指向 canonical 入口（`strategy_registry.register`、`workflow.promote`、`run_daily.py`、受控 lake writer）。任务剧本见 [`docs/agent_skills/`](factor_research/docs/agent_skills/)（data-health / factor-audit / candidate-promote / production-readiness / module-cleanup）。
+* **边界(重要)**：该层是**建议(advisory)不是强制** —— `can_agent_do` 只答"该不该"，**挡不住**绕过它直接 `open()` 写文件。真正的强制仍是 §16 的确定性 CI 守卫 + `strategy_registry.register` 唯一写入口。故：走入口是纪律，不是护栏；守卫全绿前不得报"完成"。参见 `DECISIONS.md` ADR-030。
 
 ---
 
