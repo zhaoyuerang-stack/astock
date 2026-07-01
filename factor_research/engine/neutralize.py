@@ -21,8 +21,14 @@ def mad_winsorize(s: pd.Series, n: float = 5.0) -> pd.Series:
     return s.clip(lower, upper)
 
 
-def zscore(s: pd.Series) -> pd.Series:
+def zscore_series(s: pd.Series) -> pd.Series:
+    """One-dimensional z-score for a single cross-section or generic Series."""
     return (s - s.mean()) / (s.std() + 1e-10)
+
+
+def zscore(s: pd.Series) -> pd.Series:
+    """Backward-compatible wrapper for ``zscore_series``."""
+    return zscore_series(s)
 
 
 def neutralize_cross_section(

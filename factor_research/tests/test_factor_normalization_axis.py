@@ -18,7 +18,8 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from factors.alpha.transforms import zscore, mad_clip, rank_transform
+from factors.alpha.transforms import zscore, zscore_cross_section, mad_clip, rank_transform
+from engine.neutralize import zscore_series
 from factors.utils import safe_zscore
 
 # 行=日期、列=股票;刻意非对称,使横截面/时间轴结果可区分。
@@ -43,6 +44,20 @@ def test_zscore_is_cross_sectional():
     out = zscore(_DF)
     assert _rows_centered(out), "zscore 不是逐行(横截面)归一化 → 疑似时间轴泄露"
     assert not _cols_centered(out), "zscore 看起来在 axis=0(时间轴)归一化 → 泄露"
+
+
+def test_zscore_cross_section_alias_is_cross_sectional():
+    out = zscore_cross_section(_DF)
+    assert _rows_centered(out), "zscore_cross_section 不是逐行(横截面)归一化"
+    assert not _cols_centered(out)
+    pd.testing.assert_frame_equal(out, zscore(_DF))
+
+
+def test_zscore_series_is_one_dimensional():
+    s = pd.Series([1.0, 2.0, 3.0, 4.0])
+    out = zscore_series(s)
+    assert abs(float(out.mean())) < 1e-10
+    assert abs(float(out.std()) - 1.0) < 1e-8
 
 
 def test_safe_zscore_is_cross_sectional():

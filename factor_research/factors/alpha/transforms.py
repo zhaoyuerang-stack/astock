@@ -13,10 +13,15 @@ from factors.alpha.base import register_transform
 # Core transforms
 # ---------------------------------------------------------------------------
 
+def zscore_cross_section(df: pd.DataFrame) -> pd.DataFrame:
+    """Cross-sectional z-score (row-wise, date by date)."""
+    return df.sub(df.mean(axis=1), axis=0).div(df.std(axis=1) + 1e-8, axis=0)
+
+
 @register_transform("zscore")
 def zscore(df: pd.DataFrame) -> pd.DataFrame:
-    """Cross-sectional z-score (row-wise)."""
-    return df.sub(df.mean(axis=1), axis=0).div(df.std(axis=1) + 1e-8, axis=0)
+    """Backward-compatible DSL name for row-wise cross-sectional z-score."""
+    return zscore_cross_section(df)
 
 
 @register_transform("mad_clip")
