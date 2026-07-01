@@ -31,6 +31,29 @@ def test_services_read_cannot_import_action_layer(monkeypatch, tmp_path):
     assert guard.check() == 1
 
 
+def test_policy_layer_cannot_import_higher_layers(monkeypatch, tmp_path):
+    """policy 是底层硬约束叶子,被 factors.veto 反向 import。若 policy 倒灌
+    strategies(或 factory/workflow/factors),就是 R-ARCH-001 分层倒置,守卫必须拦住。"""
+    rogue = tmp_path / "policy" / "rogue.py"
+    rogue.parent.mkdir(parents=True)
+    rogue.write_text("from strategies.small_cap import build_small_cap\n", encoding="utf-8")
+
+    monkeypatch.setattr(guard, "ROOT", tmp_path)
+
+    assert guard.check() == 1
+
+
+def test_policy_layer_cannot_import_factors_no_cycle(monkeypatch, tmp_path):
+    """factors→policy 已存在(veto wrapper),policy 反过来 import factors 会成环,必须拦住。"""
+    rogue = tmp_path / "policy" / "rogue.py"
+    rogue.parent.mkdir(parents=True)
+    rogue.write_text("from factors.veto import loser_veto_reversal\n", encoding="utf-8")
+
+    monkeypatch.setattr(guard, "ROOT", tmp_path)
+
+    assert guard.check() == 1
+
+
 def test_live_repo_layer_deps_guard_passes():
     assert guard.check() == 0
 

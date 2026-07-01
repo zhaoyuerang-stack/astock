@@ -22,6 +22,12 @@ FORBIDDEN_EDGES = [
     ("run_daily", ["factory.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
     ("strategies.", ["factory.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
     ("factors.", ["factory.", "strategies.", "scripts.research.", "workflow.", "core.", "knowledge.", "api.", "services."]),
+    # policy 是候选/持仓硬约束的底层叶子(candidate_filters/constraints),被 factors.veto
+    # 等兼容 wrapper 反向 import(factors→policy),因此 policy 必须停在 factors 之下:
+    # 不得 import factors(否则 factors↔policy 成环)、engine/core,也不得倒灌
+    # strategies/factory/workflow/scripts.research 等上层。只可依赖 stdlib/pandas/lake/contracts。
+    ("policy.", ["factors.", "engine.", "core.", "factory.", "strategies.",
+                 "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
     ("lake.", ["factors.", "strategies.", "core.", "factory.", "scripts.research.", "knowledge.", "api.", "services."]),
     ("core.engine", ["factory.", "strategies.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
     ("core.analysis", ["factory.", "strategies.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
