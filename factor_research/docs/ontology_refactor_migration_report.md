@@ -50,6 +50,31 @@ This migration introduced canonical names for the highest-confusion ontology ter
 
 All targeted tests above and both static guards pass.
 
+## Real-Panel Numerical Equivalence (Adversarial)
+
+The plan **retyped** function bodies into new canonical modules rather than
+`git mv`-ing them, so a one-character transcription drift (an epsilon, an added
+`fill_method`) could pass every toy-fixture test yet diverge on real data. This was
+audited two independent ways; both are clean.
+
+**1. Runtime bit-equivalence on the provisioned lake.** Each canonical function was
+run against its pre-refactor original body (extracted from git `1afd2494^`) on the
+same real A-share panel loaded from `data_lake/price/daily_all.parquet`. Two slices:
+a dense slice (250 dates × 1200 codes, 0.9% NaN) and a halt/IPO-heavy slice (120
+dates, NaN-sorted codes, 2.6% NaN, exercising the `inf→NaN` replace path). Result:
+**5/5 bit-identical** (`assert_frame_equal` / `assert_series_equal`) on both slices —
+`loser_reversal_filter`, `salience_covariance_score`, `small_cap_exposure_signal`,
+`zscore_cross_section`, `equal_weight_factor`.
+
+**2. Source-identity proof (holds for all inputs, not just sampled ones).** The
+arithmetic bodies were diffed line-for-line against the originals:
+`salience_covariance_score` is **character-identical** to `salience_covariance_veto`;
+`small_cap_exposure_signal` differs from `small_cap_timing` only in the `def` name
+line; `zscore` epsilons match (`1e-8` cross-section, `1e-10` series). Identical source
+⇒ identical output on every input, closing the "unsampled code path" gap.
+
+Conclusion: the retype introduced **zero numerical drift**.
+
 ## test_all.sh Caveat (Failure Proven Unrelated to This Refactor)
 
 `bash scripts/test_all.sh` stops (`set -e`) at `test_engine.py` with:
