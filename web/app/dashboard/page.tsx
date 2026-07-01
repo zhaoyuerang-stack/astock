@@ -50,7 +50,8 @@ export default function DashboardPage() {
       api.risk(),
       api.systemConfig(),
       api.strategyDetail(selectedStrategyId, selectedStrategyVersion),
-      api.trustCalibration()
+      // 信任校准是首屏补充信息,不得因其端点缺失/报错拖垮整个操作台(与 system-governance 一致的隔离)。
+      api.trustCalibration().catch(() => null)
     ])
       .then(([m, tr, pp, rk, sc, sd, tc]) => {
         setMarket(m);
