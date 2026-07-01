@@ -20,7 +20,7 @@
 - ⚠ 依赖顺序:组合/展示的收益必须建在 `core/` 真实成本口径上;旧 `data_full/data` 已清理,不得恢复为主线。
 - 执行边界:**模拟盘自动执行**,真实账户**不自动下单**;实盘动作只给人工跟单参考。
 
-### 运行态架构图(2026-06-12)
+### 运行态架构图(2026-06-30)
 源文件:`docs/architecture_runtime.mmd`;图片:`docs/architecture_runtime.svg`。
 
 ```mermaid
@@ -29,12 +29,16 @@ flowchart TD
   B --> C["lake 层<br/>加载 / 聚合 / 校验 / invariants / fingerprint"]
   C --> D["factors 层<br/>因子库 / AutoResearch DSL"]
   D --> E["core.engine.BacktestEngine<br/>唯一回测权威<br/>成本 / 融资 / 指标 / anomalies"]
-  E --> F["strategies<br/>生产策略: illiquidity / bond rotation 等"]
+  E --> F["strategies<br/>生产策略构造器"]
   E --> G["factory + workflow<br/>L0-L3 / walk-forward / promote / phase4 register"]
+  G --> G2["workflow.nine_gate_runner<br/>可复用 9-Gate runner"]
   G --> H["strategy_registry<br/>唯一策略台账写入口"]
-  F --> I["production<br/>run_daily / paper_engine / launchd ops"]
+  H --> R["portfolio.runner_registry<br/>research catalog / deployment runner"]
+  F --> R
+  R --> I["production<br/>run_daily / paper_engine / launchd ops"]
   H --> I
   I --> J["services<br/>read/actions/agent"]
+  A2["runtime.artifacts<br/>artifact path repositories"] --> J
   J --> K["FastAPI api.routers<br/>薄 HTTP 层"]
   K --> L["Next.js web<br/>overview / data / risk / portfolio / paper / experiments / settings"]
   I --> M["signals / paper / reports / logs"]
@@ -48,6 +52,9 @@ data(lake) → factors → core.engine → {strategies(生产), factory/workflow
 ```
 - 生产层(`run_daily`/`scripts/data`/`strategies`)**禁止**依赖 `factory.*`/`scripts.research.*`/`workflow.*`;探索层只消费 data/factors/core.engine 的稳定接口。
 - **策略漏斗(候选→登记唯一通道)**:`factory/lines` 负责广度(变异生成 + L0 IC/L1 BT/L2 regime/L3 WF 廉价筛选,候选以 `factory.ontology.Hypothesis` 存于 `factory.pool`);L3_PASSED 经 `workflow/from_factory.py` 适配 → `workflow` phase1 合成防未来审计 → phase2/3 → `phase4_register` 登记 → `line3_marginal` 边际评级定 ACTIVE/SHADOW。驱动:`workflow/promote.py` 或 `python3 apps/factory_cli.py promote`。
+- **9-Gate 可复用入口** = `workflow/nine_gate_runner.py`;`scripts/research/run_nine_gates_all.py` 只是 CLI 包装,不得作为 workflow 库依赖。
+- **组合/runner 边界**:旧 strategy_runners 兼容模块仅做 re-export;研究目录在 `portfolio/research_catalog.py`,部署解析在 `portfolio/deployment_runner.py`,查询入口在 `portfolio/runner_registry.py`。
+- **运行产物路径边界**:`runtime/artifacts.py::ArtifactPaths` 集中表达 `data_lake/reports/paper/signals` 布局;API 层不得直接读写 artifact,只经 `services.read`/`services.actions`。
 - **台账唯一写入口** = `strategy_registry.register_family/register`(经 `phase4_register`);禁止任何代码直写 `strategy_versions.json`。
 - `phase1_synthetic` 是**全系统唯一**机械执行「防未来函数」铁律的闸门。
 

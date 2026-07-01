@@ -244,6 +244,60 @@ def test_single_hypothesis_stage_reuses_canonical_runner_and_advances_status():
     assert log.list_by_hypothesis(hyp.id)[0].experiment_id == "exp-l0"
 
 
+def test_workflow_research_stages_own_l0_l3_execution():
+    import pandas as pd
+
+    from factory.ontology import (
+        Decision,
+        EconomicThesis,
+        Experiment,
+        ExperimentProtocol,
+        ExperimentResult,
+        Hypothesis,
+        HypothesisStatus,
+    )
+    from factory.pool.pool_repo import HypothesisPool
+    from factory.repositories.experiment_log import ExperimentLog
+    from workflow.research_stages import run_hypothesis_stage
+
+    pool = HypothesisPool(_tmp("hypothesis_pool.jsonl"))
+    log = ExperimentLog(_tmp("experiment_log.jsonl"))
+    hyp = Hypothesis(
+        name="workflow-owned-stage",
+        description="unit",
+        factor_fn_name="factors.small_cap.small_cap_factor",
+        factor_params={"window": 20},
+        data_dependencies=("price/amount",),
+        thesis=EconomicThesis(mechanism="风险补偿", citation="unit"),
+        status=HypothesisStatus.QUEUED,
+    )
+    pool.add(hyp)
+
+    def fake_l0(item, close, volume, amount, forward_ret, vintage_id, sample_dates=None):
+        return Experiment(
+            experiment_id="workflow-exp-l0",
+            hypothesis_id=item.id,
+            protocol=ExperimentProtocol.L0_IC_SCAN,
+            vintage_id=vintage_id,
+            result=ExperimentResult(metrics={"ICIR": 0.5}, details={"direction": "long"}),
+            decision=Decision.PROMOTE,
+            notes="pass",
+        )
+
+    empty = pd.DataFrame()
+    result = run_hypothesis_stage(
+        hyp.id,
+        "l0",
+        hypothesis_pool=pool,
+        experiment_log=log,
+        data_loader=lambda start: (empty, empty, empty, empty, "unit-vintage"),
+        runners={"l0": fake_l0},
+    )
+
+    assert result["experiment_id"] == "workflow-exp-l0"
+    assert pool.get(hyp.id).status == HypothesisStatus.L0_PASSED
+
+
 if __name__ == "__main__":
     test_complete_draft_queues_canonical_hypothesis()
     test_incomplete_draft_cannot_enter_l0_queue()
@@ -251,4 +305,5 @@ if __name__ == "__main__":
     test_legacy_autoresearch_review_also_records_generic_review()
     test_duplicate_running_action_returns_conflict()
     test_single_hypothesis_stage_reuses_canonical_runner_and_advances_status()
+    test_workflow_research_stages_own_l0_l3_execution()
     print("research workflow action tests passed")

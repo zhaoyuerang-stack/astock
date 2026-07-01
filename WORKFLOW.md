@@ -18,7 +18,7 @@
 | L0 | **代码** | IC 扫描(NW 校正) | ICIR 闸 |
 | L1 | **代码** | 快回测 | 回撤<40%/年化>5% |
 | L2/L3 | **代码** | 稳健/成本敏感/样本外滚动 | 三段达标 |
-| **9-Gate风险审计** | **代码** | `nine_gates.py` 自动化 9 关风险审计 | 参见 1.1 风险审计明细 |
+| **9-Gate风险审计** | **代码** | `workflow/nine_gate_runner.py` 自动化 9 关风险审计；`scripts/research/run_nine_gates_all.py` 仅为 CLI 包装 | 参见 1.1 风险审计明细 |
 | 风格审计 | **代码** | `style_neutralization.py` 对 CNE6 测特质增量 | 有特质 alpha (非纯风格) |
 | 边际审计 | **代码** | Alpha Audit (NW+RidgeCV+置换) 对在册 book 增量 | 真增量 REAL |
 | 登记 | **代码** | `phase4_register` 写台账(唯一入口) | 年化>15% & 回撤<20%+失效信号 |
@@ -38,6 +38,21 @@
 *   **Gate 6: Cost & Capacity Modeling** (波动率平方根模型 + 5日拆单自适应优化器，平衡冲击成本与延迟Alpha衰减)
 *   **Gate 7: Out-of-Sample & Stress Testing** (OOS 样本外滚动夏普、Bull/Bear 牛熊市依赖度及极端 Regime 压力测试)
 *   **Gate 8: Live Monitoring** (设定实盘每日收益/波动均值期望、风控跟踪误差及最大硬止损触发线)
+
+### 1.2 组合晋级与 Runner 边界
+
+组合晋级不得在脚本内重新手写每条策略公式。目标路径是:
+
+```
+family/version allocation spec
+  ──▶ workflow.composite_spec 解析与权重校验
+  ──▶ portfolio.runner_registry / runtime deployment 取 leg runner
+  ──▶ 生成组合权重/收益流
+  ──▶ workflow promote / nine_gate_runner 审计
+  ──▶ phase4_register 入册
+```
+
+当前实现边界:旧 alias(`illiq_sc`/`lc_mom`/`reversal`)会显式映射到对应 `family/version`,并与已支持的显式腿共同走 `portfolio.runner_registry`。未登记 runner 的组合腿必须 fail-fast,不得静默回退到脚本内重写公式。
 
 ---
 
@@ -89,4 +104,3 @@ Claude 设计管线+判断代码+契约+协调 ───────────
     *   **Size Factor**：计算 60 日滚动成交额规模及全市场分位数。
 *   **Veto 判定**：调用 [veto.py](file:///Users/kiki/astcok/factor_research/factors/veto.py)，计算该股的 faded Salience Covariance 分数，若截面百分比 $\le 30.0\%$ 则判定为 `❌ VETOED` (高气泡风险/过度博弈)，实盘调仓将强制剔除。
 *   **产出**：生成 20 日历史明细表，辅助判断持仓合理性与冲击成本。
-

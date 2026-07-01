@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 
 from contracts.views import FunnelView, HypothesisView, RegisteredExperimentView, ResearchRunIndexView
+from runtime.artifacts import ArtifactPaths
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -103,3 +104,54 @@ def research_run_index() -> ResearchRunIndexView:
     from research_ledger.ledger import load_research_run_index
 
     return ResearchRunIndexView(**load_research_run_index())
+
+
+def _read_json(path: Path, default):
+    if not path.exists():
+        return default
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return default
+
+
+def _artifacts() -> ArtifactPaths:
+    return ArtifactPaths(ROOT)
+
+
+def shadow_incubation() -> dict:
+    """Shadow ontology incubation artifacts for the experiments view."""
+    paths = _artifacts()
+    return {
+        "incubation": _read_json(paths.shadow_incubation_log, {}),
+        "predictions": _read_json(paths.ontology_predictions, {}),
+        "performance": _read_json(paths.shadow_ontology_performance, {}),
+    }
+
+
+def amount_timing_validation() -> dict:
+    default = {
+        "latest_signal": None,
+        "all_market": [],
+        "ex688": [],
+        "cost_sensitivity": [],
+        "walk_forward": [],
+    }
+    return _read_json(_artifacts().amount_timing_validation, default)
+
+
+def logical_chains() -> list[dict]:
+    logic_dir = _artifacts().logic_chains_dir
+    if not logic_dir.exists():
+        return []
+    chains: list[dict] = []
+    for fp in sorted(logic_dir.glob("*.json")):
+        item = _read_json(fp, None)
+        if isinstance(item, dict):
+            chains.append(item)
+    return chains
+
+
+def industry_knowledge_graph() -> dict:
+    default = {"nodes": [], "links": [], "meta": {"total_nodes": 0, "total_links": 0}}
+    return _read_json(_artifacts().industry_knowledge_graph, default)

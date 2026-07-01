@@ -564,8 +564,8 @@ class Phase4Register:
         """Build metrics dict from Phase 2+3 data."""
         m = {}
         segs = p2.get("segments", {})
-        for label, key in [("IS  2018-2022", "2018"), ("OOS 2023-2026", "2023"),
-                            ("压力 2010-2017", "2010")]:
+        for label_prefix, key in [("IS", "2018"), ("OOS 2023-", "2023"), ("压力", "2010")]:
+            label = next((name for name in segs if str(name).startswith(label_prefix)), "")
             s = segs.get(label, {})
             if s:
                 m[f"annual_{key}"] = s.get("annual", 0)

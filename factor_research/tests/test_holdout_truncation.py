@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import workflow.phase2_backtest as p2
 import workflow.phase3_wf as p3
+from scripts.ci.check_holdout_compliance import REQUIRED
 from governance.holdout import boundary
 
 BOUNDARY = boundary()
@@ -76,6 +77,10 @@ def test_phase3_windows_never_test_vault_years(monkeypatch):
     # 聚合 OOS 收益末日 < boundary
     # (windows 已截,聚合自然 < boundary;此处只做存在性 sanity)
     assert report["aggregate"]["total_windows"] >= 1
+
+
+def test_composite_promotion_is_holdout_guarded():
+    assert "workflow/promote_composite.py" in REQUIRED
 
 
 if __name__ == "__main__":

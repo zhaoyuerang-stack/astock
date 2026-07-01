@@ -196,7 +196,7 @@ data_lake → factors → core.engine → strategies / factory / workflow → re
 | G8   | DSR / 多重测试惩罚 | 是否经得起大规模搜索后的统计惩罚         |
 | G9   | 入册材料完整性      | thesis/配置/绩效/风险/失效信号是否齐全 |
 
-代码入口：`workflow/` 与 `scripts/research/run_nine_gates_all.py`。
+代码入口：可复用库入口为 `workflow/nine_gate_runner.py`；`scripts/research/run_nine_gates_all.py` 只作 CLI 包装,不得被 workflow 反向依赖。
 
 ---
 
@@ -320,6 +320,9 @@ Web 不是本文件主要作用域。涉及 Web 必须先读 [`web/CLAUDE.md`](w
 | 规则 / 关注点              | 等级 | 守卫脚本(`scripts/ci/`)        | 说明                                   |
 | --------------------- | -- | ------------------------- | ------------------------------------ |
 | R-ARCH-001 单向依赖       | P1 | `check_layer_deps.py`     | AST 静态分析 FORBIDDEN_EDGES，禁下层/生产层反向 import |
+| API 薄层 / artifact 边界  | P1 | `check_layer_deps.py`     | API 禁直接读取 `data_lake/reports/signals/paper`;直接写运行审计产物必须显式经 `services.actions.action_guard` |
+| services 权限分层          | P1 | `check_layer_deps.py`     | `services.read` 禁 import `services.actions`;`services.actions` 高风险 promote/registry 动作必须经 `jobs` 或 `action_guard` |
+| workflow / script 边界     | P1 | `check_layer_deps.py`     | `workflow.*` 禁 import `scripts.research.*`;research script 只能包 CLI |
 | R-ARCH-004 数据湖写入可审计  | P1 | `check_lake_writers.py`   | 写 data_lake 核心区必须走 canonical writer + 更新 manifest |
 | R-WF-001 候选入册通道       | P0 | `check_no_force_promote.py`| 禁自动晋级脚本 `force=True` 跳过 phase1/2 防未来门 |
 | R-REG-001 / R-EVIDENCE-001 证据自证 | P0 | `check_registry_evidence.py`| 禁跨家族 IC 证据照抄；standalone 在册 DSR 缺算/不显著(≥0.05)亦判失败(G3) |

@@ -102,6 +102,20 @@ def _passing_phase3():
     return {"aggregate": {"verdict": "PASS", "annual": 0.19, "maxdd": -0.11, "sharpe": 1.4}}
 
 
+def test_phase4_metrics_accept_dynamic_oos_label():
+    p2 = _passing_phase2()
+    p2["segments"] = {
+        "IS  2018-2022": {"annual": 0.20, "maxdd": -0.10, "sharpe": 1.5, "calmar": 2.0},
+        "OOS 2023-2024": {"annual": 0.18, "maxdd": -0.12, "sharpe": 1.3},
+        "压力 2010-2017": {"annual": 0.15, "maxdd": -0.15, "sharpe": 1.0},
+    }
+    metrics = Phase4Register("fam-dynamic", "v1.0")._build_metrics(p2, _passing_phase3())
+    assert metrics["annual_2023"] == 0.18
+    assert metrics["maxdd_2023"] == -0.12
+    assert metrics["sharpe_2023"] == 1.3
+    print("✅ test_phase4_metrics_accept_dynamic_oos_label passed")
+
+
 def test_phase4_blocks_offset_sensitivity_fail():
     """调仓偏移扰动失败时,Phase4 必须拒绝登记。"""
     def body():
@@ -166,6 +180,7 @@ if __name__ == "__main__":
     test_register_persists_evidence()
     test_register_evidence_defaults_empty()
     test_phase4_threads_evidence_into_registry()
+    test_phase4_metrics_accept_dynamic_oos_label()
     test_phase4_blocks_offset_sensitivity_fail()
     test_phase4_blocks_rebalance_slower_than_factor_half_life()
     test_phase4_persists_executable_spec_from_ast_execution()

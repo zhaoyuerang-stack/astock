@@ -7,6 +7,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from contracts.views import TradeReadinessView
+from runtime.artifacts import ArtifactPaths
 from runtime.production_readiness import get_production_readiness
 from services.read.risk import risk_report
 from services.read.state import data_quality
@@ -17,13 +18,17 @@ ROOT = Path(__file__).resolve().parents[2]
 _DECAY_TO_HEALTH = {"green": "normal", "yellow": "watch", "red": "degraded"}
 
 
+def _artifacts() -> ArtifactPaths:
+    return ArtifactPaths(ROOT)
+
+
 def _factor_health_from_decay() -> tuple[str, dict]:
     """读真实 decay 报告(reports/decay_status.json)定 factor_health,绝不硬编码 normal。
 
     返回 (health, meta)。文件缺失/解析失败 → "unknown"(诚实未知,不假绿)。
     """
     import json
-    p = ROOT / "reports" / "decay_status.json"
+    p = _artifacts().decay_status
     try:
         d = json.loads(p.read_text(encoding="utf-8"))
     except Exception:
@@ -93,8 +98,7 @@ def get_trade_readiness() -> TradeReadinessView:
     regime_confidence = 0.85
     try:
         import json
-        sig_dir = ROOT / "signals"
-        files = sorted(sig_dir.glob("20*.json"))
+        files = sorted(_artifacts().signals.glob("20*.json"))
         if files:
             with open(files[-1], "r", encoding="utf-8") as f:
                 sig = json.load(f)

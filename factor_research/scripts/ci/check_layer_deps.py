@@ -44,6 +44,8 @@ FORBIDDEN_EDGES = [
     # read 是只读查询面,不得调用 actions 写入/执行面;actions 可按需读 read 视图。
     ("services.read.", ["services.actions."]),
     ("services.", ["api."]),
+    # workflow 是可复用晋级库层,不得反向依赖 scripts/research CLI。
+    ("workflow.", ["scripts.research."]),
     # contracts 是纯 DTO 叶子:只依赖 pydantic + stdlib,不得依赖任何业务层
     ("contracts.", ["core.", "lake.", "factors.", "strategies.", "factory.", "workflow.",
                     "engine.", "metasearch.", "knowledge.", "scripts.", "services.", "api."]),
@@ -81,6 +83,10 @@ ALLOWED_IMPORT_EXCEPTIONS = {
     # 生产衰减监控:读在册版本并经 attach_decay_check 写回衰减审计字段。
     ("scripts/ops/decay_monitor.py", "strategy_registry"),
 }
+
+RUNTIME_ARTIFACT_ROOTS = {"data_lake", "reports", "signals", "paper"}
+
+API_ARTIFACT_READ_ALLOWLIST = set()
 
 
 def module_path(py_file: Path) -> str:
@@ -124,6 +130,15 @@ def _mentions_registry(node) -> bool:
     return False
 
 
+def _mentions_runtime_artifact(node) -> bool:
+    for n in ast.walk(node):
+        if isinstance(n, ast.Constant) and isinstance(n.value, str):
+            parts = set(Path(n.value).parts)
+            if n.value in RUNTIME_ARTIFACT_ROOTS or parts & RUNTIME_ARTIFACT_ROOTS:
+                return True
+    return False
+
+
 def registry_write_violations(py_file: Path):
     """检测对 strategy_versions.json 的直接写操作(write_text/write_bytes/open(...,'w'))。"""
     try:
@@ -159,6 +174,116 @@ def registry_write_violations(py_file: Path):
     return hits
 
 
+def api_runtime_artifact_read_violations(py_file: Path):
+    """检测 api 层对 data_lake/reports/signals/paper 的直接文件读取。"""
+    try:
+        tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=str(py_file))
+    except (SyntaxError, UnicodeDecodeError):
+        return []
+
+    hits = []
+    artifact_vars = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and _mentions_runtime_artifact(node.value):
+            for tgt in node.targets:
+                if isinstance(tgt, ast.Name):
+                    artifact_vars.add(tgt.id)
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            attr = node.func.attr
+            obj = node.func.value
+            mentions = _mentions_runtime_artifact(obj) or (
+                isinstance(obj, ast.Name) and obj.id in artifact_vars
+            )
+            if mentions and attr in ("read_text", "read_bytes"):
+                hits.append(node.lineno)
+            if mentions and attr == "open" and _call_opens_for_read(node, mode_arg_index=0):
+                hits.append(node.lineno)
+            if isinstance(node.func.value, ast.Name) and node.func.value.id == "pd":
+                if attr.startswith("read_") and any(_mentions_runtime_artifact(arg) for arg in node.args):
+                    hits.append(node.lineno)
+
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "open":
+            if node.args and (
+                _mentions_runtime_artifact(node.args[0])
+                or (isinstance(node.args[0], ast.Name) and node.args[0].id in artifact_vars)
+            ) and _call_opens_for_read(node, mode_arg_index=1):
+                hits.append(node.lineno)
+    return hits
+
+
+def runtime_artifact_write_violations(py_file: Path):
+    """检测对 data_lake/reports/signals/paper 运行产物的直接写操作。"""
+    try:
+        tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=str(py_file))
+    except (SyntaxError, UnicodeDecodeError):
+        return []
+
+    artifact_vars = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and _mentions_runtime_artifact(node.value):
+            for tgt in node.targets:
+                if isinstance(tgt, ast.Name):
+                    artifact_vars.add(tgt.id)
+
+    hits = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            attr = node.func.attr
+            obj = node.func.value
+            mentions = _mentions_runtime_artifact(obj) or (
+                isinstance(obj, ast.Name) and obj.id in artifact_vars
+            )
+            if mentions and attr in ("write_text", "write_bytes"):
+                hits.append(node.lineno)
+            if mentions and attr == "open" and not _call_opens_for_read(node, mode_arg_index=0):
+                hits.append(node.lineno)
+
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "open":
+            if node.args and (
+                _mentions_runtime_artifact(node.args[0])
+                or (isinstance(node.args[0], ast.Name) and node.args[0].id in artifact_vars)
+            ) and not _call_opens_for_read(node, mode_arg_index=1):
+                hits.append(node.lineno)
+    return hits
+
+
+def service_action_permission_violations(py_file: Path):
+    """services.actions 高风险动作必须显式经 jobs/action_guard。"""
+    mods = imported_modules(py_file)
+    targets = [target for target, _lineno in mods]
+    has_permission_boundary = any(
+        target == "services.actions.jobs"
+        or target.startswith("services.actions.jobs.")
+        or target == "services.actions.action_guard"
+        or target.startswith("services.actions.action_guard.")
+        for target in targets
+    )
+    high_risk_imports = [
+        (target, lineno)
+        for target, lineno in mods
+        if target == "workflow.promote"
+        or target.startswith("workflow.promote.")
+        or target == "strategy_registry"
+        or target.startswith("strategy_registry.")
+    ]
+    if high_risk_imports and not has_permission_boundary:
+        return [lineno for _target, lineno in high_risk_imports]
+    return []
+
+
+def _call_opens_for_read(node: ast.Call, *, mode_arg_index: int) -> bool:
+    """True for open()/Path.open() calls whose mode can read."""
+    mode = "r"
+    if len(node.args) > mode_arg_index and isinstance(node.args[mode_arg_index], ast.Constant):
+        mode = str(node.args[mode_arg_index].value)
+    for kw in node.keywords:
+        if kw.arg == "mode" and isinstance(kw.value, ast.Constant):
+            mode = str(kw.value.value)
+    return "r" in mode or "+" in mode
+
+
 def check() -> int:
     violations = []
     for py_file in sorted(ROOT.rglob("*.py")):
@@ -172,6 +297,21 @@ def check() -> int:
             for lineno in registry_write_violations(py_file):
                 violations.append((rel, lineno,
                     f"直写 {REGISTRY_FILE} — 台账只能经 strategy_registry.register()"))
+        if (mod == "api" or mod.startswith("api.")) and str(rel) not in API_ARTIFACT_READ_ALLOWLIST:
+            for lineno in api_runtime_artifact_read_violations(py_file):
+                violations.append((rel, lineno,
+                    "api 直读运行产物 — HTTP 层只能经 services.read/contracts"))
+            if not any(
+                target == "services.actions.action_guard" or target.startswith("services.actions.action_guard.")
+                for target, _lineno in imported_modules(py_file)
+            ):
+                for lineno in runtime_artifact_write_violations(py_file):
+                    violations.append((rel, lineno,
+                        "api 直写运行产物 — 写动作必须经 services.actions.action_guard"))
+        if mod.startswith("services.actions.") and py_file.name not in {"action_guard.py", "jobs.py"}:
+            for lineno in service_action_permission_violations(py_file):
+                violations.append((rel, lineno,
+                    "services.actions 高风险动作必须经 jobs 或 action_guard 接缝"))
         # 全局禁止import检查(任何文件都不得import这些已退场模块)
         for target, lineno in imported_modules(py_file):
             for forbidden in GLOBAL_FORBIDDEN_IMPORTS:

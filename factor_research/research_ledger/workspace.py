@@ -9,10 +9,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_ROOT = ROOT / "data_lake" / "factory" / "research_workspace"
-DEFAULT_DRAFT_PATH = DEFAULT_ROOT / "drafts.jsonl"
-DEFAULT_REVIEW_PATH = DEFAULT_ROOT / "reviews.jsonl"
+from runtime.artifacts import ArtifactPaths
+
+DEFAULT_ROOT = ArtifactPaths().research_workspace_dir
+DEFAULT_DRAFT_PATH = ArtifactPaths().research_workspace_drafts
+DEFAULT_REVIEW_PATH = ArtifactPaths().research_workspace_reviews
 _LOCK = threading.Lock()
 
 

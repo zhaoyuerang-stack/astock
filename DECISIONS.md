@@ -286,6 +286,19 @@
 
 ---
 
+### ADR-030 服务接缝与组合 runner 解耦
+- **上下文**: 2026-06-30 架构盘点发现三类边界债务:① `workflow/promote.py` 反向依赖 `scripts/research/run_nine_gates_all.py` 的 CLI 实现;② API/服务层散落直接读 `data_lake/reports/signals/paper` 路径;③ 旧 strategy_runners 兼容模块同时承担研究目录、runner、部署解析三种职责,组合晋级脚本还在本地重写腿公式。
+- **决策**:
+  1. `workflow/nine_gate_runner.py` 成为可复用 9-Gate 入口;`scripts/research/run_nine_gates_all.py` 降为 CLI 包装。
+  2. API 层保持薄层,artifact 读取下沉到 `services.read.*`;运行产物路径统一由 `runtime.artifacts.ArtifactPaths` 表达。
+  3. 旧 strategy_runners 入口降为兼容 re-export;研究 catalog、部署 runner、runner registry 分文件承载。
+  4. `services` 分三类端口:`read` 只读、`actions` 写/重任务必须经 `action_guard` 或 `jobs`、`agent` 只编排 read/actions;L0-L3 research workspace stage runner 下沉到 `workflow/research_stages.py`。
+  5. Composite allocation spec 先落 `workflow/composite_spec.py`;非 legacy alias 的 `family/version:weight` runner-backed 组合路径在权重流实现前 fail-fast,禁止静默复用脚本内旧公式。
+- **理由**: 架构边界不能靠约定。workflow 依赖 research script 会让 CLI 变成库事实源;API/服务散读路径会把文件布局焊死到 UI;组合脚本重写腿公式会让登记版本与晋级公式漂移。先用守卫防回流,再小步迁移实现,比一次性重写策略口径更稳。
+- **验证**: `tests/test_layer_deps_guard.py` 覆盖 workflow→research script、API artifact 直读、services 权限分层与高风险 actions;`tests/test_artifact_paths.py` 覆盖 artifact path 注入;`tests/test_portfolio_runner_boundaries.py` 覆盖 runner re-export/deployment fallback;`tests/test_research_workflow_actions.py` 覆盖 workflow-owned L0 stage;相关精确测试和 `scripts/ci/check_layer_deps.py` 均通过。完整 `scripts/test_all.sh` 作为最终总验收。
+
+---
+
 ## ③ 投资/交易决策记录
 
 > 实盘/模拟盘的逐日决策**已自动落盘**:`factor_research/signals/<date>.json`(信号)+ Obsidian `30.output/A股v2.0模拟盘/`(操作卡)。本节只记**需人工复盘的关键决策**(regime 切换、风控动作、异常),不重复日常信号。
@@ -301,4 +314,3 @@
 | 2026-06-29 | — | 落地 Regime-Aware 极小值极大化目标函数并重启另类因子大比例进化搜寻 | 2024年初踩踏暴露全局平均优化脆弱性；Min-Max 框架成功提升 OOS 业绩（年化+28.23%）并触发门禁拦截置为影子池热备 | 证明了系统防过拟合门禁的强自律性与影子池在不同政权环境下的高战术价值 |
 
 > 复盘要点(填):切换是否过频(regime 无滞回)、成本损耗是否超预期、事后是否印证。损耗超预期 → 立新假设走研究流程,不私改口径。
-

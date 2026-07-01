@@ -24,6 +24,7 @@ REQUIRED = {
     "workflow/promote.py": "_run_marginal 边际 ACTIVE/SHADOW 定级",
     "workflow/phase2_backtest.py": "三段回测/成本/相关性/decay 验证栈(ADR-021)",
     "workflow/phase3_wf.py": "walk-forward 训练/测试窗口(ADR-021)",
+    "workflow/promote_composite.py": "组合晋级 9-Gate / 候选持久化证据",
 }
 BOUND = re.compile(r"boundary\(|assert_search_clean|validate_on_holdout")
 

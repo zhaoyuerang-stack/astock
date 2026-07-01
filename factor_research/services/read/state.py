@@ -13,20 +13,26 @@ import json
 from pathlib import Path
 
 from contracts.views import DataQualityView, FactorHealthView, MarketStateView
+from runtime.artifacts import ArtifactPaths
 
 ROOT = Path(__file__).resolve().parents[2]  # factor_research/
 
 
-def _read_json(rel: str):
-    p = ROOT / rel
+def _artifacts() -> ArtifactPaths:
+    return ArtifactPaths(ROOT)
+
+
+def _read_json(path: Path):
+    p = Path(path)
     if not p.exists():
         return None
     return json.loads(p.read_text(encoding="utf-8"))
 
 
 def data_quality(with_duckdb: bool = True) -> DataQualityView:
-    d = _read_json("data_lake/quality_report.json") or {}
-    triage = _read_json("reports/data/data_issue_triage.json") or {}
+    paths = _artifacts()
+    d = _read_json(paths.quality_report) or {}
+    triage = _read_json(paths.data_issue_triage) or {}
     triage_summary = triage.get("summary") or {}
     breakdown = d.get("issue_breakdown", {}) or {}
     # 真问题:键含 负价格 / OHLC;正常现象:跳变
@@ -63,7 +69,7 @@ def _duckdb_scan() -> dict:
 
     优雅降级:duckdb 未安装则返回 available=False。
     """
-    parquet = ROOT / "data_lake" / "price" / "daily_all.parquet"
+    parquet = _artifacts().daily_all_prices
     try:
         import duckdb  # 受控接缝:仅即席 QA 用
     except ImportError:
@@ -97,7 +103,7 @@ def _duckdb_scan() -> dict:
 
 
 def strategy_health() -> list[FactorHealthView]:
-    d = _read_json("reports/factor_health.json") or {}
+    d = _read_json(_artifacts().factor_health) or {}
     as_of = str(d.get("updated", ""))  # 报告数据截至日,透出供前端明示时效(周期生成,非实时)
     out: list[FactorHealthView] = []
     for name, m in d.items():
@@ -114,7 +120,7 @@ def strategy_health() -> list[FactorHealthView]:
 
 
 def market_state() -> MarketStateView:
-    d = _read_json("signals/state.json") or {}
+    d = _read_json(_artifacts().signal_state) or {}
     return MarketStateView(
         current_position=d.get("current_position", ""),
         last_action=d.get("last_action", ""),

@@ -7,15 +7,17 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Iterator
 
+from runtime.artifacts import ArtifactPaths
+
 from .models import Candidate, CandidateDecision, CandidateEvaluationResult, CandidateStatus
 
 _repo_lock = threading.Lock()
 
 
-DEFAULT_ROOT = Path(__file__).resolve().parents[2] / "data_lake" / "factory" / "autoresearch"
-DEFAULT_CANDIDATE_PATH = DEFAULT_ROOT / "candidates.jsonl"
-DEFAULT_EXPERIMENT_PATH = DEFAULT_ROOT / "experiment_log.jsonl"
-DEFAULT_REVIEW_PATH = DEFAULT_ROOT / "review_queue.jsonl"
+DEFAULT_ROOT = ArtifactPaths().autoresearch_dir
+DEFAULT_CANDIDATE_PATH = ArtifactPaths().autoresearch_candidates
+DEFAULT_EXPERIMENT_PATH = ArtifactPaths().autoresearch_experiment_log
+DEFAULT_REVIEW_PATH = ArtifactPaths().autoresearch_review_queue
 
 
 def _json_ready(value):

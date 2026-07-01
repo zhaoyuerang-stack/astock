@@ -25,6 +25,7 @@ from contracts.views import (
     PaperTradesView,
     TradePlanView,
 )
+from runtime.artifacts import ArtifactPaths
 from portfolio.paper_engine import (
     NAV_FP,
     SIGNALS,
@@ -46,6 +47,10 @@ DISCLAIMER = ("本操作卡为策略信号的机械呈现,模拟盘全自动按�
               "仅供研究参考,不构成投资建议;回测与模拟盘业绩不代表未来收益。")
 
 
+def _artifacts() -> ArtifactPaths:
+    return ArtifactPaths(ROOT)
+
+
 def _latest_signal() -> dict:
     files = sorted(SIGNALS.glob("[0-9]*-[0-9]*-[0-9]*.json"))
     return json.loads(files[-1].read_text(encoding="utf-8")) if files else {}
@@ -55,7 +60,7 @@ def _latest_trading_day() -> str:
     """本地交易日历 ≤ 今天的最大交易日(判断信号是否过期)。"""
     try:
         import pandas as pd
-        cal = pd.read_parquet(ROOT / "data_lake/meta/trade_calendar.parquet")["date"]
+        cal = pd.read_parquet(_artifacts().trade_calendar)["date"]
         cal = pd.to_datetime(cal)
         today = pd.Timestamp(datetime.now(CHINA_TZ).date())
         eligible = cal[cal <= today]

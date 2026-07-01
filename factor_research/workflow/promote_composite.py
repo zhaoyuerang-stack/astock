@@ -21,133 +21,58 @@ import numpy as np
 
 from strategies.small_cap import load_price_panels
 from lake.load_lake import load_daily_basic_panel
-from core.risk.dual_valve import apply_dual_valve_gating
-from factors.autoresearch_dsl import compute_dsl_factor
 from core.engine import PricePanel, Signal, BacktestEngine, CostModel, BacktestConfig
 from core.analysis.nine_gates import NineGatesEvaluator, NineGatesReport
+from governance.holdout import boundary, assert_search_clean
+from lake.version_returns import write_version_returns
+from portfolio.runner_registry import get_composite_weight_runner
 from strategy_registry import register_family, register, attach_nine_gate
+from workflow.composite_spec import allocation_dict, parse_composite_allocation
 
-AST_REVERSAL = {
-    "type": "linear_combo",
-    "terms": [
-        {"factor": "momentum", "params": {"window": 60}, "transforms": ["mad_clip", "zscore", "rank"], "weight": 0.5},
-        {"factor": "revenue_yoy", "params": {}, "transforms": ["mad_clip", "zscore", "rank"], "weight": 0.37}
-    ],
-    "direction": "negative",
-    "execution": {"portfolio_size": 25, "rebalance_freq": "20D"}
-}
 
 def parse_allocation(alloc_str: str) -> dict[str, float]:
-    alloc = {}
-    try:
-        for item in alloc_str.split(","):
-            k, v = item.split(":")
-            alloc[k.strip()] = float(v.strip())
-    except Exception as e:
-        raise ValueError(f"Invalid allocation format: {alloc_str}. Detail: {e}")
-    total = sum(alloc.values())
-    if not (0.99 <= total <= 1.01):
-        raise ValueError(f"Portfolio weights must sum up to 1.0, got: {total}")
-    return alloc
+    return allocation_dict(parse_composite_allocation(alloc_str))
 
 def run_pipeline(version: str, allocation_str: str, persist: bool = False, start_date: str = "2023-01-01"):
     print("=" * 95)
     print(f"  Composite Strategy Promotion Pipeline (with Adversarial Guard) | Version: {version}")
     print("=" * 95)
     
-    alloc = parse_allocation(allocation_str)
+    legs = parse_composite_allocation(allocation_str)
+    alloc = allocation_dict(legs)
     print("Strategy Capital Allocations:")
     for strat, w in alloc.items():
         print(f"  - {strat:<20}: {w:.2%}")
         
     print("\n[Step 1] Loading price and total_mv panels...")
     close, volume, amount = load_price_panels("2010-01-01")
+    holdout_boundary = boundary()
+    raw_end = close.index[-1]
+    close = close.loc[close.index < holdout_boundary]
+    volume = volume.loc[volume.index < holdout_boundary]
+    amount = amount.loc[amount.index < holdout_boundary]
+    assert_search_clean(close.index, label="Composite promotion")
+    print(
+        f"  Data clipped to < holdout boundary {holdout_boundary.date()}: "
+        f"{close.index[0].date()}~{close.index[-1].date()} (raw end {raw_end.date()})"
+    )
     prices = PricePanel(close=close, volume=volume, amount=amount)
     
     basic_panels = load_daily_basic_panel(close.index, codes=close.columns.tolist(), fields=["total_mv"])
     total_mv = basic_panels["total_mv"].reindex(index=close.index, columns=close.columns).ffill().fillna(0.0)
     
-    # Generate weights for each strategy (Both T-0 and T-1 lagged weights)
+    # Generate weights for each leg through portfolio runner registry.
     weight_dfs_t0 = []
     weight_dfs_t1 = []
-    
-    # Strategy A: illiq_sc
-    if "illiq_sc" in alloc:
-        print("\n[Step 2.1] Generating weights for Strategy A (Illiquidity)...")
-        sc_universe = total_mv.rank(axis=1, ascending=True, pct=False) <= 800
-        amihud = (close.pct_change().abs() / amount).rolling(20).mean()
-        amihud_sc = amihud.where(sc_universe)
-        
-        sig_a_base = Signal(factor=amihud_sc.rank(axis=1, pct=True), top_n=25, direction=1, rebalance_freq="20D", family="illiq_sc")
-        config_a = BacktestConfig(leverage=1.0, cost=CostModel(), start="2010-01-01")
-        engine_a = BacktestEngine(prices, config_a)
-        res_a_base = engine_a.run(sig_a_base)
-        
-        nav_a_base = (1 + res_a_base.returns).cumprod()
-        nav_a_ma = nav_a_base.rolling(16).mean()
-        timing_a = pd.Series(0.0, index=res_a_base.returns.index)
-        timing_a[nav_a_base > nav_a_ma] = 1.0
-        timing_a = timing_a.reindex(close.index).ffill().fillna(0.0)
-        
-        w_a = sig_a_base._resolve_weights(prices).reindex(close.index).ffill().fillna(0.0)
-        
-        w_a_t0 = w_a.mul(timing_a, axis=0)
-        w_a_t1 = w_a.mul(timing_a.shift(1).fillna(0.0), axis=0)
-        
-        weight_dfs_t0.append(w_a_t0 * alloc["illiq_sc"])
-        weight_dfs_t1.append(w_a_t1 * alloc["illiq_sc"])
-        
-    # Strategy 2: lc_mom
-    if "lc_mom" in alloc:
-        print("\n[Step 2.2] Generating weights for Strategy B (Large-Cap Momentum)...")
-        lc_universe = total_mv.rank(axis=1, ascending=False, pct=False) <= 200
-        mom_raw = close.pct_change(120).where(lc_universe)
-        
-        sig_b_base = Signal(factor=mom_raw.rank(axis=1, pct=True), top_n=25, direction=1, rebalance_freq="20D", family="lc_mom")
-        engine_b = BacktestEngine(prices, config_a)
-        res_b_base = engine_b.run(sig_b_base)
-        
-        b_weights = sig_b_base._resolve_weights(prices).reindex(close.index).ffill().fillna(0.0)
-        timing_b = apply_dual_valve_gating(
-            baseline_returns=res_b_base.returns,
-            volume=volume,
-            weights=b_weights,
-            trade_dates=close.index,
-            style_window=40,
-            panic_threshold=2.0,
-            panic_leverage=0.2,
-            smoothing_window=5
-        )
-        w_b_t0 = b_weights.mul(timing_b, axis=0)
-        w_b_t1 = b_weights.mul(timing_b.shift(1).fillna(1.0), axis=0)
-        
-        weight_dfs_t0.append(w_b_t0 * alloc["lc_mom"])
-        weight_dfs_t1.append(w_b_t1 * alloc["lc_mom"])
-        
-    # Strategy 3: reversal
-    if "reversal" in alloc:
-        print("\n[Step 2.3] Generating weights for Strategy C (Reversal)...")
-        factor_rev = compute_dsl_factor(close, volume, ast=AST_REVERSAL, cache_mode="disk")
-        sig_c_base = Signal(factor=factor_rev, top_n=25, direction=-1, rebalance_freq="20D", family="rev_base")
-        engine_c = BacktestEngine(prices, config_a)
-        res_c_base = engine_c.run(sig_c_base)
-        
-        c_weights = sig_c_base._resolve_weights(prices).reindex(close.index).ffill().fillna(0.0)
-        timing_c = apply_dual_valve_gating(
-            baseline_returns=res_c_base.returns,
-            volume=volume,
-            weights=c_weights,
-            trade_dates=close.index,
-            style_window=40,
-            panic_threshold=2.0,
-            panic_leverage=0.2,
-            smoothing_window=5
-        )
-        w_c_t0 = c_weights.mul(timing_c, axis=0)
-        w_c_t1 = c_weights.mul(timing_c.shift(1).fillna(1.0), axis=0)
-        
-        weight_dfs_t0.append(w_c_t0 * alloc["reversal"])
-        weight_dfs_t1.append(w_c_t1 * alloc["reversal"])
+    for idx, leg in enumerate(legs, start=1):
+        leg_name = leg.alias or f"{leg.family}/{leg.version}"
+        print(f"\n[Step 2.{idx}] Generating weights for {leg_name} via runner registry...")
+        runner = get_composite_weight_runner(leg)
+        if runner is None:
+            raise ValueError(f"No composite weight runner registered for {leg.family}/{leg.version}")
+        leg_t0, leg_t1 = runner(prices, close, volume, amount, total_mv)
+        weight_dfs_t0.append(leg_t0 * leg.weight)
+        weight_dfs_t1.append(leg_t1 * leg.weight)
         
     # -----------------------------------------------------------------------
     # Reconstruct Combined Weights for Both Versions
@@ -253,6 +178,9 @@ This gate checks the strategy performance degradation under a T-1 execution lag 
 * **Adversarial Lagged (T-1)**: Sharpe={sr_t1:.2f}, MaxDD={dd_t1:.2%}, AnnualReturn={ann_t1:.2%}
 * **Execution Decay**: Sharpe Decay={decay_sharpe:+.2f}, Drawdown Expansion={decay_dd:+.2%}
 * **Gate Status**: {"✅ PASS" if adversarial_pass else "❌ FAIL (VETOED)"} (Limits: Sharpe Decay <= {sh_threshold:.2f}, Drawdown Expansion <= {dd_threshold:.2%})
+
+## Holdout Boundary
+All composite promotion evidence in this report is computed on dates **before {holdout_boundary.date()}**. Dates on or after the boundary are reserved for explicit holdout validation and are not used by this script.
 """
     # Insert before Detailed Gate Findings
     parts = markdown_content.split("## Detailed Gate Findings")
@@ -326,8 +254,10 @@ This gate checks the strategy performance degradation under a T-1 execution lag 
             config=config_dict,
             data_scope={
                 "source": "data_lake",
-                "period": f"{start_date}-2026",
-                "survivorship_bias": False
+                "period": f"{start_date}-{(holdout_boundary - pd.Timedelta(days=1)).date()}",
+                "survivorship_bias": False,
+                "holdout_boundary": str(holdout_boundary.date()),
+                "holdout_excluded": True,
             },
             metrics=metrics_dict,
             status=status_registry,
@@ -341,10 +271,8 @@ This gate checks the strategy performance degradation under a T-1 execution lag 
         # Save returns sequence
         rets = res_t1.returns
         if rets is not None and len(rets) > 0:
-            store = ROOT / "data_lake" / "version_returns"
-            store.mkdir(parents=True, exist_ok=True)
-            rets.rename("ret").to_csv(store / f"composite-portfolio__{version}.csv", header=True)
-            print(f"Returns sequence saved to version_returns/composite-portfolio__{version}.csv")
+            ret_path = write_version_returns(rets, family="composite-portfolio", version=version)
+            print(f"Returns sequence saved to version_returns/{ret_path.name}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Composite Strategy Promotion Pipeline")

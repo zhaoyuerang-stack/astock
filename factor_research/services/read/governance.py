@@ -5,10 +5,10 @@ Retrieves model cards, independent validation reports, and research ledgers from
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from contracts.views import GovernanceView
 from model_risk.model_inventory import ModelInventory
 from research_ledger.ledger import ResearchLedger
+from runtime.artifacts import ArtifactPaths
 
 
 def _approval_from_status(status: str) -> str:
@@ -258,7 +258,7 @@ def get_governance_overview() -> GovernanceView:
 
     # Load from factory experiment_log.jsonl
     try:
-        factory_log_path = Path(__file__).resolve().parent.parent.parent / "data_lake" / "factory" / "experiment_log.jsonl"
+        factory_log_path = ArtifactPaths().factory_experiment_log
         if factory_log_path.exists():
             with open(factory_log_path, "r", encoding="utf-8") as f:
                 for line in f:

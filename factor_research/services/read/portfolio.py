@@ -12,27 +12,31 @@ import threading
 from pathlib import Path
 
 from contracts.views import Holding, PortfolioView
+from runtime.artifacts import ArtifactPaths
 
 ROOT = Path(__file__).resolve().parents[2]
 
 _TARGET_LOCK = threading.Lock()
-_LAKE_FILES = ("data_lake/price/daily_all.parquet", "data_lake/price/daily_raw_all.parquet")
+
+
+def _artifacts() -> ArtifactPaths:
+    return ArtifactPaths(ROOT)
 
 
 def _data_version() -> tuple:
     """数据版本指纹(湖文件 mtime)——日更后缓存自动失效,无需重启后端。"""
-    return tuple(int((ROOT / rel).stat().st_mtime_ns) if (ROOT / rel).exists() else 0
-                 for rel in _LAKE_FILES)
+    paths = _artifacts()
+    lake_files = (paths.daily_all_prices, paths.daily_raw_all_prices)
+    return tuple(int(path.stat().st_mtime_ns) if path.exists() else 0 for path in lake_files)
 
 
-def _read_json(rel: str):
-    p = ROOT / rel
+def _read_json(path: Path):
+    p = Path(path)
     return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
 
 
 def _latest_signal_json() -> dict:
-    sig_dir = ROOT / "signals"
-    files = sorted(sig_dir.glob("20*.json"))
+    files = sorted(_artifacts().signals.glob("20*.json"))
     return json.loads(files[-1].read_text(encoding="utf-8")) if files else {}
 
 
@@ -49,7 +53,7 @@ def _target_cached(start: str, top_n: int, rebalance_days: int, factor_window: i
     from factors.small_cap import small_cap_factor
 
     # 1. Load fdates directly from the first few symbol files to avoid loading the whole large pivot table
-    daily_dir = ROOT / "data_lake/price/daily"
+    daily_dir = _artifacts().price_daily_dir
     symbol_files = sorted(daily_dir.glob("*.parquet"))[:5]
     fast_dates_set = set()
     for fp in symbol_files:
@@ -121,8 +125,9 @@ def target_portfolio(start: str = "2023-01-01", top_n: int = 25,
 
 
 def current_portfolio(with_target: bool = True) -> PortfolioView:
-    acct = _read_json("paper/account.json")
-    state = _read_json("signals/state.json")
+    paths = _artifacts()
+    acct = _read_json(paths.paper_account)
+    state = _read_json(paths.signal_state)
     sig = _latest_signal_json()
     
     from portfolio.paper_engine import valuation

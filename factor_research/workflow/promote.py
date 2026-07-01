@@ -178,7 +178,7 @@ def _infer_nine_gate_strategy(family: str) -> str | None:
 
 def _default_nine_gate_runner(strategy_name, n_trials=15, persist=False, version=None, start=None):
     """Lazy adapter so importing promote.py stays light."""
-    from scripts.research.run_nine_gates_all import run_evaluation
+    from workflow.nine_gate_runner import run_evaluation
     return run_evaluation(
         strategy_name,
         n_trials=n_trials,
@@ -318,7 +318,7 @@ def _run_marginal(spec, report):
             import strategy_registry
             strategy_registry.attach_catalog_status(report.family, report.version, catalog_status, marginal=mres)
             print(f"  [marginal] 已写台账 catalog_status={catalog_status}"
-                  f"(portfolio/strategy_runners.py 下次加载时生效)", flush=True)
+                  f"(portfolio research catalog 下次加载时生效)", flush=True)
         except Exception as e:
             print(f"  [marginal] 写台账失败(non-fatal): {type(e).__name__}: {str(e)[:80]}", flush=True)
     except Exception as e:
