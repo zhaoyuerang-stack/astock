@@ -8,6 +8,10 @@ echo "=== check_layer_deps.py (分层依赖 + 台账唯一写入口) ==="
 python3 scripts/ci/check_layer_deps.py
 
 echo ""
+echo "=== check_module_status.py (每个顶层模块必须有可解析 MODULE_STATUS.md) ==="
+python3 scripts/ci/check_module_status.py
+
+echo ""
 echo "=== check_naming_taxonomy.py (本体命名 taxonomy:禁新增歧义模块名) ==="
 python3 scripts/ci/check_naming_taxonomy.py
 
