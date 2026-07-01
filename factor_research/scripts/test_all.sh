@@ -8,6 +8,10 @@ echo "=== check_layer_deps.py (分层依赖 + 台账唯一写入口) ==="
 python3 scripts/ci/check_layer_deps.py
 
 echo ""
+echo "=== check_naming_taxonomy.py (本体命名 taxonomy:禁新增歧义模块名) ==="
+python3 scripts/ci/check_naming_taxonomy.py
+
+echo ""
 echo "=== check_test_discovery.py (全量测试发现:防 test_*.py 被静默排除) ==="
 python3 scripts/ci/check_test_discovery.py
 
