@@ -3,7 +3,7 @@
 ## What Changed
 
 - Added structured contracts for module status, artifact policy, action policy, and agent decisions.
-- Added `MODULE_STATUS.md` for all 33 top-level modules (prerequisite the plan assumed but did not include; created as "Task 0"). Classifications are inspection-based, not uniform: `core=ONLINE_CRITICAL` (BacktestEngine + CostModel authority), `execution=ARCHIVE_OR_REHOME` (only one test imports it, no live caller — verified by grep).
+- Added `MODULE_STATUS.md` for all top-level modules (prerequisite the plan assumed but did not include; created as "Task 0"): 33 dirs present at start, plus the runtime-created artifact dirs `signals/`, `paper/`, `logs/` (force-added because they are gitignored) so the guard stays consistent once those dirs materialize — 36 in total. Classifications are inspection-based, not uniform: `core=ONLINE_CRITICAL` (BacktestEngine + CostModel authority), `execution=ARCHIVE_OR_REHOME` (only one test imports it, no live caller — verified by grep).
 - Added module inventory reader from top-level `MODULE_STATUS.md`.
 - Added artifact inventory boundaries for data lake, reports, signals, paper, scratch, results, and logs.
 - Added action policy checks for registry writes, data-lake writes, promotion, formal evidence, deployment, and daily runs.
@@ -14,12 +14,34 @@
 
 ## Safety Properties
 
-- Agent code cannot treat scratch/results/logs as formal evidence.
-- Agent code gets blocked from direct registry and data-lake writes.
-- Candidate promotion points to workflow only.
-- Deployment changes remain human-approved.
-- Module archival remains human-approved.
-- All new services are read-only or fact-assembling; none mutate registry, data lake, signals, paper, or deployment manifests. Layer-dependency guard passes (no forbidden edges introduced).
+**Scope: this is an advisory guidance layer, not an enforcement layer.**
+`can_agent_do(...)` returns a structured decision; it does not intercept file
+writes. An agent that ignores the policy and calls `open('strategy_versions.json',
+'w')` directly is *not* stopped by this code. Actual enforcement of the
+non-negotiable rules stays with the existing deterministic CI guards
+(`check_registry_evidence`, `check_no_force_promote`, `check_holdout_compliance`,
+`check_lake_writers`, `check_layer_deps`, `check_control_exceptions`) and the
+`strategy_registry.register` single write entrypoint. This layer's job is to give
+a compliant agent the correct answer *before* it acts, and to make the boundaries
+machine-readable — not to be the last line of defense.
+
+What this layer guarantees when consulted:
+
+- A compliant agent asking `USE_FORMAL_EVIDENCE` is told **no** for scratch/results/logs
+  (case-insensitive, any path segment) and for any path outside a known evidence area
+  (positive whitelist / fail-closed).
+- `WRITE_REGISTRY` / `WRITE_DATA_LAKE` return `allowed=False` and point to the
+  canonical entrypoint (`strategy_registry.register`, controlled lake writers).
+- `PROMOTE_CANDIDATE` points only to `workflow.promote`.
+- `UPDATE_DEPLOYMENT` and `ARCHIVE_MODULE` return `allowed=False`, requiring human approval.
+- An unknown action fails closed (raises `ValueError`) rather than silently allowing.
+
+What this layer itself does not do:
+
+- It does not block writes at the filesystem/registry level (that is the CI guards' job).
+- All new services are read-only or fact-assembling; none mutate registry, data lake,
+  signals, paper, or deployment manifests. Layer-dependency guard passes (no forbidden
+  edges introduced), so the guidance layer cannot become a write path.
 
 ## Verification
 
