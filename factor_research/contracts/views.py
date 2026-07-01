@@ -853,3 +853,55 @@ class GateVerdictsView(BaseModel):
     summary: dict = Field(default_factory=dict)  # 按 verdict 计数 + audited 数
     verdicts: list[GateVerdict] = Field(default_factory=list)
     truth_sources: dict = Field(default_factory=dict)
+
+
+# ── 信任校准首屏(Trust Calibration) ─────────────────────────────────────
+# 决策:「用户在看 KPI 前,当前策略池有多可信 / 哪里最可能是假 alpha 或已在失效?」
+# 定位:**over-trust 防护带**,不是新判定。裁决权威仍是
+#   ``core.analysis.nine_gate_policy.decide_nine_gate``(经 get_gate_verdicts 复用)。
+# 诚实护栏:
+#   - banner 只做「聚合」不「重算」,永远不比其权威输入更绿(fail-closed)。
+#   - holdout 只展示原始事实(边界/genesis),完整性判定归 check_holdout_compliance,本视图不自判。
+#   - decay_signal / failure_boundaries 是 §7.1 论点字段(该盯什么),非实时状态;
+#     实时衰减权威 = reports/decay_status.json(缺失则如实标「未监控」,绝不用论点字段冒充实时)。
+
+class TrustSignal(BaseModel):
+    """一条信任维度:名字 + 状态 + 证据 + 权威来源(可追溯,非本视图裁决)。"""
+    key: str = ""                 # overfit_guard | oos_regime | audit_coverage | holdout | decay_watch
+    label: str = ""               # 中文展示名
+    status: str = "info"          # ok | attention | blocked | info(info=仅陈述事实,不参与裁绿)
+    evidence: str = ""            # 一句话机械证据
+    authority: str = ""           # 该维度的权威来源(谁说了算)
+
+
+class TrustStrategyRow(BaseModel):
+    """信任逐行:某版本的 over-trust 相关事实(复用 gate 裁决 + 论点字段,均标注来源)。"""
+    family: str = ""
+    version: str = ""
+    stage: str = ""                       # 台账 status(候选/在册/参考/退役)
+    verdict: str = ""                     # 权威 9-Gate 裁决(PASSED/FAILED/PENDING/RUN_FAILED)
+    verdict_label: str = ""
+    audited: bool = False
+    dsr_p: float | None = None            # 多重检验惩罚 p(越小越稳)
+    dsr_significant: bool | None = None   # DSR 是否显著(<0.05)
+    bull_sharpe: float | None = None      # 牛市 regime(自标字段,非 IS/OOS 臆测)
+    bear_sharpe: float | None = None      # 熊市 regime
+    wf_sharpe: float | None = None        # walk-forward(样本外稳健性)
+    decay_thesis: str = ""                # §7.1 预期失效信号(论点·非实时)
+    failure_thesis: str = ""              # §7.1 失效边界(论点·非实时)
+    trust_note: str = ""                  # 该行一句话 over-trust 提示
+
+
+class TrustCalibrationView(BaseModel):
+    """信任校准首屏:StatusBanner 综合裁决 + 逐维度信号 + 逐策略行(渐进式披露)。
+
+    banner_status 直接映射 web StatusBanner 的 status prop
+    (ready|attention|blocked|neutral);headline→title,detail→detail。"""
+    as_of: str = ""
+    banner_status: str = "neutral"        # ready | attention | blocked | neutral
+    headline: str = ""                    # 一句话信任裁决(StatusBanner title)
+    detail: str = ""                      # 一句话支撑(StatusBanner detail)
+    signals: list[TrustSignal] = Field(default_factory=list)
+    strategies: list[TrustStrategyRow] = Field(default_factory=list)
+    truth_sources: dict = Field(default_factory=dict)
+    honesty: str = ""                     # 本视图定位与边界的显式声明
