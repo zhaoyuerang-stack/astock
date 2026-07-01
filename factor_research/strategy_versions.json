@@ -3185,21 +3185,21 @@
           "data_scope": {
             "source": "data_lake",
             "period": "2018-2024",
-            "survivorship_bias": false,
+            "train_period": "2018-2022",
             "oos_period": "2023-2024",
-            "oos_annual": 0.2022,
-            "oos_sharpe": 1.26,
-            "t1_decay": -0.001
+            "survivorship_bias": false,
+            "n_trials": 126,
+            "dsr_p": 1e-06
           },
           "metrics": {
-            "annual": 0.2022,
-            "maxdd": -0.1524,
-            "sharpe": 1.26,
-            "calmar": 1.33,
-            "hit": true
+            "annual": 0.1735,
+            "maxdd": -0.1725,
+            "sharpe": 0.87,
+            "calmar": 1.01,
+            "hit": false
           },
-          "status": "候选",
-          "notes": "✅2026-06-30审计通过。OOS T-1夏普1.26/年化20.2%/回撤-15.2%/卡玛1.33。T-1衰减近零(0.001)。lc_hedge与illiq相关0.11提供天然回撤对消。熊市2018-19+7.2%,2022+9.6%,2024+37.3%。",
+          "status": "参考",
+          "notes": "⚠️ 2026-06-30 严格训练/OOS分离测试(2018-22训练/2023-24验证)。最优权重 illiq_v11(60%)+illiq(10%)+small(10%)+size_earn(10%)+hq_full(10%)。OOS T-1: 年化17.35%/夏普0.87/回撤-17.25%/卡玛1.01。夏普差一口气(0.87 vs 门槛1.0)。DSR高度显著(p≈0,n_trials=126)。策略池多样性不足(illiq簇合计70%)，需引入真正正交的新因子后重组合。记为参考，待新因子入库后重跑。",
           "evidence": {},
           "admission": {},
           "nine_gate": {}
