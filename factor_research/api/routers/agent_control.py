@@ -1,7 +1,7 @@
 """Read-only agent control-plane endpoints."""
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from services.read.action_policy import can_agent_do
 from services.read.artifact_inventory import get_artifact_inventory
@@ -23,7 +23,10 @@ def artifact_inventory():
 
 @router.get("/policy")
 def action_policy(action: str, target: str):
-    return can_agent_do(action, target).to_dict()
+    try:
+        return can_agent_do(action, target).to_dict()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/strategies")
