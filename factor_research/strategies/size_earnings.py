@@ -190,6 +190,11 @@ def run_strategy(config=None):
 
 
 def latest_signal(config=None):
+    """Backward-compatible wrapper for :func:`latest_decision`."""
+    return latest_decision(config)
+
+
+def latest_decision(config=None):
     """Latest signal for live trading."""
     config = config or StrategyConfig()
     result = run_strategy(config)

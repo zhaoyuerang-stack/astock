@@ -94,6 +94,11 @@ def run_hq_momentum_strategy(config=StrategyConfig()):
     }
 
 def latest_signal(config=StrategyConfig()):
+    """Backward-compatible wrapper for :func:`latest_decision`."""
+    return latest_decision(config)
+
+
+def latest_decision(config=StrategyConfig()):
     """Returns the latest signal and holdings for live trading."""
     result = run_hq_momentum_strategy(config)
     

@@ -12,10 +12,10 @@ ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, latest_signal, load_price_panels
+from strategies.small_cap import StrategyConfig, latest_decision, load_price_panels
 from lake.load_lake import load_raw_close                                   # noqa: E402
 
-sig = latest_signal(StrategyConfig(start="2010-01-01"))
+sig = latest_decision(StrategyConfig(start="2010-01-01"))
 close = sig["result"]["close"]
 last = close.index[-1]
 in_market = sig["in_market"]

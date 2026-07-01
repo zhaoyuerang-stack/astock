@@ -112,6 +112,11 @@ def run_large_cap_strategy(config=StrategyConfig()):
     }
 
 def latest_signal(config=StrategyConfig()):
+    """Backward-compatible wrapper for :func:`latest_decision`."""
+    return latest_decision(config)
+
+
+def latest_decision(config=StrategyConfig()):
     """Returns the latest signal and holdings for live trading."""
     # Run strategy
     result = run_large_cap_strategy(config)
