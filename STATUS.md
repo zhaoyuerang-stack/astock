@@ -4,6 +4,11 @@
 
 ## 一句话
 
+**2026-07-02(产品主界面翻转:决策收件箱 + 今日简报,「系统找人」)**：
+  · **后端读层**:新增 `services/read/decision_inbox.py`(六源聚合:在册FAILED处置/部署fail-closed换腿/review队列/衰减确认/数据质量/研究重心 advisory;零新判定,actions 经 `action_policy` 装配指向 canonical 入口)+ `services/read/daily_brief.py`(首屏三问;trust banner 原样透传禁更绿)。API:`GET /inbox` + `/inbox/brief`。**空箱三态**:有待裁决 / 全源可读健康 / 有源不可读禁称无事(源异常显式入箱,不静默)。
+  · **前端首屏**:新增 `web/app/inbox`(⓪ 今日简报·收件箱),首页 redirect 改指 `/inbox`——打开产品先看「要不要介入」,而非巡视九页看板;空收件箱显式呈现为「系统健康」。真实数据下正确推出唯一待裁决项 = 部署 fail-closed 换腿(illiquidity/v3.1 降级遗留,TASKS 既有待决项)。
+  · **对抗测试** 17/17(4 个变异——盲区假绿/在册FAILED降级/info假紧迫/溢出静默截断——全被抓);静态守卫全绿;web tsc/lint 绿、npm test 22/23(唯一失败经 stash 基线复测为预存误报:system-governance 页诚实性注释含「硬编码」触发 fake-scaffold 禁词,已另立修复任务)。worktree 无数据湖价格数据,`test_engine` 等数据依赖用例环境性失败(非代码)。
+
 **2026-07-02(WS6:regime 从特征升级为审计器,ADR-033)**：
   · **调度默认跨 regime 生存**:周搜 `run_autoresearch_walk_forward` 显式 `regime_aware=True`(min-|ICIR| 生存适应度,ADR-026),堵"晴天因子";接线时修一处隐藏坑——walk-forward 截断面板下 2024 两 regime 段无数据,旧实现把"无数据"混同 ICIR=0,`min()` 会让**所有候选 edge 归零**;现 `_regime_survival_edge` 只聚合可用段、全缺退回全样本 edge。
   · **regime 审计披露层**:新增 `services/read/regime_audit.py`——当前 regime(四维+置信度)、逐在册版本按 regime 归因(lagged 标签防同日虚假相关)、§7"压力段反成最佳年"机械化 WARN(统计口径 z>2,经对抗测试两轮迭代:裸比较与固定夏普差都被真实量级纯噪声打回)。纯披露非判定,准入仍归 9-Gate。
