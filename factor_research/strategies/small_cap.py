@@ -164,6 +164,11 @@ def run_small_cap_strategy(config=StrategyConfig()):
 
 
 def latest_signal(config=StrategyConfig()):
+    """Backward-compatible wrapper for :func:`latest_decision`."""
+    return latest_decision(config)
+
+
+def latest_decision(config=StrategyConfig()):
     """Latest signal for live trading."""
     result = run_small_cap_strategy(config)
     close = result["close"]

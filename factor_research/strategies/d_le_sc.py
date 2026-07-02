@@ -150,6 +150,11 @@ def run_d_le_sc_strategy(config=StrategyConfig()):
 
 
 def latest_signal(config=StrategyConfig()):
+    """Backward-compatible wrapper for :func:`latest_decision`."""
+    return latest_decision(config)
+
+
+def latest_decision(config=StrategyConfig()):
     """Returns the latest signal and holdings for live trading."""
     result = run_d_le_sc_strategy(config)
     close = result["close"]
