@@ -905,3 +905,72 @@ class TrustCalibrationView(BaseModel):
     strategies: list[TrustStrategyRow] = Field(default_factory=list)
     truth_sources: dict = Field(default_factory=dict)
     honesty: str = ""                     # 本视图定位与边界的显式声明
+
+
+# ── 决策收件箱(Decision Inbox)──────────────────────────────────────────
+# 产品主界面从「人巡视看板」翻转为「系统找人」:收件箱只装**需要人裁决的事项**,
+# 每项 = 一个决策问句 + 已装配证据 + canonical 动作入口(advisory,人执行)。
+# 诚实护栏:
+#   - 本视图**只聚合权威事实源,不做任何新判定**(裁决权威见各 item.authority);
+#   - 空收件箱 = 「确认过所有事实源且无待裁决」,与「事实源读不到」严格区分
+#     (all_sources_readable=False 时禁止宣称"无需介入",fail-closed);
+#   - actions 是 advisory 导航(R-LLM-001 / ADR-030):指向 canonical 入口由人执行,
+#     本视图不执行任何写动作。
+
+class DecisionAction(BaseModel):
+    """收件箱事项的一个候选动作:指向 canonical 入口(advisory,人执行)。"""
+    label: str = ""            # 动作文案(如「批准进入 shadow」)
+    entrypoint: str = ""       # canonical 入口(命令/函数/API 路径)
+    allowed: bool = True       # services.read.action_policy 裁决(advisory)
+    reason: str = ""           # 允/拒理由(来自 action_policy 或事实源)
+
+
+class DecisionItem(BaseModel):
+    """一张待裁决卡片:一个决策 + 支撑证据 + 后果 + 动作。"""
+    key: str = ""              # 稳定 id(如 review:<fingerprint> / deployment:fail-closed)
+    kind: str = ""             # registered_failed|deployment|review|decay|data|steer|source_error
+    severity: str = "info"     # blocked | attention | info(info=常设建议,不计入待裁决数)
+    title: str = ""            # 一句话决策问句
+    evidence: list[str] = Field(default_factory=list)   # 机械证据(已装配,可直显)
+    consequence: str = ""      # 不裁决的后果
+    actions: list[DecisionAction] = Field(default_factory=list)
+    authority: str = ""        # 该事项谁说了算(权威来源,非本视图)
+    drilldown: str = ""        # 证据抽屉 API 路径(溯源入口)
+
+
+class DecisionInboxView(BaseModel):
+    """决策收件箱:今天需要人裁决的 0-N 件事。
+
+    headline 语义(三态,严格区分):
+    ① 有待裁决 → 「今天需要你裁决 N 件事」;
+    ② 全源可读且无待裁决 → 「今天无需你介入」(收件箱为空 = 系统健康,是功能不是空态);
+    ③ 任一事实源不可读 → 「收件箱不完整」(**不得**宣称无事,fail-closed)。"""
+    as_of: str = ""
+    headline: str = ""
+    pending_count: int = 0     # blocked+attention 事项数(info 不计)
+    all_sources_readable: bool = True
+    items: list[DecisionItem] = Field(default_factory=list)
+    truth_sources: dict = Field(default_factory=dict)
+    honesty: str = ""
+
+
+class DailyBriefView(BaseModel):
+    """今日简报:打开产品的唯一首屏。回答三问:
+    系统自己干了什么 / 世界有什么变化 / 今天需要我裁决几件事。
+
+    诚实护栏:trust banner 直接复用 ``get_trust_calibration``(不重算不改写);
+    各 section 事实源不可读时如实标 unknown,绝不填默认值假绿。"""
+    as_of: str = ""
+    # 信任裁决(复用 trust_calibration,原样透传)
+    trust_banner_status: str = "neutral"
+    trust_headline: str = ""
+    # 今天需要你裁决几件事(来自 decision_inbox)
+    decision_count: int = 0
+    decision_headline: str = ""
+    top_decisions: list[DecisionItem] = Field(default_factory=list)  # 最多 3 张预览
+    # 系统自己干了什么(autoresearch 漏斗 + 近期活动)
+    system_activity: dict = Field(default_factory=dict)
+    # 世界有什么变化(数据新鲜度 / 衰减 / paper 实测)
+    world_state: dict = Field(default_factory=dict)
+    truth_sources: dict = Field(default_factory=dict)
+    honesty: str = ""

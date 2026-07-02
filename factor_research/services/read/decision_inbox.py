@@ -1,0 +1,353 @@
+"""Decision-Inbox Read Service —— 决策收件箱(产品主界面,「系统找人」)。
+
+回答唯一问题:**今天有哪几件事需要人裁决?每件事的证据和 canonical 动作是什么?**
+
+产品定位(承 DECISION_COCKPITS.md 决策导向):单人 shop 最稀缺的是注意力,
+巡视式看板假设人每天主动巡查;本视图翻转为推送式——系统把「只有人能做的决定」
+装配好证据后推到人面前,其余一切自动、可追溯。
+
+诚实护栏(必须遵守):
+- **只聚合权威事实源,不做任何新判定**:逐版本裁决 = ``validation_gate.get_gate_verdicts``
+  (权威 decide_nine_gate);部署三态 = ``system_truth.get_system_truth``(fail-closed 校验);
+  review 待办 = ``factory.autoresearch.ReviewQueue.pending``;衰减 = ``reports/decay_status.json``;
+  数据 = ``state.data_quality``;研究重心 = ``promotion_readiness``(advisory)。
+- **空箱三态严格区分**:「无待裁决」只能在**全部事实源可读**时宣称;任一源不可读
+  → 该源以 ``source_error`` 事项显式入箱(attention),headline 禁止称"无需介入"。
+  控制路径禁静默吞异常(check_control_exceptions 同精神):异常必须成为可见事项。
+- **actions 是 advisory 导航**(R-LLM-001 / ADR-030):allowed/entrypoint 来自
+  ``action_policy.can_agent_do``,指向 canonical 入口由人执行;本视图零写动作。
+- info 级事项(常设研究重心建议)不计入「待裁决数」,不制造虚假紧迫感。
+"""
+from __future__ import annotations
+
+import json
+from datetime import datetime
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+from contracts.views import DecisionAction, DecisionInboxView, DecisionItem
+
+ROOT = Path(__file__).resolve().parents[2]
+CHINA_TZ = ZoneInfo("Asia/Shanghai")
+DECAY_STATUS = ROOT / "reports" / "decay_status.json"
+
+_REGISTERED = {"在册", "ACTIVE", "active"}
+_SEVERITY_ORDER = {"blocked": 0, "attention": 1, "info": 2}
+_REVIEW_ITEM_CAP = 10  # 收件箱逐条展示上限,超出部分聚合为计数(注意力保护)
+
+
+def _policy_action(label: str, action: str, target: str, entrypoint_fallback: str) -> DecisionAction:
+    """经 action_policy 装配一个 advisory 动作;policy 不可用时如实降级(不臆造 allowed)。"""
+    try:
+        from services.read.action_policy import can_agent_do
+
+        d = can_agent_do(action, target)
+        return DecisionAction(
+            label=label,
+            entrypoint=d.required_entrypoint or entrypoint_fallback,
+            allowed=d.allowed,
+            reason=d.reason,
+        )
+    except Exception as exc:  # noqa: BLE001 —— 降级为不可判,绝不默认 allowed=True
+        return DecisionAction(
+            label=label, entrypoint=entrypoint_fallback,
+            allowed=False, reason=f"action_policy 不可用:{exc}",
+        )
+
+
+def _source_error_item(source: str, exc: Exception) -> DecisionItem:
+    """事实源不可读 → 显式入箱(fail-closed:读不到 ≠ 无事)。"""
+    return DecisionItem(
+        key=f"source_error:{source}",
+        kind="source_error",
+        severity="attention",
+        title=f"事实源「{source}」不可读——先修复可观测性,期间不得假定该面无事。",
+        evidence=[f"{type(exc).__name__}: {exc}"],
+        consequence="该面处于盲区:任何『系统健康』结论都不完整。",
+        actions=[],
+        authority=source,
+    )
+
+
+# ── 各事实源 → 待裁决事项 ────────────────────────────────────────────────
+
+def _items_registered_failed(verdicts) -> list[DecisionItem]:
+    """在册版本权威 FAILED/RUN_FAILED → 必须人裁决(退役还是重审),blocked 级。"""
+    out: list[DecisionItem] = []
+    for gr in verdicts:
+        if gr.stage in _REGISTERED and gr.verdict in ("FAILED", "RUN_FAILED"):
+            out.append(DecisionItem(
+                key=f"registered_failed:{gr.family}/{gr.version}",
+                kind="registered_failed",
+                severity="blocked",
+                title=f"在册策略 {gr.family}/{gr.version} 权威 9-Gate {gr.verdict}——退役还是重审?",
+                evidence=[
+                    f"权威裁决 decide_nine_gate = {gr.verdict}({gr.verdict_label})",
+                    f"阻断根因:{gr.register_blocker or '见验证闸门逐门诊断'}",
+                    f"dsr_p={gr.dsr_p} pbo={gr.pbo} n_trials={gr.n_trials}",
+                ],
+                consequence="在册身份与权威裁决矛盾:任何据其实战/展示都属 over-trust。",
+                actions=[
+                    DecisionAction(
+                        label="退役(保留历史,记录失效归因)",
+                        entrypoint="strategy_registry(唯一写入口;按 §7.4 退役纪律)",
+                        allowed=True, reason="退役是台账状态变更,走唯一写入口",
+                    ),
+                    _policy_action("重审(重跑完整 9-Gate)", "run_validation",
+                                   f"{gr.family}/{gr.version}", "workflow.nine_gate_runner"),
+                ],
+                authority="core.analysis.nine_gate_policy.decide_nine_gate",
+                drilldown="/governance/gate-verdicts",
+            ))
+    return out
+
+
+def _items_deployment(truth) -> list[DecisionItem]:
+    """部署清单声明了身份但 fail-closed 校验不过 → 换腿/停用,blocked 级。"""
+    if not truth.declared_present or truth.verified:
+        return []
+    legs = ", ".join(f"{l.family}/{l.version}" for l in truth.declared_legs) or "(无腿)"
+    return [DecisionItem(
+        key="deployment:fail-closed",
+        kind="deployment",
+        severity="blocked",
+        title="部署清单指向不可部署版本(fail-closed 已拦截)——换腿还是停用清单?",
+        evidence=[
+            f"declared:{truth.declared_deployment_id or '未知'} → {legs}",
+            f"fail-closed 根因:{truth.verify_error or ';'.join(truth.blocking_reasons) or '未知'}",
+            f"production_allowed={truth.production_allowed}",
+        ],
+        consequence="信号/模拟盘停更是正确 fail-closed;但换腿决定只有人能做,拖延=系统停摆。",
+        actions=[
+            _policy_action("更新部署清单(换腿/停用)", "update_deployment",
+                           "deployments/manifest", "deployments/(canonical manifest 入口)"),
+        ],
+        authority="services.read.system_truth(fail-closed 校验)",
+        drilldown="/system/truth",
+    )]
+
+
+def _items_review_queue(pending: list[dict]) -> list[DecisionItem]:
+    """autoresearch 待人工复核候选 → 每条一张卡(上限内),approve/reject 只有人能做。"""
+    out: list[DecisionItem] = []
+    for rec in pending[:_REVIEW_ITEM_CAP]:
+        fp = rec.get("fingerprint", "")
+        out.append(DecisionItem(
+            key=f"review:{fp}",
+            kind="review",
+            severity="attention",
+            title=f"候选 {fp[:12]}… 已过自动闸门等待人工复核——批准进入 shadow 还是驳回?",
+            evidence=[
+                f"candidate: {rec.get('candidate', '')[:120]}",
+                f"自动闸决定:{rec.get('decision', '?')}({rec.get('reason', '')})",
+                f"metrics: {json.dumps(rec.get('metrics') or {}, ensure_ascii=False)[:200]}",
+            ],
+            consequence="不裁决则该候选停在队列,自动环无法继续推进它。",
+            actions=[
+                _policy_action("批准(approve,不写 LIVE 台账)", "promote_candidate",
+                               fp, f"POST /experiments/autoresearch/review/{fp}"),
+                DecisionAction(label="驳回(reject,留痕)",
+                               entrypoint=f"POST /experiments/autoresearch/review/{fp}",
+                               allowed=True, reason="人工复核是 R-WF-001 通道内动作"),
+            ],
+            authority="factory.autoresearch.ReviewQueue(L0-L3 自动闸已过,人是最后一道)",
+            drilldown="/experiments/autoresearch/review-queue",
+        ))
+    if len(pending) > _REVIEW_ITEM_CAP:
+        out.append(DecisionItem(
+            key="review:overflow",
+            kind="review",
+            severity="attention",
+            title=f"另有 {len(pending) - _REVIEW_ITEM_CAP} 个候选同样待复核(已按队列截断展示)。",
+            evidence=[f"待复核总数 {len(pending)},收件箱逐条上限 {_REVIEW_ITEM_CAP}。"],
+            consequence="队列积压越久,自动研究环产出转化越慢。",
+            actions=[],
+            authority="factory.autoresearch.ReviewQueue",
+            drilldown="/experiments/autoresearch/review-queue",
+        ))
+    return out
+
+
+def _items_decay(decay: dict | None) -> list[DecisionItem]:
+    """decay 报告标红 → 人确认处置/归因。报告缺失不在此造事项(信任缺口归 trust_calibration)。"""
+    if not isinstance(decay, dict):
+        return []
+    status = str(decay.get("status", "")).lower()
+    strategies = decay.get("strategies") or []
+    decayed = [s.get("strategy") for s in strategies if isinstance(s, dict) and s.get("decayed")]
+    flagged = bool(decay.get("decaying")) or status == "red" or bool(decayed)
+    if not flagged:
+        return []
+    return [DecisionItem(
+        key="decay:red",
+        kind="decay",
+        severity="attention",
+        title=f"衰减监控标红({len(decayed) or '?'} 个策略)——确认退役归因还是维持观察?",
+        evidence=[
+            f"decay_status={status or 'red(decaying 标记)'} as_of={decay.get('as_of_date', '?')}",
+            f"标红策略:{', '.join(str(x) for x in decayed) or '(见报告)'}",
+        ],
+        consequence="衰减确认拖延 = 失效策略继续占据台账身份与注意力(§7.4 退役纪律)。",
+        actions=[
+            DecisionAction(label="确认退役(记录失效归因)",
+                           entrypoint="strategy_registry(唯一写入口;§7.4)",
+                           allowed=True, reason="退役走台账唯一写入口"),
+            DecisionAction(label="维持观察(在报告中留痕)",
+                           entrypoint="reports/decay_status.json 生成管线",
+                           allowed=True, reason="观察决定应留痕,不得静默"),
+        ],
+        authority="reports/decay_status.json(实时衰减唯一权威)",
+        drilldown="/governance/trust-calibration",
+    )]
+
+
+def _items_data(dq) -> list[DecisionItem]:
+    """数据质量裁决非「可用」→ 先修数据再谈研究(R-DATA 系)。"""
+    if dq.verdict == "可用":
+        return []
+    return [DecisionItem(
+        key="data:quality",
+        kind="data",
+        severity="blocked" if dq.verdict == "不建议回测" else "attention",
+        title=f"数据质量裁决「{dq.verdict}」——先修数据还是带伤研究(须显式记录)?",
+        evidence=[
+            f"severe={dq.severe_count}(负价/OHLC 错,真问题) jump={dq.jump_count}(多为除权/涨跌停,正常现象)",
+            f"clean_ratio={dq.clean_ratio}",
+        ],
+        consequence="带伤口径出的一切结论按 R-DATA 系可作废;静默使用半截数据违反 §9。",
+        actions=[
+            DecisionAction(label="查看质量报告并修复",
+                           entrypoint="data_lake/quality_report.json + validate_final.py",
+                           allowed=True, reason="数据修复走 canonical 校验管线"),
+        ],
+        authority="services.read.state.data_quality(data_lake/quality_report.json)",
+        drilldown="/data/quality",
+    )]
+
+
+def _items_steer(promo) -> list[DecisionItem]:
+    """常设研究重心建议(info 级,不计入待裁决数):下一轮算力投给谁。"""
+    if not promo.lead_candidate:
+        return []
+    return [DecisionItem(
+        key="steer:promotion",
+        kind="steer",
+        severity="info",
+        title=f"研究重心建议:{promo.lead_candidate}(距入册最近)——继续推进还是换向?",
+        evidence=[
+            f"唯一卡点:{promo.lead_blocker or '(已就绪)'}",
+            f"边际动作:{promo.research_steer or '(无建议)'}",
+        ],
+        consequence="常设建议,非紧急;但算力持续投向拥挤簇 = 白涨 n_trials(见 metasearch 发现)。",
+        actions=[
+            _policy_action("按 R-WF-001 通道推进", "promote_candidate",
+                           promo.lead_candidate, "workflow.promote"),
+        ],
+        authority="services.read.promotion_readiness(排序键=距入册,advisory 非裁决)",
+        drilldown="/experiments/promotion-readiness",
+    )]
+
+
+# ── 装配 ────────────────────────────────────────────────────────────────
+
+def _load_decay() -> dict | None:
+    if not DECAY_STATUS.exists():
+        return None
+    return json.loads(DECAY_STATUS.read_text(encoding="utf-8"))
+
+
+def get_decision_inbox(
+    *,
+    gate_verdicts=None,
+    system_truth=None,
+    review_pending: list[dict] | None = None,
+    decay: dict | None = ...,  # ... 哨兵 = 从磁盘读;None = 显式「无报告」
+    data_quality_view=None,
+    promotion=None,
+) -> DecisionInboxView:
+    """装配收件箱。关键字参数仅供测试注入事实源;生产路径全部走权威读服务。"""
+    items: list[DecisionItem] = []
+    all_readable = True
+
+    # 每个事实源独立 try:失败 → source_error 显式入箱,绝不静默跳过。
+    try:
+        if gate_verdicts is None:
+            from services.read.validation_gate import get_gate_verdicts
+            gate_verdicts = get_gate_verdicts().verdicts
+        items += _items_registered_failed(gate_verdicts)
+    except Exception as exc:  # noqa: BLE001
+        all_readable = False
+        items.append(_source_error_item("validation_gate.get_gate_verdicts", exc))
+
+    try:
+        if system_truth is None:
+            from services.read.system_truth import get_system_truth
+            system_truth = get_system_truth()
+        items += _items_deployment(system_truth)
+    except Exception as exc:  # noqa: BLE001
+        all_readable = False
+        items.append(_source_error_item("system_truth.get_system_truth", exc))
+
+    try:
+        if review_pending is None:
+            from factory.autoresearch import ReviewQueue
+            review_pending = ReviewQueue().pending()
+        items += _items_review_queue(review_pending)
+    except Exception as exc:  # noqa: BLE001
+        all_readable = False
+        items.append(_source_error_item("autoresearch.ReviewQueue.pending", exc))
+
+    try:
+        if decay is ...:
+            decay = _load_decay()
+        items += _items_decay(decay)
+    except Exception as exc:  # noqa: BLE001
+        all_readable = False
+        items.append(_source_error_item("reports/decay_status.json", exc))
+
+    try:
+        if data_quality_view is None:
+            from services.read.state import data_quality
+            data_quality_view = data_quality(with_duckdb=False)
+        items += _items_data(data_quality_view)
+    except Exception as exc:  # noqa: BLE001
+        all_readable = False
+        items.append(_source_error_item("state.data_quality", exc))
+
+    try:
+        if promotion is None:
+            from services.read.promotion_readiness import get_promotion_readiness
+            promotion = get_promotion_readiness()
+        items += _items_steer(promotion)
+    except Exception as exc:  # noqa: BLE001
+        all_readable = False
+        items.append(_source_error_item("promotion_readiness", exc))
+
+    items.sort(key=lambda i: (_SEVERITY_ORDER.get(i.severity, 9), i.key))
+    pending = sum(1 for i in items if i.severity in ("blocked", "attention"))
+
+    if pending > 0:
+        headline = f"今天需要你裁决 {pending} 件事;最高优先级:{items[0].title}"
+    elif all_readable:
+        headline = "今天无需你介入:所有事实源已确认,无待裁决事项(空收件箱 = 系统健康)。"
+    else:
+        # 理论不可达(源错误本身是 attention 事项),防御性保留:禁在盲区宣称无事。
+        headline = "部分事实源不可读,收件箱不完整——不得视为无事。"
+
+    return DecisionInboxView(
+        as_of=datetime.now(CHINA_TZ).isoformat(timespec="seconds"),
+        headline=headline,
+        pending_count=pending,
+        all_sources_readable=all_readable,
+        items=items,
+        truth_sources={
+            "verdict_authority": "core.analysis.nine_gate_policy.decide_nine_gate",
+            "deployment": "services.read.system_truth(fail-closed)",
+            "review_queue": "factory.autoresearch.ReviewQueue",
+            "decay_live": str(DECAY_STATUS),
+            "data": "data_lake/quality_report.json",
+            "steer": "services.read.promotion_readiness(advisory)",
+        },
+        honesty="本视图只聚合权威事实源,不做新判定;actions 为 advisory 导航,由人经 canonical "
+                "入口执行(R-LLM-001/ADR-030);任一事实源不可读即显式入箱,空箱只在全源可读时宣称。",
+    )
