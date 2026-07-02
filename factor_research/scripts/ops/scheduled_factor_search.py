@@ -188,6 +188,9 @@ def main():
         search_res = run_autoresearch_walk_forward(
             cutoff=str(meta_cutoff.date()),
             oos_end=str(meta_oos_end.date()),
+            # WS6:调度搜索默认跨 regime 生存(min |ICIR| 只聚合截断面板内可用段,
+            # ADR-026/ADR-033)——堵"晴天因子"(单段行情堆出来的高 ICIR)。
+            regime_aware=True,
             islands=5,
             generations=3,
             population=6,

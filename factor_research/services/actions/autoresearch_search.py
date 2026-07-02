@@ -241,6 +241,7 @@ def run_autoresearch_walk_forward(
     amount=None,
     vintage_id: str | None = None,
     runners: dict | None = None,
+    regime_aware: bool = False,
 ) -> AutoResearchWalkForwardResponse:
     """元级防未来的岛屿搜索:演化只见 <=cutoff,冠军在 (cutoff, oos_end] 一次性 OOS 评分。
 
@@ -282,6 +283,9 @@ def run_autoresearch_walk_forward(
         rediscovery_corr=rediscovery_corr,
         experiment_log=experiment_log,
         review_queue=review_queue,
+        # WS6:跨 regime 生存适应度(ADR-026)透传;截断面板下缺段由
+        # islands._regime_survival_edge 只聚合可用段,不会 edge 归零。
+        regime_aware=regime_aware,
     )
     # §5.1 chokepoint:walk-forward 搜索同样记账(此前完全漏计 = DSR 虚松)。
     record_trials("autoresearch", max(1, int(result.evaluated)), context="walk-forward search")

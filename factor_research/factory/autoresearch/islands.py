@@ -40,6 +40,25 @@ class _MockRepo:
     def append(self, *args, **kwargs) -> None: pass
 
 
+# 三个极性历史 regime 段(ADR-026:min-ICIR 生存适应度;全部 < holdout boundary 2025-01-01)
+REGIME_SEGMENTS = (
+    ("regime_1", "2024-01-02", "2024-02-08"),  # 小盘流动性踩踏
+    ("regime_2", "2024-04-01", "2024-09-30"),  # 蓝筹/价值轮动
+    ("regime_3", "2023-01-02", "2023-12-31"),  # 常态牛市
+)
+
+
+def _regime_survival_edge(segment_icirs, fallback_edge: float) -> float:
+    """跨 regime 生存 edge = min(|ICIR|),只聚合面板内有数据的段(None = 段不在面板)。
+
+    walk-forward 截断下(如调度 cutoff≈2023 年末)2024 两段不可用;若把"无数据"
+    混同 ICIR=0 参与 min,所有候选 edge 恒为 0,fitness 对 ICIR 失明。全段不可用
+    时退回全样本 edge(regime_aware 不会让搜索瞎掉)。
+    """
+    avail = [abs(float(v)) for v in segment_icirs if v is not None]
+    return min(avail) if avail else float(fallback_edge)
+
+
 def ast_expr(ast: dict) -> str:
     expr = " + ".join(
         f"{t.get('factor')}({t.get('params', {}).get('window', '')})×{t.get('weight', 1)}"
@@ -790,11 +809,10 @@ def run_island_search(
         if orth_weight > 0 and panel is not None and style_panels:
             style_pen = _style_exposure(panel, style_panels)
 
-        # Define 3 historical regimes:
-        # Regime 1 (Small-cap Crash): 2024-01-02 to 2024-02-08
-        # Regime 2 (Value/Large-cap Rotation): 2024-04-01 to 2024-09-30
-        # Regime 3 (Normal/Bull Market): 2023-01-02 to 2023-12-31
-        icir1 = icir2 = icir3 = 0.0
+        # 三段极性 regime ICIR(段定义 = 模块级 REGIME_SEGMENTS,ADR-026)。
+        # None = 段不在面板内(walk-forward 截断)——与"真 ICIR≈0"必须区分,
+        # 否则 min 聚合把截断误判成零 edge(见 _regime_survival_edge)。
+        segment_icirs: dict[str, float | None] = {name: None for name, _, _ in REGIME_SEGMENTS}
         if forward_ret is not None:
             from factors.autoresearch_dsl import compute_dsl_factor
             try:
@@ -802,41 +820,39 @@ def run_island_search(
             except Exception:
                 factor_panel = None
 
-            def _get_regime_icir(start_dt: str, end_dt: str) -> float:
+            def _get_regime_icir(start_dt: str, end_dt: str) -> float | None:
                 if factor_panel is None:
-                    return 0.0
+                    return None
                 r_idx = forward_ret.index[(forward_ret.index >= start_dt) & (forward_ret.index <= end_dt)]
                 common_idx = factor_panel.index.intersection(r_idx)
                 if len(common_idx) < 5:
-                    return 0.0
+                    return None  # 段不在(截断后)面板内,不是 ICIR=0
                 from engine.factor_analysis import calc_ic
                 try:
                     ic_slice = calc_ic(factor_panel.loc[common_idx], forward_ret.loc[common_idx], method="rank").dropna()
                     if len(ic_slice) < 5:
-                        return 0.0
+                        return None
                     mean_val = ic_slice.mean()
                     std_val = ic_slice.std()
                     if std_val <= 1e-8:
-                        return 0.0
+                        return 0.0  # 有数据但因子无区分度 = 真 0,参与 min
                     return float(mean_val / std_val)
                 except Exception:
-                    return 0.0
+                    return None
 
-            icir1 = _get_regime_icir("2024-01-02", "2024-02-08")
-            icir2 = _get_regime_icir("2024-04-01", "2024-09-30")
-            icir3 = _get_regime_icir("2023-01-02", "2023-12-31")
+            for seg_name, seg_start, seg_end in REGIME_SEGMENTS:
+                segment_icirs[seg_name] = _get_regime_icir(seg_start, seg_end)
 
+        # meta 透出保持 dict[str, float] 契约(champion view/JSON):None → 0.0
         regime_meta[candidate.fingerprint] = {
-            "regime_1": icir1,
-            "regime_2": icir2,
-            "regime_3": icir3,
+            name: (0.0 if v is None else float(v)) for name, v in segment_icirs.items()
         }
 
         priority_adjustment = float(
             (result.metrics.get("knowledge_gate", {}) or {}).get("priority_adjustment", 1.0)
         )
         if regime_aware:
-            edge = min(abs(icir1), abs(icir2), abs(icir3))
+            edge = _regime_survival_edge(segment_icirs.values(), edge)
         fit = (edge + novelty_weight * nov - corr_weight * corr - turnover_weight * turn
                - complexity_weight * comp_val - orth_weight * style_pen) * priority_adjustment
         memo[candidate.fingerprint] = (fit, result)
