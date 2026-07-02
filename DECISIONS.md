@@ -308,6 +308,12 @@
 - **诚实多重检验(item3)**: best-of-k size 是搜索自由度。`sweep_audit_size` **函数内强制**把 `len(grid)` 记入 `governance.trial_ledger`(耦合保证"扫了必记"),在 9-Gate 读 `honest_n_trials` 前累加,DSR 惩罚如实反映(R-EVIDENCE-001 ④)。
 - **验证**: 对抗测试 `tests/test_scheduled_search_topn.py`——核心 `test_pick_audit_size_is_not_just_max_size`(size=25 净夏普最高时必选 25、不选最大 100)、容量仅平手打破(>5% 不翻盘)、`sweep_audit_size` 把 len(grid) 记入注入 tmp 账本(未碰真账本)、override 压过搜出值;8/8 通过 + 4 守卫绿(layer_deps/test_discovery/no_force_promote/holdout_compliance)。数据依赖全量套件仍受 worktree 缺 data_lake 限制(与本 diff 无关)。
 
+### ADR-033 regime 升级:调度搜索默认跨 regime 生存 + 独立 regime 审计披露层(WS6)
+- **上下文**: regime 此前只被"消费"(择时 / `regime_aware` 搜索适应度 / Gate7 bull-bear 拆分),从未被独立审计;`regime_aware=True`(ADR-026 min-|ICIR| 生存适应度)只有个别 research 脚本启用,调度周搜路径(`run_autoresearch_walk_forward`)甚至没有该参数。接线时发现隐藏坑:调度 walk-forward 训练面板截到 cutoff≈2023 年末,而 REGIME 段 1/2 是 2024 日期——旧内联实现把"段不在面板"与"真 ICIR=0"都返回 0.0,`min()` 会把**所有候选 edge 归零**,fitness 对 ICIR 失明。
+- **决策**: ① 调度周搜显式 `regime_aware=True`(services 参数默认仍 False,其它调用方行为不变);② `islands.py` 提取模块级 `REGIME_SEGMENTS` + `_regime_survival_edge()`:段不在面板返回 None 并被跳过、全 None 退回全样本 edge、真 0(有数据无区分度)照常参与 min;③ 新增只读披露层 `services/read/regime_audit.py`:当前 regime(四维标签+连续值+历史分位置信度)、逐在册版本按 regime 归因(`data_lake/version_returns`)、§7"压力段反成最佳年"的机械化 WARN(`stress_outperforms`)。归因统一用 **lagged 标签**(trend 列 RegimeEngine 已内建 shift(1),其余三维本层 shift(1)),防同日信息虚假相关。
+- **理由**: min-|ICIR| 已是评审过的机制(ADR-026),本次只是接到调度默认 + 截断健壮化,不发明新适应度;审计层是纯披露(排序供人审视),**不是新准入门**——判定仍归 9-Gate/decay_monitor。`stress_outperforms` 经对抗测试迭代两次:裸 `down>up` 与拍脑袋固定夏普差都被"真实量级纯噪声"测试打回(130 天桶的夏普差随机 SD≈2),最终用统计口径 **z>2**(夏普差/其标准误 √(252/n_d+252/n_u),自适应样本长度;z 连续值同时披露)。
+- **验证**: `tests/test_regime_survival.py` 6/6——晴天因子 (0.05,0.9,0.9)→edge 0.05(全样本口径会给 0.9 放行)、截断 (None,None,0.6)→0.6(旧 None≡0.0 实现给 0,旧码必红)、全 None 回退、段日期钉死 <2025-01-01(不偷金库)、AST 钉死调度传参与 services 转发;`tests/test_regime_audit.py` 7/7——lagged 口径(同日构造收益在 lagged 归因下消失,同日口径实现必红)、stress WARN 真阳/真阴/纯噪声不误报、小桶 insufficient、确定性、晴天策略排审计首位、RegimeEngine 契约烟测。守卫 5 绿(layer_deps/test_discovery=114/module_status/holdout_compliance/control_exceptions)。既有 `test_autoresearch_engine.py` 两例失败为**基线预存**(未改动基线复现同样失败、main 独有 32 提交未触该文件),非本次引入。
+
 ---
 
 ## ③ 投资/交易决策记录

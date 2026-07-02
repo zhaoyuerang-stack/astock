@@ -1,8 +1,13 @@
 # STATUS — 当前进度
 
-> 更新:2026-07-01。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
+> 更新:2026-07-02。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
+
+**2026-07-02(WS6:regime 从特征升级为审计器,ADR-033)**：
+  · **调度默认跨 regime 生存**:周搜 `run_autoresearch_walk_forward` 显式 `regime_aware=True`(min-|ICIR| 生存适应度,ADR-026),堵"晴天因子";接线时修一处隐藏坑——walk-forward 截断面板下 2024 两 regime 段无数据,旧实现把"无数据"混同 ICIR=0,`min()` 会让**所有候选 edge 归零**;现 `_regime_survival_edge` 只聚合可用段、全缺退回全样本 edge。
+  · **regime 审计披露层**:新增 `services/read/regime_audit.py`——当前 regime(四维+置信度)、逐在册版本按 regime 归因(lagged 标签防同日虚假相关)、§7"压力段反成最佳年"机械化 WARN(统计口径 z>2,经对抗测试两轮迭代:裸比较与固定夏普差都被真实量级纯噪声打回)。纯披露非判定,准入仍归 9-Gate。
+  · **对抗测试** 13/13 + 守卫 5 绿;既有 `test_autoresearch_engine` 两例失败为基线预存(未改动基线复现、main 独有提交未触该文件),非本次引入。
 
 **2026-07-01(系统演进路线图 + WS0 生产安全原则固化)**：owner 提出 7 条演进诉求(模拟盘展示 top-N / 多策略组合逃小盘陷阱 / 日度挖掘 / 持仓数不写死 25 / 文献启发 / regime 审计 / 机械判断自省),已出计划(`.claude/plans/`),起步聚焦「小盘陷阱集群 WS2+4+6」。
   · **WS0 落地**:新增 P0 规则 `R-PROD-001`(不自动下单;排名靠前 top-N 策略自动模拟盘作为实测证据,「不下单 ≠ 不实测」),同步 `SPEC.md` 执行边界 + `DECISIONS.md` ADR-031。纯文档,未触代码/口径。
