@@ -721,3 +721,51 @@ export interface TrustCalibrationView {
   truth_sources: Record<string, string>;
   honesty: string;
 }
+
+// ── 决策收件箱 / 今日简报(产品主界面:「系统找人」)────────────────────
+// 对应后端 contracts.views.DecisionInboxView / DailyBriefView(GET /inbox, /inbox/brief)。
+// 前端只呈现:severity/headline 语义由后端 fail-closed 装配,UI 不得改写或补绿。
+
+export type DecisionSeverity = "blocked" | "attention" | "info";
+
+export interface DecisionAction {
+  label: string;
+  entrypoint: string;                // canonical 入口(命令/函数/API 路径),人执行
+  allowed: boolean;                  // action_policy 裁决(advisory)
+  reason: string;
+}
+
+export interface DecisionItem {
+  key: string;
+  kind: string;                      // registered_failed|deployment|review|decay|data|steer|source_error
+  severity: DecisionSeverity;
+  title: string;
+  evidence: string[];
+  consequence: string;
+  actions: DecisionAction[];
+  authority: string;
+  drilldown: string;                 // 证据抽屉 API 路径
+}
+
+export interface DecisionInboxView {
+  as_of: string;
+  headline: string;
+  pending_count: number;             // blocked+attention(info 不计)
+  all_sources_readable: boolean;     // false = 收件箱不完整,禁称无事
+  items: DecisionItem[];
+  truth_sources: Record<string, string>;
+  honesty: string;
+}
+
+export interface DailyBriefView {
+  as_of: string;
+  trust_banner_status: TrustBannerStatus;  // 原样透传 trust_calibration
+  trust_headline: string;
+  decision_count: number;            // -1 = 收件箱不可读(须显式呈现,非 0)
+  decision_headline: string;
+  top_decisions: DecisionItem[];
+  system_activity: Record<string, unknown>;
+  world_state: Record<string, { status: string; [k: string]: unknown }>;
+  truth_sources: Record<string, string>;
+  honesty: string;
+}

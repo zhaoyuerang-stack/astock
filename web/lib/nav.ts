@@ -19,6 +19,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: "决策驾驶舱",
     items: [
+      { href: "/inbox", label: "⓪ 今日简报·收件箱", desc: "系统找人:信任裁决 + 今天需要你裁决的事项(证据已装配,空箱=健康)", ready: true, icon: "dashboard", modes: ["ops", "rd"] },
       { href: "/alpha-factory", label: "① Alpha 工厂", desc: "晋级就绪:候选按距入册排序 + 唯一卡点门 + 信息簇拥挤度(下一步研究投向哪)", ready: true, icon: "candidates", modes: ["ops", "rd"] },
       { href: "/system-governance", label: "② 验证闸门", desc: "9-Gate 逐门裁决 + 部署真相 + CI 守卫/审计(候选能否独立验证通过→入册)", ready: true, icon: "settings", modes: ["ops", "rd"] },
       { href: "/dashboard", label: "③ PM 交易台", desc: "今日操作台:今天是否可交易 + 绑定原因 + 板凳/解锁路径", ready: true, icon: "dashboard", modes: ["ops", "rd"] },

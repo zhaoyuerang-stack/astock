@@ -39,6 +39,8 @@ import type {
   PromotionReadinessView,
   GateVerdictsView,
   TrustCalibrationView,
+  DecisionInboxView,
+  DailyBriefView,
 } from "./types";
 
 const BASE =
@@ -267,6 +269,8 @@ export const api = {
   promotionReadiness: () => get<PromotionReadinessView>("/experiments/promotion-readiness"),
   gateVerdicts: () => get<GateVerdictsView>("/governance/gate-verdicts"),
   trustCalibration: () => get<TrustCalibrationView>("/governance/trust-calibration"),
+  decisionInbox: () => get<DecisionInboxView>("/inbox"),
+  dailyBrief: () => get<DailyBriefView>("/inbox/brief"),
   shadowIncubation: () => get<any>("/experiments/shadow-incubation"),
   amountTimingValidation: () => get<any>("/experiments/amount-timing-validation"),
 };
