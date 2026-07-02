@@ -33,6 +33,51 @@ from governance.holdout import (
 )
 
 
+_DEFAULT_TOP_N = 25
+_DEFAULT_REBALANCE_DAYS = 20
+
+
+def _candidate_exec_params(ast: dict) -> tuple[int, int]:
+    """从候选 AST 的 execution 块取 (top_n, rebalance_days)(WS4)。
+
+    islands 搜索把 portfolio_size / rebalance_freq 写进 ``ast["execution"]``
+    (见 factory/autoresearch/islands.py:106-113)。此前审计/holdout 权重硬写
+    25/20,把搜出的持仓数丢弃;现改为读候选自己搜出的值。候选从未变异出
+    execution 块时退回 canonical StrategyConfig 默认 (25, 20)——这是"无搜索
+    信息"的合法默认,不是"忽略已搜出的值"。
+    """
+    ex = (ast or {}).get("execution") or {}
+    size = ex.get("portfolio_size")
+    top_n = int(size) if size else _DEFAULT_TOP_N
+    freq = ex.get("rebalance_freq")
+    rebalance_days = _DEFAULT_REBALANCE_DAYS
+    if isinstance(freq, str) and freq[:-1].isdigit() and freq[-1:] in ("D", "d"):
+        rebalance_days = int(freq[:-1])
+    elif isinstance(freq, (int, float)) and freq:
+        rebalance_days = int(freq)
+    return top_n, rebalance_days
+
+
+def build_weights_for_candidate(ast, factor_df, close, *, veto_factor, veto_q=0.30):
+    """按候选搜出的 portfolio_size / rebalance 构造调仓权重(WS4)。
+
+    审计(9-Gate)与晋级前 holdout 校验都必须评在候选**真实持仓数**上,否则
+    islands 搜出的 portfolio_size(见 _candidate_exec_params)被丢弃、这一维
+    搜索自由度白费(还照样计入 DSR 的 n_trials,变成纯惩罚)。
+    """
+    from strategies.small_cap import build_rebalance_weights
+
+    top_n, rebalance_days = _candidate_exec_params(ast)
+    return build_rebalance_weights(
+        factor_df,
+        close,
+        top_n=top_n,
+        rebalance_days=rebalance_days,
+        veto_factor=veto_factor,
+        veto_q=veto_q,
+    )
+
+
 def main():
     print("=" * 80)
     print("  Scheduled AutoResearch & 9-Gate Audit Execution")
@@ -174,11 +219,11 @@ def main():
             hyp = ast_to_hypothesis(cand)
             spec = hypothesis_to_spec(hyp)
             
-            # Resolve weights
-            from strategies.small_cap import build_rebalance_weights
+            # Resolve weights (top_n/rebalance come from the candidate via build_weights_for_candidate)
             from factors.veto import salience_covariance_veto
             
-            # We use standard parameters (top 25, 20d rebalance, veto)
+            # WS4: weights use the candidate's own searched portfolio_size/rebalance
+            # (ast["execution"]), not a hardcoded 25/20 — otherwise the searched size is discarded.
             veto = salience_covariance_veto(close).shift(1)
             # Wrap factor_builder to match NineGatesEvaluator expectations (takes PricePanel)
             def wrapped_builder(prices_obj):
@@ -190,13 +235,8 @@ def main():
                 )
 
             factor_df = spec.factor_builder(close, volume, amount, close.index)
-            scheduled = build_rebalance_weights(
-                factor_df,
-                close,
-                top_n=25,
-                rebalance_days=20,
-                veto_factor=veto,
-                veto_q=0.30
+            scheduled = build_weights_for_candidate(
+                cand.ast, factor_df, close, veto_factor=veto, veto_q=0.30,
             )
             
             signal = Signal(
@@ -232,9 +272,8 @@ def main():
             try:
                 veto_full = salience_covariance_veto(close_full).shift(1)
                 factor_full = spec.factor_builder(close_full, volume_full, amount_full, close_full.index)
-                weights_full = build_rebalance_weights(
-                    factor_full, close_full, top_n=25, rebalance_days=20,
-                    veto_factor=veto_full, veto_q=0.30,
+                weights_full = build_weights_for_candidate(
+                    cand.ast, factor_full, close_full, veto_factor=veto_full, veto_q=0.30,
                 )
                 ho_cost = CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065)
                 ret_full = BacktestEngine(
