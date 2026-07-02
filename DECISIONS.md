@@ -295,6 +295,12 @@
 - **理由**: 让 agent 走受控入口而非乱翻仓库，把"scratch 非证据、禁直写台账/数据湖、晋级只走 workflow、部署需人批"变成机器可读的 `can_agent_do` 决策。本层定位为 **advisory(建议)**：`can_agent_do` 只答"该不该"，挡不住绕过它直接写文件——真正强制仍是 §16 确定性 CI 守卫 + `strategy_registry.register` 唯一写入口。契合"宁可多写守卫，不要靠自觉"，故宪法明写本层不是护栏。
 - **验证**: 9 个定向测试（`test_agent_*`/`test_module_*`/`test_strategy_*`）+ `check_module_status` + `check_layer_deps` 全绿；对抗矩阵 8/9 绕过已全部 BLOCKED，合法证据区（`reports/`、`strategy_versions.json`）放行、未知路径 fail-closed。全量 `test_all.sh` 仍在既有 `test_engine.py` 数据缺口（本 worktree `data_lake` 无 parquet）处中止，非本次回归。
 
+### ADR-031 生产安全原则固化:不自动下单 / 排名靠前策略自动模拟盘(R-PROD-001)
+- **上下文**: 「系统永不自动下单、但可模拟盘」此前只散在 `SPEC.md` 执行边界一行,未上升为 `CLAUDE.md` 规则级不变量;owner(2026-07-01)要求把「排名靠前的 top-N 策略并行模拟盘作为实测证据」写成一等原则,并明确「不下单 ≠ 不实测」。当前排名分数 `productionScore` 只在前端 `web/lib/institutional.ts` 瞬时计算、不持久化,与「排名 = 确定性代码」诉求不符。
+- **决策**: 新增 P0 级 `R-PROD-001`(`CLAUDE.md` §4):① 真实账户永不自动下单,真实交易永远需人工;② 模拟盘全自动、零真金,可对排名 top-N 策略并行运行;③ 排名须由**后端确定性代码**产出并持久化,口径不得为让某策略上榜而更改。`SPEC.md` 执行边界行同步引用 R-PROD-001。
+- **理由**: 资本安全是最高 severity 不变量,不能只靠 SPEC 一行约定。「不下单 ≠ 不实测」需明确为产品定位,否则模拟盘的价值(排名策略的实测证据)不可见。纯原则固化,不改任何研究口径 / 成本 / 门禁 / holdout。
+- **验证**: 纯文档 ADR,不触代码。后续 WS1(排名下沉后端 + 多账户 paper engine + 对比展示)落地实现;其对抗测试须断言「无人工确认的真实下单路径不存在」(承护栏 C)。
+
 ---
 
 ## ③ 投资/交易决策记录

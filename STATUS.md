@@ -4,6 +4,10 @@
 
 ## 一句话
 
+**2026-07-01(系统演进路线图 + WS0 生产安全原则固化)**：owner 提出 7 条演进诉求(模拟盘展示 top-N / 多策略组合逃小盘陷阱 / 日度挖掘 / 持仓数不写死 25 / 文献启发 / regime 审计 / 机械判断自省),已出计划(`.claude/plans/`),起步聚焦「小盘陷阱集群 WS2+4+6」。
+  · **WS0 落地**:新增 P0 规则 `R-PROD-001`(不自动下单;排名靠前 top-N 策略自动模拟盘作为实测证据,「不下单 ≠ 不实测」),同步 `SPEC.md` 执行边界 + `DECISIONS.md` ADR-031。纯文档,未触代码/口径。
+  · **护栏 C(owner 要求)**:每个功能实现必须含**对抗性测试**(守卫真拒 / 门真杀假 alpha / 修复真传播即旧码必失败 / 自欺信号真被抓),happy-path only 视为未完成。
+
 **2026-07-01(Agent 控制平面落地并写入宪法)**：
   · **操作层**：新增 agent 受控入口——`services.read.{module_inventory,artifact_inventory,action_policy,strategy_lifecycle}` 结构化读事实 + `services.actions.agent_tasks` 安全包装 + `/agent-control/*` 只读 API + `scripts/ci/check_module_status.py` 守卫（已接入 `test_all.sh`）；为每个顶层模块补 `MODULE_STATUS.md`。
   · **对抗加固**：`action_policy` 经对抗审查修一处真安全洞——正式证据拦截由「大小写敏感前缀匹配」改为「大小写不敏感 + 规范化 + 任意路径段 + 正向白名单(fail-closed)」，堵住 8/9 绕过；并明确本层为 advisory，强制仍靠 §16 CI 守卫 + `register` 唯一写入口。
