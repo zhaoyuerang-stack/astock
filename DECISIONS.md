@@ -301,6 +301,13 @@
 - **理由**: 资本安全是最高 severity 不变量,不能只靠 SPEC 一行约定。「不下单 ≠ 不实测」需明确为产品定位,否则模拟盘的价值(排名策略的实测证据)不可见。纯原则固化,不改任何研究口径 / 成本 / 门禁 / holdout。
 - **验证**: 纯文档 ADR,不触代码。后续 WS1(排名下沉后端 + 多账户 paper engine + 对比展示)落地实现;其对抗测试须断言「无人工确认的真实下单路径不存在」(承护栏 C)。
 
+### ADR-032 持仓数 size 选择归审计层(非 L0 适应度),按净收益+容量扫网格
+- **上下文**: WS4 要让持仓数不再写死 25(owner 质疑"为什么不是 10/50/100")。计划原案是"拓 L0 适应度网格 + 加容量项"。读码发现:① `scheduled_factor_search` 审计/holdout 权重此前硬写 top_n=25,丢弃 islands 搜出的 portfolio_size(前一 commit 已修);② **L0 适应度 edge = 全截面 rank-IC,与 size 无关**(`factory/autoresearch/islands.py`),只回答"哪个因子好";③ "容量-换手权衡"实为两者都奖励更大 N,唯一反力(alpha 集中度)不在 L0——往 L0 适应度加容量项会**退化成选最大 N、抛弃集中的小盘 alpha**(系统唯一有效源),且改适应度属 L2(铁律 L-1 禁自动)。
+- **决策**: size 选择放**审计层**而非 L0 适应度。`scheduled_factor_search.sweep_audit_size()` 在 <holdout boundary 面板上对 {10,25,50,100} 逐档跑真实成本回测(`BacktestEngine`+canonical `CostModel`)与美元容量(`capacity.dollar_capacity`),按**净成本后夏普为主、5% 内平手取高容量**选(`_pick_audit_size`);选定 size 同用于 9-Gate 审计与 holdout 校验。判据:L0 按 size 无关 rank-IC 选因子(→搜索),size 是"给定因子的可交易性优化"(→审计,只有 Gate5/6 建模成本容量)。
+- **理由**: size 留审计层,既让持仓数成为**有依据**的选择(不再随机 4 选 1),又不碰 L0 选择压力、零"漂向最大 N 抛弃小盘 alpha"的 L2 风险。net-sharpe 优先 + 容量仅平手打破 = 透明、无魔数硬门(容量作为人工部署决策的一等 provenance,承 R-PROD-001 部署人工)。
+- **诚实多重检验(item3)**: best-of-k size 是搜索自由度。`sweep_audit_size` **函数内强制**把 `len(grid)` 记入 `governance.trial_ledger`(耦合保证"扫了必记"),在 9-Gate 读 `honest_n_trials` 前累加,DSR 惩罚如实反映(R-EVIDENCE-001 ④)。
+- **验证**: 对抗测试 `tests/test_scheduled_search_topn.py`——核心 `test_pick_audit_size_is_not_just_max_size`(size=25 净夏普最高时必选 25、不选最大 100)、容量仅平手打破(>5% 不翻盘)、`sweep_audit_size` 把 len(grid) 记入注入 tmp 账本(未碰真账本)、override 压过搜出值;8/8 通过 + 4 守卫绿(layer_deps/test_discovery/no_force_promote/holdout_compliance)。数据依赖全量套件仍受 worktree 缺 data_lake 限制(与本 diff 无关)。
+
 ---
 
 ## ③ 投资/交易决策记录

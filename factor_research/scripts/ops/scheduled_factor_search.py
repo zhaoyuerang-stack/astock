@@ -23,7 +23,7 @@ from core.analysis.nine_gates import NineGatesEvaluator, NineGatesReport
 from services.actions.autoresearch_search import run_autoresearch_walk_forward
 from factory.autoresearch.repositories import CandidateRepository, ReviewQueue, ExperimentLog
 from strategies.small_cap import load_price_panels
-from governance.trial_ledger import honest_n_trials  # LOOP_ENGINEERING §5.1(record 下沉到 orchestrator)
+from governance.trial_ledger import honest_n_trials, record_trials  # LOOP_ENGINEERING §5.1(record 下沉到 orchestrator)
 from governance.holdout import (
     boundary,
     assert_search_clean,
@@ -58,16 +58,18 @@ def _candidate_exec_params(ast: dict) -> tuple[int, int]:
     return top_n, rebalance_days
 
 
-def build_weights_for_candidate(ast, factor_df, close, *, veto_factor, veto_q=0.30):
-    """按候选搜出的 portfolio_size / rebalance 构造调仓权重(WS4)。
+def build_weights_for_candidate(ast, factor_df, close, *, veto_factor, veto_q=0.30, top_n_override=None):
+    """构造调仓权重;top_n 来自审计层 size 选择(top_n_override)或候选搜出值(WS4)。
 
-    审计(9-Gate)与晋级前 holdout 校验都必须评在候选**真实持仓数**上,否则
-    islands 搜出的 portfolio_size(见 _candidate_exec_params)被丢弃、这一维
-    搜索自由度白费(还照样计入 DSR 的 n_trials,变成纯惩罚)。
+    rebalance_days 恒取候选搜出值(_candidate_exec_params)。top_n_override 由
+    审计层 sweep_audit_size 决定的可交易性最优持仓数注入;为 None 时退回候选
+    自己搜出的 portfolio_size(此前硬写 25,已修)。
     """
     from strategies.small_cap import build_rebalance_weights
 
     top_n, rebalance_days = _candidate_exec_params(ast)
+    if top_n_override is not None:
+        top_n = int(top_n_override)
     return build_rebalance_weights(
         factor_df,
         close,
@@ -76,6 +78,80 @@ def build_weights_for_candidate(ast, factor_df, close, *, veto_factor, veto_q=0.
         veto_factor=veto_factor,
         veto_q=veto_q,
     )
+
+
+_AUDIT_SIZE_GRID = (10, 25, 50, 100)
+
+
+def _pick_audit_size(sweep: dict) -> int:
+    """净成本后夏普为主;近似平手(在最优净夏普的 5% 内)取高容量(WS4 item1)。
+
+    关键:**不是**选最大 size。L0 已按 size 无关的 rank-IC 选定"哪个因子";此处只
+    在给定因子上按可交易性(净收益 + 容量)挑持仓数。这样避免了"往 L0 适应度加容量
+    项 → 退化成选最大 N → 抛弃集中的小盘 alpha"的 L2 陷阱(见 DECISIONS ADR-032)。
+    """
+    if not sweep:
+        return _DEFAULT_TOP_N
+    best = max(v["net_sharpe"] for v in sweep.values())
+    band = best - 0.05 * abs(best)  # 净夏普在最优 5% 内视为平手,由容量打破
+    near = {sz: v for sz, v in sweep.items() if v["net_sharpe"] >= band}
+    return int(max(near, key=lambda sz: near[sz]["capacity_aum"]))
+
+
+def sweep_audit_size(
+    ast,
+    factor_df,
+    close,
+    volume,
+    amount,
+    *,
+    veto_factor,
+    veto_q=0.30,
+    start="2018-01-01",
+    grid=_AUDIT_SIZE_GRID,
+    trial_scope="autoresearch",
+    ledger_path=None,
+):
+    """审计层扫 size 网格,按净成本后夏普 + 容量选持仓数(WS4 item1,ADR-032)。
+
+    为什么在审计层而非 L0 适应度:L0 edge = 全截面 rank-IC,与 size 无关,只回答
+    "哪个因子好";而成本与容量只有 Gate5/6(审计层)建模。往 L0 适应度加容量项会
+    退化成"选最大 N"、抛弃集中的小盘 alpha(系统唯一有效源)——见 ADR-032。
+
+    item3(诚实多重检验):best-of-k size 是搜索自由度,**函数内强制**把 len(grid)
+    记入 trial 账本(耦合保证"扫了必记",不靠调用方自觉),再供 DSR 惩罚。
+
+    在 <holdout boundary 的面板上扫(调用方已截断),size 选择绝不偷看金库。
+    返回 (chosen_size, sweep{size: {net_sharpe, net_annual, capacity_aum}})。
+    """
+    import pandas as pd
+    from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
+    from capacity.dollar_capacity import estimate_dollar_capacity
+
+    cost = CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065)
+    prices = PricePanel(close=close, volume=volume, amount=amount)
+    adv = amount.rolling(20, min_periods=5).mean()
+    sweep: dict[int, dict] = {}
+    for s in grid:
+        w = build_weights_for_candidate(
+            ast, factor_df, close, veto_factor=veto_factor, veto_q=veto_q, top_n_override=s,
+        )
+        if not w:  # 该 size 建不出仓(池不足)→ 不进可选集(但仍算一次尝试,见记账)
+            continue
+        res = BacktestEngine(
+            prices=prices, config=BacktestConfig(start=start, cost=cost, leverage=1.0),
+        ).run(Signal(weights=w))
+        w_df = pd.DataFrame(w).T.fillna(0.0)
+        cap = estimate_dollar_capacity(w_df, adv)
+        sweep[int(s)] = {
+            "net_sharpe": round(float(res.sharpe), 3),
+            "net_annual": round(float(res.annual), 4),
+            "capacity_aum": round(float(cap), 0),
+        }
+    # item3:扫描即多重检验。保守计入全部 len(grid)(含建不出仓的 size)= 搜索自由度,
+    # 供 honest_n_trials → DSR 惩罚(R-EVIDENCE-001 ④)。
+    record_trials(trial_scope, len(grid), context="audit size sweep", path=ledger_path)
+    return _pick_audit_size(sweep), sweep
 
 
 def main():
@@ -235,10 +311,30 @@ def main():
                 )
 
             factor_df = spec.factor_builder(close, volume, amount, close.index)
-            scheduled = build_weights_for_candidate(
-                cand.ast, factor_df, close, veto_factor=veto, veto_q=0.30,
+            # WS4 item1 (ADR-032): choose portfolio_size at the AUDIT layer by net-of-cost
+            # sharpe + capacity (Gate5/6 model cost/capacity; L0 rank-IC is size-blind). The
+            # sweep records its k-width to the trial ledger (honest multiple testing) internally.
+            chosen_size, size_sweep = sweep_audit_size(
+                cand.ast, factor_df, close, volume, amount, veto_factor=veto, veto_q=0.30,
             )
-            
+            print(
+                f"  [size-sweep] top_n={chosen_size} ← "
+                + ", ".join(
+                    f"{k}:sh{v['net_sharpe']}/cap{v['capacity_aum']:.0f}"
+                    for k, v in sorted(size_sweep.items())
+                ),
+                flush=True,
+            )
+            # item2 provenance:记录"为什么这个持仓数"(每档净收益/容量 + 选中值)
+            review_queue.record_fields(
+                fp,
+                audit_top_n=int(chosen_size),
+                audit_size_sweep={str(k): v for k, v in size_sweep.items()},
+            )
+            scheduled = build_weights_for_candidate(
+                cand.ast, factor_df, close, veto_factor=veto, veto_q=0.30, top_n_override=chosen_size,
+            )
+
             signal = Signal(
                 weights=scheduled,
                 family=f"autoresearch_{fp[:8]}",
@@ -274,6 +370,7 @@ def main():
                 factor_full = spec.factor_builder(close_full, volume_full, amount_full, close_full.index)
                 weights_full = build_weights_for_candidate(
                     cand.ast, factor_full, close_full, veto_factor=veto_full, veto_q=0.30,
+                    top_n_override=chosen_size,
                 )
                 ho_cost = CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065)
                 ret_full = BacktestEngine(
