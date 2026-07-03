@@ -314,6 +314,9 @@ class ChampionRecord:
     complexity: float = 0.0
     regime_icirs: dict[str, float] = field(default_factory=dict)
     ast: dict = field(default_factory=dict)
+    # knowledge gate 的 fitness 乘子(1.0 正常 / 0.3 方向降权;R-EVIDENCE 精神:
+    # fitness 必须能从记录字段机械复原,pa≠1 时缺它冠军 fitness 无法自证)
+    priority_adjustment: float = 1.0
 
 
 @dataclass
@@ -768,7 +771,7 @@ def run_island_search(
                 panel = None  # 算不出因子 → 不奖不罚(L0 同样会废掉它)
 
         # 缓存 candidate 用于特征提取
-        meta[candidate.fingerprint] = (island, generation, float(icir) if icir is not None else 0.0, candidate, 0.0, 0.0, 0.0)
+        meta[candidate.fingerprint] = (island, generation, float(icir) if icir is not None else 0.0, candidate, 0.0, 0.0, 0.0, 1.0)
 
         nov = 0.0
         if novelty_weight > 0 and panel is not None:
@@ -856,11 +859,11 @@ def run_island_search(
         fit = (edge + novelty_weight * nov - corr_weight * corr - turnover_weight * turn
                - complexity_weight * comp_val - orth_weight * style_pen) * priority_adjustment
         memo[candidate.fingerprint] = (fit, result)
-        # 更新完整的 meta
-        meta[candidate.fingerprint] = (island, generation, float(icir) if icir is not None else 0.0, candidate, nov, corr, turn)
+        # 更新完整的 meta(含 priority_adjustment:pa≠1 时冠军 fitness 才能机械复原)
+        meta[candidate.fingerprint] = (island, generation, float(icir) if icir is not None else 0.0, candidate, nov, corr, turn, priority_adjustment)
         return fit
 
-    meta: dict[str, tuple[int, int, float, Candidate, float, float, float]] = {}
+    meta: dict[str, tuple[int, int, float, Candidate, float, float, float, float]] = {}
     regime_meta: dict[str, dict[str, float]] = {}
 
     # 初始化:种子轮转分配 + 变异补满
@@ -1109,7 +1112,7 @@ def run_island_search(
 
     champions: list[ChampionRecord] = []
     for fp, (fit, l0_result) in ranked_all:
-        island, gen, icir, candidate, nov, corr, turn = meta[fp]
+        island, gen, icir, candidate, nov, corr, turn, pa = meta[fp]
         result = final_results.get(fp, l0_result)
         from factory.autoresearch.complexity import compute_complexity
         comp_report = compute_complexity(candidate)
@@ -1122,6 +1125,7 @@ def run_island_search(
             complexity=float(comp_report.score),
             regime_icirs=regime_meta.get(fp, {}),
             ast=candidate.ast,
+            priority_adjustment=pa,
         ))
     return IslandSearchResult(evaluated=evaluated + prefilter_trials[0], champions=champions)
 

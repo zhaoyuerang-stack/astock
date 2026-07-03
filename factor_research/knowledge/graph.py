@@ -36,15 +36,27 @@ _PRIORITY = {"SKIP": 0.0, "DEPRIORITIZE": 0.3, "REQUIRE_RETEST": 1.0}
 # ── 候选身份提取(duck-typed Hypothesis)────────────────────────────────────
 
 def _atom_attrs(hyp) -> dict:
-    """从 Hypothesis 抽出可匹配属性(字符串化,便于稳定比较)。"""
+    """从 Hypothesis 抽出可匹配属性(字符串化,便于稳定比较)。
+
+    _term_factors:DSL 候选(autoresearch)的 factor_fn_name 恒为 compute_dsl_factor
+    (ast_to_hypothesis 统一封装),因子级 gate 靠 factor_fn_name 对它们永远失配——
+    从 factor_params["ast"]["terms"] 抽出成分因子名,供 term_factor 匹配(方向登记簿用)。
+    """
     attrs = {
         "id": getattr(hyp, "id", ""),
         "name": getattr(hyp, "name", ""),
         "factor_fn_name": getattr(hyp, "factor_fn_name", ""),
         "timing_fn_name": getattr(hyp, "timing_fn_name", "") or "",
     }
-    for k, v in (getattr(hyp, "factor_params", {}) or {}).items():
+    params = getattr(hyp, "factor_params", {}) or {}
+    for k, v in params.items():
         attrs[str(k)] = str(v)
+    ast = params.get("ast")
+    if isinstance(ast, dict):
+        attrs["_term_factors"] = tuple(
+            str(t.get("factor", "")) for t in ast.get("terms", [])
+            if isinstance(t, dict) and t.get("factor")
+        )
     return attrs
 
 
@@ -60,6 +72,11 @@ class SearchGate:
     def matches(self, hyp) -> bool:
         attrs = _atom_attrs(hyp)
         for k, v in self.match.items():
+            if k == "term_factor":
+                # 成员匹配:候选任一成分因子命中即命中(方向登记簿的因子族 gate)
+                if str(v) not in attrs.get("_term_factors", ()):
+                    return False
+                continue
             if str(attrs.get(k)) != str(v):
                 return False
         return True
@@ -386,6 +403,21 @@ def sync_pending_lessons_to_graph(
 DEFAULT_STORE = os.path.join(os.path.dirname(__file__), "findings.json")
 
 
-def load_graph(store_path: Optional[str] = None) -> KnowledgeGraph:
-    """加载知识图谱(缺省用 knowledge/findings.json)。空文件 → 空图。"""
-    return KnowledgeGraph(store_path or DEFAULT_STORE)
+def load_graph(store_path: Optional[str] = None, include_directions: bool = True) -> KnowledgeGraph:
+    """加载知识图谱(缺省用 knowledge/findings.json)。空文件 → 空图。
+
+    include_directions=True 时内存合并方向登记簿(direction_registry.json)的 gates:
+    策展知识与机器自长知识分离存储、消费端统一——promote/pipeline/factory_cli 经
+    本入口自动获得方向级 SKIP/DEPRIORITIZE。只合并不落盘(不污染机器自长文件);
+    合并失败 fail-open(生成端 steering 不得阻断验证主线)。
+    """
+    kg = KnowledgeGraph(store_path or DEFAULT_STORE)
+    if include_directions:
+        try:
+            from knowledge.directions import direction_findings
+            for f in direction_findings():
+                # setdefault + 直插:不经 add()(add 会把策展条目写回 findings.json)
+                kg._findings.setdefault(f.id, f)
+        except Exception as e:
+            print(f"[knowledge] 方向登记簿合并失败(fail-open): {e}")
+    return kg

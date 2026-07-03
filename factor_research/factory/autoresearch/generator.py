@@ -9,12 +9,11 @@ from .validator import validate_candidate_ast
 
 
 _SEEDS = [
-    # 股东户数正交族置顶(probe 实测最强正交源:原始 ICIR 0.57、OOS 留存 159%、残差去 size/流动后
-    # 87% OOS 不塌)。户数减少=筹码集中=机构吸筹。集中度 × 趋势 / 质量。
+    # 股东户数/北向正交族:probe 早期看好(原始 ICIR 0.57),但后续全市场 top25 long-only
+    # 实测太弱(research_ledger e6e655401623899d,残差 ICIR~0.2)——现由方向登记簿
+    # (knowledge/direction_registry.json)动态降权排尾,不再硬编码置顶;条目到期自动复活重测。
     ("holder_count_chg", {"window": 60}, "momentum", {"window": 20}),
     ("holder_count_chg", {"window": 60}, "roe", {}),
-    # 北向资金正交族置顶(打破小盘坍缩):islands 以小 limit 采种,置顶保证 smart-money
-    # 正交维度必进搜索初始种群。smart-money × 趋势 / 质量。
     ("northbound_accumulation", {"window": 20}, "momentum", {"window": 20}),
     ("northbound_accumulation", {"window": 20}, "roe", {}),
     ("momentum", {"window": 20}, "volume_ratio", {"window": 5}),
@@ -63,19 +62,60 @@ def _ast_for(seed: tuple, weight: float) -> dict:
     }
 
 
+def _steer_seed_order(all_seeds: list) -> list:
+    """方向登记簿 + MI 冗余簇对种子过滤/排序(生成端 steering,LOOP §3 生成层)。
+
+    SKIP 方向不生成(死路不复搜);DEPRIORITIZE / 两腿同 MI 簇(同信息算两遍)排尾;
+    BOOST(策展空白区 ∪ metasearch frontier)排头,islands 小 limit 采种时优先吃到。
+    fail-open + 自饿保护:登记簿读不出 / 过滤后为空 → 退回原顺序 + 诚实警告,
+    方向层故障绝不阻断搜索;验真端(L0-L3/9-Gate/holdout)不受本函数影响。
+    """
+    try:
+        from knowledge.directions import boost_factors, redundancy_clusters, same_cluster, seed_action
+
+        boosts = boost_factors()
+        clusters = redundancy_clusters()
+        front: list = []
+        mid: list = []
+        back: list = []
+        skipped = 0
+        for seed in all_seeds:
+            left_f, right_f = seed[0], seed[2]
+            action, _reason = seed_action((left_f, right_f))
+            if action == "SKIP":
+                skipped += 1
+                continue
+            if action == "DEPRIORITIZE" or same_cluster(left_f, right_f, clusters=clusters):
+                back.append(seed)
+            elif left_f in boosts or right_f in boosts:
+                front.append(seed)
+            else:
+                mid.append(seed)
+        steered = front + mid + back
+        if not steered:
+            print("[generator] 方向登记簿过滤后种子为空,退回未过滤顺序(自饿保护)")
+            return all_seeds
+        if skipped:
+            print(f"[generator] 方向登记簿 SKIP {skipped} 个种子(已证伪方向不再复搜)")
+        return steered
+    except Exception as e:
+        print(f"[generator] 方向层 steering 失败(fail-open,保持原顺序): {e}")
+        return all_seeds
+
+
 def generate_seed_candidates(limit: int = 10) -> Iterator[Candidate]:
     """Yield unique, validated low-complexity seed candidates, covering all 47 whitelisted factors."""
     from .registry import ALLOWED_FACTORS
 
     # 1. Start with manually designed high-quality seeds
     all_seeds = list(_SEEDS)
-    
+
     # 2. Track which factors are covered by manually designed seeds
     covered = set()
     for left_f, _, right_f, _ in _SEEDS:
         covered.add(left_f)
         covered.add(right_f)
-        
+
     # 3. For any whitelisted factor not covered, pair it with a default companion
     for fname, spec in ALLOWED_FACTORS.items():
         if fname not in covered:
@@ -83,7 +123,7 @@ def generate_seed_candidates(limit: int = 10) -> Iterator[Candidate]:
             if "window" in spec.params:
                 lo, hi = spec.params["window"]
                 params = {"window": int((lo + hi) // 2)}
-            
+
             # If alternative or fundamental, pair with momentum; else pair with roe
             if "fundamental" in str(spec.data_dependencies) or "holder" in str(spec.data_dependencies):
                 partner = "momentum"
@@ -91,8 +131,11 @@ def generate_seed_candidates(limit: int = 10) -> Iterator[Candidate]:
             else:
                 partner = "roe"
                 partner_params = {}
-                
+
             all_seeds.append((fname, params, partner, partner_params))
+
+    # 4. 方向层教训回流:limit 截断前先过滤/重排(否则死路种子照旧占掉小 limit 的名额)
+    all_seeds = _steer_seed_order(all_seeds)
 
     seen: set[str] = set()
     weights = [0.7, 0.6, 0.5]

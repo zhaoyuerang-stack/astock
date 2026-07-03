@@ -14,6 +14,16 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
+# Hermetic 钉死:方向登记簿/metasearch steering 是搜索行为的**仓库态输入**
+# (种子重排 + knowledge_gate priority_adjustment 进 fitness)。不钉死,任何人编辑
+# knowledge/direction_registry.json 都会漂移本文件固定 rng_seed 的确定性搜索轨迹
+# (例:BOOST 基本面族会把 bp_proxy 种子推到队头,在合成价格面板上算不出因子)。
+# steering 行为本身的对抗测试归 tests/test_direction_registry.py。
+import knowledge.directions as _kd  # noqa: E402
+_kd.DEFAULT_REGISTRY = "/nonexistent/direction_registry.json"
+_kd.DEFAULT_CLUSTERS = "/nonexistent/redundancy_clusters.json"
+_kd.DEFAULT_FRONTIER = "/nonexistent/frontier.json"
+
 from factory.autoresearch import (  # noqa: E402
     CandidateDecision,
     CandidateRepository,
