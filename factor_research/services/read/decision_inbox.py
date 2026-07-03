@@ -294,6 +294,46 @@ def _items_recompose(rec) -> list[DecisionItem]:
     )]
 
 
+def _items_knowledge_expiry(ke) -> list[DecisionItem]:
+    """研究结论过保质期(info 级常设建议):复测还是带新证据续期,只有人能决定。
+
+    过期 gate 已自动失效(SearchGate/方向条目停止生效)——不透出的话,失效是静默的,
+    「到期重测」的设计初衷落空(孤岛回收:check_expiry 此前只在 CLI 手动命令里)。
+    """
+    if not isinstance(ke, dict) or ke.get("state") != "retest_due":
+        return []
+    ef = ke.get("expired_findings") or []
+    ed = ke.get("expired_directions") or []
+    evidence = [f"过期总数 {ke.get('n_expired')}(findings {len(ef)} + 方向条目 {len(ed)});过期 = gate 已自动失效"]
+    for f in ef[:5]:
+        evidence.append(f"finding {f.get('id')}: {str(f.get('statement'))[:60]}(expires {f.get('expires')})")
+    for d in ed[:5]:
+        evidence.append(f"方向 {d.get('id')}: 复活条件 = {str(d.get('revival_condition'))[:80]}")
+    return [DecisionItem(
+        key="knowledge:expiry",
+        kind="knowledge_expiry",
+        severity="info",
+        title=f"{ke.get('n_expired')} 条研究结论已过保质期——重测还是带新证据续期?",
+        evidence=evidence,
+        consequence="常设建议,非紧急;但过期 gate 静默失效 = 死路可能重新被搜索/被 LLM 重提,"
+                    "而「复活条件是否满足」只有人能判。",
+        actions=[
+            DecisionAction(
+                label="重测(probe / L0 重跑)",
+                entrypoint="skill:probe-signal-source 或 apps/factory_cli.py knowledge",
+                allowed=True, reason="重测产 L0-L3 证据,结论回写登记簿(证据门控)",
+            ),
+            DecisionAction(
+                label="续期(须带新证据指针改 expires)",
+                entrypoint="knowledge/direction_registry.json / knowledge/findings.json",
+                allowed=True, reason="无新证据的裸续期 = 把保质期机制改成永久墓碑,禁止",
+            ),
+        ],
+        authority="services.read.knowledge_expiry(check_expiry+方向登记簿,advisory)",
+        drilldown="/experiments/autoresearch",
+    )]
+
+
 def _items_exhaustion(exh) -> list[DecisionItem]:
     """研究枯竭信号 → 外探(新数据/文献)还是调整搜索空间,只有人能决定(LOOP §6)。
 
@@ -362,6 +402,7 @@ def get_decision_inbox(
     promotion=None,
     exhaustion: dict | None = None,
     recompose: dict | None = ...,  # ... 哨兵 = 从磁盘读;None = 显式「无提案」
+    knowledge_expiry: dict | None = None,
 ) -> DecisionInboxView:
     """装配收件箱。关键字参数仅供测试注入事实源;生产路径全部走权威读服务。"""
     items: list[DecisionItem] = []
@@ -439,6 +480,15 @@ def get_decision_inbox(
         all_readable = False
         items.append(_source_error_item("portfolio_recompose", exc))
 
+    try:
+        if knowledge_expiry is None:
+            from services.read.knowledge_expiry import get_knowledge_expiry
+            knowledge_expiry = get_knowledge_expiry()
+        items += _items_knowledge_expiry(knowledge_expiry)
+    except Exception as exc:  # noqa: BLE001
+        all_readable = False
+        items.append(_source_error_item("knowledge_expiry", exc))
+
     items.sort(key=lambda i: (_SEVERITY_ORDER.get(i.severity, 9), i.key))
     pending = sum(1 for i in items if i.severity in ("blocked", "attention"))
 
@@ -465,6 +515,7 @@ def get_decision_inbox(
             "steer": "services.read.promotion_readiness(advisory)",
             "research_exhaustion": "services.read.research_exhaustion(机械判据 advisory)",
             "portfolio_recompose": str(RECOMPOSE_LATEST) + "(周度确定性排名,advisory)",
+            "knowledge_expiry": "services.read.knowledge_expiry(保质期复核,advisory)",
         },
         honesty="本视图只聚合权威事实源,不做新判定;actions 为 advisory 导航,由人经 canonical "
                 "入口执行(R-LLM-001/ADR-030);任一事实源不可读即显式入箱,空箱只在全源可读时宣称。",
