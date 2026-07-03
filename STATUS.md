@@ -4,6 +4,11 @@
 
 ## 一句话
 
+**2026-07-02(WS-D/WS-E 收尾:组合再构成周度 job + 文献扫描剧本 + probe 回写纪律固化)**:
+  · **组合再构成(WS-D)**:`portfolio/recompose.py` 确定性内核——多目标排名(mean-rank(sharpe/calmar/边际残差夏普),衰减腿强制垫底,R-OBJECTIVE-001 非单一收益;口径 RANKING_VERSION 锚定)+ 非冗余贪心选腿(两两|corr|≥0.7 同质变体跳过留痕,§5.3)+ 静态 inverse-vol 提案 + 组合自身 decay_check(§5.4)。`scheduled_portfolio_recompose`(周度,挂周维护研究旁路)读在册 `version_returns` → **持久化** `reports/research/portfolio_recompose.json`(latest+归档,R-PROD-001「排名后端确定性产出」)含 top-N `paper_candidates` 名单;决策收件箱**第八源**(info 级提案,>14 天过期不入箱)。对抗测试 8/8(高全样本夏普但近三年衰减的腿必垫底且被提案排除——单看夏普的实现必挂;冗余双胞胎只留一;样本不足诚实拒判不出绩效数字;全灭空提案不硬凑;同输入恒同输出)。**留白已立 TASKS**:paper 多账户并行的执行侧(paper_engine 现单账户,须生产机改造验收)。
+  · **文献扫描剧本(WS-E)**:`docs/agent_skills/literature_scan.md`——枯竭信号经人批准触发;先读方向登记簿再扫描(防重发现死路);产出带出处 Hypothesis 草案走 factory_cli queue;阴性结论也落报告;不判有效不写台账(R-LLM-001/R-WF-001)。已接收件箱枯竭事项 actions + CLAUDE.md §2 剧本路由(两处清单加 literature-scan)。
+  · **probe 回写纪律固化**:probe-signal-source skill 加步骤 8(必做,含阴性:DEPRIORITIZE/SKIP+revival_condition+180d expires;阳性 BOOST;均须证据指针),种子置顶指引改为登记簿 BOOST(不再硬编码 _SEEDS 顺序)。守卫:分层(新增 scheduled_portfolio_recompose→strategy_registry 只读例外,与 decay_monitor 同款留痕)+测试发现 120 全收集。
+
 **2026-07-02(方向半环补全:教训机械回流生成端 + metasearch 回流 + 研究枯竭信号,ADR-034)**:
   · **方向登记簿**:`knowledge/direction_registry.json`(策展,证据门控:无 evidence 一律忽略;到期=复活重测)+ `knowledge/directions.py`——研究级证伪(北向/holder 族太弱、动量全市场 null、size×illiq 同信息)首次变成生成器可消费的机械约束。接线:`generate_seed_candidates` 种子层 SKIP/排尾/BOOST(fail-open+自饿保护)、LLM 播种 prompt 注入、`load_graph()` 内存合并(promote/pipeline 自动消费)。顺手修真实盲区:SearchGate 因子级匹配对 DSL 候选恒失配(factor_fn_name 恒 `compute_dsl_factor`)→ 新增 `term_factor` 成分匹配。
   · **metasearch 机械回流**:`factor_mi_audit`/`information_map` 加 `--json` 落 `redundancy_clusters.json`(同簇两腿=同信息算两遍→种子排尾)/`frontier.json`(距 LIVE 锚最远→排头);周维护挂**月度**刷新(研究旁路,失败不标 failed)。
