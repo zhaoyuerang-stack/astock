@@ -7,6 +7,7 @@ This script is read-only. It does not fetch or update market data.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import math
 import os
@@ -42,6 +43,15 @@ INDEX_COMPONENTS = [
 ]
 
 
+def normalize_code(code: object) -> str:
+    text = str(code).strip()
+    if "." in text:
+        text = text.split(".", 1)[0]
+    if len(text) != 6 or not text.isdigit():
+        raise SystemExit(f"Invalid A-share code: {text!r}")
+    return text
+
+
 def parse_codes(raw: str) -> dict[str, str]:
     out: dict[str, str] = {}
     for item in raw.split(","):
@@ -52,12 +62,69 @@ def parse_codes(raw: str) -> dict[str, str]:
             code, name = item.split(":", 1)
         else:
             code, name = item, item
-        code = code.strip()
-        if len(code) != 6 or not code.isdigit():
-            raise SystemExit(f"Invalid A-share code: {code!r}")
+        code = normalize_code(code)
         out[code] = name.strip() or code
     if not out:
-        raise SystemExit("No codes supplied. Use --codes '002371:北方华创,...'")
+        raise SystemExit("No codes supplied. Use --codes or --codes-file.")
+    return out
+
+
+def parse_codes_file(path: Path) -> dict[str, str]:
+    """Read a stock universe from CSV/TSV or plain text.
+
+    Accepted shapes:
+    - CSV/TSV with columns: code/name, ts_code/name, 股票代码/公司
+    - CSV/TSV without a header: first column code, second column optional name
+    - Plain text: one "code[:name]" or "code,name" per line
+    """
+    if not path.exists():
+        raise SystemExit(f"codes file not found: {path}")
+    text = path.read_text(encoding="utf-8-sig").strip()
+    if not text:
+        raise SystemExit(f"codes file is empty: {path}")
+
+    delimiter = "\t" if "\t" in text.splitlines()[0] else ","
+    rows = list(csv.reader(text.splitlines(), delimiter=delimiter))
+    header = [cell.strip().lower() for cell in rows[0]]
+    code_keys = {"code", "ts_code", "symbol", "股票代码", "证券代码", "代码"}
+    name_keys = {"name", "company", "stock_name", "股票名称", "证券简称", "公司", "公司名称", "名称"}
+    has_header = bool(set(header) & code_keys)
+
+    out: dict[str, str] = {}
+    if has_header:
+        code_idx = next(i for i, cell in enumerate(header) if cell in code_keys)
+        name_idx = next((i for i, cell in enumerate(header) if cell in name_keys), None)
+        data_rows = rows[1:]
+    else:
+        code_idx = 0
+        name_idx = 1 if len(rows[0]) > 1 else None
+        data_rows = rows
+
+    for row in data_rows:
+        if not row or not row[0].strip():
+            continue
+        if len(row) == 1 and (":" in row[0] or "：" in row[0]):
+            code, name = row[0].replace("：", ":", 1).split(":", 1)
+        else:
+            if code_idx >= len(row):
+                continue
+            code = row[code_idx]
+            name = row[name_idx] if name_idx is not None and name_idx < len(row) else code
+        normalized = normalize_code(code)
+        out[normalized] = str(name).strip() or normalized
+    if not out:
+        raise SystemExit(f"codes file contains no valid A-share codes: {path}")
+    return out
+
+
+def merge_code_inputs(raw_codes: str | None, codes_file: str | None) -> dict[str, str]:
+    out: dict[str, str] = {}
+    if codes_file:
+        out.update(parse_codes_file(Path(codes_file)))
+    if raw_codes:
+        out.update(parse_codes(raw_codes))
+    if not out:
+        raise SystemExit("No codes supplied. Provide --codes or --codes-file.")
     return out
 
 
@@ -726,7 +793,8 @@ def clean_json(value: object) -> object:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--codes", required=True, help="Comma list like '002371:北方华创,688012:中微公司'")
+    parser.add_argument("--codes", help="Comma list like '000001:平安银行,600519:贵州茅台'. Overrides duplicate codes from --codes-file.")
+    parser.add_argument("--codes-file", help="CSV/TSV/text stock universe. Use columns such as code/name or ts_code/name, or one code[:name] per line.")
     parser.add_argument("--repo", default=".", help="Repository root containing factor_research/data_lake")
     parser.add_argument("--include-date", action="store_true", help="Keep 日期 in the markdown table")
     parser.add_argument("--analysis", action="store_true", help="Emit peer medians, deviations, and composite relative valuation labels")
@@ -735,7 +803,7 @@ def main() -> None:
     parser.add_argument("--json", action="store_true", help="Emit JSON records and warnings instead of markdown")
     args = parser.parse_args()
 
-    codes = parse_codes(args.codes)
+    codes = merge_code_inputs(args.codes, args.codes_file)
     repo = Path(args.repo).resolve()
     df_full, warnings = build_snapshot(repo, codes)
     df = df_full.copy()

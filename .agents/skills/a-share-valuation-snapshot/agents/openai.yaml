@@ -1,4 +1,4 @@
 interface:
   display_name: "A-Share Valuation Snapshot"
   short_description: "Generate A-share valuation index charts"
-  default_prompt: "Use $a-share-valuation-snapshot to build a valuation snapshot, peer-relative analysis, buy-index PNG, and explanation from the local factor_research data lake."
+  default_prompt: "Use $a-share-valuation-snapshot to build a valuation snapshot, peer-relative analysis, buy-index PNG, and explanation for my supplied A-share universe from the local factor_research data lake."

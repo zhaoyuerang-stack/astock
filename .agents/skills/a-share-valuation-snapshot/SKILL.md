@@ -9,9 +9,12 @@ description: Generate guarded A-share company valuation snapshot tables, relativ
 
 Use this skill to build A-share valuation tables, cross-sectional relative valuation analysis, and a PNG financial-valuation attractiveness chart from the repository's own `factor_research/data_lake` first. The goal is not to maximize field coverage; it is to produce an output whose source, date, units, missing fields, function relationship, and peer-relative conclusions are honest.
 
+The skill must never assume a fixed stock batch. The stock universe must come from the user's request, a supplied stock-universe file, or a clearly stated upstream screen.
+
 ## First Principles
 
 - Treat `data_lake` as the first source of truth before external web/API scraping.
+- Do not hardcode a peer set. Every run must accept its company universe as an input.
 - Use source-defined valuation fields when available. Do not recompute PE/PB/PS from adjusted prices.
 - Keep forecast fields separate from historical fields. `PE(2026E)` and consensus PEG require a forecast/consensus source; do not backfill them from historical financials.
 - State stale dates per security. A mixed-date table is allowed only when each row shows or discloses the row date.
@@ -22,22 +25,32 @@ Use this skill to build A-share valuation tables, cross-sectional relative valua
 ## Workflow
 
 1. Read repo context if not already done: `CLAUDE.md`, `STATUS.md`, and `git status --short --branch`.
-2. Confirm the requested companies and map each to a six-digit A-share code.
+2. Confirm the requested companies and map each to a six-digit A-share code. If the user has not provided a universe, ask for one or use a clearly named upstream screen; never reuse a previous ad hoc batch.
 3. Inspect local availability:
    - `factor_research/data_lake/daily_basic/daily_basic_all.parquet` for `total_mv`, `pe_ttm`, `pb`, `ps_ttm`/`ps`.
    - `factor_research/data_lake/price/daily_raw/<code>.parquet` for unadjusted `raw_close`.
    - Optional: `financials/income_all.parquet` and `financials/balancesheet_all.parquet` for estimated EV/EBITDA.
    - Optional: `financials/fina_indicator_all.parquet` for latest historical `netprofit_yoy` if the user accepts a historical PEG proxy.
-4. Use the bundled script when the standard table is enough:
+4. Use the bundled script when the standard table is enough. Prefer `--codes-file` for reusable screens and larger peer sets:
 
 ```bash
 python3 .agents/skills/a-share-valuation-snapshot/scripts/valuation_snapshot.py \
-  --codes "002371:北方华创,688012:中微公司,688082:盛美上海" \
+  --codes-file /path/to/stock_universe.csv \
   --include-date \
   --analysis \
   --buy-index \
   --output-png /private/tmp/a_share_buy_index.png
 ```
+
+For quick one-off runs, pass an explicit comma-separated list:
+
+```bash
+python3 .agents/skills/a-share-valuation-snapshot/scripts/valuation_snapshot.py \
+  --codes "000001:示例公司A,600000:示例公司B" \
+  --analysis
+```
+
+`--codes-file` accepts CSV/TSV files with columns such as `code,name`, `ts_code,name`, `股票代码,公司`, or plain text with one `code[:name]` per line.
 
 5. If the user asked for the exact framework without a date column, disclose dates in prose and omit `日期` from the final table.
 6. For comparison requests, include the analysis section unless the user only asked for raw data.
