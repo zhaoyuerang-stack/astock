@@ -56,6 +56,7 @@ def main():
     rows = []
     decayed = []
     latest_dates = []
+    leg_returns = {}  # 拥挤归因用:name -> 日收益(与 decay 同源 version_returns)
     for fam in data.get("families", []):
         family = fam["id"]
         for v in fam.get("versions", []):
@@ -73,6 +74,7 @@ def main():
             if not len(ret):
                 continue
             latest_dates.append(ret.index[-1])
+            leg_returns[name] = ret
             res = decay_check(ret)
             rows.append({"strategy": name, **res})
             tag = "⚠️衰减" if res["decayed"] else "健康"
@@ -92,6 +94,29 @@ def main():
     no_registered = not rows
     if no_registered:
         print("无在册策略可复测(0 在册或均缺收益序列)——写诚实空报告刷新陈旧控制面,不早退。")
+
+    # 拥挤归因维度(§7 失效模式/退役归因字段;孤岛回收:capacity.strategy_pool_crowding)。
+    # 披露非判定:不改 status 红绿,只给每腿补 corr_to_pool/crowded 供退役复核时归因
+    # 「拥挤」;计算失败显式落 reason,不静默吞(check_control_exceptions 同精神)。
+    try:
+        from capacity.crowding_score import strategy_pool_crowding
+        crowding = strategy_pool_crowding(leg_returns)
+    except Exception as e:  # noqa: BLE001
+        crowding = {"computable": False, "reason": f"{type(e).__name__}: {str(e)[:120]}"}
+        print(f"  [crowding] 拥挤度计算失败(披露层,不阻断 decay 报告): {e}", file=sys.stderr)
+    if crowding.get("computable"):
+        per_leg = crowding.get("per_leg", {})
+        for r in rows:
+            leg = per_leg.get(r["strategy"])
+            if leg:
+                r["crowding_corr_to_pool"] = leg["corr_to_pool"]
+                r["crowding_max_pair"] = f"{leg['max_pair_with']}({leg['max_pair_corr']})"
+                r["crowded"] = leg["crowded"]
+        crowded_names = [n for n, l in per_leg.items() if l["crowded"]]
+        print(f"  [crowding] 池级拥挤={crowding['pool_crowding_latest']}"
+              f"(阈值 {crowding['threshold']});拥挤腿:{crowded_names or '无'}")
+    else:
+        print(f"  [crowding] 未计算:{crowding.get('reason')}")
 
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     with open(REPORT, "a") as f:
@@ -118,6 +143,7 @@ def main():
         "status": "red" if decayed else "green",
         "no_registered": no_registered,
         "strategies": rows,
+        "pool_crowding": crowding,
     }
     LATEST.parent.mkdir(parents=True, exist_ok=True)
     LATEST.write_text(json.dumps(envelope, ensure_ascii=False, indent=2, default=float))
