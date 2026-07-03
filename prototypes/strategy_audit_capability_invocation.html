@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<!--
+Capability-invocation prototype.
+Assumptions:
+- A retail user does not start from "audit a strategy"; they start from an intent such as "find stocks", "check my idea", or "explain this stock".
+- System capabilities must be visible and callable near the input area, not hidden behind reports.
+- All stock names and numbers are sample placeholders and not investment advice.
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>策略审计小程序 · 能力调用体验</title>
+  <style>
+    :root {
+      --canvas: #e8edf1;
+      --paper: #fbfaf7;
+      --paper-2: #f3f1eb;
+      --ink: #11151a;
+      --ink-2: #36414c;
+      --muted: #6c7782;
+      --faint: #9aa4ad;
+      --line: #d7dddf;
+      --line-strong: #b6c0c4;
+      --green: #105d40;
+      --green-soft: #e0efe7;
+      --blue: #254f73;
+      --blue-soft: #e2edf4;
+      --amber: #8b6119;
+      --amber-soft: #f6ead2;
+      --red: #9a332d;
+      --red-soft: #f3dfdc;
+      --black: #0c1116;
+      --radius: 8px;
+      --shadow: 0 26px 84px rgba(17, 21, 26, 0.16);
+      --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+      --serif: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--sans);
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, rgba(17, 21, 26, 0.045) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(17, 21, 26, 0.045) 1px, transparent 1px),
+        var(--canvas);
+      background-size: 44px 44px;
+    }
+
+    button { font: inherit; cursor: pointer; }
+
+    .page {
+      min-height: 100vh;
+      padding: 34px 38px;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 34px;
+      align-items: center;
+    }
+
+    .brief {
+      align-self: stretch;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 16px 0;
+    }
+
+    .brand {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 11px;
+      border: 1px solid var(--line-strong);
+      background: rgba(251, 250, 247, 0.78);
+      border-radius: 999px;
+      color: var(--ink-2);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .brand-mark {
+      width: 20px;
+      height: 20px;
+      border-radius: 5px;
+      background: var(--black);
+      position: relative;
+    }
+
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      inset: 5px;
+      border: 1px solid #c8d8d0;
+      border-radius: 3px;
+    }
+
+    h1 {
+      margin: 34px 0 16px;
+      font-family: var(--serif);
+      font-size: 42px;
+      line-height: 1.12;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      margin: 0;
+      color: var(--ink-2);
+      font-size: 15px;
+      line-height: 1.8;
+    }
+
+    .rules {
+      margin-top: 28px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .rule {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 10px;
+      align-items: start;
+      padding: 12px;
+      background: rgba(251, 250, 247, 0.72);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .rule-index {
+      height: 24px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--paper);
+    }
+
+    .rule b {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .rule span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .anti {
+      margin-top: 20px;
+      padding: 12px;
+      border: 1px dashed #aeb8bd;
+      border-radius: var(--radius);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    .screens {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(260px, 320px));
+      gap: 22px;
+      justify-content: center;
+      align-items: start;
+    }
+
+    .phone-wrap { display: grid; gap: 10px; }
+
+    .screen-label {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0;
+      font-style: italic;
+    }
+
+    .phone {
+      width: 320px;
+      height: 694px;
+      padding: 10px;
+      border-radius: 34px;
+      background: #10151b;
+      box-shadow: var(--shadow);
+    }
+
+    .screen {
+      height: 100%;
+      overflow: hidden;
+      border-radius: 25px;
+      background: var(--paper);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      height: 48px;
+      flex: 0 0 auto;
+      display: grid;
+      grid-template-columns: 34px 1fr 46px;
+      align-items: center;
+      padding: 0 10px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(251, 250, 247, 0.96);
+    }
+
+    .back, .more {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 20px;
+      line-height: 1;
+      padding: 0;
+    }
+
+    .more { font-size: 16px; letter-spacing: 0.12em; }
+
+    .top-title { text-align: center; min-width: 0; }
+
+    .top-title b {
+      display: block;
+      font-size: 14px;
+      line-height: 1.1;
+    }
+
+    .top-title span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 9px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .body {
+      flex: 1;
+      overflow: auto;
+      padding: 12px;
+    }
+
+    .body::-webkit-scrollbar { width: 0; }
+
+    .credit-strip {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      background: var(--paper-2);
+      border-radius: var(--radius);
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 10px;
+    }
+
+    .credit-strip strong {
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hero {
+      border: 1px solid var(--line-strong);
+      background: #fffefa;
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+
+    .eyebrow {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .hero h2, .panel h2 {
+      margin: 7px 0 0;
+      font-family: var(--serif);
+      font-size: 21px;
+      line-height: 1.16;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .hero p {
+      margin: 10px 0 0;
+      color: var(--ink-2);
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    .capability-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .cap {
+      min-height: 104px;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: var(--radius);
+      padding: 10px;
+      text-align: left;
+      color: var(--ink);
+    }
+
+    .cap b {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 5px;
+    }
+
+    .cap span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .cap small {
+      display: inline-flex;
+      margin-top: 8px;
+      padding: 3px 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--blue);
+      background: var(--blue-soft);
+      font-size: 9px;
+      font-weight: 900;
+    }
+
+    .recent-card {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .recent-head {
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .recent-head b { font-size: 12px; }
+    .recent-head span { color: var(--muted); font-size: 10px; }
+
+    .recent-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      padding: 9px 10px;
+      border-bottom: 1px solid #edf0f0;
+      font-size: 11px;
+    }
+
+    .recent-row:last-child { border-bottom: 0; }
+    .recent-row span { color: var(--muted); }
+
+    .composer {
+      flex: 0 0 auto;
+      padding: 8px 10px 12px;
+      border-top: 1px solid var(--line);
+      background: rgba(251, 250, 247, 0.98);
+    }
+
+    .quick-strip {
+      display: flex;
+      gap: 6px;
+      overflow: hidden;
+      margin-bottom: 7px;
+    }
+
+    .quick {
+      flex: 0 0 auto;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink-2);
+      border-radius: 999px;
+      padding: 5px 8px;
+      font-size: 10px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .input-row {
+      display: grid;
+      grid-template-columns: 34px 1fr 48px;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .mode {
+      width: 34px;
+      height: 34px;
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      border-radius: 999px;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .field {
+      height: 36px;
+      display: flex;
+      align-items: center;
+      padding: 0 11px;
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      border-radius: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .send {
+      height: 36px;
+      border: 1px solid var(--green);
+      background: var(--green);
+      color: #fff;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .panel {
+      border: 1px solid var(--line-strong);
+      background: #fffefa;
+      border-radius: var(--radius);
+      padding: 13px;
+      margin-bottom: 10px;
+    }
+
+    .intent {
+      margin-top: 9px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .intent-row {
+      display: grid;
+      grid-template-columns: 66px 1fr;
+      gap: 8px;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .intent-row b {
+      color: var(--muted);
+      font-weight: 900;
+    }
+
+    .plan {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .plan-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .plan-head b { font-size: 13px; }
+    .badge {
+      padding: 4px 7px;
+      border-radius: 999px;
+      border: 1px solid #e2c583;
+      color: var(--amber);
+      background: var(--amber-soft);
+      font-size: 10px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .tool-step {
+      display: grid;
+      grid-template-columns: 24px 1fr auto;
+      gap: 8px;
+      align-items: center;
+      padding: 9px 10px;
+      border-bottom: 1px solid #edf0f0;
+      font-size: 11px;
+    }
+
+    .tool-step:last-child { border-bottom: 0; }
+
+    .step-num {
+      width: 23px;
+      height: 23px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      color: var(--muted);
+      font-size: 10px;
+      background: var(--paper-2);
+    }
+
+    .tool-step b { display: block; font-size: 12px; }
+    .tool-step span { display: block; color: var(--muted); margin-top: 2px; }
+    .tool-cost { font-family: var(--mono); color: var(--ink-2); }
+
+    .confirm-card {
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .confirm-total {
+      padding: 11px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .confirm-total strong {
+      display: block;
+      font-size: 22px;
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .confirm-total span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .confirm-actions {
+      display: grid;
+      grid-template-columns: 1fr 1.35fr;
+      gap: 8px;
+      padding: 10px;
+    }
+
+    .secondary, .primary {
+      border-radius: 7px;
+      padding: 9px 6px;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .secondary {
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .primary {
+      border: 1px solid var(--green);
+      background: var(--green);
+      color: #fff;
+    }
+
+    .result-summary {
+      border: 1px solid var(--line-strong);
+      background: #fffefa;
+      border-radius: var(--radius);
+      padding: 13px;
+      margin-bottom: 10px;
+    }
+
+    .result-summary h2 {
+      margin: 7px 0 0;
+      font-family: var(--serif);
+      font-size: 20px;
+      line-height: 1.15;
+    }
+
+    .counts {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+      margin-top: 11px;
+    }
+
+    .count {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 7px;
+      padding: 8px 5px;
+      text-align: center;
+    }
+
+    .count strong {
+      display: block;
+      font-size: 17px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .count span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 9px;
+    }
+
+    .stock {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      margin-bottom: 9px;
+      overflow: hidden;
+    }
+
+    .stock-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      padding: 11px 11px 7px;
+    }
+
+    .stock-name { font-size: 14px; font-weight: 900; }
+    .stock-code { margin-top: 3px; font-family: var(--mono); color: var(--muted); font-size: 10px; }
+
+    .score { text-align: right; }
+    .score strong { display: block; color: var(--green); font-size: 18px; line-height: 1; }
+    .score span { color: var(--muted); font-size: 9px; }
+
+    .rationale {
+      padding: 0 11px 9px;
+      color: var(--ink-2);
+      font-size: 11px;
+      line-height: 1.55;
+    }
+
+    .pills {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+      padding: 0 11px 10px;
+    }
+
+    .pill {
+      padding: 4px 6px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--paper-2);
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 900;
+    }
+
+    .pill.green { color: var(--green); border-color: #b9dfc9; background: var(--green-soft); }
+    .pill.amber { color: var(--amber); border-color: #e2c583; background: var(--amber-soft); }
+
+    .stock-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+      padding: 9px 11px 11px;
+      border-top: 1px solid #edf0f0;
+    }
+
+    .stock-actions button {
+      border-radius: 7px;
+      padding: 8px 4px;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .watch { border: 1px solid var(--line-strong); background: #fff; color: var(--ink); }
+    .audit { border: 1px solid var(--green); background: var(--green); color: #fff; }
+
+    .bottom-action {
+      flex: 0 0 auto;
+      padding: 10px 12px 14px;
+      display: grid;
+      grid-template-columns: 1fr 1.25fr;
+      gap: 8px;
+      border-top: 1px solid var(--line);
+      background: rgba(251, 250, 247, 0.96);
+    }
+
+    @media (max-width: 1260px) {
+      .page { grid-template-columns: 1fr; }
+      .brief { max-width: 940px; margin: 0 auto; }
+    }
+
+    @media (max-width: 1040px) {
+      .screens { grid-template-columns: 1fr; }
+      .phone-wrap { justify-content: center; }
+    }
+
+    @media (max-width: 430px) {
+      .page { padding: 0; display: block; }
+      .brief { display: none; }
+      .screens { display: block; }
+      .phone-wrap:not(:first-child) { display: none; }
+      .screen-label { display: none; }
+      .phone { width: 100vw; height: 100vh; border-radius: 0; padding: 0; }
+      .screen { border-radius: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="brief">
+      <div>
+        <div class="brand"><span class="brand-mark"></span><span>STRATEGY AUDIT OS</span></div>
+        <h1>用户不是来走流程的，是来调用能力的。</h1>
+        <p class="lead">更合理的产品入口不是“提交审计”，而是“我现在能让系统帮我做什么”。自然语言输入是主入口，能力卡是可见菜单，系统把用户一句话分派到找股票、审计策略、解释单股、过滤风险和观察提醒。</p>
+        <div class="rules">
+          <div class="rule">
+            <div class="rule-index">01</div>
+            <div><b>先暴露能力</b><span>用户不需要知道系统内部模块，但要知道可调用的任务。</span></div>
+          </div>
+          <div class="rule">
+            <div class="rule-index">02</div>
+            <div><b>从用户意图出发</b><span>“帮我找股票”“解释这只票”“审计这个想法”都应是一等入口。</span></div>
+          </div>
+          <div class="rule">
+            <div class="rule-index">03</div>
+            <div><b>系统要会组装工具链</b><span>一句话背后可以调用解析、筛选、回测、风险过滤、单股解释。</span></div>
+          </div>
+          <div class="rule">
+            <div class="rule-index">04</div>
+            <div><b>费用跟着任务走</b><span>先让用户看懂会调用哪些能力，再确认 credit，而不是先谈扣费。</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="anti">对抗性审查：如果首页只是一块输入框，用户不知道系统能干什么；如果首页只是按钮，用户又失去自然表达。正确结构是“能力卡 + 自然语言输入 + 系统自动编排”。</div>
+    </section>
+
+    <section class="screens" aria-label="能力调用三屏原型">
+      <div class="phone-wrap">
+        <div class="screen-label">01 · 用户先看到系统能力，再自由输入</div>
+        <div class="phone">
+          <div class="screen">
+            <header class="topbar">
+              <button class="back">‹</button>
+              <div class="top-title"><b>策略助手</b><span>找股票 · 审计策略 · 解释风险</span></div>
+              <button class="more">···</button>
+            </header>
+            <div class="body">
+              <div class="credit-strip"><span>个人租户 KIKI-001</span><span><strong>2,640</strong> credits</span></div>
+              <section class="hero">
+                <div class="eyebrow">Capability Hub</div>
+                <h2>你可以直接说需求，也可以先点一个能力。</h2>
+                <p>系统会把你的话翻译成可执行任务链，先展示计划，再确认 credits。</p>
+              </section>
+
+              <section class="capability-grid">
+                <button class="cap"><b>找股票</b><span>按你说的条件筛出今日研究候选。</span><small>常用</small></button>
+                <button class="cap"><b>审计策略</b><span>回测、成本、样本外、多重测试。</span><small>标准</small></button>
+                <button class="cap"><b>解释单股</b><span>回答为什么入选、风险在哪里。</span><small>低成本</small></button>
+                <button class="cap"><b>看持仓风险</b><span>把你的持仓和策略条件对照。</span><small>持仓</small></button>
+              </section>
+
+              <section class="recent-card">
+                <div class="recent-head"><b>最近任务</b><span>可继续追问</span></div>
+                <div class="recent-row"><span>20日动量 + 放量 + 估值过滤</span><b>候选 18</b></div>
+                <div class="recent-row"><span>解释 示例电气 为什么入选</span><b>已完成</b></div>
+                <div class="recent-row"><span>观察池风险提醒</span><b>已开启</b></div>
+              </section>
+            </div>
+            <footer class="composer">
+              <div class="quick-strip">
+                <button class="quick">帮我找低估值走强股票</button>
+                <button class="quick">审计我的策略想法</button>
+              </div>
+              <div class="input-row">
+                <button class="mode">语</button>
+                <div class="field">输入需求，例如“帮我找放量但估值不高的票”</div>
+                <button class="send">发送</button>
+              </div>
+            </footer>
+          </div>
+        </div>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="screen-label">02 · 系统把一句话编排成可确认的能力链</div>
+        <div class="phone">
+          <div class="screen">
+            <header class="topbar">
+              <button class="back">‹</button>
+              <div class="top-title"><b>任务计划</b><span>先确认调用哪些能力</span></div>
+              <button class="more">···</button>
+            </header>
+            <div class="body">
+              <section class="panel">
+                <div class="eyebrow">User Intent</div>
+                <h2>“帮我找最近放量、上涨、估值不太高的股票。”</h2>
+                <div class="intent">
+                  <div class="intent-row"><b>目标</b><span>找今日候选股票，而不是只做策略报告。</span></div>
+                  <div class="intent-row"><b>约束</b><span>默认全 A、T+1、扣成本、排除不可交易。</span></div>
+                  <div class="intent-row"><b>缺口</b><span>需要确认调仓频率和持仓数量。</span></div>
+                </div>
+              </section>
+
+              <section class="plan">
+                <div class="plan-head"><b>系统将调用 5 个能力</b><span class="badge">待确认</span></div>
+                <div class="tool-step">
+                  <div class="step-num">01</div>
+                  <div><b>理解策略条件</b><span>动量、放量、估值、流动性</span></div>
+                  <div class="tool-cost">18</div>
+                </div>
+                <div class="tool-step">
+                  <div class="step-num">02</div>
+                  <div><b>生成受控规则</b><span>不执行用户代码，只生成 DSL</span></div>
+                  <div class="tool-cost">35</div>
+                </div>
+                <div class="tool-step">
+                  <div class="step-num">03</div>
+                  <div><b>扫描今日候选</b><span>全市场条件匹配 + 可交易过滤</span></div>
+                  <div class="tool-cost">80</div>
+                </div>
+                <div class="tool-step">
+                  <div class="step-num">04</div>
+                  <div><b>风险排除</b><span>涨跌停、停牌、成交不足、波动异常</span></div>
+                  <div class="tool-cost">60</div>
+                </div>
+                <div class="tool-step">
+                  <div class="step-num">05</div>
+                  <div><b>生成候选解释</b><span>每只股票给入选理由和风险提示</span></div>
+                  <div class="tool-cost">70</div>
+                </div>
+              </section>
+
+              <section class="confirm-card">
+                <div class="confirm-total">
+                  <div><strong>263 credits</strong><span>先找候选，不跑完整 9-Gate 深审</span></div>
+                  <span class="badge">余额足够</span>
+                </div>
+                <div class="confirm-actions">
+                  <button class="secondary">先补充条件</button>
+                  <button class="primary">确认调用</button>
+                </div>
+              </section>
+            </div>
+            <footer class="composer">
+              <div class="quick-strip">
+                <button class="quick">改成每周调仓</button>
+                <button class="quick">只看沪深300</button>
+              </div>
+              <div class="input-row">
+                <button class="mode">语</button>
+                <div class="field">补充限制，例如“持有前20只”</div>
+                <button class="send">发送</button>
+              </div>
+            </footer>
+          </div>
+        </div>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="screen-label">03 · 结果页继续暴露后续能力，而不是终止流程</div>
+        <div class="phone">
+          <div class="screen">
+            <header class="topbar">
+              <button class="back">‹</button>
+              <div class="top-title"><b>今日候选</b><span>研究候选 · 非投资建议</span></div>
+              <button class="more">···</button>
+            </header>
+            <div class="body">
+              <section class="result-summary">
+                <div class="eyebrow">Result</div>
+                <h2>找到 18 只符合条件股票，7 只被风险过滤。</h2>
+                <div class="counts">
+                  <div class="count"><strong>18</strong><span>符合条件</span></div>
+                  <div class="count"><strong>11</strong><span>进入观察</span></div>
+                  <div class="count"><strong>7</strong><span>风险过滤</span></div>
+                </div>
+              </section>
+
+              <article class="stock">
+                <div class="stock-head">
+                  <div>
+                    <div class="stock-name">示例电气</div>
+                    <div class="stock-code">600123.SH · 示例</div>
+                  </div>
+                  <div class="score"><strong>86</strong><span>匹配度</span></div>
+                </div>
+                <div class="rationale">20 日动量 +8.4%，成交额放大 1.6x，PE 分位 42%。近 5 日涨幅偏快，不适合追高。</div>
+                <div class="pills">
+                  <span class="pill green">可交易性通过</span>
+                  <span class="pill green">未触发风控</span>
+                  <span class="pill">中盘</span>
+                </div>
+                <div class="stock-actions">
+                  <button class="watch">加入观察</button>
+                  <button class="audit">单股审计</button>
+                </div>
+              </article>
+
+              <article class="stock">
+                <div class="stock-head">
+                  <div>
+                    <div class="stock-name">示例科技</div>
+                    <div class="stock-code">300456.SZ · 示例</div>
+                  </div>
+                  <div class="score"><strong>79</strong><span>匹配度</span></div>
+                </div>
+                <div class="rationale">动量排名前 12%，成交额连续三周抬升。波动率处于近一年 78% 分位。</div>
+                <div class="pills">
+                  <span class="pill green">流动性通过</span>
+                  <span class="pill amber">波动偏高</span>
+                  <span class="pill">创业板</span>
+                </div>
+                <div class="stock-actions">
+                  <button class="watch">加入观察</button>
+                  <button class="audit">单股审计</button>
+                </div>
+              </article>
+            </div>
+            <footer class="bottom-action">
+              <button class="secondary">查看过滤原因</button>
+              <button class="primary">继续追问</button>
+            </footer>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
