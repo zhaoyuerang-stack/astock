@@ -14,6 +14,12 @@ from .alpha_audit import (
     ridge_joint_increment,
 )
 from .artifacts import ArtifactType, ControlArtifact, HostSpec
+from .historical_memory import (
+    RollingMemoryResult,
+    build_historical_memory_factor,
+    rank_ic_series,
+    rolling_memory_rankic,
+)
 from .marginal import MarginalReport, compute_marginal_report
 from .policy import apply_veto_filter
 from .triage import TriageDecision, route_failed_candidate
@@ -35,4 +41,9 @@ __all__ = [
     "corrected_icir",
     "newey_west_icir",
     "ridge_joint_increment",
+    # 历史相似截面记忆实验
+    "RollingMemoryResult",
+    "build_historical_memory_factor",
+    "rank_ic_series",
+    "rolling_memory_rankic",
 ]

@@ -124,6 +124,10 @@ echo "=== test_factor_store_scoring.py (Factor Store 统一评分层) ==="
 python3 -m pytest tests/test_factor_store_scoring.py -q
 
 echo ""
+echo "=== test_historical_memory_experiment.py (历史相似截面记忆保守实验) ==="
+python3 -m pytest tests/test_historical_memory_experiment.py -q
+
+echo ""
 echo "=== test_factor_store_backfill.py (核心因子真实回填编排) ==="
 python3 -m pytest tests/test_factor_store_backfill.py -q
 
