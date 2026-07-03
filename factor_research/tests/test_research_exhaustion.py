@@ -49,6 +49,7 @@ def _healthy_inbox_kwargs(**overrides):
                                           verdict="可用", severe_count=0),
         promotion=PromotionReadinessView(),
         exhaustion={"state": "healthy"},
+        recompose=None,
     )
     base.update(overrides)
     return base

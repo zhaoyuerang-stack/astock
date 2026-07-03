@@ -31,6 +31,7 @@ from contracts.views import DecisionAction, DecisionInboxView, DecisionItem
 ROOT = Path(__file__).resolve().parents[2]
 CHINA_TZ = ZoneInfo("Asia/Shanghai")
 DECAY_STATUS = ROOT / "reports" / "decay_status.json"
+RECOMPOSE_LATEST = ROOT / "reports" / "research" / "portfolio_recompose.json"
 
 _REGISTERED = {"在册", "ACTIVE", "active"}
 _SEVERITY_ORDER = {"blocked": 0, "attention": 1, "info": 2}
@@ -249,6 +250,50 @@ def _items_steer(promo) -> list[DecisionItem]:
     )]
 
 
+def _items_recompose(rec) -> list[DecisionItem]:
+    """组合再构成提案(info 级常设建议,不计入待裁决数):多策略组合权重是否重排。
+
+    只在 artifact 新鲜(≤14 天,周度 job 两个周期)且有有效提案时入箱;缺失/过期/
+    空提案不制造事项(周度 job 未跑/无可组合腿都不是"待裁决",不假紧迫)。
+    """
+    if not isinstance(rec, dict):
+        return []
+    prop = rec.get("proposal") or {}
+    if prop.get("status") != "ok" or not prop.get("weights"):
+        return []
+    try:
+        gen = datetime.fromisoformat(str(rec.get("generated_at", "")))
+        age_days = (datetime.now(CHINA_TZ) - gen).days
+    except Exception:
+        return []  # 无法判新鲜度 → 不入箱(过期提案比没提案更误导)
+    if age_days > 14:
+        return []
+    w = ", ".join(f"{k}={v}" for k, v in prop["weights"].items())
+    cm = prop.get("composite_metrics") or {}
+    return [DecisionItem(
+        key="recompose:proposal",
+        kind="portfolio_recompose",
+        severity="info",
+        title="组合再构成提案(周度):采纳新权重/paper 名单,还是维持现状?",
+        evidence=[
+            f"提案权重:{w}(排名口径 {rec.get('ranking_version')},多目标非单一收益,R-OBJECTIVE-001)",
+            f"组合体检:sharpe={cm.get('sharpe')} maxdd={cm.get('maxdd')} "
+            f"组合衰减={prop.get('composite_decay', {}).get('decayed')}",
+            f"paper 名单(top-N,R-PROD-001):{rec.get('paper_candidates')}",
+        ],
+        consequence="常设建议,非紧急;组合不随台账/衰减状态重估 = 权重停留在上次人工实验的假设上。",
+        actions=[
+            DecisionAction(
+                label="查看完整排名与提案",
+                entrypoint="reports/research/portfolio_recompose.json(latest+按日期归档)",
+                allowed=True, reason="后端确定性产出的持久化排名(R-PROD-001),只读",
+            ),
+        ],
+        authority="portfolio.recompose(确定性内核)+ scheduled_portfolio_recompose(周度,advisory)",
+        drilldown="/portfolio-risk",
+    )]
+
+
 def _items_exhaustion(exh) -> list[DecisionItem]:
     """研究枯竭信号 → 外探(新数据/文献)还是调整搜索空间,只有人能决定(LOOP §6)。
 
@@ -282,6 +327,12 @@ def _items_exhaustion(exh) -> list[DecisionItem]:
                 reason="外探产物只进 L0-L3 证据,不判有效(R-LLM-001);结论须回写方向登记簿",
             ),
             DecisionAction(
+                label="启动文献扫描剧本(literature-scan)",
+                entrypoint="docs/agent_skills/literature_scan.md(产出带出处 Hypothesis 草案入候选队列)",
+                allowed=True,
+                reason="只提假设不判有效(R-LLM-001);草案仍走完整 L0-L3/9-Gate(R-WF-001)",
+            ),
+            DecisionAction(
                 label="调整搜索空间(方向登记簿策展)",
                 entrypoint="knowledge/direction_registry.json(证据门控,须带 evidence 指针)",
                 allowed=True,
@@ -310,6 +361,7 @@ def get_decision_inbox(
     data_quality_view=None,
     promotion=None,
     exhaustion: dict | None = None,
+    recompose: dict | None = ...,  # ... 哨兵 = 从磁盘读;None = 显式「无提案」
 ) -> DecisionInboxView:
     """装配收件箱。关键字参数仅供测试注入事实源;生产路径全部走权威读服务。"""
     items: list[DecisionItem] = []
@@ -378,6 +430,15 @@ def get_decision_inbox(
         all_readable = False
         items.append(_source_error_item("research_exhaustion", exc))
 
+    try:
+        if recompose is ...:
+            recompose = (json.loads(RECOMPOSE_LATEST.read_text(encoding="utf-8"))
+                         if RECOMPOSE_LATEST.exists() else None)
+        items += _items_recompose(recompose)
+    except Exception as exc:  # noqa: BLE001
+        all_readable = False
+        items.append(_source_error_item("portfolio_recompose", exc))
+
     items.sort(key=lambda i: (_SEVERITY_ORDER.get(i.severity, 9), i.key))
     pending = sum(1 for i in items if i.severity in ("blocked", "attention"))
 
@@ -403,6 +464,7 @@ def get_decision_inbox(
             "data": "data_lake/quality_report.json",
             "steer": "services.read.promotion_readiness(advisory)",
             "research_exhaustion": "services.read.research_exhaustion(机械判据 advisory)",
+            "portfolio_recompose": str(RECOMPOSE_LATEST) + "(周度确定性排名,advisory)",
         },
         honesty="本视图只聚合权威事实源,不做新判定;actions 为 advisory 导航,由人经 canonical "
                 "入口执行(R-LLM-001/ADR-030);任一事实源不可读即显式入箱,空箱只在全源可读时宣称。",

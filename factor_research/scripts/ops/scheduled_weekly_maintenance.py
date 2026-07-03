@@ -130,6 +130,14 @@ def run_weekly(args):
                 [PYTHON, "scripts/ops/scheduled_cross_asset_leg_search.py"],
                 dry_run=args.dry_run,
             )
+            # 组合再构成(WS-D,ADR-034 后续;研究旁路,失败不标 failed):在册腿多目标
+            # 排名 + 非冗余组合权重提案 + top-N paper 名单,后端确定性产出并持久化
+            # (R-PROD-001);advisory,生效由人经决策收件箱裁决。
+            report["portfolio_recompose"] = run_subprocess(
+                "weekly portfolio recompose (多策略组合重排提案,advisory)",
+                [PYTHON, "scripts/ops/scheduled_portfolio_recompose.py"],
+                dry_run=args.dry_run,
+            )
             # 自动补审:对任何「在册」但缺 DSR 审计的版本(配置已知者)自动跑 9-Gate 并落台账,
             # 保持台账多重检验覆盖不留空(行业级因子等不适配者会被记 SKIP)。
             report["audit_stale"] = run_subprocess(

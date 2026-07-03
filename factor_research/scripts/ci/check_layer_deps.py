@@ -86,6 +86,8 @@ ALLOWED_IMPORT_EXCEPTIONS = {
     ("scripts/ops/scheduled_factor_search.py", "workflow.from_factory"),
     # 生产衰减监控:读在册版本并经 attach_decay_check 写回衰减审计字段。
     ("scripts/ops/decay_monitor.py", "strategy_registry"),
+    # 周度组合再构成(WS-D):只读在册版本清单定位 version_returns 序列,零台账写入。
+    ("scripts/ops/scheduled_portfolio_recompose.py", "strategy_registry"),
 }
 
 
