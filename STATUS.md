@@ -1,8 +1,14 @@
 # STATUS — 当前进度
 
-> 更新:2026-07-02。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
+> 更新:2026-07-03。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
+
+**2026-07-03(孤岛回收四项:拥挤归因 + 保质期复核环 + 基本面质量因子族 + 被丢信号销账)**:
+  · **拥挤 → 衰减归因**:`capacity.strategy_pool_crowding`(零调用方孤岛回收)接进 `decay_monitor` 周度——池级(等权"策略组合"复用 calculate_crowding_score)+ 逐腿 `max_pair_corr` 点名"和谁拥挤"(阈值单源 = governance.marginal.REDUNDANT_CORR)。对抗测试抓到真设计缺陷:逐腿对池均值相关会被正交腿稀释漏检双胞胎(corr 0.99 的孪生对池仅 0.64),已改两两口径。<2 腿/样本不足诚实拒判不给 0 分假绿。测试 5/5。
+  · **保质期复核环**:`services/read/knowledge_expiry.py`(check_expiry 此前只挂 CLI 手动命令,结论过期没人重测)——findings 过期+父过期级联 + 方向条目过期(带 revival_condition)→ 决策收件箱**第九源**(info 级:「重测还是带新证据续期?」,裸续期=永久墓碑警示)。测试 6/6。
+  · **基本面质量因子族(probe 前候选)**:`factors/fundamental_quality.py`——资负表科目(Phase 1 已摄取,anndate PIT)首次因子化:净占款议价权/应收强度改善/存货强度改善,纯核心可注入面板单测(方向对/缺字段显式拒/预热 NaN 诚实/池对齐),6/6。**未接 DSL 白名单**:按 probe 纪律先体检(TASKS 立数据依赖执行项),frontier 正指基本面族空白区。
+  · **被丢信号销账**:`reports/research/unused_signals_disposition.md`——salience 已在产销账;hmm_stress 后两输出=regime 轨迹/模型稳定性诊断量,非截面 alpha 不立 probe;pricing_gap 06-23「本体丢」经查部分陈旧(生产画像两值都消费),真缺口=截面因子化,归产业基本面 Phase 3 不重复立项。留休眠判定:execution/机构组合栈条件触发,model_risk 深层/regime_gate 维持休眠(复活需 ADR,R-ARCH-005)。
 
 **2026-07-02(WS-D/WS-E 收尾:组合再构成周度 job + 文献扫描剧本 + probe 回写纪律固化)**:
   · **组合再构成(WS-D)**:`portfolio/recompose.py` 确定性内核——多目标排名(mean-rank(sharpe/calmar/边际残差夏普),衰减腿强制垫底,R-OBJECTIVE-001 非单一收益;口径 RANKING_VERSION 锚定)+ 非冗余贪心选腿(两两|corr|≥0.7 同质变体跳过留痕,§5.3)+ 静态 inverse-vol 提案 + 组合自身 decay_check(§5.4)。`scheduled_portfolio_recompose`(周度,挂周维护研究旁路)读在册 `version_returns` → **持久化** `reports/research/portfolio_recompose.json`(latest+归档,R-PROD-001「排名后端确定性产出」)含 top-N `paper_candidates` 名单;决策收件箱**第八源**(info 级提案,>14 天过期不入箱)。对抗测试 8/8(高全样本夏普但近三年衰减的腿必垫底且被提案排除——单看夏普的实现必挂;冗余双胞胎只留一;样本不足诚实拒判不出绩效数字;全灭空提案不硬凑;同输入恒同输出)。**留白已立 TASKS**:paper 多账户并行的执行侧(paper_engine 现单账户,须生产机改造验收)。
