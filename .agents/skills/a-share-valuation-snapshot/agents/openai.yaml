@@ -1,4 +1,4 @@
 interface:
   display_name: "A-Share Valuation Snapshot"
-  short_description: "Generate guarded A-share valuation tables"
-  default_prompt: "Use $a-share-valuation-snapshot to build a valuation snapshot table from the local factor_research data lake."
+  short_description: "Generate guarded A-share valuation analysis"
+  default_prompt: "Use $a-share-valuation-snapshot to build a valuation snapshot and peer-relative median deviation analysis from the local factor_research data lake."

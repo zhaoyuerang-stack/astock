@@ -29,6 +29,9 @@ DEFAULT_COLUMNS = [
     "PEG",
 ]
 
+ANALYSIS_METRICS = ["市值", "PE(TTM)", "PB", "PS", "EV/EBITDA", "PEG"]
+VALUATION_MULTIPLES = ["PE(TTM)", "PB", "PS", "EV/EBITDA", "PEG"]
+
 
 def parse_codes(raw: str) -> dict[str, str]:
     out: dict[str, str] = {}
@@ -198,7 +201,82 @@ def build_snapshot(repo: Path, codes: dict[str, str]) -> tuple[pd.DataFrame, lis
             }
         )
 
-    return pd.DataFrame(rows), warnings
+    snapshot = pd.DataFrame(rows)
+    if "日期" in snapshot.columns:
+        dates = sorted(str(date) for date in snapshot["日期"].dropna().unique())
+        if len(dates) > 1:
+            warnings.append(f"Mixed row dates in peer table: {', '.join(dates)}")
+    return snapshot, warnings
+
+
+def numeric_or_none(value: object) -> float | None:
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+        number = float(value)
+    except Exception:
+        return None
+    return number if math.isfinite(number) else None
+
+
+def build_analysis(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    numeric = df.copy()
+    for metric in ANALYSIS_METRICS:
+        if metric in numeric.columns:
+            numeric[metric] = pd.to_numeric(numeric[metric], errors="coerce")
+
+    median_rows: list[dict[str, object]] = []
+    medians: dict[str, float] = {}
+    for metric in ANALYSIS_METRICS:
+        if metric not in numeric.columns:
+            continue
+        series = numeric[metric].dropna()
+        series = series[series > 0]
+        median = float(series.median()) if not series.empty else float("nan")
+        medians[metric] = median
+        median_rows.append({"指标": metric, "有效样本数": int(series.count()), "中位数": median if math.isfinite(median) else None})
+
+    deviation_rows: list[dict[str, object]] = []
+    summary_rows: list[dict[str, object]] = []
+    for _, row in numeric.iterrows():
+        dev_row: dict[str, object] = {"公司": row.get("公司"), "代码": row.get("代码")}
+        valuation_devs: list[float] = []
+        for metric in ANALYSIS_METRICS:
+            value = numeric_or_none(row.get(metric))
+            median = medians.get(metric)
+            deviation = None
+            if value is not None and median is not None and math.isfinite(median) and median > 0:
+                deviation = (value / median - 1.0) * 100.0
+                if metric in VALUATION_MULTIPLES:
+                    valuation_devs.append(deviation)
+            dev_row[f"{metric}偏离%"] = deviation
+        deviation_rows.append(dev_row)
+
+        composite = float(pd.Series(valuation_devs).median()) if valuation_devs else None
+        if len(valuation_devs) < 3:
+            label = "估值数据不足"
+            composite = None
+        elif composite is None:
+            label = "估值数据不足"
+        elif composite >= 20:
+            label = "相对同组偏贵"
+        elif composite <= -20:
+            label = "相对同组偏便宜"
+        else:
+            label = "接近同组中位"
+        summary_rows.append(
+            {
+                "公司": row.get("公司"),
+                "代码": row.get("代码"),
+                "估值综合偏离%": composite,
+                "相对位置": label,
+                "可用倍数数": len(valuation_devs),
+            }
+        )
+
+    return pd.DataFrame(median_rows), pd.DataFrame(deviation_rows), pd.DataFrame(summary_rows)
 
 
 def format_value(value: object) -> str:
@@ -214,11 +292,44 @@ def format_value(value: object) -> str:
     return str(value)
 
 
+def format_percent(value: object) -> str:
+    number = numeric_or_none(value)
+    if number is None:
+        return "—"
+    return f"{number:+.1f}%"
+
+
+def format_markdown(df: pd.DataFrame, percent_columns: set[str] | None = None) -> str:
+    percent_columns = percent_columns or set()
+    display = df.copy()
+    for col in display.columns:
+        if col in {"公司", "代码", "日期", "指标", "相对位置"}:
+            continue
+        if col in percent_columns or col.endswith("偏离%"):
+            display[col] = display[col].map(format_percent)
+        elif col in {"有效样本数", "可用倍数数"}:
+            display[col] = display[col].map(lambda value: "—" if pd.isna(value) else str(int(value)))
+        else:
+            display[col] = display[col].map(format_value)
+    return display.to_markdown(index=False)
+
+
+def clean_json(value: object) -> object:
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {key: clean_json(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [clean_json(item) for item in value]
+    return value
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--codes", required=True, help="Comma list like '002371:北方华创,688012:中微公司'")
     parser.add_argument("--repo", default=".", help="Repository root containing factor_research/data_lake")
     parser.add_argument("--include-date", action="store_true", help="Keep 日期 in the markdown table")
+    parser.add_argument("--analysis", action="store_true", help="Emit peer medians, deviations, and composite relative valuation labels")
     parser.add_argument("--json", action="store_true", help="Emit JSON records and warnings instead of markdown")
     args = parser.parse_args()
 
@@ -227,15 +338,29 @@ def main() -> None:
     if not args.include_date and "日期" in df.columns:
         df = df.drop(columns=["日期"])
 
+    median_df, deviation_df, summary_df = build_analysis(df)
+
     if args.json:
-        print(json.dumps({"rows": df.to_dict("records"), "warnings": warnings}, ensure_ascii=False, indent=2))
+        payload = {"rows": df.to_dict("records"), "warnings": warnings}
+        if args.analysis:
+            payload.update(
+                {
+                    "medians": median_df.to_dict("records"),
+                    "deviations": deviation_df.to_dict("records"),
+                    "summary": summary_df.to_dict("records"),
+                }
+            )
+        print(json.dumps(clean_json(payload), ensure_ascii=False, indent=2, allow_nan=False))
         return
 
-    display = df.copy()
-    for col in display.columns:
-        if col not in {"公司", "代码", "日期"}:
-            display[col] = display[col].map(format_value)
-    print(display.to_markdown(index=False))
+    print(format_markdown(df))
+    if args.analysis:
+        print("\nPeer medians:")
+        print(format_markdown(median_df))
+        print("\nRelative deviations vs peer median:")
+        print(format_markdown(deviation_df))
+        print("\nComposite valuation position:")
+        print(format_markdown(summary_df, percent_columns={"估值综合偏离%"}))
     if warnings:
         print("\nWarnings:")
         for warning in warnings:
