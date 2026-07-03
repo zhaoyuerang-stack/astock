@@ -5,6 +5,9 @@
 
 ## 🔴 进行中 / 优先
 
+- [ ] **【WS-D】组合再构成周度 job + top-N paper 排名持久化(ADR-034 后续,计划见 `.claude/plans/PLAN_self_evolution_direction_layer.md`)** — 零件全有(`portfolio/` optimizer + `governance.marginal_alpha` + `data_lake/version_returns/`),缺定时编排:周度取在册+影子池日收益 → 逐腿边际贡献 → optimizer 重算权重 → 建议进决策收件箱(人裁决,不自动生效);排名由后端确定性代码产出并**持久化**(R-PROD-001),top-N 自动开 paper 账户并行实测;组合本身进衰减复测。护栏 C:排名口径不得为让某策略上榜而改(R-OBJECTIVE-001)。谁:研究侧 + workflow。
+- [ ] **【WS-E】文献扫描剧本(枯竭触发的外探之二,ADR-034 后续)** — 研究枯竭信号(收件箱第七源)已落地,数据 scouting 走 probe-signal-source + `knowledge/data_source_backlog.json`;文献侧缺剧本:人批准后 agent 用 WebSearch 扫 SSRN/arXiv q-fin/业界因子研究,产出**带出处** Hypothesis 草案进 factory 候选队列(R-LLM-001 合规:只提假设不判有效;R-WF-001:仍走 L0-L3/9-Gate)。落成 `factor_research/docs/agent_skills/` 剧本文档。价值最不确定,排 WS-D 之后。谁:强模型 + 人批准。
+- [ ] **【probe 结论回写纪律】外探/probe 结果(含阴性)必须回写 `knowledge/direction_registry.json`(带证据指针)** — 否则死路会被反复重提(方向登记簿存在的原因,ADR-034);证据门控会拒无证据条目。每次 probe-signal-source 收尾时执行。谁:执行 probe 的 agent + 人复核。
 - [ ] **【2026-09-30 复核】small-cap-size/v2.0 纸面前向实验(ADR-024)** — 06-22 启动的人工 override 纸面前向(零真金,DSR=0.086 未过门,主仓继续防守)。跟踪器 `scripts/research/paper_forward_smallcap.py` 已接进日更旁路(每日自动累积快照到 `reports/experiments/smallcap_v2_paper_forward.jsonl`)。**到 ~2026-09 底(≥3 月前向)复核**:前向兑现(夏普稳、回撤受控、未破 MA16 防守)→ 证据增强(n_periods↑,DSR 可能真过)→ 再议小额真仓 + 走正式 promote;前向塌陷/破防守 → 证否、停实验。**注:复核前绝不因「纸面好看」就绕 DSR 门登记在册(R-LLM-001/§12.3)。** 谁:用户 + 走 workflow。
 - [ ] **【并行设计】冠军因子 L1~L3 审计并行化改造** — 06-28 发现演化收尾时的 Top K 冠军因子 L3 审计为串行，单线程排队 Walk-Forward 耗时 15-20 分钟成为新瓶颈。已在 `factory/autoresearch/islands.py` 完成多核并行化重构（父进程顺序写盘以防止文件锁死锁），语法编译已通过。待随下一次大规模进化寻优启动进行实跑效果与性能验证。谁:研究侧 + 走 workflow。
 

@@ -4,6 +4,12 @@
 
 ## 一句话
 
+**2026-07-02(方向半环补全:教训机械回流生成端 + metasearch 回流 + 研究枯竭信号,ADR-034)**:
+  · **方向登记簿**:`knowledge/direction_registry.json`(策展,证据门控:无 evidence 一律忽略;到期=复活重测)+ `knowledge/directions.py`——研究级证伪(北向/holder 族太弱、动量全市场 null、size×illiq 同信息)首次变成生成器可消费的机械约束。接线:`generate_seed_candidates` 种子层 SKIP/排尾/BOOST(fail-open+自饿保护)、LLM 播种 prompt 注入、`load_graph()` 内存合并(promote/pipeline 自动消费)。顺手修真实盲区:SearchGate 因子级匹配对 DSL 候选恒失配(factor_fn_name 恒 `compute_dsl_factor`)→ 新增 `term_factor` 成分匹配。
+  · **metasearch 机械回流**:`factor_mi_audit`/`information_map` 加 `--json` 落 `redundancy_clusters.json`(同簇两腿=同信息算两遍→种子排尾)/`frontier.json`(距 LIVE 锚最远→排头);周维护挂**月度**刷新(研究旁路,失败不标 failed)。
+  · **研究枯竭信号**:`scheduled_factor_search` 落 append-only 运行摘要 → `services/read/research_exhaustion`(机械三态,连续 4 次非失败运行零 holdout 产出→exhausted;样本不足/搜索环自崩不假报)→ 决策收件箱**第七源**(attention:「启动外探还是调向?」附 `knowledge/data_source_backlog.json`,退市回补置顶=数据债优先)。外探启动永远须人批准(LOOP §6)。
+  · **对抗测试** 25/25(SKIP 因果对照/证据门控真拒/过期真复活/自饿兜底/prompt 注入登记簿驱动/簇塌缩防假冗余/枯竭不假报/源爆炸显式入箱)+ 9 静态守卫全绿;`ChampionRecord` 补记 `priority_adjustment`(gate 咬进 fitness 后记录可自证);搜索单测 hermetic 钉死登记簿路径(曾被种子重排打挂 2 例,已修,回归到基线仅 2 例预存失败)。WS-D(组合周度 job+top-N paper 排名)/WS-E(文献扫描剧本)已立项 TASKS。计划:`.claude/plans/PLAN_self_evolution_direction_layer.md`。
+
 **2026-07-02(产品主界面翻转:决策收件箱 + 今日简报,「系统找人」)**：
   · **后端读层**:新增 `services/read/decision_inbox.py`(六源聚合:在册FAILED处置/部署fail-closed换腿/review队列/衰减确认/数据质量/研究重心 advisory;零新判定,actions 经 `action_policy` 装配指向 canonical 入口)+ `services/read/daily_brief.py`(首屏三问;trust banner 原样透传禁更绿)。API:`GET /inbox` + `/inbox/brief`。**空箱三态**:有待裁决 / 全源可读健康 / 有源不可读禁称无事(源异常显式入箱,不静默)。
   · **前端首屏**:新增 `web/app/inbox`(⓪ 今日简报·收件箱),首页 redirect 改指 `/inbox`——打开产品先看「要不要介入」,而非巡视九页看板;空收件箱显式呈现为「系统健康」。真实数据下正确推出唯一待裁决项 = 部署 fail-closed 换腿(illiquidity/v3.1 降级遗留,TASKS 既有待决项)。
