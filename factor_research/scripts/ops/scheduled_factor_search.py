@@ -36,6 +36,25 @@ from governance.holdout import (
 _DEFAULT_TOP_N = 25
 _DEFAULT_REBALANCE_DAYS = 20
 
+# 每次运行的 append-only 摘要:研究枯竭信号的数据源
+# (services.read.research_exhaustion 消费:连续 N 次无产出 → 收件箱推「外探还是调向」)。
+# 此前零晋级只打印即退出,「连续几周无产出」这一枯竭事实系统自己看不见。
+_RUNS_SUMMARY = ROOT / "reports" / "research" / "factor_search_runs.jsonl"
+
+
+def _append_run_summary(**record) -> None:
+    """落一条运行摘要。best-effort:失败只打印,绝不影响搜索/审计主流程退出码。"""
+    import json
+    from datetime import datetime
+
+    record = {"ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), **record}
+    try:
+        _RUNS_SUMMARY.parent.mkdir(parents=True, exist_ok=True)
+        with _RUNS_SUMMARY.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except Exception as e:
+        print(f"  ⚠️ 运行摘要写入失败(不影响主流程): {e}", file=sys.stderr)
+
 
 def _candidate_exec_params(ast: dict) -> tuple[int, int]:
     """从候选 AST 的 execution 块取 (top_n, rebalance_days)(WS4)。
@@ -248,6 +267,7 @@ def main():
             print(f"  ⚠️ Failed to sync experiments to ResearchLedger: {err}")
     except Exception as e:
         print(f"❌ Island Search failed to run: {e}", file=sys.stderr)
+        _append_run_summary(status="search_failed", error=f"{type(e).__name__}: {str(e)[:200]}")
         sys.exit(1)
 
     # 3. Fetch promoted candidates that passed L3
@@ -259,6 +279,12 @@ def main():
     ]
     if not promoted:
         print("\n[Step 2] No candidates passed L3 validation in this run. No reports to audit.")
+        _append_run_summary(
+            status="no_candidates",
+            evaluated=int(search_res.evaluated),
+            n_promoted_l3=0,
+            n_holdout_ok=0,
+        )
         sys.exit(0)
 
     print(f"\n[Step 2] Found {len(promoted)} candidates promoted to review. Running 9-Gate audits...", flush=True)
@@ -280,6 +306,8 @@ def main():
         book_search = None
         print(f"  [marginal] 在册组合加载失败,跳过边际判定: {_bk_err}", flush=True)
 
+    n_holdout_ok = 0
+    marginal_verdicts: list[str] = []
     for item in promoted:
         from factory.autoresearch.models import Candidate, CandidateStatus
         cand = Candidate(
@@ -461,10 +489,20 @@ def main():
             )
             report_path.write_text(report.to_markdown() + ho_md, encoding="utf-8")
             print(f"  ✅ 9-Gate audit report saved to:\n  {report_path}")
+            # 枯竭信号口径:候选过 L3 且 holdout 校验 OK 才算「本次运行有产出」
+            n_holdout_ok += 1 if ho_ok else 0
+            marginal_verdicts.append(str(mg.get("marginal_verdict")))
 
         except Exception as e:
             print(f"  ❌ Failed to evaluate candidate {fp[:8]}: {e}", file=sys.stderr)
 
+    _append_run_summary(
+        status="audited",
+        evaluated=int(search_res.evaluated),
+        n_promoted_l3=len(promoted),
+        n_holdout_ok=n_holdout_ok,
+        marginal_verdicts=marginal_verdicts,
+    )
     print("\n🎉 Scheduled factor search and evaluation completed!")
 
 

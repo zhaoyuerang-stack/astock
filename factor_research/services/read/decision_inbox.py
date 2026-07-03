@@ -10,7 +10,8 @@
 - **只聚合权威事实源,不做任何新判定**:逐版本裁决 = ``validation_gate.get_gate_verdicts``
   (权威 decide_nine_gate);部署三态 = ``system_truth.get_system_truth``(fail-closed 校验);
   review 待办 = ``factory.autoresearch.ReviewQueue.pending``;衰减 = ``reports/decay_status.json``;
-  数据 = ``state.data_quality``;研究重心 = ``promotion_readiness``(advisory)。
+  数据 = ``state.data_quality``;研究重心 = ``promotion_readiness``(advisory);
+  研究枯竭 = ``research_exhaustion``(机械判据 advisory:连续 N 次搜索无产出 → 外探还是调向)。
 - **空箱三态严格区分**:「无待裁决」只能在**全部事实源可读**时宣称;任一源不可读
   → 该源以 ``source_error`` 事项显式入箱(attention),headline 禁止称"无需介入"。
   控制路径禁静默吞异常(check_control_exceptions 同精神):异常必须成为可见事项。
@@ -248,6 +249,50 @@ def _items_steer(promo) -> list[DecisionItem]:
     )]
 
 
+def _items_exhaustion(exh) -> list[DecisionItem]:
+    """研究枯竭信号 → 外探(新数据/文献)还是调整搜索空间,只有人能决定(LOOP §6)。
+
+    只在权威读层判 exhausted 时入箱;healthy / insufficient_evidence 不制造事项
+    (刚接上仪表/样本不足时不得假报枯竭——那是 research_exhaustion 的诚实三态)。
+    """
+    if not isinstance(exh, dict) or exh.get("state") != "exhausted":
+        return []
+    backlog = exh.get("data_source_backlog") or []
+    top3 = "; ".join(
+        f"{b.get('id')}({b.get('playbook', '')})" for b in backlog[:3]
+    )
+    return [DecisionItem(
+        key="research:exhausted",
+        kind="research_exhaustion",
+        severity="attention",
+        title=(f"自动研究环连续 {exh.get('window')} 次搜索无产出——"
+               f"启动外部探索(新数据/文献)还是调整搜索空间?"),
+        evidence=[
+            f"判据(机械):{exh.get('criterion', '')}",
+            f"runs 明细:{exh.get('detail', '')}",
+            f"候选数据源清单 top3:{top3 or '(knowledge/data_source_backlog.json 缺失)'}",
+        ],
+        consequence="继续在耗尽的搜索空间烧算力 = 白涨 n_trials 加重 DSR 惩罚;"
+                    "外探是生成端扩张,启动须人批准(LOOP §6),系统绝不自动抓取。",
+        actions=[
+            DecisionAction(
+                label="启动数据体检剧本(probe-signal-source)",
+                entrypoint="skill:probe-signal-source + knowledge/data_source_backlog.json",
+                allowed=True,
+                reason="外探产物只进 L0-L3 证据,不判有效(R-LLM-001);结论须回写方向登记簿",
+            ),
+            DecisionAction(
+                label="调整搜索空间(方向登记簿策展)",
+                entrypoint="knowledge/direction_registry.json(证据门控,须带 evidence 指针)",
+                allowed=True,
+                reason="生成端 steering,不触验真;无证据条目会被 directions.py 忽略",
+            ),
+        ],
+        authority="services.read.research_exhaustion(机械判据 advisory,非裁决)",
+        drilldown="/experiments/autoresearch",
+    )]
+
+
 # ── 装配 ────────────────────────────────────────────────────────────────
 
 def _load_decay() -> dict | None:
@@ -264,6 +309,7 @@ def get_decision_inbox(
     decay: dict | None = ...,  # ... 哨兵 = 从磁盘读;None = 显式「无报告」
     data_quality_view=None,
     promotion=None,
+    exhaustion: dict | None = None,
 ) -> DecisionInboxView:
     """装配收件箱。关键字参数仅供测试注入事实源;生产路径全部走权威读服务。"""
     items: list[DecisionItem] = []
@@ -323,6 +369,15 @@ def get_decision_inbox(
         all_readable = False
         items.append(_source_error_item("promotion_readiness", exc))
 
+    try:
+        if exhaustion is None:
+            from services.read.research_exhaustion import get_research_exhaustion
+            exhaustion = get_research_exhaustion()
+        items += _items_exhaustion(exhaustion)
+    except Exception as exc:  # noqa: BLE001
+        all_readable = False
+        items.append(_source_error_item("research_exhaustion", exc))
+
     items.sort(key=lambda i: (_SEVERITY_ORDER.get(i.severity, 9), i.key))
     pending = sum(1 for i in items if i.severity in ("blocked", "attention"))
 
@@ -347,6 +402,7 @@ def get_decision_inbox(
             "decay_live": str(DECAY_STATUS),
             "data": "data_lake/quality_report.json",
             "steer": "services.read.promotion_readiness(advisory)",
+            "research_exhaustion": "services.read.research_exhaustion(机械判据 advisory)",
         },
         honesty="本视图只聚合权威事实源,不做新判定;actions 为 advisory 导航,由人经 canonical "
                 "入口执行(R-LLM-001/ADR-030);任一事实源不可读即显式入箱,空箱只在全源可读时宣称。",
