@@ -137,6 +137,21 @@ def run_weekly(args):
                 [PYTHON, "scripts/research/run_nine_gates_all.py", "--audit-stale", "--persist"],
                 dry_run=args.dry_run,
             )
+            # metasearch 月度刷新(每月首周;研究旁路,失败不标 failed):
+            # MI 冗余簇 + 信息地图空白区 → 机器可读 JSON,供生成端 steering
+            # (knowledge/directions.py 消费:同簇排尾 / frontier 排头)。此前这两个
+            # 元研究产物只有人工跑+人读报告,教训不回流(见 metasearch_findings_20260623)。
+            if datetime.now().day <= 7:
+                report["metasearch_clusters"] = run_subprocess(
+                    "metasearch MI redundancy clusters (月度,机器可读)",
+                    [PYTHON, "-m", "metasearch.factor_mi_audit", "--json"],
+                    dry_run=args.dry_run,
+                )
+                report["metasearch_frontier"] = run_subprocess(
+                    "metasearch information-map frontier (月度,机器可读)",
+                    [PYTHON, "-m", "metasearch.information_map", "--json"],
+                    dry_run=args.dry_run,
+                )
             report["status"] = "ok" if all(
                 report[name].get("ok")
                 for name in ["aggregate", "raw_close", "quality", "decay_monitor"]
