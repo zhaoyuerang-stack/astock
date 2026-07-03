@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT))
 
 from research_toolkit import (  # noqa: E402
     build_historical_memory_factor,
+    build_historical_memory_factor_fast,
     rank_ic_series,
     rolling_memory_rankic,
 )
@@ -112,3 +113,26 @@ def test_rolling_memory_rankic_reports_oos_windows_and_delta():
     assert result.summary["rankic_delta"] > 0
     assert result.summary["windows"] == len(result.windows)
     assert result.summary["method"] == "historical_similar_cross_section_memory"
+
+
+def test_fast_memory_factor_matches_reference_implementation():
+    factor, forward_ret = _synthetic_panels()
+
+    reference = build_historical_memory_factor(
+        factor,
+        forward_ret,
+        horizon=3,
+        lookback=25,
+        n_neighbors=4,
+        min_history=4,
+    )
+    fast = build_historical_memory_factor_fast(
+        factor,
+        forward_ret,
+        horizon=3,
+        lookback=25,
+        n_neighbors=4,
+        min_history=4,
+    )
+
+    pd.testing.assert_frame_equal(fast, reference, check_exact=False, atol=1e-12, rtol=1e-12)

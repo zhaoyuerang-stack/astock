@@ -28,7 +28,7 @@ from factors.alpha.base import FactorData  # noqa: E402
 from factors.alpha.builtins import AmihudIlliq  # noqa: E402
 from factors.utils import mad_clip, safe_zscore  # noqa: E402
 from governance.holdout import assert_search_clean, boundary  # noqa: E402
-from research_toolkit import build_historical_memory_factor, rank_ic_series  # noqa: E402
+from research_toolkit import build_historical_memory_factor_fast, rank_ic_series  # noqa: E402
 from strategies.small_cap import _drop_star, build_rebalance_weights, load_price_panels  # noqa: E402
 
 
@@ -141,7 +141,7 @@ def run(args) -> dict:
     base_factor = safe_zscore(mad_clip(AmihudIlliq(window=args.factor_window).compute(data)))
     forward_ret = _forward_returns(close, args.horizon)
 
-    memory_factor = build_historical_memory_factor(
+    memory_factor = build_historical_memory_factor_fast(
         base_factor,
         forward_ret,
         horizon=args.horizon,

@@ -112,6 +112,82 @@ def build_historical_memory_factor(
     return out
 
 
+def _rank_unit_matrix(frame: pd.DataFrame) -> np.ndarray:
+    ranks = frame.rank(axis=1, method="average", na_option="keep").to_numpy(dtype="float64")
+    valid = np.isfinite(ranks)
+    counts = valid.sum(axis=1, keepdims=True)
+    sums = np.where(valid, ranks, 0.0).sum(axis=1, keepdims=True)
+    means = np.divide(sums, counts, out=np.zeros_like(sums), where=counts > 0)
+    centered = np.where(valid, ranks - means, 0.0)
+    norms = np.sqrt((centered * centered).sum(axis=1, keepdims=True))
+    return np.divide(centered, norms, out=np.zeros_like(centered), where=norms > 0)
+
+
+def build_historical_memory_factor_fast(
+    factor: pd.DataFrame,
+    forward_ret: pd.DataFrame,
+    *,
+    horizon: int = 20,
+    lookback: int = 756,
+    n_neighbors: int = 20,
+    min_history: int = 20,
+    min_names: int = 30,
+) -> pd.DataFrame:
+    """Vectorized memory factor for full-universe grid experiments.
+
+    The time discipline is identical to ``build_historical_memory_factor``:
+    the factor is shifted by one row internally and only matured labels are
+    eligible. Similarity is computed from full-row rank unit vectors so the
+    no-missing-data case matches Spearman correlation exactly.
+    """
+    if horizon < 1:
+        raise ValueError("horizon must be >= 1")
+    if lookback < 1:
+        raise ValueError("lookback must be >= 1")
+    if n_neighbors < 1:
+        raise ValueError("n_neighbors must be >= 1")
+
+    dates = factor.index.intersection(forward_ret.index)
+    factor_s = factor.reindex(dates).shift(1)
+    labels = forward_ret.reindex(index=dates, columns=factor.columns).astype("float64")
+    rank_units = _rank_unit_matrix(factor_s)
+    label_arr = labels.to_numpy(dtype="float64")
+    out = np.full(label_arr.shape, np.nan, dtype="float64")
+
+    valid_names = factor_s.notna().sum(axis=1).to_numpy()
+    for pos in range(len(dates)):
+        if valid_names[pos] < min_names:
+            continue
+        hpos = list(_matured_history_positions(pos, horizon, lookback))
+        if len(hpos) < min_history:
+            continue
+
+        sims = rank_units[hpos] @ rank_units[pos]
+        sims = np.where(np.isfinite(sims) & (sims > 0), sims, np.nan)
+        ok = np.isfinite(sims)
+        if int(ok.sum()) < min_history:
+            continue
+
+        ok_idx = np.flatnonzero(ok)
+        if len(ok_idx) > n_neighbors:
+            best_local = ok_idx[np.argpartition(sims[ok_idx], -n_neighbors)[-n_neighbors:]]
+            best_local = best_local[np.argsort(sims[best_local])[::-1]]
+        else:
+            best_local = ok_idx[np.argsort(sims[ok_idx])[::-1]]
+
+        weights = sims[best_local].astype("float64")
+        if not np.isfinite(weights).all() or weights.sum() <= 0:
+            continue
+        weights = weights / weights.sum()
+        rows = label_arr[np.asarray(hpos, dtype=int)[best_local]]
+        weighted = np.nansum(rows * weights[:, None], axis=0)
+        has_value = np.isfinite(rows).any(axis=0)
+        weighted[~has_value] = np.nan
+        out[pos] = weighted
+
+    return pd.DataFrame(out, index=dates, columns=factor.columns)
+
+
 def rolling_memory_rankic(
     factor: pd.DataFrame,
     forward_ret: pd.DataFrame,
@@ -129,7 +205,7 @@ def rolling_memory_rankic(
     dates = factor.index.intersection(forward_ret.index)
     if step_days is None:
         step_days = test_days
-    memory = build_historical_memory_factor(
+    memory = build_historical_memory_factor_fast(
         factor.reindex(dates),
         forward_ret.reindex(dates),
         horizon=horizon,

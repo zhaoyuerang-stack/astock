@@ -17,6 +17,7 @@ from .artifacts import ArtifactType, ControlArtifact, HostSpec
 from .historical_memory import (
     RollingMemoryResult,
     build_historical_memory_factor,
+    build_historical_memory_factor_fast,
     rank_ic_series,
     rolling_memory_rankic,
 )
@@ -44,6 +45,7 @@ __all__ = [
     # 历史相似截面记忆实验
     "RollingMemoryResult",
     "build_historical_memory_factor",
+    "build_historical_memory_factor_fast",
     "rank_ic_series",
     "rolling_memory_rankic",
 ]
