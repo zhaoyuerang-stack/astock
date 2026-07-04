@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <title>Quant OS 20s Product Promo</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #000000;
+        color: #f5f5f7;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+      }
+
+      #root {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #000000;
+      }
+
+      .scene {
+        position: absolute;
+        inset: 0;
+      }
+
+      .caption {
+        position: absolute;
+        left: 120px;
+        right: 120px;
+        bottom: 62px;
+        z-index: 20;
+        display: flex;
+        justify-content: center;
+        pointer-events: none;
+      }
+
+      .caption-line {
+        max-width: 1120px;
+        padding: 18px 26px;
+        border: 1px solid rgba(245, 245, 247, 0.16);
+        border-radius: 8px;
+        background: rgba(28, 28, 30, 0.76);
+        color: #f5f5f7;
+        font-size: 34px;
+        line-height: 1.28;
+        font-weight: 650;
+        text-align: center;
+        box-shadow: 0 22px 50px rgba(0, 0, 0, 0.34);
+      }
+    </style>
+  </head>
+  <body>
+    <div data-hf-id="hf-at0g" id="root" data-composition-id="main" data-start="0" data-duration="20" data-width="1920" data-height="1080">
+      <div data-hf-id="hf-ifqi" id="scene-1" class="scene" data-composition-id="scene-1-hook" data-composition-src="compositions/scene-1-hook.html" data-start="0" data-duration="5" data-track-index="1" data-width="1920" data-height="1080"></div>
+
+      <div data-hf-id="hf-f5x6" id="scene-2" class="scene" data-composition-id="scene-2-audit" data-composition-src="compositions/scene-2-audit.html" data-start="5" data-duration="5" data-track-index="1" data-width="1920" data-height="1080"></div>
+
+      <div data-hf-id="hf-h0mf" id="scene-3" class="scene" data-composition-id="scene-3-decision" data-composition-src="compositions/scene-3-decision.html" data-start="10" data-duration="5" data-track-index="1" data-width="1920" data-height="1080"></div>
+
+      <div data-hf-id="hf-a2l9" id="scene-4" class="scene" data-composition-id="scene-4-close" data-composition-src="compositions/scene-4-close.html" data-start="15" data-duration="5" data-track-index="1" data-width="1920" data-height="1080"></div>
+
+      <div data-hf-id="hf-8gv8" id="caption-track" data-composition-id="captions" data-start="0" data-duration="20" data-track-index="2" data-width="1920" data-height="1080">
+        <div data-hf-id="hf-gsc6" class="caption">
+          <div data-hf-id="hf-1ise" id="caption-text" class="caption-line">漂亮回测，不等于可以下手。</div>
+        </div>
+        <script>
+          (function () {
+            const tl = gsap.timeline({ paused: true });
+            const caption = document.querySelector("#caption-text");
+            const lines = [
+              { t: 0.4, end: 4.25, text: "漂亮回测，不等于可以下手。" },
+              { t: 5.25, end: 9.35, text: "Quant OS 把策略先送进九道门：数据、成本、样本外、DSR。" },
+              { t: 10.25, end: 14.2, text: "它不替你喊买卖，只告诉你：能不能信，哪里会翻车。" },
+              { t: 15.3, end: 19.2, text: "面向个人用户，从一只股票开始，把研究纪律变成日常决策。" },
+            ];
+
+            lines.forEach((line) => {
+              tl.set(caption, { innerText: line.text, visibility: "visible" }, line.t);
+              tl.fromTo(
+                caption,
+                { y: 34, opacity: 0 },
+                {
+                  y: 0,
+                  opacity: 1,
+                  duration: 0.42,
+                  ease: "power3.out",
+                  immediateRender: false,
+                  overwrite: "auto",
+                },
+                line.t,
+              );
+              tl.to(caption, { y: -18, opacity: 0, duration: 0.28, ease: "power2.in" }, line.end);
+              tl.set(caption, { opacity: 0, visibility: "hidden" }, line.end + 0.3);
+            });
+
+            window.__timelines = window.__timelines || {};
+            window.__timelines["captions"] = tl;
+          })();
+        </script>
+      </div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const mainTl = gsap.timeline({ paused: true });
+      mainTl.to("#scene-1", { opacity: 0, duration: 0.28, ease: "power2.in" }, 4.72);
+      mainTl.fromTo("#scene-2", { opacity: 0 }, { opacity: 1, duration: 0.24 }, 5);
+      mainTl.to("#scene-2", { opacity: 0, duration: 0.28, ease: "power2.in" }, 9.72);
+      mainTl.fromTo("#scene-3", { opacity: 0 }, { opacity: 1, duration: 0.24 }, 10);
+      mainTl.to("#scene-3", { opacity: 0, duration: 0.28, ease: "power2.in" }, 14.72);
+      mainTl.fromTo("#scene-4", { opacity: 0 }, { opacity: 1, duration: 0.24 }, 15);
+      window.__timelines["main"] = mainTl;
+    </script>
+  </body>
+</html>

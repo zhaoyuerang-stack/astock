@@ -1,0 +1,346 @@
+<template id="scene-3-decision-template">
+  <div id="scene-3-root" data-composition-id="scene-3-decision" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+    <div class="scene-shell">
+      <div class="scene-content">
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="status">9:41 <span>策略审计</span></div>
+            <div class="appbar">策略审计助手</div>
+            <div class="disclaimer">研究方法学工具 · 不构成投资建议</div>
+            <div class="chat">
+              <div class="msg bot">描述你的策略，我帮你跑 9-Gate 机构级审计。</div>
+              <div class="msg me">小市值低流动性月调仓，持仓 25 只</div>
+              <div class="report">
+                <div class="report-head">
+                  <span>9-Gate 裁决</span>
+                  <strong>不可行</strong>
+                </div>
+                <div class="metric-row">
+                  <div><span>年化</span><strong>21.6%</strong></div>
+                  <div><span>夏普</span><strong>1.38</strong></div>
+                  <div><span>DSR p</span><strong class="bad">0.086</strong></div>
+                </div>
+                <p>无法排除过拟合，成本衰减吃掉 40% alpha。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="decision">
+          <div class="eyebrow">面向个人用户</div>
+          <h2>不是荐股器，是决策刹车</h2>
+          <div class="decision-card">
+            <div class="stock-head">
+              <span>600519 · 单股审计卡</span>
+              <strong>谨慎持有</strong>
+            </div>
+            <div class="split">
+              <div>
+                <span>如果还没买</span>
+                <strong>先别追</strong>
+                <small>估值/拥挤/样本外风险未解</small>
+              </div>
+              <div>
+                <span>如果已经持有</span>
+                <strong>降仓观察</strong>
+                <small>等待风险闸门恢复</small>
+              </div>
+            </div>
+            <div class="checklist">
+              <div><i class="fail"></i> 不输出买卖指令</div>
+              <div><i class="warn"></i> 明确翻车原因</div>
+              <div><i class="pass"></i> 保留可复核证据</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <style>
+      #scene-3-root {
+        overflow: hidden;
+        background: #e1e8f0;
+        color: #2c2c2a;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      #scene-3-root .scene-shell {
+        width: 100%;
+        height: 100%;
+        background: #e1e8f0;
+        overflow: hidden;
+      }
+
+      #scene-3-root .scene-content {
+        width: 100%;
+        height: 100%;
+        padding: 76px 130px 86px;
+        display: grid;
+        grid-template-columns: 520px 1fr;
+        gap: 120px;
+        align-items: center;
+      }
+
+      #scene-3-root .phone {
+        width: 430px;
+        height: 842px;
+        border-radius: 48px;
+        background: #2c2c2a;
+        padding: 12px;
+        box-shadow: 0 32px 90px rgba(0, 0, 0, 0.26);
+      }
+
+      #scene-3-root .phone-screen {
+        height: 100%;
+        border-radius: 38px;
+        overflow: hidden;
+        background: #f1efe8;
+        display: flex;
+        flex-direction: column;
+      }
+
+      #scene-3-root .status,
+      #scene-3-root .appbar,
+      #scene-3-root .disclaimer {
+        flex: none;
+      }
+
+      #scene-3-root .status {
+        height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 24px;
+        font-size: 13px;
+      }
+
+      #scene-3-root .status span {
+        color: #5f5e5a;
+        font-size: 12px;
+      }
+
+      #scene-3-root .appbar {
+        height: 52px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-bottom: 1px solid #d3d1c7;
+        font-size: 17px;
+        font-weight: 600;
+      }
+
+      #scene-3-root .disclaimer {
+        background: #faeeda;
+        color: #854f0b;
+        text-align: center;
+        font-size: 12px;
+        padding: 7px;
+        border-bottom: 1px solid #fac775;
+      }
+
+      #scene-3-root .chat {
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      #scene-3-root .msg,
+      #scene-3-root .report {
+        border: 1px solid #d3d1c7;
+        border-radius: 12px;
+        background: #ffffff;
+        padding: 14px;
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      #scene-3-root .msg.me {
+        align-self: flex-end;
+        max-width: 82%;
+        background: #185fa5;
+        color: #ffffff;
+        border-color: #185fa5;
+      }
+
+      #scene-3-root .report {
+        border-color: #f7c1c1;
+        background: #ffffff;
+      }
+
+      #scene-3-root .report-head {
+        display: flex;
+        justify-content: space-between;
+        color: #5f5e5a;
+        font-size: 12px;
+      }
+
+      #scene-3-root .report-head strong {
+        color: #a32d2d;
+      }
+
+      #scene-3-root .metric-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin: 14px 0;
+      }
+
+      #scene-3-root .metric-row div {
+        background: #f8fafc;
+        border-radius: 8px;
+        padding: 10px 8px;
+        text-align: center;
+      }
+
+      #scene-3-root .metric-row span {
+        display: block;
+        color: #888780;
+        font-size: 10px;
+      }
+
+      #scene-3-root .metric-row strong {
+        display: block;
+        margin-top: 5px;
+        font-family: "SF Mono", ui-monospace, Menlo, monospace;
+        font-size: 17px;
+      }
+
+      #scene-3-root .metric-row .bad {
+        color: #a32d2d;
+      }
+
+      #scene-3-root .report p {
+        color: #a32d2d;
+        font-size: 13px;
+      }
+
+      #scene-3-root .decision {
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+      }
+
+      #scene-3-root .eyebrow {
+        color: #185fa5;
+        font-family: "SF Mono", ui-monospace, Menlo, monospace;
+        font-size: 21px;
+        font-weight: 760;
+      }
+
+      #scene-3-root h2 {
+        max-width: 820px;
+        font-size: 88px;
+        line-height: 1.05;
+        font-weight: 840;
+        letter-spacing: 0;
+      }
+
+      #scene-3-root .decision-card {
+        max-width: 940px;
+        border: 1px solid #d3d1c7;
+        border-radius: 12px;
+        background: #ffffff;
+        padding: 30px;
+        box-shadow: 0 24px 70px rgba(44, 44, 42, 0.14);
+      }
+
+      #scene-3-root .stock-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid #f1efe8;
+        padding-bottom: 20px;
+      }
+
+      #scene-3-root .stock-head span {
+        color: #5f5e5a;
+        font-family: "SF Mono", ui-monospace, Menlo, monospace;
+        font-size: 17px;
+      }
+
+      #scene-3-root .stock-head strong {
+        color: #854f0b;
+        background: #faeeda;
+        border: 1px solid #fac775;
+        border-radius: 7px;
+        padding: 8px 12px;
+        font-size: 18px;
+      }
+
+      #scene-3-root .split {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 18px;
+        margin-top: 22px;
+      }
+
+      #scene-3-root .split div {
+        border-radius: 10px;
+        background: #f8fafc;
+        padding: 22px;
+      }
+
+      #scene-3-root .split span,
+      #scene-3-root .split small {
+        display: block;
+        color: #888780;
+        font-size: 15px;
+      }
+
+      #scene-3-root .split strong {
+        display: block;
+        color: #2c2c2a;
+        font-size: 34px;
+        margin: 12px 0;
+      }
+
+      #scene-3-root .checklist {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin-top: 20px;
+        color: #5f5e5a;
+        font-size: 17px;
+      }
+
+      #scene-3-root .checklist div {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+
+      #scene-3-root i {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+
+      #scene-3-root i.fail { background: #a32d2d; }
+      #scene-3-root i.warn { background: #ba7517; }
+      #scene-3-root i.pass { background: #0f6e56; }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      (function () {
+        const tl = gsap.timeline({ paused: true });
+        const scope = '#scene-3-root ';
+
+        tl.fromTo(scope + ".phone", { opacity: 0, x: -80, rotationY: -10 }, { opacity: 1, x: 0, rotationY: -4, duration: 0.72, ease: "power3.out" }, 0.18);
+        tl.fromTo(scope + ".msg", { opacity: 0, y: 28 }, { opacity: 1, y: 0, duration: 0.36, stagger: 0.12, ease: "power2.out" }, 0.78);
+        tl.fromTo(scope + ".report", { opacity: 0, y: 34, scale: 0.96 }, { opacity: 1, y: 0, scale: 1, duration: 0.46, ease: "power2.out" }, 1.45);
+        tl.fromTo(scope + ".decision", { opacity: 0, x: 80 }, { opacity: 1, x: 0, duration: 0.68, ease: "power3.out" }, 0.58);
+        tl.fromTo(scope + ".split div", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.38, stagger: 0.09, ease: "power2.out" }, 1.55);
+        tl.fromTo(scope + ".checklist div", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.3, stagger: 0.08, ease: "power2.out" }, 2.18);
+        tl.to(scope + ".phone", { y: -10, duration: 3.2, ease: "sine.inOut" }, 1.0);
+        tl.to(scope + ".decision-card", { y: -8, duration: 2.8, ease: "sine.inOut" }, 1.6);
+        tl.to(scope + ".scene-content", { y: -28, opacity: 0, duration: 0.36, ease: "power2.in" }, 4.55);
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["scene-3-decision"] = tl;
+      })();
+    </script>
+  </div>
+</template>

@@ -1,0 +1,228 @@
+<template id="scene-2-audit-template">
+  <div id="scene-2-root" data-composition-id="scene-2-audit" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+    <div class="scene-shell">
+      <div class="rail" data-layout-ignore></div>
+      <div class="scene-content">
+        <div class="left">
+          <div class="eyebrow">9-Gate R2P 审计流水线</div>
+          <h2>先证伪，再考虑部署</h2>
+          <p>不是让 AI 判断 alpha。每一道门都由确定性代码、统一回测和固定门禁裁决。</p>
+        </div>
+
+        <div class="gate-board">
+          <div class="gate pass"><span>G0</span><strong>数据审计</strong><em>通过</em></div>
+          <div class="gate pass"><span>G1</span><strong>经济假设</strong><em>通过</em></div>
+          <div class="gate pass"><span>G2</span><strong>单因子验证</strong><em>ICIR 1.42</em></div>
+          <div class="gate warn"><span>G3</span><strong>中性化</strong><em>留存 62%</em></div>
+          <div class="gate fail"><span>G4</span><strong>DSR 多重检验</strong><em>p=0.086</em></div>
+          <div class="gate pass"><span>G5</span><strong>真实成本回测</strong><em>夏普 1.38</em></div>
+          <div class="gate fail"><span>G6</span><strong>成本容量</strong><em>衰减高</em></div>
+          <div class="gate warn"><span>G7</span><strong>样本外压力</strong><em>2018 塌陷</em></div>
+          <div class="gate pass"><span>G7A</span><strong>防泄露 CV</strong><em>通过</em></div>
+        </div>
+
+        <div class="verdict">
+          <div class="label">机器裁决</div>
+          <div class="stamp">FALSIFIED</div>
+          <div class="reason">漂亮，但统计上还不能信。</div>
+        </div>
+      </div>
+    </div>
+
+    <style>
+      #scene-2-root {
+        overflow: hidden;
+        background: #000000;
+        color: #f5f5f7;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      #scene-2-root .scene-shell {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background: #000000;
+        overflow: hidden;
+      }
+
+      #scene-2-root .rail {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 518px;
+        height: 2px;
+        background: #2c2c2e;
+      }
+
+      #scene-2-root .rail::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: -1px;
+        width: 54%;
+        height: 4px;
+        background: #0a84ff;
+        box-shadow: 0 0 28px rgba(10, 132, 255, 0.65);
+      }
+
+      #scene-2-root .scene-content {
+        width: 100%;
+        height: 100%;
+        padding: 92px 104px 92px;
+        display: grid;
+        grid-template-columns: 0.62fr 1fr;
+        gap: 58px;
+        align-items: center;
+      }
+
+      #scene-2-root .left {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+      }
+
+      #scene-2-root .eyebrow {
+        color: #30d158;
+        font-family: "SF Mono", ui-monospace, Menlo, monospace;
+        font-size: 20px;
+        font-weight: 760;
+      }
+
+      #scene-2-root h2 {
+        max-width: 620px;
+        font-size: 88px;
+        line-height: 1.04;
+        font-weight: 820;
+        letter-spacing: 0;
+      }
+
+      #scene-2-root p {
+        max-width: 560px;
+        color: #c7c7cc;
+        font-size: 30px;
+        line-height: 1.45;
+      }
+
+      #scene-2-root .gate-board {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+      }
+
+      #scene-2-root .gate {
+        min-height: 164px;
+        border: 1px solid #2c2c2e;
+        border-radius: 8px;
+        background: #1c1c1e;
+        padding: 22px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      #scene-2-root .gate span {
+        width: 48px;
+        height: 30px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: "SF Mono", ui-monospace, Menlo, monospace;
+        font-size: 14px;
+        background: #2c2c2e;
+        color: #f5f5f7;
+      }
+
+      #scene-2-root .gate strong {
+        font-size: 25px;
+        line-height: 1.15;
+      }
+
+      #scene-2-root .gate em {
+        font-style: normal;
+        color: #8e8e93;
+        font-size: 17px;
+      }
+
+      #scene-2-root .gate.pass {
+        border-color: rgba(48, 209, 88, 0.28);
+      }
+
+      #scene-2-root .gate.pass span {
+        background: rgba(48, 209, 88, 0.12);
+        color: #30d158;
+      }
+
+      #scene-2-root .gate.warn {
+        border-color: rgba(255, 159, 10, 0.42);
+      }
+
+      #scene-2-root .gate.warn span {
+        background: rgba(255, 159, 10, 0.14);
+        color: #ff9f0a;
+      }
+
+      #scene-2-root .gate.fail {
+        border-color: rgba(255, 69, 58, 0.5);
+        background: rgba(255, 69, 58, 0.1);
+      }
+
+      #scene-2-root .gate.fail span {
+        background: rgba(255, 69, 58, 0.16);
+        color: #ff453a;
+      }
+
+      #scene-2-root .verdict {
+        position: absolute;
+        right: 118px;
+        bottom: 84px;
+        width: 420px;
+        border: 1px solid rgba(255, 69, 58, 0.45);
+        border-radius: 8px;
+        background: rgba(28, 28, 30, 0.94);
+        padding: 24px;
+        box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
+      }
+
+      #scene-2-root .label {
+        color: #8e8e93;
+        font-family: "SF Mono", ui-monospace, Menlo, monospace;
+        font-size: 14px;
+        margin-bottom: 10px;
+      }
+
+      #scene-2-root .stamp {
+        color: #ff453a;
+        font-size: 48px;
+        font-weight: 860;
+        letter-spacing: 0;
+      }
+
+      #scene-2-root .reason {
+        color: #c7c7cc;
+        margin-top: 9px;
+        font-size: 20px;
+      }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      (function () {
+        const tl = gsap.timeline({ paused: true });
+        const scope = '#scene-2-root ';
+
+        tl.fromTo(scope + ".left", { opacity: 0, y: 54 }, { opacity: 1, y: 0, duration: 0.64, ease: "power3.out" }, 0.15);
+        tl.fromTo(scope + ".gate", { opacity: 0, y: 60, scale: 0.96 }, { opacity: 1, y: 0, scale: 1, duration: 0.42, stagger: 0.07, ease: "power2.out" }, 0.72);
+        tl.fromTo(scope + ".rail", { opacity: 0 }, { opacity: 1, duration: 0.35 }, 0.58);
+        tl.fromTo(scope + ".verdict", { opacity: 0, y: 36, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 0.52, ease: "back.out(1.2)" }, 2.35);
+        tl.to(scope + ".gate.fail", { y: -10, duration: 0.34, stagger: 0.1, ease: "power2.out" }, 2.52);
+        tl.to(scope + ".gate.fail", { y: 0, duration: 0.42, stagger: 0.1, ease: "power2.inOut" }, 2.9);
+        tl.to(scope + ".gate-board", { y: -12, duration: 2.4, ease: "sine.inOut" }, 2.0);
+        tl.to(scope + ".scene-content", { y: -30, opacity: 0, duration: 0.36, ease: "power2.in" }, 4.55);
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["scene-2-audit"] = tl;
+      })();
+    </script>
+  </div>
+</template>

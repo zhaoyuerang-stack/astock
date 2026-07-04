@@ -1,0 +1,394 @@
+<template id="scene-1-hook-template">
+  <div id="scene-1-root" data-composition-id="scene-1-hook" data-start="0" data-duration="5" data-width="1920" data-height="1080">
+    <div class="scene-shell">
+      <div class="grid" data-layout-ignore></div>
+      <div class="glow blue" data-layout-ignore></div>
+      <div class="glow amber" data-layout-ignore></div>
+
+      <div class="scene-content">
+        <div class="brand-row">
+          <div class="mark">Q</div>
+          <div>
+            <div class="brand">Quant OS</div>
+            <div class="tag">Research-first decision system</div>
+          </div>
+        </div>
+
+        <div class="hero">
+          <div class="copy">
+            <div class="eyebrow">个人量化研究分析平台</div>
+            <h1>
+              漂亮回测
+              <span>先假设有问题</span>
+            </h1>
+            <p>把一只股票、一个策略、一次灵感，送进可复测的研究纪律。</p>
+          </div>
+
+          <div class="desk" aria-label="Quant OS operations desk mockup">
+            <div class="side">
+              <div class="side-title">Quant OS</div>
+              <div class="mode active">行动桌面</div>
+              <div class="mode">研发实验室</div>
+              <div class="nav active">今日操作台</div>
+              <div class="nav">策略台账</div>
+              <div class="nav">研究实验</div>
+              <div class="nav">系统治理</div>
+            </div>
+            <div class="main">
+              <div class="topbar">
+                <span>生产就绪度</span>
+                <strong>BLOCKED</strong>
+              </div>
+              <div class="cards">
+                <div class="card red">
+                  <span>今日交易门禁</span>
+                  <strong>被拦截</strong>
+                  <small>信号过期 / 策略降级</small>
+                </div>
+                <div class="card">
+                  <span>当前策略</span>
+                  <strong>illiquidity v3.1</strong>
+                  <small>参考态，不自动放行</small>
+                </div>
+                <div class="card green">
+                  <span>防守仓</span>
+                  <strong>511010</strong>
+                  <small>Fail closed</small>
+                </div>
+              </div>
+              <div class="chart">
+                <div class="bar b1"></div>
+                <div class="bar b2"></div>
+                <div class="bar b3"></div>
+                <div class="bar b4"></div>
+                <svg viewBox="0 0 620 150" preserveAspectRatio="none">
+                  <path class="nav-path" d="M0 115 C90 98 130 40 205 64 S330 135 420 78 S540 28 620 56" />
+                </svg>
+              </div>
+            </div>
+            <div class="agent">
+              <div class="agent-title">AI 审查员</div>
+              <div class="bubble">不要按当前 paper/signal 下单。</div>
+              <div class="bubble muted">进入系统治理页排查部署、数据与信号时效。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <style>
+      #scene-1-root {
+        overflow: hidden;
+        background: #000000;
+        color: #f5f5f7;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      #scene-1-root .scene-shell {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000000;
+      }
+
+      #scene-1-root .grid {
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(rgba(245, 245, 247, 0.045) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(245, 245, 247, 0.045) 1px, transparent 1px);
+        background-size: 64px 64px;
+        opacity: 0.55;
+      }
+
+      #scene-1-root .glow {
+        position: absolute;
+        width: 760px;
+        height: 760px;
+        border-radius: 50%;
+        filter: blur(64px);
+        opacity: 0.28;
+      }
+
+      #scene-1-root .glow.blue {
+        right: -170px;
+        top: -170px;
+        background: #0a84ff;
+      }
+
+      #scene-1-root .glow.amber {
+        left: -220px;
+        bottom: -280px;
+        background: #ff9f0a;
+        opacity: 0.16;
+      }
+
+      #scene-1-root .scene-content {
+        position: relative;
+        z-index: 2;
+        width: 100%;
+        height: 100%;
+        padding: 74px 92px 86px;
+        display: flex;
+        flex-direction: column;
+        gap: 54px;
+      }
+
+      #scene-1-root .brand-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      #scene-1-root .mark {
+        width: 58px;
+        height: 58px;
+        border-radius: 8px;
+        background: #0a84ff;
+        color: #f5f5f7;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 30px;
+        font-weight: 800;
+      }
+
+      #scene-1-root .brand {
+        font-size: 28px;
+        line-height: 1;
+        font-weight: 760;
+      }
+
+      #scene-1-root .tag {
+        margin-top: 7px;
+        font-family: "SF Mono", ui-monospace, Menlo, monospace;
+        color: #8e8e93;
+        font-size: 15px;
+      }
+
+      #scene-1-root .hero {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 0.72fr 1.28fr;
+        gap: 58px;
+        align-items: center;
+      }
+
+      #scene-1-root .eyebrow {
+        color: #ff9f0a;
+        font-family: "SF Mono", ui-monospace, Menlo, monospace;
+        font-size: 19px;
+        font-weight: 700;
+        margin-bottom: 24px;
+      }
+
+      #scene-1-root h1 {
+        max-width: 620px;
+        font-size: 96px;
+        line-height: 1.02;
+        font-weight: 820;
+        letter-spacing: 0;
+      }
+
+      #scene-1-root h1 span {
+        display: block;
+        color: #0a84ff;
+      }
+
+      #scene-1-root p {
+        margin-top: 28px;
+        max-width: 550px;
+        color: #c7c7cc;
+        font-size: 30px;
+        line-height: 1.42;
+      }
+
+      #scene-1-root .desk {
+        min-height: 660px;
+        display: grid;
+        grid-template-columns: 210px 1fr 250px;
+        gap: 14px;
+        padding: 16px;
+        border: 1px solid #2c2c2e;
+        border-radius: 8px;
+        background: rgba(28, 28, 30, 0.92);
+        box-shadow: 0 42px 120px rgba(0, 0, 0, 0.48);
+      }
+
+      #scene-1-root .side,
+      #scene-1-root .main,
+      #scene-1-root .agent {
+        border: 1px solid #2c2c2e;
+        border-radius: 8px;
+        background: #161617;
+      }
+
+      #scene-1-root .side,
+      #scene-1-root .agent {
+        padding: 22px;
+      }
+
+      #scene-1-root .side-title,
+      #scene-1-root .agent-title {
+        font-weight: 760;
+        font-size: 18px;
+        margin-bottom: 22px;
+      }
+
+      #scene-1-root .mode,
+      #scene-1-root .nav {
+        border-radius: 7px;
+        padding: 11px 12px;
+        color: #8e8e93;
+        font-size: 16px;
+        margin-bottom: 8px;
+      }
+
+      #scene-1-root .mode.active,
+      #scene-1-root .nav.active {
+        color: #0a84ff;
+        background: rgba(10, 132, 255, 0.12);
+        border-left: 3px solid #0a84ff;
+      }
+
+      #scene-1-root .main {
+        padding: 22px;
+      }
+
+      #scene-1-root .topbar {
+        height: 62px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: #8e8e93;
+        font-size: 16px;
+      }
+
+      #scene-1-root .topbar strong {
+        color: #ff453a;
+        font-family: "SF Mono", ui-monospace, Menlo, monospace;
+        font-size: 18px;
+      }
+
+      #scene-1-root .cards {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+      }
+
+      #scene-1-root .card {
+        min-height: 150px;
+        border: 1px solid #2c2c2e;
+        border-radius: 8px;
+        background: #1c1c1e;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      #scene-1-root .card span,
+      #scene-1-root .card small {
+        color: #8e8e93;
+        font-size: 14px;
+      }
+
+      #scene-1-root .card strong {
+        color: #f5f5f7;
+        font-size: 28px;
+        line-height: 1.1;
+      }
+
+      #scene-1-root .card.red {
+        border-color: rgba(255, 69, 58, 0.4);
+        background: rgba(255, 69, 58, 0.1);
+      }
+
+      #scene-1-root .card.green {
+        border-color: rgba(48, 209, 88, 0.28);
+        background: rgba(48, 209, 88, 0.08);
+      }
+
+      #scene-1-root .chart {
+        position: relative;
+        height: 330px;
+        margin-top: 26px;
+        border: 1px solid #2c2c2e;
+        border-radius: 8px;
+        background: #000000;
+        overflow: hidden;
+        display: flex;
+        align-items: flex-end;
+        gap: 36px;
+        padding: 34px 42px;
+      }
+
+      #scene-1-root .bar {
+        width: 88px;
+        border-radius: 7px 7px 0 0;
+        background: rgba(10, 132, 255, 0.42);
+      }
+
+      #scene-1-root .b1 { height: 92px; }
+      #scene-1-root .b2 { height: 170px; }
+      #scene-1-root .b3 { height: 126px; background: rgba(255, 159, 10, 0.48); }
+      #scene-1-root .b4 { height: 236px; background: rgba(48, 209, 88, 0.42); }
+
+      #scene-1-root .chart svg {
+        position: absolute;
+        left: 42px;
+        right: 42px;
+        bottom: 82px;
+        width: calc(100% - 84px);
+        height: 150px;
+      }
+
+      #scene-1-root .nav-path {
+        fill: none;
+        stroke: #f5f5f7;
+        stroke-width: 4;
+        stroke-linecap: round;
+        stroke-dasharray: 760;
+        stroke-dashoffset: 760;
+      }
+
+      #scene-1-root .bubble {
+        border: 1px solid #2c2c2e;
+        border-radius: 8px;
+        background: #1c1c1e;
+        padding: 16px;
+        margin-bottom: 14px;
+        color: #f5f5f7;
+        font-size: 17px;
+        line-height: 1.45;
+      }
+
+      #scene-1-root .bubble.muted {
+        color: #c7c7cc;
+      }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      (function () {
+        const tl = gsap.timeline({ paused: true });
+        const scope = '#scene-1-root ';
+
+        tl.fromTo(scope + ".brand-row", { opacity: 0, y: 22 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 0.12);
+        tl.fromTo(scope + ".copy", { opacity: 0, x: -70 }, { opacity: 1, x: 0, duration: 0.72, ease: "power3.out" }, 0.42);
+        tl.fromTo(scope + ".desk", { opacity: 0, x: 110, scale: 0.94 }, { opacity: 1, x: 0, scale: 1, duration: 0.82, ease: "power3.out" }, 0.62);
+        tl.fromTo(scope + ".card", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.46, stagger: 0.08, ease: "power2.out" }, 1.18);
+        tl.to(scope + ".nav-path", { strokeDashoffset: 0, duration: 1.18, ease: "power2.out" }, 1.42);
+        tl.fromTo(scope + ".bubble", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.4, stagger: 0.12, ease: "power2.out" }, 2.0);
+        tl.to(scope + ".glow.blue", { scale: 1.08, opacity: 0.36, duration: 4.7, ease: "sine.inOut" }, 0);
+        tl.to(scope + ".glow.amber", { scale: 1.14, opacity: 0.22, duration: 4.7, ease: "sine.inOut" }, 0);
+        tl.to(scope + ".desk", { y: -12, duration: 3.4, ease: "sine.inOut" }, 1.3);
+        tl.to(scope + ".scene-content", { y: -26, opacity: 0, duration: 0.36, ease: "power2.in" }, 4.55);
+
+        window.__timelines = window.__timelines || {};
+        window.__timelines["scene-1-hook"] = tl;
+      })();
+    </script>
+  </div>
+</template>
