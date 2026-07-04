@@ -17,10 +17,11 @@ from workflow import nine_gate_runner as _runner
 
 TrialCountUnknown = _runner.TrialCountUnknown
 VERSION_OVERRIDES = _runner.VERSION_OVERRIDES
+_ORIGINAL_FAMILY_N_TRIALS = _runner._family_n_trials
 
 
 def _family_n_trials(*args, **kwargs):
-    return _runner._family_n_trials(*args, **kwargs)
+    return _ORIGINAL_FAMILY_N_TRIALS(*args, **kwargs)
 
 
 def _load_spec_from_registry(*args, **kwargs):

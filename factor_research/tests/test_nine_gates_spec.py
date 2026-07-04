@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT))
 
 from core.engine import PricePanel
 from scripts.research.run_nine_gates_all import _load_spec_from_registry, run_evaluation
+from workflow.nine_gate_runner import _auditable
 
 
 def test_load_spec_from_registry():
@@ -115,3 +116,94 @@ def test_run_evaluation_with_spec():
         assert args[0] == "mock-family"
         assert args[1] == "v1.0"
         assert "dsr_p" in args[2]
+
+
+def test_registry_config_versions_are_auditable_when_adapter_supported():
+    mock_registry_data = {
+        "families": [
+            {
+                "id": "small_cap_factor__window45",
+                "versions": [
+                    {
+                        "version": "v1.0",
+                        "config": {
+                            "top_n": 25,
+                            "rebalance_days": 20,
+                            "window": 45,
+                            "factor_fn_name": "factors.small_cap.small_cap_factor",
+                            "factor_params": {"window": 45},
+                        },
+                    }
+                ],
+            },
+            {
+                "id": "industry-neglect-rotation",
+                "versions": [
+                    {
+                        "version": "v1.4",
+                        "config": {
+                            "factor": "Huaxi 11 Volume-Price Factors Composite + Stock Quality",
+                            "top_k_industries": 10,
+                        },
+                    }
+                ],
+            },
+        ]
+    }
+
+    with patch("strategy_registry._load", return_value=mock_registry_data):
+        assert _auditable("small_cap_factor__window45", "v1.0")
+        assert not _auditable("industry-neglect-rotation", "v1.4")
+
+
+def test_run_evaluation_with_registry_config_adapter():
+    mock_registry_data = {
+        "families": [
+            {
+                "id": "small_cap_factor__window45",
+                "name": "Small-cap window 45",
+                "hypothesis": "Window-specific small-cap amount factor",
+                "versions": [
+                    {
+                        "version": "v1.0",
+                        "config": {
+                            "top_n": 2,
+                            "rebalance_days": 10,
+                            "window": 45,
+                            "factor_fn_name": "factors.small_cap.small_cap_factor",
+                            "factor_params": {"window": 45},
+                        },
+                    }
+                ],
+            }
+        ]
+    }
+
+    dates = pd.bdate_range("2024-01-01", periods=120)
+    codes = ["000001", "000002", "000003"]
+    close = pd.DataFrame(
+        np.linspace(10.0, 12.0, len(dates) * len(codes)).reshape(len(dates), len(codes)),
+        index=dates,
+        columns=codes,
+    )
+    volume = pd.DataFrame(1000, index=dates, columns=codes)
+    amount = pd.DataFrame(
+        {
+            "000001": np.linspace(1000, 2000, len(dates)),
+            "000002": np.linspace(3000, 2000, len(dates)),
+            "000003": np.linspace(5000, 3000, len(dates)),
+        },
+        index=dates,
+    )
+
+    with patch("strategy_registry._load", return_value=mock_registry_data), \
+         patch("strategies.small_cap.load_price_panels", return_value=(close, volume, amount)), \
+         patch("strategy_registry.attach_nine_gate") as mock_attach, \
+         patch("scripts.research.run_nine_gates_all._family_n_trials", return_value=7):
+
+        summary = run_evaluation("small_cap_factor__window45", version="v1.0", persist=True)
+
+    assert summary["strategy"] == "small_cap_factor__window45"
+    assert summary["version"] == "v1.0"
+    mock_attach.assert_called_once()
+    assert mock_attach.call_args.args[0] == "small_cap_factor__window45"

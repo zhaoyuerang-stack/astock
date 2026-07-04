@@ -17,6 +17,7 @@ import os
 import sys
 import warnings
 from pathlib import Path
+from types import SimpleNamespace
 
 warnings.filterwarnings("ignore")
 
@@ -25,6 +26,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import pandas as pd
+import numpy as np
 
 from core.engine import PricePanel, Signal
 from core.analysis.nine_gates import NineGatesEvaluator, NineGatesReport
@@ -195,6 +197,118 @@ def _load_spec_from_registry(family: str, version: str | None) -> dict | None:
     return None
 
 
+def _load_version_from_registry(family: str, version: str | None) -> dict | None:
+    """从台账载入指定版本记录；version 缺省时取该 family 的默认/首个版本。"""
+    try:
+        import strategy_registry
+        data = strategy_registry._load()
+        for fam in data.get("families", []):
+            if fam["id"] != family:
+                continue
+            versions = fam.get("versions", [])
+            if version:
+                return next((v for v in versions if v.get("version") == version), None)
+            default_ver = DEFAULT_VERSIONS.get(family)
+            if default_ver:
+                found = next((v for v in versions if v.get("version") == default_ver), None)
+                if found:
+                    return found
+            return versions[0] if versions else None
+    except Exception:
+        return None
+    return None
+
+
+def _load_config_from_registry(family: str, version: str | None) -> dict | None:
+    """从台账载入旧式 config 字典。"""
+    rec = _load_version_from_registry(family, version)
+    cfg = (rec or {}).get("config")
+    return dict(cfg) if isinstance(cfg, dict) else None
+
+
+def _registry_config_supported(family: str, cfg: dict | None) -> bool:
+    """旧式 registry config 是否能机械复现。
+
+    只白名单可执行因子配置；描述性行业轮动/网络策略 config 继续不可审，避免伪造 DSR。
+    """
+    if not cfg:
+        return False
+    factor_fn = cfg.get("factor_fn_name")
+    if factor_fn in {
+        "factors.small_cap.small_cap_factor",
+        "factors.autoresearch_dsl.compute_dsl_factor",
+    }:
+        return True
+    if isinstance(cfg.get("ast"), dict):
+        return True
+    if family == "size-low-vol" and "low_vol" in str(cfg.get("factor", "")):
+        return True
+    return False
+
+
+def _build_from_registry_config(family: str, version: str | None, cfg: dict, start: str | None):
+    """用台账旧式 config 构造 9-Gate 所需的价格、因子、调仓和择时对象。"""
+    from app_config.settings import get_settings
+    from factors.small_cap import small_cap_factor, small_cap_timing
+    from factors.utils import mad_clip, safe_zscore
+    from strategies.small_cap import build_rebalance_weights, load_price_panels
+
+    ver = version or (_load_version_from_registry(family, None) or {}).get("version") or "v1.0"
+    ts = start or _taibook_start(family, ver) or "2018-01-01"
+    warmup = get_settings().data.warmup_start
+    ds = str(min(pd.Timestamp(ts), pd.Timestamp(warmup)).date())
+    close, volume, amount = load_price_panels(ds)
+
+    top_n = int(cfg.get("top_n", 25))
+    rebalance_days = int(cfg.get("rebalance_days", cfg.get("rebal_days", 20)))
+    timing_ma = int(cfg.get("timing_ma", cfg.get("ma_window", 16)))
+    timing, _, _ = small_cap_timing(close, amount, ma_window=timing_ma)
+
+    factor_fn = cfg.get("factor_fn_name")
+    factor_params = dict(cfg.get("factor_params") or {})
+    ast = cfg.get("ast") or factor_params.get("ast")
+
+    def build_factor(prices: PricePanel) -> pd.DataFrame:
+        if factor_fn == "factors.small_cap.small_cap_factor":
+            window = int(factor_params.get("window", cfg.get("window", 60)))
+            return small_cap_factor(prices.amount, window=window)
+        if factor_fn == "factors.autoresearch_dsl.compute_dsl_factor" or isinstance(ast, dict):
+            if not isinstance(ast, dict):
+                raise ValueError(f"{family}/{ver} registry config 缺少 AutoResearch ast")
+            from factors.autoresearch_dsl import compute_dsl_factor
+            return compute_dsl_factor(prices.close, prices.volume, ast=ast)
+        if family == "size-low-vol" and "low_vol" in str(cfg.get("factor", "")):
+            text = str(cfg.get("factor", ""))
+            vol_window = 40 if "std40" in text or "vol40" in text else int(cfg.get("vol_w", 20))
+            size_window = int(cfg.get("size_window", 60))
+            size = -np.log(prices.amount.rolling(size_window).mean() + 1)
+            ret = prices.close.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan)
+            low_vol = -ret.rolling(vol_window).std()
+            return safe_zscore(mad_clip(size + low_vol))
+        raise ValueError(f"{family}/{ver} 无可机械复现的 registry config adapter")
+
+    prices = PricePanel(close=close, volume=volume, amount=amount)
+    factor = build_factor(prices)
+    scheduled = build_rebalance_weights(factor, close, top_n=top_n, rebalance_days=rebalance_days)
+
+    rec = _load_version_from_registry(family, ver) or {}
+    thesis_cfg = ast.get("thesis", {}) if isinstance(ast, dict) else {}
+    thesis = {
+        "mechanism": thesis_cfg.get("mechanism") or rec.get("desc") or f"Registry config execution of {family} {ver}",
+        "citation": thesis_cfg.get("citation") or family,
+    }
+    res = {
+        "close": close,
+        "volume": volume,
+        "amount": amount,
+        "factor": factor,
+        "scheduled_weights": scheduled,
+        "timing": timing,
+    }
+    config = SimpleNamespace(version=ver, start=ts)
+    return res, thesis, config, build_factor
+
+
 def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: bool = False,
                    version: str | None = None, start: str | None = None) -> dict:
     print("=" * 80)
@@ -206,6 +320,8 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
 
     family_id = STRATEGY_TO_FAMILY.get(strategy_name, strategy_name)
     spec_dict = _load_spec_from_registry(family_id, version)
+    registry_config = _load_config_from_registry(family_id, version)
+    config_factor_builder = None
 
     if spec_dict:
         print(f"  Found executable_spec in registry for {family_id}/{version}. Running dynamically via ExecutableStrategySpec...", flush=True)
@@ -255,6 +371,11 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
             "citation": thesis_citation
         }
         config = SimpleNamespace(version=spec.version, start=ts)
+    elif _registry_config_supported(family_id, registry_config):
+        print(f"  Found registry config for {family_id}/{version}. Running via config adapter...", flush=True)
+        res, thesis, config, config_factor_builder = _build_from_registry_config(
+            family_id, version, registry_config, start
+        )
     else:
         if strategy_name == "small_cap":
             from strategies.small_cap import run_small_cap_strategy, StrategyConfig
@@ -432,6 +553,11 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
                 return strat_pert.factor
             except Exception as e:
                 print(f"  [lookahead check] Dynamic factor rebuild failed: {e}. Falling back to cached factor.")
+        if config_factor_builder is not None:
+            try:
+                return config_factor_builder(p)
+            except Exception as e:
+                print(f"  [lookahead check] Config factor rebuild failed: {e}. Falling back to cached factor.")
         return factor
 
     evaluator = NineGatesEvaluator(
@@ -520,6 +646,9 @@ def _auditable(strategy_name, version) -> bool:
         return True
     if strategy_name == "illiquidity":
         return version in ILLIQ_SPECS
+    cfg = _load_config_from_registry(family_id, version)
+    if _registry_config_supported(family_id, cfg):
+        return True
     if (strategy_name, version) in VERSION_OVERRIDES:
         return True
     return DEFAULT_VERSIONS.get(strategy_name) == version
