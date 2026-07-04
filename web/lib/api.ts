@@ -38,6 +38,7 @@ import type {
   SystemTruthView,
   PromotionReadinessView,
   GateVerdictsView,
+  TrustCalibrationView,
 } from "./types";
 
 const BASE =
@@ -265,6 +266,7 @@ export const api = {
   systemTruth: () => get<SystemTruthView>("/system/truth"),
   promotionReadiness: () => get<PromotionReadinessView>("/experiments/promotion-readiness"),
   gateVerdicts: () => get<GateVerdictsView>("/governance/gate-verdicts"),
+  trustCalibration: () => get<TrustCalibrationView>("/governance/trust-calibration"),
   shadowIncubation: () => get<any>("/experiments/shadow-incubation"),
   amountTimingValidation: () => get<any>("/experiments/amount-timing-validation"),
 };
