@@ -138,6 +138,14 @@ def run_weekly(args):
                 [PYTHON, "scripts/ops/scheduled_portfolio_recompose.py"],
                 dry_run=args.dry_run,
             )
+            # 组合配置发现(WS2/ADR-034):在册腿的配权方法×腿子集搜索,按 Δsharpe 标
+            # SHADOW;发现≠晋级(晋级唯一通道 promote_composite + 人工)。研究旁路,
+            # 失败不标 weekly failed(同 factor_search / cross_asset)。
+            report["composite_search"] = run_subprocess(
+                "composite allocation search (组合配权发现,标 SHADOW 推荐)",
+                [PYTHON, "scripts/ops/scheduled_composite_search.py"],
+                dry_run=args.dry_run,
+            )
             # 自动补审:对任何「在册」但缺 DSR 审计的版本(配置已知者)自动跑 9-Gate 并落台账,
             # 保持台账多重检验覆盖不留空(行业级因子等不适配者会被记 SKIP)。
             report["audit_stale"] = run_subprocess(
