@@ -1,0 +1,37 @@
+<template id="scene-3-data-lake-template">
+  <div data-composition-id="scene-3-data-lake" data-start="0" data-duration="10" data-width="1920" data-height="1080">
+    <div class="scene-content">
+      <div class="copy"><div class="kicker">STEP 02 / DATA LAKE</div><h1>不是文件夹堆积<br>是可追溯的湖仓</h1><p>分层保存原始口径、研究口径、财务长表、元数据和 manifest。</p></div>
+      <div class="stack">
+        <div class="layer l5">_manifest.json <span>latest_date · rows · vintage</span></div>
+        <div class="layer l4">meta/ <span>trade_calendar · codes · st_history</span></div>
+        <div class="layer l3">fundamental_batch.parquet <span>公告日长表</span></div>
+        <div class="layer l2">price/daily/ <span>后复权价量</span></div>
+        <div class="layer l1">price/daily_raw/ <span>不复权 OHLC</span></div>
+      </div>
+      <div class="seal">VINTAGE<br>LOCKED</div>
+    </div>
+    <style>
+      [data-composition-id="scene-3-data-lake"] { width:100%; height:100%; overflow:hidden; background:#000000; color:#F5F5F7; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+      .scene-content { width:100%; height:100%; padding:86px 120px; display:flex; justify-content:space-between; align-items:center; gap:70px; background:radial-gradient(circle at 78% 45%, rgba(10,132,255,.18), transparent 34%); }
+      .copy { width:640px; display:flex; flex-direction:column; gap:24px; }
+      .kicker { color:#0A84FF; font:700 18px ui-monospace,SFMono-Regular,Menlo,monospace; }
+      h1 { font-size:68px; line-height:1.08; font-weight:780; letter-spacing:0; }
+      p { width:560px; color:#8E8E93; font-size:28px; line-height:1.45; }
+      .stack { width:850px; height:610px; position:relative; perspective:1200px; }
+      .layer { position:absolute; left:40px; right:40px; height:92px; padding:24px 32px; border:1px solid rgba(10,132,255,.42); border-radius:8px; background:#0E2238; color:#E6EDF7; font:800 28px ui-monospace,SFMono-Regular,Menlo,monospace; box-shadow:0 24px 54px rgba(0,0,0,.36); }
+      .layer span { float:right; color:#8E8E93; font-size:19px; font-weight:650; margin-top:8px; }
+      .l1{bottom:0}.l2{bottom:108px}.l3{bottom:216px}.l4{bottom:324px}.l5{bottom:432px;border-color:rgba(48,209,88,.52)}
+      .seal { position:absolute; right:142px; bottom:116px; width:180px; height:180px; border-radius:50%; border:3px solid #30D158; display:flex; align-items:center; justify-content:center; color:#30D158; font:900 30px ui-monospace,SFMono-Regular,Menlo,monospace; text-align:center; background:rgba(48,209,88,.08); transform:rotate(-9deg); }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      window.__timelines=window.__timelines||{}; var tl=gsap.timeline({paused:true});
+      tl.fromTo(".copy > *",{opacity:0,y:36},{opacity:1,y:0,duration:.55,stagger:.15,ease:"power3.out"},.25);
+      tl.fromTo(".layer",{opacity:0,y:150,rotationX:20},{opacity:1,y:0,rotationX:0,duration:.72,stagger:.16,ease:"power3.out"},1.1);
+      tl.to(".layer",{x:8,repeat:4,yoyo:true,duration:.9,stagger:.05,ease:"sine.inOut"},3.5);
+      tl.fromTo(".seal",{opacity:0,scale:1.6,rotation:-24},{opacity:1,scale:1,rotation:-9,duration:.55,ease:"back.out(1.3)"},4.2);
+      window.__timelines["scene-3-data-lake"]=tl;
+    </script>
+  </div>
+</template>

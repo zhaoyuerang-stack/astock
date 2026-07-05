@@ -1,0 +1,205 @@
+{
+  "typography": [
+    {
+      "role": "display",
+      "fontFamily": "ui-sans-serif",
+      "fontSize": "20px",
+      "fontWeight": "600",
+      "lineHeight": "28px",
+      "letterSpacing": "normal",
+      "color": "#F5F5F7",
+      "sampleText": "今日操作台"
+    },
+    {
+      "role": "code",
+      "fontFamily": "ui-sans-serif",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "lineHeight": "24px",
+      "letterSpacing": "normal",
+      "color": "#FFFFFF",
+      "sampleText": "Quant Research OSQuant OS清晨 · 窗前微光 · 算筹与朱砂⚡ 行动桌面🧪 研发实验室决策驾驶"
+    },
+    {
+      "role": "heading",
+      "fontFamily": "ui-sans-serif",
+      "fontSize": "14px",
+      "fontWeight": "700",
+      "lineHeight": "20px",
+      "letterSpacing": "0.7px",
+      "color": "#8E8E93",
+      "sampleText": "模拟盘账户 (Shadow)"
+    },
+    {
+      "role": "body",
+      "fontFamily": "ui-sans-serif",
+      "fontSize": "14px",
+      "fontWeight": "400",
+      "lineHeight": "20px",
+      "letterSpacing": "normal",
+      "color": "#8E8E93",
+      "sampleText": "全天候交易信號、生產就緒度門禁與今日持倉狀態 (Today's Operations Desk)"
+    },
+    {
+      "role": "link",
+      "fontFamily": "ui-sans-serif",
+      "fontSize": "12px",
+      "fontWeight": "700",
+      "lineHeight": "18px",
+      "letterSpacing": "normal",
+      "color": "#0A84FF",
+      "sampleText": "③ PM 交易台今日操作台:今天是否可交易 + 绑定原因 + 板凳/解锁路径"
+    }
+  ],
+  "spacing": {
+    "observed": [
+      2,
+      4,
+      6,
+      8,
+      10,
+      12,
+      16,
+      20,
+      24
+    ],
+    "baseUnit": 4
+  },
+  "radius": [
+    "4px",
+    "6px",
+    "8px",
+    "12px"
+  ],
+  "shadows": [
+    {
+      "value": "rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.06) 0px 2px 4px -1px",
+      "count": 3
+    },
+    {
+      "value": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.05) 0px 1px 2px 0px",
+      "count": 1
+    }
+  ],
+  "buttons": [
+    {
+      "label": "button",
+      "background": "transparent",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "#8E8E93",
+      "padding": "0px",
+      "borderRadius": "6px",
+      "border": "0px solid rgb(229, 231, 235)",
+      "boxShadow": "none",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "height": "24px"
+    },
+    {
+      "label": "⚡ 行动桌面",
+      "background": "#30D158",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "#30D158",
+      "padding": "6px 0px",
+      "borderRadius": "6px",
+      "border": "1px solid rgba(48, 209, 88, 0.3)",
+      "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.05) 0px 1px 2px 0px",
+      "fontSize": "11px",
+      "fontWeight": "600",
+      "height": "30.5px"
+    },
+    {
+      "label": "🎯 策略: illiquidity v3.1▼",
+      "background": "#1C1C1E",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "#F5F5F7",
+      "padding": "6px 12px",
+      "borderRadius": "6px",
+      "border": "1px solid rgb(44, 44, 46)",
+      "boxShadow": "none",
+      "fontSize": "12px",
+      "fontWeight": "400",
+      "height": "32px"
+    },
+    {
+      "label": "📋",
+      "background": "transparent",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "#3D7BFF",
+      "padding": "0px",
+      "borderRadius": "0px",
+      "border": "0px solid rgb(229, 231, 235)",
+      "boxShadow": "none",
+      "fontSize": "11px",
+      "fontWeight": "400",
+      "height": "16.5px"
+    },
+    {
+      "label": "持倉與交易",
+      "background": "transparent",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "#E6EDF7",
+      "padding": "8px 16px",
+      "borderRadius": "0px",
+      "border": "",
+      "boxShadow": "none",
+      "fontSize": "13px",
+      "fontWeight": "700",
+      "height": "37.5px"
+    },
+    {
+      "label": "新会话",
+      "background": "transparent",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "#0A84FF",
+      "padding": "2px 6px",
+      "borderRadius": "4px",
+      "border": "1px solid rgba(44, 44, 46, 0.5)",
+      "boxShadow": "none",
+      "fontSize": "10px",
+      "fontWeight": "400",
+      "height": "21px"
+    }
+  ],
+  "cards": [
+    {
+      "label": "card",
+      "background": "#1C1C1E",
+      "backgroundImage": "",
+      "backdropFilter": "",
+      "color": "#F5F5F7",
+      "padding": "16px",
+      "borderRadius": "12px",
+      "border": "1px solid rgb(44, 44, 46)",
+      "boxShadow": "rgba(0, 0, 0, 0.1) 0px 4px 6px -1px, rgba(0, 0, 0, 0.06) 0px 2px 4px -1px",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "height": "86.5px"
+    }
+  ],
+  "nav": {
+    "label": "navigation",
+    "background": "transparent",
+    "backgroundImage": "",
+    "backdropFilter": "",
+    "color": "#F5F5F7",
+    "padding": "16px 12px",
+    "borderRadius": "0px",
+    "border": "0px solid rgb(229, 231, 235)",
+    "boxShadow": "none",
+    "fontSize": "16px",
+    "fontWeight": "400",
+    "height": "855px"
+  },
+  "chips": [],
+  "statCells": [],
+  "tabs": [],
+  "backgrounds": [],
+  "glass": []
+}

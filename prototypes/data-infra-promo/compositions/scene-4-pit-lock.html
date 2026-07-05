@@ -1,0 +1,40 @@
+<template id="scene-4-pit-lock-template">
+  <div data-composition-id="scene-4-pit-lock" data-start="0" data-duration="10" data-width="1920" data-height="1080">
+    <div class="scene-content">
+      <div class="kicker">STEP 03 / POINT-IN-TIME</div>
+      <h1>把时间锁住</h1>
+      <div class="rail">
+        <div class="tick">T-2</div><div class="tick">T-1</div><div class="tick active">T</div><div class="tick future">T+1</div>
+        <div class="wall">未来信息墙</div>
+      </div>
+      <div class="packets">
+        <div class="packet p1">财务 → avail_date ffill</div>
+        <div class="packet p2">盘后资金 → shift(1)</div>
+        <div class="packet p3">估值 → raw_close</div>
+        <div class="packet blocked">未来价格 ✕</div>
+      </div>
+      <div class="rule-card">T 日信号只能使用 T 日之前已公开的信息</div>
+    </div>
+    <style>
+      [data-composition-id="scene-4-pit-lock"] { width:100%; height:100%; overflow:hidden; background:#000000; color:#F5F5F7; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+      .scene-content{width:100%;height:100%;padding:80px 120px;display:flex;flex-direction:column;gap:28px;background:radial-gradient(circle at 50% 52%,rgba(255,69,58,.12),transparent 36%),#000}
+      .kicker{color:#0A84FF;font:700 18px ui-monospace,SFMono-Regular,Menlo,monospace} h1{font-size:78px;line-height:1;font-weight:780;letter-spacing:0}
+      .rail{position:relative;margin-top:80px;height:190px;border-top:4px solid #2C2C2E;display:grid;grid-template-columns:repeat(4,1fr);align-items:start}
+      .tick{position:relative;padding-top:24px;color:#8E8E93;font:800 34px ui-monospace,SFMono-Regular,Menlo,monospace}.tick:before{content:"";position:absolute;top:-14px;left:0;width:24px;height:24px;border-radius:50%;background:#0A84FF}.active{color:#F5F5F7}.future{color:#FF453A}
+      .wall{position:absolute;left:74%;top:-72px;width:8px;height:300px;background:#FF453A;box-shadow:0 0 45px rgba(255,69,58,.6);color:#FF453A;font:800 22px ui-monospace,SFMono-Regular,Menlo,monospace;writing-mode:vertical-rl;padding-top:18px}
+      .packets{position:relative;height:360px}.packet{position:absolute;width:360px;padding:22px;border:1px solid rgba(48,209,88,.45);border-radius:8px;background:#0E2238;color:#E6EDF7;font:760 24px ui-monospace,SFMono-Regular,Menlo,monospace}.p1{left:120px;top:30px}.p2{left:580px;top:135px}.p3{left:860px;top:28px}.blocked{right:120px;top:155px;border-color:rgba(255,69,58,.62);background:rgba(255,69,58,.12);color:#FF453A}
+      .rule-card{position:absolute;left:120px;bottom:110px;padding:24px 32px;border:1px solid rgba(255,159,10,.45);border-radius:8px;background:rgba(255,159,10,.1);color:#FF9F0A;font-size:34px;font-weight:780}
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      window.__timelines=window.__timelines||{}; var tl=gsap.timeline({paused:true});
+      tl.fromTo(".kicker,h1",{opacity:0,y:34},{opacity:1,y:0,duration:.55,stagger:.12,ease:"power3.out"},.25);
+      tl.fromTo(".rail",{opacity:0,x:-90},{opacity:1,x:0,duration:.8,ease:"power3.out"},1.0);
+      tl.fromTo(".packet",{opacity:0,y:52},{opacity:1,y:0,duration:.55,stagger:.18,ease:"power3.out"},2.1);
+      tl.fromTo(".wall",{opacity:0,scaleY:.2},{opacity:1,scaleY:1,duration:.5,ease:"power2.out"},3.0);
+      tl.to(".blocked",{x:-80,repeat:3,yoyo:true,duration:.5,ease:"power2.inOut"},4.2);
+      tl.fromTo(".rule-card",{opacity:0,y:40},{opacity:1,y:0,duration:.55,ease:"power3.out"},5.0);
+      window.__timelines["scene-4-pit-lock"]=tl;
+    </script>
+  </div>
+</template>

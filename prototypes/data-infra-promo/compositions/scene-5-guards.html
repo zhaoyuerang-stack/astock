@@ -1,0 +1,36 @@
+<template id="scene-5-guards-template">
+  <div data-composition-id="scene-5-guards" data-start="0" data-duration="10" data-width="1920" data-height="1080">
+    <div class="shot"><img src="capture/screenshots/scroll-100.png" alt="blocked dashboard"></div>
+    <div class="overlay"></div>
+    <div class="content">
+      <div class="kicker">STEP 04 / MACHINE GUARDS</div>
+      <h1>宁可 blocked<br>也不假装 ready</h1>
+      <div class="guards">
+        <div class="guard pass">validate_final.py<span>极端跳变 / 负价 / OHLC</span></div>
+        <div class="guard pass">check_lake_writers.py<span>非法写湖入口</span></div>
+        <div class="guard pass">check_no_legacy_data.py<span>旧缓存 data_full</span></div>
+        <div class="guard warn">check_layer_deps.py<span>分层倒灌</span></div>
+      </div>
+      <div class="stamp">FAIL-CLOSED</div>
+    </div>
+    <style>
+      [data-composition-id="scene-5-guards"]{position:relative;width:100%;height:100%;overflow:hidden;background:#000;color:#F5F5F7;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+      .shot{position:absolute;inset:70px 70px 70px 520px;border:1px solid #2C2C2E;border-radius:10px;overflow:hidden;background:#1C1C1E;box-shadow:0 40px 80px rgba(0,0,0,.55)}.shot img{width:100%;height:100%;object-fit:cover;object-position:top left}
+      .overlay{position:absolute;inset:0;background:linear-gradient(90deg,#000 0%,rgba(0,0,0,.86) 34%,rgba(0,0,0,.35) 72%,rgba(0,0,0,.18) 100%)}
+      .content{position:absolute;inset:0;padding:84px 110px;display:flex;flex-direction:column;gap:28px}.kicker{color:#0A84FF;font:700 18px ui-monospace,SFMono-Regular,Menlo,monospace}h1{font-size:74px;line-height:1.06;font-weight:780;letter-spacing:0}
+      .guards{width:680px;display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px}.guard{min-height:118px;padding:20px;border-radius:8px;background:#0E2238;border:1px solid rgba(48,209,88,.42);color:#30D158;font:800 22px ui-monospace,SFMono-Regular,Menlo,monospace}.guard span{display:block;margin-top:12px;color:#8E8E93;font-size:17px;line-height:1.35}.warn{border-color:rgba(255,159,10,.46);color:#FF9F0A}
+      .stamp{position:absolute;right:155px;bottom:120px;padding:28px 36px;border:3px solid #FF453A;border-radius:8px;color:#FF453A;background:rgba(255,69,58,.1);font:900 46px ui-monospace,SFMono-Regular,Menlo,monospace;transform:rotate(-6deg)}
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      window.__timelines=window.__timelines||{}; var tl=gsap.timeline({paused:true});
+      tl.fromTo(".shot",{opacity:0,x:120,scale:.96},{opacity:1,x:0,scale:1,duration:.9,ease:"power3.out"},.2);
+      tl.to(".shot img",{scale:1.035,duration:9,ease:"none"},.4);
+      tl.fromTo(".kicker,h1",{opacity:0,y:34},{opacity:1,y:0,duration:.55,stagger:.12,ease:"power3.out"},.55);
+      tl.fromTo(".guard",{opacity:0,x:-48},{opacity:1,x:0,duration:.5,stagger:.12,ease:"power3.out"},1.6);
+      tl.fromTo(".stamp",{opacity:0,scale:1.7,rotation:-18},{opacity:1,scale:1,rotation:-6,duration:.52,ease:"back.out(1.2)"},3.1);
+      tl.to(".stamp",{scale:1.04,repeat:4,yoyo:true,duration:.55,ease:"sine.inOut"},4.0);
+      window.__timelines["scene-5-guards"]=tl;
+    </script>
+  </div>
+</template>

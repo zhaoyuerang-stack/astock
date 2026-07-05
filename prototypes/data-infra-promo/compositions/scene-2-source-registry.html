@@ -1,0 +1,49 @@
+<template id="scene-2-source-registry-template">
+  <div data-composition-id="scene-2-source-registry" data-start="0" data-duration="10" data-width="1920" data-height="1080">
+    <div class="scene-content">
+      <div class="kicker">STEP 01 / SOURCE REGISTRY</div>
+      <h1>数据源先声明职责</h1>
+      <div class="terminal">INTERFACES[] → mode / fields / store / keys / rate-limit</div>
+      <div class="cards">
+        <div class="source"><b>Tushare</b><span>daily_basic · moneyflow · stk_limit</span></div>
+        <div class="source"><b>Tencent</b><span>后复权价量 · 新股历史补全</span></div>
+        <div class="source"><b>Akshare</b><span>财务季报 · meta 维度</span></div>
+        <div class="source"><b>Exchange</b><span>两融 · 停复牌 · 交易日历</span></div>
+        <div class="source"><b>Eastmoney</b><span>ETF · 资金面 · 备源</span></div>
+      </div>
+      <svg viewBox="0 0 1550 420" class="routes" aria-hidden="true">
+        <path class="route r1" d="M110 90 C420 20 780 40 1240 165"/>
+        <path class="route r2" d="M110 170 C470 130 800 140 1240 190"/>
+        <path class="route r3" d="M110 250 C520 260 830 245 1240 215"/>
+        <path class="route r4" d="M110 330 C470 385 850 345 1240 240"/>
+      </svg>
+      <div class="manifest">tushare_manifest.json<br><span>rows · latest_date · fields · vintage</span></div>
+    </div>
+    <style>
+      [data-composition-id="scene-2-source-registry"] { width:100%; height:100%; overflow:hidden; background:#000000; color:#F5F5F7; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+      .scene-content { width:100%; height:100%; padding:76px 110px; display:flex; flex-direction:column; gap:26px; position:relative; }
+      .kicker { color:#0A84FF; font:700 18px ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:0; }
+      h1 { font-size:68px; line-height:1; font-weight:760; letter-spacing:0; }
+      .terminal { width:780px; padding:18px 22px; border:1px solid #2C2C2E; border-radius:7px; background:#1C1C1E; color:#E6EDF7; font:700 24px ui-monospace,SFMono-Regular,Menlo,monospace; }
+      .cards { width:720px; display:grid; grid-template-columns:repeat(2,1fr); gap:16px; margin-top:20px; }
+      .source { min-height:106px; padding:20px; border:1px solid rgba(10,132,255,.35); border-radius:8px; background:#0E2238; display:flex; flex-direction:column; gap:12px; }
+      .source b { font-size:28px; color:#F5F5F7; }
+      .source span { font-size:18px; line-height:1.35; color:#8E8E93; }
+      .routes { position:absolute; left:70px; top:355px; width:1550px; height:420px; pointer-events:none; }
+      .route { fill:none; stroke:#0A84FF; stroke-width:4; stroke-linecap:round; stroke-dasharray:1500; stroke-dashoffset:1500; opacity:.85; }
+      .manifest { position:absolute; right:140px; top:405px; width:410px; padding:28px; border:1px solid rgba(48,209,88,.5); border-radius:10px; background:rgba(14,34,56,.96); color:#30D158; font:800 32px ui-monospace,SFMono-Regular,Menlo,monospace; box-shadow:0 0 60px rgba(48,209,88,.14); }
+      .manifest span { display:block; margin-top:14px; color:#8E8E93; font-size:20px; line-height:1.35; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      var tl=gsap.timeline({paused:true});
+      tl.fromTo(".kicker,h1,.terminal",{opacity:0,y:35},{opacity:1,y:0,duration:.58,stagger:.13,ease:"power3.out"},.25);
+      tl.fromTo(".source",{opacity:0,y:50},{opacity:1,y:0,duration:.55,stagger:.12,ease:"power3.out"},1.4);
+      tl.to(".route",{strokeDashoffset:0,duration:1.8,stagger:.12,ease:"power2.out"},2.35);
+      tl.fromTo(".manifest",{opacity:0,scale:.86,y:28},{opacity:1,scale:1,y:0,duration:.55,ease:"back.out(1.4)"},3.7);
+      tl.to(".source",{y:-4,repeat:4,yoyo:true,duration:.8,stagger:.05,ease:"sine.inOut"},4.4);
+      window.__timelines["scene-2-source-registry"]=tl;
+    </script>
+  </div>
+</template>

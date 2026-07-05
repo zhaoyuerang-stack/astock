@@ -1,0 +1,89 @@
+[div] Quant OS
+[div] 清晨 · 窗前微光 · 算筹与朱砂
+[button] 行动桌面
+[button] 研发实验室
+[span] ① Alpha 工厂
+[span] ③ PM 交易台
+[span] 今日操作台:今天是否可交易 + 绑定原因 + 板凳/解锁路径
+[div] 當前策略：
+[div] illiquidity v3.1
+[div] 系統版本：—
+[div] 數據日期：
+[span] 今日：
+[span] 最新數據：
+[span] 🎯 策略:
+[span] illiquidity
+[span] v3.1
+[h1] 今日操作台
+[p] 全天候交易信號、生產就緒度門禁與今日持倉狀態 (Today's Operations Desk)
+[div] 信任校准 · 首屏 (Trust Calibration)
+[div] 正在从
+[span] /governance/trust-calibration
+[div] 载入…… 后端未启动时此处为空,
+[span] 不显示任何假裁决
+[div] ⚠️ API 載入出錯:
+[div] TypeError: Failed to fetch
+[div] （請確認 FastAPI 後端已在 8011 埠運行）
+[div] 今日交易决策 (Trade Decision)
+[div] 正在從
+[span] /trade-readiness
+[div] 載入…… 後端未啟動時此處為空,
+[span] 不顯示任何假就緒態
+[div] 今日交易門禁：載入中…
+[h3] 模拟盘账户 (Shadow)
+[span] 非 live 实盘 · paper
+[div] 總淨資產 (NAV)
+[span] CNY
+[div] 累計收益率 (Total Return)
+[div] 持倉市值 (Market Value)
+[span] CNY
+[div] 可用資金 (Cash)
+[span] CNY
+[h3] 生產就緒度門禁檢查 (Ready-to-Trade Gates)
+[span] 1. Governance
+[span] PENDING
+[p] 未接入生產門禁結果
+[span] Checked: —
+[span] 2. Decay
+[span] PENDING
+[p] 未接入因子健康度結果
+[span] Checked: —
+[span] 3. Paper
+[span] PENDING
+[p] 未接入紙面交易計畫
+[span] Checked: —
+[span] 4. Data
+[span] PENDING
+[p] 未接入數據可用性結果
+[span] Checked: —
+[span] 5. Risk
+[span] PENDING
+[p] 未接入風控評估結果
+[span] Checked: —
+[div] 決策身份指紋 (Spec Hash & Metadata)
+[span] 發布狀態：
+[span] 已阻塞
+[span] 部署ID: —
+[span] 策略版本:
+[span] illiquidity
+[span] v3.1
+[span] Spec Hash
+[span] 數據指紋
+[button] 持倉與交易
+[button] Top-25 候選
+[button] 否決器過濾
+[button] 執行風險
+[span] 當前運行持倉明細 (Current Position Holdings)
+[span] 只證券
+[th] 持有股數
+[th] 持倉成本
+[th] 當前市價
+[th] 持倉市值
+[th] 持倉盈虧
+[td] 當前無持倉記錄
+[div] AI 交易审计员
+[span] 风控审计
+[div] 研究副驾驶
+[button] 新会话
+[div] 在左侧选择模块开始研究。Agent 会随当前页面上下文给出解读与建议。
+[div] AI 僅供研究與審計參考，不替代有效性裁決，不構成交易建議。

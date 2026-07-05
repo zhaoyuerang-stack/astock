@@ -1,0 +1,47 @@
+<template id="scene-1-data-first-template">
+  <div data-composition-id="scene-1-data-first" data-start="0" data-duration="10" data-width="1920" data-height="1080">
+    <div class="bg-grid"></div>
+    <canvas id="grid-canvas" width="1920" height="1080"></canvas>
+    <div class="brand"><img src="capture/assets/svgs/logo-2aa74f07.svg" alt=""><span>Quant OS</span></div>
+    <div class="desk-wrap"><img class="desk" src="capture/screenshots/scroll-000.png" alt="Quant OS dashboard"></div>
+    <div class="foundation">
+      <div class="node">data_lake</div><div class="node">schema</div><div class="node">PIT</div><div class="node">manifest</div><div class="node">guards</div>
+    </div>
+    <div class="headline"><span>先搭</span><strong>数据地基</strong></div>
+    <div class="risk-strip">漂亮回测 ≠ 可执行证据</div>
+    <style>
+      [data-composition-id="scene-1-data-first"] { position: relative; width: 100%; height: 100%; overflow: hidden; background: #000000; color: #F5F5F7; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .bg-grid { position: absolute; inset: 0; background: radial-gradient(circle at 70% 20%, rgba(10,132,255,.18), transparent 34%), #000000; }
+      #grid-canvas { position: absolute; inset: 0; opacity: .48; }
+      .brand { position: absolute; left: 76px; top: 58px; display: flex; align-items: center; gap: 14px; color: #E6EDF7; font-weight: 700; font-size: 24px; }
+      .brand img { width: 28px; height: 28px; }
+      .desk-wrap { position: absolute; right: 90px; top: 118px; width: 1120px; height: 630px; border: 1px solid #2C2C2E; border-radius: 10px; overflow: hidden; background: #1C1C1E; box-shadow: 0 45px 90px rgba(0,0,0,.55); transform-style: preserve-3d; }
+      .desk { width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+      .foundation { position: absolute; left: 150px; bottom: 178px; display: flex; gap: 16px; padding: 20px; border: 1px solid rgba(10,132,255,.42); background: rgba(14,34,56,.72); border-radius: 8px; box-shadow: 0 0 48px rgba(10,132,255,.18); }
+      .node { min-width: 126px; padding: 18px 20px; border: 1px solid rgba(48,209,88,.38); border-radius: 6px; background: #0E2238; color: #E6EDF7; font: 700 20px ui-monospace, SFMono-Regular, Menlo, monospace; text-align: center; }
+      .headline { position: absolute; left: 150px; top: 230px; width: 610px; font-size: 84px; line-height: 1.08; font-weight: 760; letter-spacing: 0; }
+      .headline span { display: block; color: #F5F5F7; }
+      .headline strong { display: block; color: #0A84FF; font-style: normal; }
+      .risk-strip { position: absolute; left: 150px; top: 440px; padding: 16px 22px; border: 1px solid rgba(255,69,58,.45); border-radius: 7px; background: rgba(255,69,58,.12); color: #FF453A; font: 700 24px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      var c = document.getElementById("grid-canvas"), ctx = c.getContext("2d"), proxy = { t: 0 };
+      function draw(t){ ctx.clearRect(0,0,1920,1080); ctx.strokeStyle="rgba(10,132,255,.16)"; ctx.lineWidth=1; for(var x=-200;x<1920;x+=80){ctx.beginPath();ctx.moveTo(x+t*22,880);ctx.lineTo(x+520+t*22,1080);ctx.stroke();} for(var y=720;y<1080;y+=42){ctx.beginPath();ctx.moveTo(0,y+t*10);ctx.lineTo(1920,y+t*10);ctx.stroke();} }
+      draw(0);
+      var tl = gsap.timeline({ paused: true });
+      tl.to(proxy,{t:1,duration:10,ease:"none",onUpdate:function(){draw(proxy.t);}},0);
+      tl.fromTo(".brand",{opacity:0,y:-20},{opacity:1,y:0,duration:.6,ease:"power2.out"},.15);
+      tl.fromTo(".desk-wrap",{opacity:0,y:80,rotationY:-16,scale:.92},{opacity:1,y:0,rotationY:-8,scale:1,duration:1.2,ease:"power3.out"},.35);
+      tl.to(".desk",{scale:1.035,duration:9.2,ease:"none"},.5);
+      tl.fromTo(".headline span",{opacity:0,x:-64},{opacity:1,x:0,duration:.55,ease:"power3.out"},.8);
+      tl.fromTo(".headline strong",{opacity:0,x:-64},{opacity:1,x:0,duration:.65,ease:"power3.out"},1.2);
+      tl.fromTo(".risk-strip",{opacity:0,x:-40},{opacity:1,x:0,duration:.45,ease:"power2.out"},2.4);
+      tl.fromTo(".node",{opacity:0,y:45},{opacity:1,y:0,duration:.55,stagger:.12,ease:"power3.out"},3.1);
+      tl.to(".node",{y:-5,repeat:3,yoyo:true,duration:1.0,stagger:.08,ease:"sine.inOut"},4.2);
+      tl.to(".headline,.risk-strip,.foundation,.brand,.desk-wrap",{y:-130,filter:"blur(18px)",opacity:0,duration:.34,ease:"power2.in"},9.55);
+      window.__timelines["scene-1-data-first"] = tl;
+    </script>
+  </div>
+</template>
