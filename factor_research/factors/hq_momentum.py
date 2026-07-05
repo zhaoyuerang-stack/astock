@@ -45,8 +45,11 @@ def build_hq_momentum_factor(panels, universe_size=800, lookback=60, q_filter_th
     roe, gross_margin, cfo_yield, _ = load_quality_fundamentals(trade_dates)
     
     # 1. Build Universe (Top N by rolling trading volume * price)
-    cap = amount.rolling(20).mean() * raw_close
-    univ = cap.rank(axis=1, ascending=False, pct=False) <= universe_size
+    if "total_mv" in panels:
+        univ = panels["total_mv"].rank(axis=1, ascending=False, pct=False) <= universe_size
+    else:
+        cap = amount.rolling(20).mean() * raw_close
+        univ = cap.rank(axis=1, ascending=False, pct=False) <= universe_size
     
     # 2. Momentum
     momentum = close.pct_change(lookback, fill_method=None).shift(20)
