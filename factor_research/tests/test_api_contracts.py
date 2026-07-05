@@ -7,6 +7,7 @@ mirror must be updated in the same change.
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -47,8 +48,10 @@ def test_action_endpoints_return_job_contracts():
 
 def test_cors_allows_fallback_next_dev_port_3001():
     cors = next(m for m in app.user_middleware if m.cls.__name__ == "CORSMiddleware")
-    assert "http://127.0.0.1:3001" in cors.kwargs["allow_origins"]
-    assert "http://localhost:3001" in cors.kwargs["allow_origins"]
+    pattern = cors.kwargs["allow_origin_regex"]
+    assert pattern == r"http://(localhost|127\.0\.0\.1):\d+"
+    assert re.fullmatch(pattern, "http://127.0.0.1:3001").group(0) == "http://127.0.0.1:3001"
+    assert re.fullmatch(pattern, "http://localhost:3001").group(0) == "http://localhost:3001"
 
 
 def test_paper_contract_exposes_settlement_dates():
