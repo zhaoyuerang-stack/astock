@@ -75,13 +75,12 @@
           var captionTl = gsap.timeline({ paused: true });
           var caption = document.querySelector("#caption-text");
           var lines = [
-            { t: 0.35, end: 4.65, text: "一个量化系统，最先该搭的，不是策略页面。是数据地基。" },
-            { t: 4.95, end: 9.35, text: "如果数据源、字段、时间线和口径没有被管住，任何漂亮回测，都只是幻觉。" },
-            { t: 10.4, end: 19.1, text: "先把数据源注册成可审计接口；职责写进声明，而不是散落在脚本里。" },
-            { t: 20.4, end: 29.0, text: "落成数据湖：原始价、复权价、财务长表、交易日历、股票池和 manifest 分层保存。" },
-            { t: 30.4, end: 39.0, text: "锁住时间：公告日对齐，盘后数据 shift(1)，估值使用不复权价格。" },
-            { t: 40.4, end: 49.0, text: "质量闸门先拦机器错误。宁可 blocked，也不假装 ready。" },
-            { t: 50.4, end: 59.0, text: "统一加载层服务研究：注册源，沉淀湖，锁时间，跑守卫，再服务研究。" }
+            { t: 0.6, end: 7.45, text: "量化系统的第一层，不是策略页面。是数据地基。先管住数据源、字段和时间线。" },
+            { t: 10.6, end: 17.25, text: "第一步，注册数据源。价量、财务、停牌、涨跌停、资金流，谁负责，写进声明。" },
+            { t: 20.6, end: 27.45, text: "第二步，沉淀数据湖。行情、财务、日历、股票池和 manifest 分层保存。" },
+            { t: 30.6, end: 37.25, text: "第三步，锁住时间。公告日对齐，盘后数据 shift 一天，T 日只看已公开事实。" },
+            { t: 40.6, end: 47.65, text: "第四步，让机器先拦错误。旧缓存和非法写湖，都先 blocked。" },
+            { t: 50.6, end: 57.25, text: "最后，统一加载层对外服务。注册源，沉淀湖，锁时间，跑守卫，再服务研究。" }
           ];
           lines.forEach(function (line) {
             captionTl.set(caption, { innerText: line.text, visibility: "visible" }, line.t);
