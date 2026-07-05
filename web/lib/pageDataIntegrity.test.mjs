@@ -9,6 +9,12 @@ function read(relative) {
   return fs.readFileSync(path.join(ROOT, relative), "utf8");
 }
 
+// 假数据守卫只针对会真正渲染/执行的代码;诚实性注释(如"不硬编码绿灯")不算脚手架。
+// 只剥离块注释与整行 // 注释,避免误伤字符串里的 "https://..."。
+function stripComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+}
+
 test("current product routes are the only route contracts under test", () => {
   for (const relative of [
     "app/dashboard/page.tsx",
@@ -39,7 +45,8 @@ test("frontend pages do not keep obvious fake-data scaffolds", () => {
   ];
 
   for (const relative of pages) {
-    const source = read(relative);
+    // 剥离注释后再匹配:守卫的是真正会渲染的代码,诚实性注释里的"硬编码/fallback"字样不是脚手架。
+    const source = stripComments(read(relative));
     assert.doesNotMatch(source, /Mock|mock keys|fallback|硬编码|all PASS|全部 PASS/);
     assert.doesNotMatch(source, /\|\|\s*['"]0\.012['"]|\|\|\s*1\.58|\|\|\s*1\.85/);
   }
