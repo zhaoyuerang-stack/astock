@@ -167,7 +167,18 @@ INTERFACES = {
         "index_codes": ["000300.SH", "000905.SH", "000852.SH", "932000.CSI",
                         "000016.SH", "399006.SZ", "000001.SH", "399001.SZ"],
     },
+    # ── 机构/游资交易公示(by_date,一次全市场一天)── 零抓取空白区,2026-07-06 接入
+    "top_list": {  # 龙虎榜:异常波动/换手触发的强制公示名单 → 游资/关注度代理
+        "mode": "by_date", "date_param": "trade_date",
+        # 同股同日可因触发多条不同上榜理由分别列示,reason 入键防止误删非重复行
+        "keys": ["ts_code", "trade_date", "reason"],
+        "store": "institutional/top_list_all.parquet",
+        "fields": ("trade_date,ts_code,name,close,pct_change,turnover_rate,amount,"
+                   "l_sell,l_buy,l_amount,net_amount,net_rate,amount_rate,float_values,reason"),
+    },
     # 注:cyq_chips(筹码分布,数十亿行)+ report_rc(研报海量)体量过大,需专门按日窗口/降采样,暂缓。
+    # 注:cyq_perf 实测账号无该接口权限(40203),top_inst/block_trade/repurchase/pledge_stat
+    # 仍待接(见 TASKS.md「第一批新维度接入」),本次只接 top_list 验证 by_date 模式端到端可行。
 }
 
 
