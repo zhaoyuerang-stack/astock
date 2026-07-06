@@ -25,14 +25,7 @@ from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, Cost
 from factors.utils import safe_zscore, mad_clip
 from factors.alpha.transforms import neutralize
 from engine.factor_analysis import calc_ic, ic_summary
-
-
-def load_industry_groups():
-    """Load latest industry mapping from fundamental parquet."""
-    fund = pd.read_parquet("data_lake/fundamental_batch.parquet", columns=["code", "avail_date", "industry"])
-    mapping = fund.dropna(subset=["industry"]).sort_values("avail_date").drop_duplicates("code", keep="last")
-    stock_to_ind = dict(zip(mapping["code"], mapping["industry"]))
-    return stock_to_ind
+from scripts.research.salience_industry import build_avail_date_industry_panel
 
 def compute_salience_factors(close, W=20, theta=0.1, delta=0.7):
     """Computes Salience Theory factors: est_return and st_cov."""
@@ -88,12 +81,8 @@ def main():
     
     # Load industry mapping and create industry group DataFrame
     print("  Creating industry group panel...")
-    stock_to_ind = load_industry_groups()
-    industry_panel = pd.DataFrame("Unknown", index=close.index, columns=close.columns)
-    for col in close.columns:
-        if col in stock_to_ind:
-            industry_panel[col] = stock_to_ind[col]
-            
+    industry_panel = build_avail_date_industry_panel(close)
+
     # Create size deciles DataFrame
     print("  Creating size decile panel (based on 20-day rolling trading amount)...")
     avg_amount = amount.rolling(20).mean()

@@ -22,13 +22,7 @@ from strategies.small_cap import load_price_panels
 from factors.utils import safe_zscore, mad_clip
 from factors.alpha.transforms import neutralize
 from engine.factor_analysis import factor_summary
-
-def load_industry_groups():
-    """Load latest industry mapping from fundamental parquet."""
-    fund = pd.read_parquet("data_lake/fundamental_batch.parquet", columns=["code", "avail_date", "industry"])
-    mapping = fund.dropna(subset=["industry"]).sort_values("avail_date").drop_duplicates("code", keep="last")
-    stock_to_ind = dict(zip(mapping["code"], mapping["industry"]))
-    return stock_to_ind
+from scripts.research.salience_industry import build_avail_date_industry_panel
 
 def compute_salience_covariance(close, W=20, theta=0.1, delta=0.7):
     """Computes faded Salience Covariance (-ST_cov)."""
@@ -81,12 +75,8 @@ def main():
     
     # Neutralize factor
     print("  Creating industry group panel...")
-    stock_to_ind = load_industry_groups()
-    industry_panel = pd.DataFrame("Unknown", index=close.index, columns=close.columns)
-    for col in close.columns:
-        if col in stock_to_ind:
-            industry_panel[col] = stock_to_ind[col]
-            
+    industry_panel = build_avail_date_industry_panel(close)
+
     print("  Creating size decile panel...")
     avg_amount = amount.rolling(20).mean()
     size_ranks = avg_amount.rank(axis=1, pct=True)
