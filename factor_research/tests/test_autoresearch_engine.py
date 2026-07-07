@@ -1751,7 +1751,7 @@ def test_dsl_disk_cache_ignores_non_overlapping_panel():
         old_get_cache_path = dsl._get_cache_path
         try:
             dsl.clear_factor_cache()
-            dsl._get_cache_path = lambda name, params: cache_path
+            dsl._get_cache_path = lambda name, params, data_signature=None: cache_path
             factor = dsl.compute_dsl_factor(close, volume, ast=ast, cache_mode="disk")
         finally:
             dsl._get_cache_path = old_get_cache_path
@@ -1760,6 +1760,79 @@ def test_dsl_disk_cache_ignores_non_overlapping_panel():
     assert factor.shape == close.shape
     assert factor.notna().to_numpy().any()
     assert factor.abs().sum().sum() > 0
+
+
+def test_dsl_disk_cache_keys_by_panel_content_when_mtime_is_zero():
+    """mtime=0 时磁盘缓存仍必须按 close/volume 内容分桶,不能跨面板复用旧 parquet。"""
+    import factors.autoresearch_dsl as dsl
+
+    close, volume, _ = _synthetic_panel(n_days=40, n_stocks=8)
+    close2 = close.copy()
+    close2.iloc[:, 0] = close2.iloc[:, 0].iloc[::-1].to_numpy()
+    volume2 = volume.copy()
+    volume2.iloc[:, 0] = volume2.iloc[:, 0] + 1_000_000.0
+
+    momentum_ast = {
+        "type": "linear_combo",
+        "terms": [{
+            "factor": "momentum",
+            "params": {"window": 5},
+            "transforms": ["zscore"],
+            "weight": 1.0,
+        }],
+        "direction": "positive",
+        "thesis": {"mechanism": "test", "citation": "test"},
+    }
+    volume_ast = {
+        "type": "linear_combo",
+        "terms": [{
+            "factor": "volume_ratio",
+            "params": {"window": 5},
+            "transforms": ["zscore"],
+            "weight": 1.0,
+        }],
+        "direction": "positive",
+        "thesis": {"mechanism": "test", "citation": "test"},
+    }
+
+    with tempfile.TemporaryDirectory() as td:
+        old_root = dsl._ROOT
+        old_source_data_mtime = dsl._source_data_mtime
+        try:
+            dsl._ROOT = Path(td)
+            dsl._source_data_mtime = lambda: 0
+
+            sig1 = dsl._data_signature(close, volume)
+            sig2 = dsl._data_signature(close2, volume)
+            sig3 = dsl._data_signature(close, volume2)
+            path1 = dsl._get_cache_path("momentum", {"window": 5}, sig1)
+            path2 = dsl._get_cache_path("momentum", {"window": 5}, sig2)
+            path3 = dsl._get_cache_path("volume_ratio", {"window": 5}, sig3)
+            assert path1 != path2
+            assert path1 != path3
+
+            dsl.clear_factor_cache()
+            disk_first = dsl.compute_dsl_factor(close, volume, ast=momentum_ast, cache_mode="disk")
+            dsl.clear_factor_cache()
+            disk_second = dsl.compute_dsl_factor(close2, volume, ast=momentum_ast, cache_mode="disk")
+            dsl.clear_factor_cache()
+            expected_second = dsl.compute_dsl_factor(close2, volume, ast=momentum_ast, cache_mode="memory")
+            pd.testing.assert_frame_equal(disk_second, expected_second)
+
+            dsl.clear_factor_cache()
+            disk_third = dsl.compute_dsl_factor(close, volume2, ast=volume_ast, cache_mode="disk")
+            dsl.clear_factor_cache()
+            expected_third = dsl.compute_dsl_factor(close, volume2, ast=volume_ast, cache_mode="memory")
+            pd.testing.assert_frame_equal(disk_third, expected_third)
+
+            # 第一轮写入仍应可复现,但不能被第二/三轮错误复用。
+            dsl.clear_factor_cache()
+            expected_first = dsl.compute_dsl_factor(close, volume, ast=momentum_ast, cache_mode="memory")
+            pd.testing.assert_frame_equal(disk_first, expected_first)
+        finally:
+            dsl._ROOT = old_root
+            dsl._source_data_mtime = old_source_data_mtime
+            dsl.clear_factor_cache()
 
 
 def test_window_mutation_snaps_to_fixed_grid():
