@@ -204,6 +204,10 @@ echo "=== test_tushare_daily_basic.py (daily_basic 归一 + pivot) ==="
 python3 tests/test_tushare_daily_basic.py
 
 echo ""
+echo "=== test_pledge_stat_loader.py (质押统计专用防未来对齐) ==="
+python3 tests/test_pledge_stat_loader.py
+
+echo ""
 echo "=== test_fina_indicator.py (财务指标公告日 ffill 防未来) ==="
 python3 tests/test_fina_indicator.py
 

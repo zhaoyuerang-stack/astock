@@ -283,6 +283,112 @@ def load_tushare_panel(dataset, trade_dates, fields=None, codes=None):
     return ffill_by_anndate(df, fields, trade_idx, codes)
 
 
+# ── 股权质押统计(pledge_stat):稀疏周度状态源,不能按普通公告日无限 ffill ──
+PLEDGE_STAT_FIELDS = [
+    "pledge_ratio",
+    "pledge_count",
+    "pledge_share_amount",
+    "pledge_observed",
+    "pledge_stale_days",
+    "pledge_coverage_state",
+]
+
+
+def _empty_pledge_panels(trade_idx, codes=None, state="unknown"):
+    cols = codes or []
+    panels = {
+        "pledge_ratio": pd.DataFrame(index=trade_idx, columns=cols, dtype=float),
+        "pledge_count": pd.DataFrame(index=trade_idx, columns=cols, dtype=float),
+        "pledge_share_amount": pd.DataFrame(index=trade_idx, columns=cols, dtype=float),
+        "pledge_stale_days": pd.DataFrame(index=trade_idx, columns=cols, dtype=float),
+        "pledge_observed": pd.DataFrame(False, index=trade_idx, columns=cols, dtype=object),
+        "pledge_coverage_state": pd.DataFrame(state, index=trade_idx, columns=cols, dtype=object),
+    }
+    return panels
+
+
+def align_pledge_stat(df, trade_dates, codes=None, max_stale_days=30):
+    """pledge_stat 长表 → date×code 状态面板。
+
+    源表是稀疏周度快照,不是全市场面板:
+      * 防未来: T 日只允许使用 ``end_date < T`` 的快照。
+      * 数值有效期: ``stale_days <= max_stale_days`` 才保留,否则置 NaN。
+      * coverage_state: current/stale/never_seen/unknown。
+      * pledge_observed: 某条源端记录首次变得可见的交易日为 True,ffill 日为 False。
+    """
+    trade_idx = pd.DatetimeIndex(trade_dates)
+    if df.empty:
+        return _empty_pledge_panels(trade_idx, codes, state="unknown")
+
+    df = df.copy()
+    df["code"] = df["ts_code"].astype(str).str.split(".").str[0]
+    df["end_dt"] = pd.to_datetime(df["end_date"].astype(str), format="%Y%m%d", errors="coerce")
+    df["pledge_share_amount"] = (
+        pd.to_numeric(df.get("unrest_pledge"), errors="coerce").fillna(0)
+        + pd.to_numeric(df.get("rest_pledge"), errors="coerce").fillna(0)
+    )
+    df = df.dropna(subset=["code", "end_dt"])
+    if codes:
+        df = df[df["code"].isin(codes)]
+        cols = list(codes)
+    else:
+        cols = sorted(df["code"].dropna().unique())
+    panels = _empty_pledge_panels(trade_idx, cols, state="never_seen")
+    if not cols:
+        return panels
+
+    left = pd.DataFrame({"trade_date": trade_idx}).sort_values("trade_date")
+    numeric_fields = ["pledge_ratio", "pledge_count", "pledge_share_amount"]
+    observed = panels["pledge_observed"]
+    for code in cols:
+        sub = (df[df["code"] == code][["end_dt"] + numeric_fields]
+               .sort_values("end_dt")
+               .drop_duplicates("end_dt", keep="last"))
+        if sub.empty:
+            continue
+
+        aligned = pd.merge_asof(
+            left,
+            sub,
+            left_on="trade_date",
+            right_on="end_dt",
+            direction="backward",
+            allow_exact_matches=False,
+        ).set_index("trade_date")
+        stale_days = (aligned.index.to_series(index=aligned.index) - aligned["end_dt"]).dt.days
+        stale_days = pd.Series(stale_days, index=aligned.index, dtype=float)
+        stale_days[aligned["end_dt"].isna()] = np.nan
+        valid = stale_days.le(max_stale_days)
+
+        for field in numeric_fields:
+            panels[field].loc[:, code] = pd.to_numeric(aligned[field], errors="coerce").where(valid)
+        panels["pledge_stale_days"].loc[:, code] = stale_days
+
+        state = pd.Series("unknown", index=trade_idx, dtype=object)
+        state[aligned["end_dt"].notna() & valid] = "current"
+        state[aligned["end_dt"].notna() & ~valid] = "stale"
+        panels["pledge_coverage_state"].loc[:, code] = state
+
+        prev_trade = pd.Series(trade_idx, index=trade_idx).shift(1)
+        newly_visible = aligned["end_dt"].notna() & valid
+        newly_visible &= (
+            prev_trade.isna()
+            | ((aligned["end_dt"] >= prev_trade) & (aligned["end_dt"] < aligned.index))
+        )
+        observed.loc[:, code] = newly_visible.astype(object)
+
+    return panels
+
+
+def load_pledge_stat_panel(trade_dates, codes=None, max_stale_days=30):
+    """加载 pledge_stat 专用状态面板。"""
+    fp = LAKE / "institutional/pledge_stat_all.parquet"
+    trade_idx = pd.DatetimeIndex(trade_dates)
+    if not fp.exists():
+        return _empty_pledge_panels(trade_idx, codes, state="unknown")
+    return align_pledge_stat(pd.read_parquet(fp), trade_idx, codes, max_stale_days)
+
+
 # ── 宏观时序层(市场级单时序,防未来 lag)──
 def align_macro(df, trade_idx):
     """宏观长表 → 对齐到交易日(防未来)。纯函数,可测。
