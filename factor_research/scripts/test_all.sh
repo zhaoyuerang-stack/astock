@@ -200,6 +200,10 @@ echo "=== test_pledge_stat_loader.py (质押统计专用防未来对齐) ==="
 python3 tests/test_pledge_stat_loader.py
 
 echo ""
+echo "=== test_pledge_factors.py (质押风险状态因子) ==="
+python3 tests/test_pledge_factors.py
+
+echo ""
 echo "=== test_fina_indicator.py (财务指标公告日 ffill 防未来) ==="
 python3 tests/test_fina_indicator.py
 
