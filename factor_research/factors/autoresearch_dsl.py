@@ -85,18 +85,34 @@ _SOURCE_DATA_PATHS = (
 )
 
 
-def _data_signature(close: pd.DataFrame) -> tuple:
-    """Generate a highly efficient structural signature of close DataFrame to avoid id(close) collisions."""
-    if isinstance(close, pd.DataFrame) and not close.empty:
-        return (
-            len(close.index),
-            close.index[0],
-            close.index[-1],
-            len(close.columns),
-            close.columns[0],
-            close.columns[-1]
-        )
-    return (0, None, None, 0, None, None)
+def _frame_signature(frame: pd.DataFrame | None) -> tuple:
+    """Return a compact content signature for a panel.
+
+    We hash the actual values plus index/column labels so different sub-panels with
+    the same shape cannot collide just because their source file mtime is equal.
+    """
+    if frame is None:
+        return (None,)
+    if not isinstance(frame, pd.DataFrame):
+        return ("invalid",)
+    if frame.empty:
+        return (0, None, None, 0, None, None, "empty")
+
+    hashed = pd.util.hash_pandas_object(frame, index=True).to_numpy(dtype="uint64", copy=False)
+    digest = _hashlib.sha256(hashed.tobytes()).hexdigest()[:16]
+    return (
+        len(frame.index),
+        frame.index[0],
+        frame.index[-1],
+        len(frame.columns),
+        frame.columns[0],
+        frame.columns[-1],
+        digest,
+    )
+
+
+def _data_signature(close: pd.DataFrame, volume: pd.DataFrame | None = None) -> tuple:
+    return (_frame_signature(close), _frame_signature(volume))
 
 
 def _source_data_mtime() -> int:
@@ -109,30 +125,34 @@ def _source_data_mtime() -> int:
     return 0
 
 
-def _get_cache_path(name: str, params: dict) -> Path:
+def _get_cache_path(name: str, params: dict, data_signature: tuple | None = None) -> Path:
     mtime = _source_data_mtime()
+    sig_suffix = ""
+    if data_signature is not None:
+        sig_suffix = f"_sig{_hashlib.sha256(repr(data_signature).encode('utf-8')).hexdigest()[:16]}"
     if not params:
-        filename = f"{name}_mt{mtime}.parquet"
+        filename = f"{name}{sig_suffix}_mt{mtime}.parquet"
     else:
         param_str = "_".join(f"{k}_{v}" for k, v in sorted(params.items()))
-        filename = f"{name}_{param_str}_mt{mtime}.parquet"
+        filename = f"{name}_{param_str}{sig_suffix}_mt{mtime}.parquet"
     base_dir = _ROOT / "data_lake" / "factor_store" / "panels"
     return base_dir / filename
 
 
 def _call_factor(name: str, close: pd.DataFrame, volume: pd.DataFrame | None, params: dict, cache_mode: str = "disk") -> pd.DataFrame:
     mtime = _source_data_mtime()
+    data_sig = _data_signature(close, volume)
 
     # 1. Check in-memory cache first
     param_key = json.dumps(params, sort_keys=True)
-    mem_key = (name, param_key, _data_signature(close), mtime)
+    mem_key = (name, param_key, data_sig, mtime)
     if mem_key in _BASE_FACTOR_MEM_CACHE:
         return _BASE_FACTOR_MEM_CACHE[mem_key]
 
     # 2. Check local parquet cache unless caller requested pure in-memory mode.
     # If cache_mode is 'memory', bypass disk reading completely (Task 1652 test requirement)
     if cache_mode != "memory":
-        cache_path = _get_cache_path(name, params)
+        cache_path = _get_cache_path(name, params, data_signature=data_sig)
         if cache_path.exists():
             try:
                 cached = pd.read_parquet(cache_path)
@@ -172,6 +192,7 @@ def _call_factor(name: str, close: pd.DataFrame, volume: pd.DataFrame | None, pa
     # 4. Save to parquet cache
     if cache_mode != "memory":
         try:
+            cache_path = _get_cache_path(name, params, data_signature=data_sig)
             cache_path.parent.mkdir(parents=True, exist_ok=True)
             out.to_parquet(cache_path)
         except Exception:
@@ -272,7 +293,7 @@ def clear_factor_cache() -> None:
 def _panel_key(ast: dict, close, volume):
     body = {k: v for k, v in ast.items() if k != "thesis"}  # direction 参与=带符号
     h = _hashlib.sha256(json.dumps(body, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:16]
-    return (h, _data_signature(close), volume is not None)
+    return (h, _data_signature(close, volume))
 
 
 def compute_dsl_factor(
