@@ -81,6 +81,21 @@
       "created": "2026-07-02",
       "expires": "2026-12-29",
       "prompt_note": "信息地图显示基本面族(净利增速/ROE/账面市值比)距现有价格类因子池 MI 距离 2.8-2.9,是最独立的空白区;优先提基本面 × 价格量能的跨信息源组合,而非价格族内部换皮。"
+    },
+    {
+      "id": "earnings-event-sue-weak-size-exposed",
+      "direction": "业绩预告/快报事件源:全市场月频 long-only SUE 主腿",
+      "status": "weak",
+      "action": "NOTE",
+      "scope_factors": [],
+      "evidence": [
+        "reports/research/earnings_event_probe_round5_findings.md(sue residual IC IS/OOS/full=0.0043/0.0040/0.0035,留存93%,但 size corr=0.439 且月频样本54<工厂L0最少60)",
+        "reports/research/probe_round5_earnings_forecast_surprise.json(forecast-only residual OOS=-0.0060,IS→OOS翻负)"
+      ],
+      "revival_condition": "改为行业内同类比较、财报季事件窗口、或与基本面质量/估值交互后重探;不要在全市场月频 long-only 下只扫窗口/归一化微调。",
+      "created": "2026-07-06",
+      "expires": "2027-01-06",
+      "prompt_note": "业绩预告/快报事件源 PIT 可用,但全市场月频 long-only SUE 很弱且 size 暴露高;forecast-only 残差 OOS 翻负。除非引入行业内比较/财报季事件窗口/基本面交互,不要把 sue/forecast_surprise 作为主腿搜索白名单。"
     }
   ]
 }
