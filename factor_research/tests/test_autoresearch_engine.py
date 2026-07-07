@@ -1679,12 +1679,12 @@ def test_dsl_disk_cache_key_uses_price_daily_all_mtime(monkeypatch=None):
             monkeypatch.setattr(dsl, "_source_data_mtime", lambda: 111)
         else:
             dsl._source_data_mtime = lambda: 111
-        first = dsl._get_cache_path("momentum", {"window": 5})
+        first = dsl._get_cache_path("momentum", {"window": 5}, data_signature=None)
         if monkeypatch is not None:
             monkeypatch.setattr(dsl, "_source_data_mtime", lambda: 222)
         else:
             dsl._source_data_mtime = lambda: 222
-        second = dsl._get_cache_path("momentum", {"window": 5})
+        second = dsl._get_cache_path("momentum", {"window": 5}, data_signature=None)
     finally:
         if monkeypatch is None:
             dsl._source_data_mtime = old_source_data_mtime
