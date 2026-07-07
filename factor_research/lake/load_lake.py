@@ -316,13 +316,13 @@ def align_pledge_stat(df, trade_dates, codes=None, max_stale_days=30):
       * coverage_state: current/stale/never_seen/unknown。
       * pledge_observed: 某条源端记录首次变得可见的交易日为 True,ffill 日为 False。
     """
-    trade_idx = pd.DatetimeIndex(trade_dates)
+    trade_idx = pd.DatetimeIndex(pd.to_datetime(trade_dates)).astype("datetime64[ns]")
     if df.empty:
         return _empty_pledge_panels(trade_idx, codes, state="unknown")
 
     df = df.copy()
     df["code"] = df["ts_code"].astype(str).str.split(".").str[0]
-    df["end_dt"] = pd.to_datetime(df["end_date"].astype(str), format="%Y%m%d", errors="coerce")
+    df["end_dt"] = pd.to_datetime(df["end_date"], errors="coerce").astype("datetime64[ns]")
     df["pledge_share_amount"] = (
         pd.to_numeric(df.get("unrest_pledge"), errors="coerce").fillna(0)
         + pd.to_numeric(df.get("rest_pledge"), errors="coerce").fillna(0)
@@ -337,46 +337,51 @@ def align_pledge_stat(df, trade_dates, codes=None, max_stale_days=30):
     if not cols:
         return panels
 
-    left = pd.DataFrame({"trade_date": trade_idx}).sort_values("trade_date")
     numeric_fields = ["pledge_ratio", "pledge_count", "pledge_share_amount"]
-    observed = panels["pledge_observed"]
-    for code in cols:
-        sub = (df[df["code"] == code][["end_dt"] + numeric_fields]
-               .sort_values("end_dt")
-               .drop_duplicates("end_dt", keep="last"))
-        if sub.empty:
-            continue
+    df["avail_dt"] = df["end_dt"] + pd.Timedelta(nanoseconds=1)
+    sub = (df[["avail_dt", "code", "end_dt"] + numeric_fields]
+           .sort_values("avail_dt")
+           .drop_duplicates(["code", "avail_dt"], keep="last"))
+    avail_idx = pd.DatetimeIndex(sub["avail_dt"].dropna().unique()).sort_values()
+    align_idx = avail_idx.union(trade_idx).sort_values()
 
-        aligned = pd.merge_asof(
-            left,
-            sub,
-            left_on="trade_date",
-            right_on="end_dt",
-            direction="backward",
-            allow_exact_matches=False,
-        ).set_index("trade_date")
-        stale_days = (aligned.index.to_series(index=aligned.index) - aligned["end_dt"]).dt.days
-        stale_days = pd.Series(stale_days, index=aligned.index, dtype=float)
-        stale_days[aligned["end_dt"].isna()] = np.nan
-        valid = stale_days.le(max_stale_days)
+    aligned_fields = {}
+    for field in numeric_fields:
+        pivot = sub.pivot_table(index="avail_dt", columns="code", values=field, aggfunc="last")
+        aligned_fields[field] = pivot.reindex(align_idx).ffill().reindex(trade_idx).reindex(columns=cols)
 
-        for field in numeric_fields:
-            panels[field].loc[:, code] = pd.to_numeric(aligned[field], errors="coerce").where(valid)
-        panels["pledge_stale_days"].loc[:, code] = stale_days
+    end_num = sub.assign(end_num=sub["end_dt"].astype("int64"))
+    end_pivot = end_num.pivot_table(index="avail_dt", columns="code", values="end_num", aggfunc="last")
+    end_aligned = end_pivot.reindex(align_idx).ffill().reindex(trade_idx).reindex(columns=cols)
+    last_end = end_aligned.apply(pd.to_datetime)
+    last_end[end_aligned.isna()] = pd.NaT
 
-        state = pd.Series("unknown", index=trade_idx, dtype=object)
-        state[aligned["end_dt"].notna() & valid] = "current"
-        state[aligned["end_dt"].notna() & ~valid] = "stale"
-        panels["pledge_coverage_state"].loc[:, code] = state
+    trade_arr = trade_idx.to_numpy(dtype="datetime64[ns]")[:, None]
+    end_arr = last_end.to_numpy(dtype="datetime64[ns]")
+    stale_arr = (trade_arr - end_arr) / np.timedelta64(1, "D")
+    stale_days = pd.DataFrame(stale_arr, index=trade_idx, columns=cols, dtype=float)
+    stale_days[last_end.isna()] = np.nan
+    valid = stale_days.le(max_stale_days)
 
-        prev_trade = pd.Series(trade_idx, index=trade_idx).shift(1)
-        newly_visible = aligned["end_dt"].notna() & valid
-        newly_visible &= (
-            prev_trade.isna()
-            | ((aligned["end_dt"] >= prev_trade) & (aligned["end_dt"] < aligned.index))
-        )
-        observed.loc[:, code] = newly_visible.astype(object)
+    for field in numeric_fields:
+        panels[field] = aligned_fields[field].where(valid)
+    panels["pledge_stale_days"] = stale_days
 
+    seen_codes = set(sub["code"].unique())
+    state = pd.DataFrame("never_seen", index=trade_idx, columns=cols, dtype=object)
+    for code in seen_codes.intersection(cols):
+        state.loc[:, code] = "unknown"
+    state[last_end.notna() & valid] = "current"
+    state[last_end.notna() & ~valid] = "stale"
+    panels["pledge_coverage_state"] = state
+
+    prev_trade = pd.Series(trade_idx, index=trade_idx).shift(1)
+    newly_visible = last_end.notna() & valid
+    newly_visible &= (
+        prev_trade.isna().to_numpy()[:, None]
+        | (last_end.ge(prev_trade, axis=0) & last_end.lt(pd.Series(trade_idx, index=trade_idx), axis=0))
+    )
+    panels["pledge_observed"] = newly_visible.astype(object)
     return panels
 
 

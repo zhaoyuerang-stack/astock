@@ -74,8 +74,23 @@ def test_align_pledge_stat_marks_never_seen_without_zero_fill():
     print("✅ pledge_stat:never_seen 不填 0")
 
 
+def test_align_pledge_stat_accepts_microsecond_datetime_precision():
+    df = _sample()
+    df["end_date"] = pd.to_datetime(df["end_date"], format="%Y%m%d").astype("datetime64[us]")
+    panels = align_pledge_stat(
+        df,
+        pd.to_datetime(["2026-07-06"]),
+        codes=["000001"],
+        max_stale_days=7,
+    )
+
+    assert panels["pledge_ratio"].loc["2026-07-06", "000001"] == 10.5
+    print("✅ pledge_stat:兼容 parquet datetime64[us] 精度")
+
+
 if __name__ == "__main__":
     test_align_pledge_stat_uses_strict_prior_end_date()
     test_align_pledge_stat_expires_values_but_keeps_stale_state()
     test_align_pledge_stat_marks_never_seen_without_zero_fill()
+    test_align_pledge_stat_accepts_microsecond_datetime_precision()
     print("\n🎉 pledge_stat loader tests passed!")
