@@ -168,6 +168,12 @@ INTERFACES = {
                         "000016.SH", "399006.SZ", "000001.SH", "399001.SZ"],
     },
     # 注:cyq_chips(筹码分布,数十亿行)+ report_rc(研报海量)体量过大,需专门按日窗口/降采样,暂缓。
+    # ── 新增: 机构行为 / 风险 / 大宗 (2026-07-01) ──
+    "pledge_stat": {  # 股权质押统计 → 暴雷预警
+        "mode": "by_stock", "keys": ["ts_code", "end_date"],
+        "store": "institutional/pledge_stat_all.parquet",
+        "fields": "ts_code,end_date,pledge_count,unrest_pledge,rest_pledge,total_share,pledge_ratio",
+    },
 }
 
 
