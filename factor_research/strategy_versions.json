@@ -1485,6 +1485,172 @@
       "failure_boundaries": {}
     },
     {
+      "id": "cross-asset-band-rotation",
+      "versions": [
+        {
+          "version": "v1.0",
+          "date": "2026-07-07",
+          "desc": "Governance-corrected audit state. The registered config says large-cap/top-20% amount Amihud w=60 + band exposure (0-75%) + 60/40 bond/gold defensive overlay, but the 2026-07-07 reproducibility check did not match the prior positive headline. Strict config replay through BacktestEngine on current data (2013-01-04..2026-07-07) produced ann=-12.8%, sr=-0.62, mdd=-89.4%, DSR_p=0.9968. The nearest positive replay used amount bottom20%, not the registered large-cap universe.",
+          "config": {
+            "family": "cross-asset-band-rotation",
+            "version": "v1.0",
+            "equity_factor": "amihud_illiquidity_largecap",
+            "illiq_window": 60,
+            "large_cap_threshold": 0.8,
+            "top_n": 25,
+            "rebalance_days": 20,
+            "timing_type": "band_zscore",
+            "timing_ma": 16,
+            "max_equity_exposure": 0.75,
+            "defense_bond_weight": 0.6,
+            "defense_gold_weight": 0.4,
+            "defense_bond_code": "511010",
+            "defense_gold_code": "518880",
+            "leverage": 1.0,
+            "buy_cost": 0.00225,
+            "sell_cost": 0.00275,
+            "financing_rate": 0.065
+          },
+          "data_scope": "data_lake·2013-2026·cross_asset",
+          "metrics": {
+            "annual": -0.1278,
+            "maxdd": -0.8942,
+            "sharpe": -0.62,
+            "calmar": -0.1429,
+            "n": 3278,
+            "hit": false,
+            "is_annual": -0.109,
+            "is_sharpe": -0.51,
+            "oos_annual": -0.148,
+            "oos_sharpe": -0.75
+          },
+          "status": "参考",
+          "notes": "2026-07-07 复测修正: 按台账 config 直译的 large-cap/top20% amount 口径不可复现原正收益,应从在册降级。正收益最接近版本来自 amount bottom20% 隐藏口径,与 desc/config 的 large-cap 假设冲突,不得作为 standalone 在册证据。",
+          "evidence": {
+            "dsr_p": 0.9968,
+            "n_trials": 5,
+            "retest_2026_07_07": {
+              "strict_registered_config": {
+                "period": "2013-01-04..2026-07-07",
+                "annual": -0.1278,
+                "sharpe": -0.62,
+                "maxdd": -0.8942,
+                "dsr_p": 0.9968,
+                "verdict": "FAIL_CONFIG_REPRODUCTION"
+              },
+              "nearest_positive_hidden_variant": {
+                "universe": "amount bottom20%, not registered large-cap/top20%",
+                "annual": 0.2123,
+                "sharpe": 1.51,
+                "maxdd": -0.1812,
+                "dsr_p": 0.034,
+                "verdict": "UNREGISTERED_UNIVERSE_MISMATCH"
+              }
+            },
+            "search_method": "prior headline not accepted as admission evidence until a canonical runner reproduces it from registry config"
+          },
+          "admission": {
+            "track": "standalone",
+            "dsr_passed": false,
+            "annual_passed": false,
+            "mdd_passed": false,
+            "hit_passed": false,
+            "reproduction_passed": false
+          },
+          "nine_gate": {
+            "run_date": "2026-07-07",
+            "passed_all": false,
+            "dsr": -2.72,
+            "dsr_p": 0.9968,
+            "dsr_significant": false,
+            "n_trials": 5,
+            "n_periods": 3278,
+            "observed_sr": -0.62,
+            "gate4_passed": false,
+            "gate5_annual": -0.1278,
+            "gate5_maxdd": -0.8942,
+            "gate5_sharpe": -0.62,
+            "config_reproduction": "FAIL: registered large_cap_threshold=0.8 replay collapses; positive replay uses amount bottom20% hidden universe",
+            "pbo": 0.65,
+            "pbo_risk": "high",
+            "pbo_n_splits": 100
+          }
+        },
+        {
+          "version": "v1.1-size",
+          "date": "2026-07-07",
+          "desc": "All-cap size factor (w=100) + band exposure (0-75%) via MA16 z-score + 60/40 bond/gold. 2026-07-07 BacktestEngine replay on current data (2013-01-04..2026-07-07): ann=19.7%, sr=1.44, mdd=-23.2%, DSR_p=0.0831. Candidate remains positive but fails DSR<0.05 and max drawdown<20% admission checks.",
+          "config": {
+            "family": "cross-asset-band-rotation",
+            "version": "v1.1-size",
+            "equity_factor": "market_cap_proxy",
+            "size_window": 100,
+            "top_n": 25,
+            "rebalance_days": 20,
+            "timing_type": "band_zscore",
+            "timing_ma": 16,
+            "max_equity_exposure": 0.75,
+            "defense_bond_weight": 0.6,
+            "defense_gold_weight": 0.4,
+            "leverage": 1.0
+          },
+          "data_scope": "data_lake·2013-2026·cross_asset",
+          "metrics": {
+            "annual": 0.1967,
+            "maxdd": -0.2321,
+            "sharpe": 1.44,
+            "calmar": 0.85,
+            "n": 3278,
+            "hit": false,
+            "is_annual": 0.213,
+            "is_sharpe": 1.42,
+            "oos_annual": 0.179,
+            "oos_sharpe": 1.49
+          },
+          "status": "候选",
+          "notes": "2026-07-07 复测修正: 当前数据下仍为正收益候选,但 DSR_p=0.0831 且最大回撤 -23.2%,不能升级在册。",
+          "evidence": {
+            "dsr_p": 0.0831,
+            "n_trials": 5,
+            "retest_2026_07_07": {
+              "period": "2013-01-04..2026-07-07",
+              "annual": 0.1967,
+              "sharpe": 1.44,
+              "maxdd": -0.2321,
+              "dsr_p": 0.0831,
+              "verdict": "POSITIVE_BUT_FAILS_ADMISSION"
+            }
+          },
+          "admission": {},
+          "nine_gate": {
+            "run_date": "2026-07-07",
+            "passed_all": false,
+            "dsr": 1.385,
+            "dsr_p": 0.0831,
+            "dsr_significant": false,
+            "n_trials": 5,
+            "n_periods": 3278,
+            "e_max_sr": 0.668,
+            "skewness": -0.665,
+            "kurtosis": 14.446,
+            "observed_sr": 1.44,
+            "gate4_passed": false,
+            "gate5_annual": 0.1967,
+            "gate5_maxdd": -0.2321,
+            "gate5_sharpe": 1.44
+          }
+        }
+      ],
+      "name": "Cross-Asset Defensive Band Rotation",
+      "hypothesis": "Cross-asset defensive band rotation research family. Current governance state: v1.0 large-cap illiquidity thesis failed config reproduction; v1.1-size remains a positive but non-admitted candidate under current BacktestEngine replay.",
+      "regime": "bull: high equity exposure via band; bear: defensive rotation to bonds/gold",
+      "decay_signal": "equity illiquidity premium erosion; bond/gold correlation regime change; band timing signal flattening",
+      "status": "active",
+      "style_betas": {},
+      "capacity_m": 0.0,
+      "failure_boundaries": {}
+    },
+    {
       "id": "d-le-sc-hedged",
       "versions": [
         {
