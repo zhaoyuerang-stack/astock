@@ -1,0 +1,946 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AStock Lens · 股票诊断客户端原型</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0d0f12;
+        --panel: #14171b;
+        --panel-2: #191d22;
+        --panel-3: #101318;
+        --line: #2a3038;
+        --line-soft: #222832;
+        --text: #eef2f6;
+        --text-2: #aeb7c2;
+        --text-3: #737f8c;
+        --blue: #6ca7ff;
+        --blue-2: #1f6feb;
+        --green: #76c893;
+        --amber: #d8a84f;
+        --red: #e16b6b;
+        --shadow: rgba(0, 0, 0, 0.28);
+        --radius: 8px;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        --sans: Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        font-size: 14px;
+        line-height: 1.45;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .app-frame {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 284px minmax(560px, 1fr) 340px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 120px),
+          var(--bg);
+      }
+
+      .sidebar,
+      .evidence {
+        background: var(--panel);
+        border-color: var(--line);
+        min-height: 100vh;
+      }
+
+      .sidebar {
+        border-right: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .evidence {
+        border-left: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .brand {
+        height: 64px;
+        padding: 16px;
+        border-bottom: 1px solid var(--line-soft);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .brand-mark {
+        width: 28px;
+        height: 28px;
+        border: 1px solid #3b4654;
+        border-radius: 7px;
+        display: grid;
+        place-items: center;
+        color: var(--blue);
+        background: #10151d;
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .brand-title {
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .brand-subtitle {
+        color: var(--text-3);
+        font-size: 11px;
+      }
+
+      .sidebar-toolbar {
+        padding: 12px;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .new-thread {
+        width: 100%;
+        height: 36px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--panel-2);
+        color: var(--text);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .new-thread:hover {
+        border-color: #405166;
+      }
+
+      .thread-list {
+        flex: 1;
+        overflow: auto;
+        padding: 10px;
+      }
+
+      .thread {
+        width: 100%;
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--text);
+        text-align: left;
+        border-radius: var(--radius);
+        padding: 10px;
+        margin-bottom: 6px;
+      }
+
+      .thread:hover {
+        background: rgba(255, 255, 255, 0.035);
+      }
+
+      .thread.active {
+        background: #1a2430;
+        border-color: #32455d;
+      }
+
+      .thread-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .thread-name {
+        font-weight: 620;
+        font-size: 13px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .thread-meta {
+        margin-top: 4px;
+        color: var(--text-3);
+        font-family: var(--mono);
+        font-size: 11px;
+      }
+
+      .badge {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--text-2);
+        background: rgba(255, 255, 255, 0.025);
+        padding: 2px 7px;
+        font-size: 11px;
+        white-space: nowrap;
+      }
+
+      .badge.observe {
+        color: var(--amber);
+        border-color: rgba(216, 168, 79, 0.45);
+        background: rgba(216, 168, 79, 0.08);
+      }
+
+      .badge.hold {
+        color: var(--green);
+        border-color: rgba(118, 200, 147, 0.45);
+        background: rgba(118, 200, 147, 0.08);
+      }
+
+      .badge.insufficient {
+        color: var(--text-2);
+        border-color: #48515d;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .sidebar-footer {
+        padding: 12px;
+        border-top: 1px solid var(--line-soft);
+        color: var(--text-3);
+        font-size: 11px;
+      }
+
+      .workspace {
+        min-width: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg);
+      }
+
+      .topbar {
+        height: 64px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 0 22px;
+        background: rgba(13, 15, 18, 0.88);
+        backdrop-filter: blur(12px);
+      }
+
+      .top-title {
+        font-weight: 660;
+        font-size: 14px;
+      }
+
+      .top-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-3);
+        font-size: 12px;
+      }
+
+      .status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: var(--green);
+        box-shadow: 0 0 0 3px rgba(118, 200, 147, 0.1);
+      }
+
+      .workspace-scroll {
+        flex: 1;
+        overflow: auto;
+        padding: 22px 22px 128px;
+      }
+
+      .diagnosis-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 300px;
+        gap: 16px;
+        max-width: 1040px;
+        margin: 0 auto;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: 0 14px 44px var(--shadow);
+      }
+
+      .card-header {
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--line-soft);
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .card-title {
+        font-weight: 650;
+        font-size: 13px;
+      }
+
+      .card-subtitle {
+        margin-top: 2px;
+        color: var(--text-3);
+        font-size: 12px;
+      }
+
+      .card-body {
+        padding: 16px;
+      }
+
+      .decision-hero {
+        display: grid;
+        grid-template-columns: 160px minmax(0, 1fr);
+        gap: 18px;
+        align-items: stretch;
+      }
+
+      .verdict-box {
+        border: 1px solid rgba(216, 168, 79, 0.38);
+        background: rgba(216, 168, 79, 0.075);
+        border-radius: var(--radius);
+        padding: 14px;
+      }
+
+      .verdict-label {
+        color: var(--text-3);
+        font-size: 11px;
+      }
+
+      .verdict {
+        margin-top: 6px;
+        color: var(--amber);
+        font-size: 34px;
+        font-weight: 720;
+        letter-spacing: 0;
+      }
+
+      .verdict-note {
+        color: var(--text-2);
+        margin-top: 6px;
+        font-size: 12px;
+      }
+
+      .decision-copy {
+        color: var(--text-2);
+        margin: 0 0 14px;
+      }
+
+      .action-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .action-card {
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        border-radius: var(--radius);
+        padding: 12px;
+      }
+
+      .action-title {
+        color: var(--text);
+        font-weight: 620;
+        font-size: 13px;
+      }
+
+      .action-text {
+        margin-top: 6px;
+        color: var(--text-2);
+        font-size: 12px;
+      }
+
+      .risk-list {
+        margin: 14px 0 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 8px;
+      }
+
+      .risk-list li {
+        border: 1px solid var(--line-soft);
+        background: var(--panel-3);
+        border-radius: 7px;
+        padding: 10px 11px;
+        color: var(--text-2);
+        font-size: 12px;
+        display: flex;
+        gap: 8px;
+      }
+
+      .risk-list li::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        margin-top: 6px;
+        border-radius: 999px;
+        background: var(--amber);
+        flex: 0 0 auto;
+      }
+
+      .timeline {
+        display: grid;
+        gap: 10px;
+      }
+
+      .step {
+        display: grid;
+        grid-template-columns: 26px minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+      }
+
+      .step-dot {
+        width: 22px;
+        height: 22px;
+        border: 1px solid #3c4654;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        color: var(--green);
+        font-size: 12px;
+        background: #121820;
+      }
+
+      .step-name {
+        color: var(--text);
+        font-weight: 620;
+        font-size: 12px;
+      }
+
+      .step-desc {
+        color: var(--text-3);
+        font-size: 11px;
+        margin-top: 2px;
+      }
+
+      .source-grid {
+        margin-top: 16px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+
+      .source-card {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--panel-2);
+        padding: 10px;
+      }
+
+      .source-label {
+        color: var(--text-3);
+        font-size: 11px;
+      }
+
+      .source-value {
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 12px;
+        margin-top: 4px;
+      }
+
+      .composer-shell {
+        position: sticky;
+        bottom: 0;
+        padding: 14px 22px 18px;
+        background: linear-gradient(180deg, rgba(13, 15, 18, 0), var(--bg) 24%);
+        border-top: 1px solid rgba(42, 48, 56, 0.72);
+      }
+
+      .composer {
+        max-width: 880px;
+        margin: 0 auto;
+        border: 1px solid #3a4452;
+        background: #15191f;
+        border-radius: 12px;
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.34);
+        padding: 8px;
+        display: grid;
+        grid-template-columns: 40px minmax(0, 1fr) 88px;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .icon-button,
+      .send-button {
+        height: 36px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-2);
+        color: var(--text-2);
+      }
+
+      .icon-button:hover,
+      .send-button:hover {
+        border-color: #4c5c70;
+        color: var(--text);
+      }
+
+      .composer input {
+        height: 38px;
+        border: 0;
+        outline: 0;
+        background: transparent;
+        color: var(--text);
+        min-width: 0;
+      }
+
+      .composer input::placeholder {
+        color: var(--text-3);
+      }
+
+      .send-button {
+        background: var(--blue-2);
+        border-color: #3478d4;
+        color: #ffffff;
+        font-weight: 620;
+      }
+
+      .panel-section {
+        padding: 16px;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .panel-heading {
+        color: var(--text);
+        font-weight: 650;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .panel-copy {
+        color: var(--text-2);
+        font-size: 12px;
+        margin-top: 10px;
+      }
+
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-top: 10px;
+      }
+
+      .chip {
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.025);
+        color: var(--text-2);
+        border-radius: 999px;
+        padding: 4px 8px;
+        font-size: 11px;
+      }
+
+      .evidence-list,
+      .question-list {
+        margin: 10px 0 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 8px;
+      }
+
+      .evidence-list li,
+      .question-list li {
+        border: 1px solid var(--line-soft);
+        border-radius: 7px;
+        background: var(--panel-2);
+        padding: 10px;
+        color: var(--text-2);
+        font-size: 12px;
+      }
+
+      .mono {
+        font-family: var(--mono);
+      }
+
+      .muted {
+        color: var(--text-3);
+      }
+
+      .prototype-note {
+        margin-top: auto;
+        padding: 14px 16px;
+        border-top: 1px solid var(--line-soft);
+        color: var(--text-3);
+        font-size: 11px;
+      }
+
+      @media (max-width: 1100px) {
+        .app-frame {
+          grid-template-columns: 240px minmax(0, 1fr);
+        }
+
+        .evidence {
+          display: none;
+        }
+
+        .diagnosis-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .app-frame {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          display: none;
+        }
+
+        .decision-hero,
+        .action-grid,
+        .source-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-frame">
+      <aside class="sidebar" data-testid="thread-sidebar" aria-label="股票诊断线程">
+        <div class="brand">
+          <div class="brand-mark">AL</div>
+          <div>
+            <div class="brand-title">AStock Lens</div>
+            <div class="brand-subtitle">本地优先 · 股票诊断客户端</div>
+          </div>
+        </div>
+        <div class="sidebar-toolbar">
+          <button class="new-thread" type="button" id="new-thread-button">
+            <span aria-hidden="true">+</span>
+            <span>新诊断</span>
+          </button>
+        </div>
+        <div class="thread-list" id="thread-list"></div>
+        <div class="sidebar-footer">
+          <div>股票诊断线程</div>
+          <div class="mono">Local engine · read-only</div>
+        </div>
+      </aside>
+
+      <main class="workspace" data-testid="diagnosis-workspace">
+        <header class="topbar">
+          <div>
+            <div class="top-title" id="thread-title">贵州茅台 600519</div>
+            <div class="top-meta">
+              <span>数据截至 2026-07-08</span>
+              <span>·</span>
+              <span>本地诊断</span>
+            </div>
+          </div>
+          <div class="top-meta">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span>Local API ready</span>
+          </div>
+        </header>
+
+        <section class="workspace-scroll" aria-label="当前诊断任务">
+          <div class="diagnosis-grid">
+            <section class="card" data-testid="decision-card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">保守单股诊断卡</div>
+                  <div class="card-subtitle">结论只来自已检查证据，保留证据边界。</div>
+                </div>
+                <span class="badge observe" id="decision-badge">观察</span>
+              </div>
+              <div class="card-body">
+                <div class="decision-hero">
+                  <div class="verdict-box">
+                    <div class="verdict-label">当前结论</div>
+                    <div class="verdict" id="verdict">观察</div>
+                    <div class="verdict-note" id="verdict-note">有证据支撑继续跟踪，但缺少足够安全边际。</div>
+                  </div>
+                  <div>
+                    <p class="decision-copy" id="decision-summary">
+                      估值、流动性和趋势状态未给出明确进场信号。当前更适合作为观察对象，而不是直接生成交易动作。
+                    </p>
+                    <div class="action-grid">
+                      <div class="action-card">
+                        <div class="action-title">如果未持有</div>
+                        <div class="action-text" id="not-held-action">等待更清晰的风险补偿；不要因为品牌确定性替代买入条件。</div>
+                      </div>
+                      <div class="action-card">
+                        <div class="action-title">如果已持有</div>
+                        <div class="action-text" id="held-action">控制仓位，继续观察趋势和估值修复，不把诊断卡当作加仓指令。</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <ul class="risk-list" id="risk-list" aria-label="主要风险"></ul>
+
+                <div class="source-grid" aria-label="证据摘要">
+                  <div class="source-card">
+                    <div class="source-label">数据新鲜度</div>
+                    <div class="source-value">T 日可用</div>
+                  </div>
+                  <div class="source-card">
+                    <div class="source-label">PIT 检查</div>
+                    <div class="source-value">通过</div>
+                  </div>
+                  <div class="source-card">
+                    <div class="source-label">诊断模式</div>
+                    <div class="source-value">read-only</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="card" data-testid="task-timeline">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">任务步骤</div>
+                  <div class="card-subtitle">Agent 推进诊断，不替代裁决。</div>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="timeline" id="task-timeline"></div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <footer class="composer-shell" data-testid="bottom-composer">
+          <form class="composer" id="composer-form">
+            <button class="icon-button" type="button" aria-label="添加上下文">+</button>
+            <input
+              id="composer-input"
+              autocomplete="off"
+              placeholder="问一只股票，或继续推进当前诊断…"
+              aria-label="诊断输入"
+            />
+            <button class="send-button" type="submit">发送</button>
+          </form>
+        </footer>
+      </main>
+
+      <aside class="evidence" data-testid="evidence-panel" aria-label="证据与 Agent 上下文">
+        <div class="panel-section">
+          <div class="panel-heading">
+            <span>证据</span>
+            <span class="badge observe">当前线程</span>
+          </div>
+          <div class="chip-row" id="source-chips"></div>
+          <ul class="evidence-list" id="evidence-list"></ul>
+        </div>
+        <div class="panel-section">
+          <div class="panel-heading">限制</div>
+          <p class="panel-copy" id="limits">
+            本原型不连接真实交易，不直接生成买卖指令。所有结论必须能回到数据日期、风险快照和读模型。
+          </p>
+        </div>
+        <div class="panel-section">
+          <div class="panel-heading">可追问</div>
+          <ul class="question-list">
+            <li>这只股票最大的下行风险是什么？</li>
+            <li>如果我已经持有，什么情况需要降低仓位？</li>
+            <li>这个结论依赖哪些数据，哪些还没覆盖？</li>
+          </ul>
+        </div>
+        <div class="prototype-note">
+          Agent 层未来可接 Pi agent-core；金融判断仍由本地 Python 读模型和确定性检查输出。
+        </div>
+      </aside>
+    </div>
+
+    <script>
+      const threads = [
+        {
+          id: "moutai",
+          name: "贵州茅台",
+          code: "600519",
+          status: "观察",
+          badgeClass: "observe",
+          updated: "刚刚",
+          verdict: "观察",
+          note: "有证据支撑继续跟踪，但缺少足够安全边际。",
+          summary: "估值、流动性和趋势状态未给出明确进场信号。当前更适合作为观察对象，而不是直接生成交易动作。",
+          notHeld: "等待更清晰的风险补偿；不要因为品牌确定性替代买入条件。",
+          held: "控制仓位，继续观察趋势和估值修复，不把诊断卡当作加仓指令。",
+          risks: ["估值容错率偏低，坏消息对价格影响可能被放大。", "消费基本面修复节奏仍需验证。", "诊断只覆盖当前可用数据，不包含盘中交易执行。"],
+          evidence: ["价格与成交数据已通过新鲜度检查。", "单股风险快照显示流动性可用但趋势信号不强。", "当前结论为观察，不构成交易建议。"],
+          chips: ["数据截至 2026-07-08", "PIT 检查", "风险快照", "read-only"],
+        },
+        {
+          id: "catl",
+          name: "宁德时代",
+          code: "300750",
+          status: "谨慎持有",
+          badgeClass: "hold",
+          updated: "12 分钟前",
+          verdict: "谨慎持有",
+          note: "持仓可继续跟踪，但不宜放大单一赛道暴露。",
+          summary: "趋势与行业地位尚可，主要问题是波动和赛道估值敏感度。更适合控制仓位后继续观察。",
+          notHeld: "先等待回撤后的风险补偿，不追逐短期强势。",
+          held: "保留核心仓位，设置风险边界，避免单日情绪扩大仓位。",
+          risks: ["新能源赛道波动仍高。", "估值与盈利预期变化耦合强。", "行业竞争格局需要持续复核。"],
+          evidence: ["成交活跃度可用。", "行业风险提示已触发中等等级。", "未发现数据新鲜度阻断。"],
+          chips: ["数据截至 2026-07-08", "行业风险", "波动检查"],
+        },
+        {
+          id: "longi",
+          name: "隆基绿能",
+          code: "601012",
+          status: "数据不足",
+          badgeClass: "insufficient",
+          updated: "昨天",
+          verdict: "数据不足",
+          note: "关键风险源未覆盖，不能给出稳定结论。",
+          summary: "当前诊断缺少足够行业链和盈利修复证据。先补充证据，再判断是否进入观察池。",
+          notHeld: "暂不进入候选，等待数据补齐。",
+          held: "如果已持有，应降低对模型结论的信任，优先人工复核行业风险。",
+          risks: ["行业链价格与产能数据缺口。", "盈利修复证据不足。", "短期价格波动可能由非基本面因素驱动。"],
+          evidence: ["数据新鲜度可用，但行业侧证据不足。", "缺少完整风险快照。", "结论降级为数据不足。"],
+          chips: ["证据缺口", "人工复核", "read-only"],
+        },
+      ];
+
+      const stepTemplate = [
+        ["识别股票", "解析名称、代码和市场。"],
+        ["检查数据新鲜度", "确认可用交易日、PIT 对齐和缺口。"],
+        ["读取风险快照", "汇总流动性、波动、行业和估值风险。"],
+        ["生成保守诊断卡", "拆分未持有与已持有两种动作语境。"],
+      ];
+
+      let activeId = "moutai";
+
+      function findThread(id) {
+        return threads.find((thread) => thread.id === id) || threads[0];
+      }
+
+      function renderThreads() {
+        const list = document.getElementById("thread-list");
+        list.innerHTML = threads
+          .map(
+            (thread) => `
+              <button class="thread ${thread.id === activeId ? "active" : ""}" type="button" data-thread-id="${thread.id}">
+                <div class="thread-title-row">
+                  <span class="thread-name">${thread.name} ${thread.code}</span>
+                  <span class="badge ${thread.badgeClass}">${thread.status}</span>
+                </div>
+                <div class="thread-meta">${thread.updated}</div>
+              </button>
+            `,
+          )
+          .join("");
+
+        list.querySelectorAll("[data-thread-id]").forEach((button) => {
+          button.addEventListener("click", () => {
+            activeId = button.dataset.threadId;
+            render();
+          });
+        });
+      }
+
+      function renderTimeline() {
+        const timeline = document.getElementById("task-timeline");
+        timeline.innerHTML = stepTemplate
+          .map(
+            ([name, desc]) => `
+              <div class="step">
+                <div class="step-dot">✓</div>
+                <div>
+                  <div class="step-name">${name}</div>
+                  <div class="step-desc">${desc}</div>
+                </div>
+              </div>
+            `,
+          )
+          .join("");
+      }
+
+      function renderDiagnosis() {
+        const thread = findThread(activeId);
+        document.getElementById("thread-title").textContent = `${thread.name} ${thread.code}`;
+        document.getElementById("decision-badge").textContent = thread.status;
+        document.getElementById("decision-badge").className = `badge ${thread.badgeClass}`;
+        document.getElementById("verdict").textContent = thread.verdict;
+        document.getElementById("verdict-note").textContent = thread.note;
+        document.getElementById("decision-summary").textContent = thread.summary;
+        document.getElementById("not-held-action").textContent = thread.notHeld;
+        document.getElementById("held-action").textContent = thread.held;
+        document.getElementById("risk-list").innerHTML = thread.risks.map((risk) => `<li>${risk}</li>`).join("");
+        document.getElementById("source-chips").innerHTML = thread.chips.map((chip) => `<span class="chip">${chip}</span>`).join("");
+        document.getElementById("evidence-list").innerHTML = thread.evidence.map((item) => `<li>${item}</li>`).join("");
+      }
+
+      function createThreadFromInput(input) {
+        const normalized = input.trim();
+        if (!normalized) return;
+
+        const inferred = normalized.includes("宁德")
+          ? ["宁德时代", "300750", "谨慎持有", "hold"]
+          : normalized.includes("隆基")
+            ? ["隆基绿能", "601012", "数据不足", "insufficient"]
+            : normalized.includes("茅台")
+              ? ["贵州茅台", "600519", "观察", "observe"]
+              : ["新的股票", "待识别", "数据不足", "insufficient"];
+
+        const id = `thread-${Date.now()}`;
+        threads.unshift({
+          id,
+          name: inferred[0],
+          code: inferred[1],
+          status: inferred[2],
+          badgeClass: inferred[3],
+          updated: "刚刚",
+          verdict: inferred[2],
+          note: "已创建诊断任务，等待接入本地读模型返回真实证据。",
+          summary: `用户问题：“${normalized}”。当前原型只展示任务流，真实结论应由本地 Python 读模型输出。`,
+          notHeld: "先完成数据新鲜度、风险快照和证据检查，再考虑是否进入候选。",
+          held: "先不要把原型结论当作交易动作；等待完整证据返回后再复核仓位。",
+          risks: ["新线程尚未连接真实后端。", "缺少完整数据证据。", "不能替代人工判断或交易确认。"],
+          evidence: ["已记录用户输入。", "已生成诊断任务框架。", "等待本地 API 返回结构化证据。"],
+          chips: ["新诊断", "待接后端", "read-only"],
+        });
+        activeId = id;
+      }
+
+      function render() {
+        renderThreads();
+        renderDiagnosis();
+        renderTimeline();
+      }
+
+      document.getElementById("composer-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const input = document.getElementById("composer-input");
+        createThreadFromInput(input.value);
+        input.value = "";
+        render();
+      });
+
+      document.getElementById("new-thread-button").addEventListener("click", () => {
+        document.getElementById("composer-input").focus();
+      });
+
+      render();
+    </script>
+  </body>
+</html>
