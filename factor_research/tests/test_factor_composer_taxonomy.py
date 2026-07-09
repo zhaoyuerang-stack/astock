@@ -1,0 +1,50 @@
+"""Factor composer taxonomy tests.
+
+Run:
+    cd factor_research && python3 tests/test_factor_composer_taxonomy.py
+"""
+import sys
+from pathlib import Path
+
+import pandas as pd
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+
+def _factors():
+    idx = pd.date_range("2024-01-01", periods=3)
+    return {
+        "a": pd.DataFrame([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], index=idx, columns=["x", "y"], dtype=float),
+        "b": pd.DataFrame([[3.0, 4.0], [5.0, 6.0], [7.0, 8.0]], index=idx, columns=["x", "y"], dtype=float),
+    }
+
+
+def test_factor_composer_canonical_and_legacy_equal_weight_match():
+    from engine.factor_composer import equal_weight_factor
+    from engine.composer import equal_weight
+
+    expected = pd.DataFrame([[2.0, 3.0], [4.0, 5.0], [6.0, 7.0]], index=list(_factors().values())[0].index, columns=["x", "y"], dtype=float)
+    pd.testing.assert_frame_equal(equal_weight_factor(_factors()), expected)
+    pd.testing.assert_frame_equal(equal_weight(_factors()), expected)
+
+
+def test_portfolio_composer_canonical_and_legacy_compose_match():
+    from portfolio.portfolio_composer import compose_portfolio_returns
+    from portfolio.composer import compose
+
+    idx = pd.date_range("2024-01-01", periods=3)
+    returns = {
+        "a": pd.Series([0.01, 0.02, 0.03], index=idx),
+        "b": pd.Series([0.03, 0.02, 0.01], index=idx),
+    }
+    new_ret, new_w = compose_portfolio_returns(returns, method="equal_weight")
+    old_ret, old_w = compose(returns, method="equal_weight")
+    pd.testing.assert_series_equal(new_ret, old_ret)
+    pd.testing.assert_frame_equal(new_w, old_w)
+
+
+if __name__ == "__main__":
+    test_factor_composer_canonical_and_legacy_equal_weight_match()
+    test_portfolio_composer_canonical_and_legacy_compose_match()
+    print("factor/portfolio composer taxonomy tests passed")
