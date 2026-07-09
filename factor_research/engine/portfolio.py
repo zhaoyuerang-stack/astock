@@ -47,16 +47,14 @@ def performance_metrics(port_ret: pd.Series, rf: float = 0.02, fmt: bool = False
 
 def to_signal(factor: pd.DataFrame, n: int = 100, direction: int = 1,
               rebalance_freq: str = "W", family: str = "", version: str = ""):
-    """Wrap a factor panel into a ``core.engine.Signal`` (factor mode).
-
-    The engine will convert the factor to top-n weights internally.
-    """
-    from core.engine import Signal
-    return Signal(
-        factor=factor,
+    """Backward-compatible wrapper for ``engine.signal_factory.factor_to_signal``."""
+    from engine.signal_factory import factor_to_signal
+    return factor_to_signal(
+        factor,
         top_n=n,
         direction=direction,
         rebalance_freq=rebalance_freq,
         family=family,
         version=version,
     )
+
