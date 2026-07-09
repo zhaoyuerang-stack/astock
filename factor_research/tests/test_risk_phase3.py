@@ -49,7 +49,7 @@ def test_current_strategy_drawdown_loaded_from_configured_version():
     strategy = (_settings().get("strategy") or {})
     assert strategy.get("family") == "illiquidity"
     assert strategy.get("version") == "v3.1"
-    assert abs((_registered_maxdd() or 0.0) - (-0.1195)) < 1e-12
+    assert abs((_registered_maxdd() or 0.0) - (-0.3794)) < 1e-12
     print("✅ 当前生产版本 maxdd 来自 illiquidity/v3.1 台账")
 
 
