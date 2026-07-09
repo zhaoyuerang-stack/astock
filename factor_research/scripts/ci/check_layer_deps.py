@@ -22,6 +22,8 @@ FORBIDDEN_EDGES = [
     ("run_daily", ["factory.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
     ("strategies.", ["factory.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
     ("factors.", ["factory.", "strategies.", "scripts.research.", "workflow.", "core.", "knowledge.", "api.", "services."]),
+    ("policy.", ["factory.", "strategies.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
+
     ("lake.", ["factors.", "strategies.", "core.", "factory.", "scripts.research.", "knowledge.", "api.", "services."]),
     ("core.engine", ["factory.", "strategies.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
     ("core.analysis", ["factory.", "strategies.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
