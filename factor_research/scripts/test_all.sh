@@ -32,6 +32,11 @@ echo "=== check_no_legacy_data.py (R-DATA-001 禁代码 import/加载 data_full 
 python3 scripts/ci/check_no_legacy_data.py
 
 echo ""
+echo "=== check_naming_taxonomy.py (命名分类体系/防止模糊命名) ==="
+python3 scripts/ci/check_naming_taxonomy.py
+
+
+echo ""
 echo "=== test_loop_foundations.py (防自欺地基:trial账本 + holdout金库) ==="
 python3 tests/test_loop_foundations.py
 
