@@ -20,10 +20,11 @@ REGIME_GATED_DEFAULT = False  # 默认关:不改既有 LIVE 行为
 
 def small_cap_regime(close: pd.DataFrame, amount: pd.DataFrame, ma: int = 16) -> pd.Series:
     """小盘受宠(1)/失宠(0)regime = PureTrend MA16(既有未拟合信号)。"""
-    from factors.small_cap import small_cap_timing
+    from factors.small_cap import small_cap_exposure_signal
 
-    timing, _, _ = small_cap_timing(close, amount, ma)
+    timing, _, _ = small_cap_exposure_signal(close, amount, ma)
     return (timing > 0).astype(int)
+
 
 
 def apply_regime_gate(equity_ret: pd.Series, regime: pd.Series, large_cap_ret: pd.Series) -> pd.Series:

@@ -14,7 +14,7 @@ import pandas as pd
 
 from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from factors.composite import size_earnings_factor
-from factors.small_cap import small_cap_timing
+from factors.small_cap import small_cap_exposure_signal
 from lake.load_lake import load_fundamental_panel, load_prices, load_raw_close
 
 # ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ def run_strategy(config=None):
     factor = build_factor(amount, trade_dates, blend_weight=config.blend_weight)
 
     # Timing: PureTrend (direction) × VolTarget (size)
-    pt_timing, small_nav, timing_dist = small_cap_timing(close, amount, config.timing_ma)
+    pt_timing, small_nav, timing_dist = small_cap_exposure_signal(close, amount, config.timing_ma)
     vt = build_vol_target(close, amount, target_vol=config.vol_target,
                           lookback=config.vol_lookback,
                           min_exp=config.vol_min_exp, max_exp=config.vol_max_exp)
