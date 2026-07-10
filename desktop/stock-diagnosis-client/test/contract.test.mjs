@@ -38,6 +38,7 @@ assert(main.includes("contextIsolation: true"), "Electron window must enable con
 assert(main.includes("nodeIntegration: false"), "Electron window must disable nodeIntegration");
 assert(main.includes("diagnosis:run"), "main process must register diagnosis IPC");
 assert(main.includes("runtime:status"), "main process must expose runtime status IPC");
+assert(main.includes("readService"), "runtime status must include read service health");
 
 const piBridge = readFileSync(join(root, "src/main/piBridge.cjs"), "utf8");
 assert(piBridge.includes("--no-tools"), "Pi bridge must disable Pi tools by default");
@@ -54,10 +55,15 @@ const requiredUiMarkers = [
   "问一只股票，或继续推进当前诊断",
   "如果未持有",
   "如果已持有",
+  "等待输入",
+  "本地数据服务不可用",
 ];
 
 for (const marker of requiredUiMarkers) {
   assert(app.includes(marker), `Missing required UI marker/copy: ${marker}`);
 }
+
+assert(!app.includes("600519-demo"), "renderer must not ship hard-coded demo diagnosis threads");
+assert(!app.includes("seedThreads"), "renderer must not seed fake thread history");
 
 console.log("desktop client contract passed");

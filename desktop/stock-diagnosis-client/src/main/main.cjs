@@ -37,9 +37,13 @@ ipcMain.handle("diagnosis:run", async (_event, prompt) => {
 });
 
 ipcMain.handle("runtime:status", async () => {
-  const pi = await piBridge.getStatus();
+  const [pi, readService] = await Promise.all([
+    piBridge.getStatus(),
+    readClient.getHealth(),
+  ]);
   return {
     readServiceUrl: readClient.baseUrl,
+    readService,
     pi,
   };
 });
