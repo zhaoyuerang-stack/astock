@@ -519,6 +519,32 @@ def run_paper_trade(report, dry_run=False):
         report["paper_trade"]["error"] = proc.stderr[-1000:]
 
 
+def run_paper_accounts_update(report, dry_run=False):
+    """旁路:paper 多账户并行实测日更(WS-D 执行侧,R-PROD-001「不下单 ≠ 不实测」)。
+
+    给 reports/research/portfolio_recompose.json::paper_candidates 里的每个
+    候选策略版本更新独立模拟盘账本(portfolio/paper_accounts.py)。与既有单账户
+    paper_trade 完全解耦(不同账户目录、不同状态文件),失败不影响日更主流程,
+    不参与 readiness/部署——与 run_paper_forward_smallcap 同款旁路纪律。
+    """
+    if dry_run:
+        print("[paper-accounts] skip paper_accounts_update")
+        report["paper_accounts_update"] = {"ran": False, "dry_run": True}
+        return
+
+    print("[paper-accounts] paper_accounts_update.py (多账户并行实测,WS-D 执行侧)")
+    proc = subprocess.run(
+        [PYTHON, "-m", "scripts.ops.paper_accounts_update"],
+        cwd=ROOT, text=True, capture_output=True, check=False,
+    )
+    print(proc.stdout)
+    if proc.stderr:
+        print(proc.stderr, file=sys.stderr)
+    report["paper_accounts_update"] = {"ran": proc.returncode == 0, "returncode": proc.returncode}
+    if proc.returncode != 0:
+        report["paper_accounts_update"]["error"] = proc.stderr[-1000:]
+
+
 def run_daily_update(args):
     expected, expected_source = expected_trade_date(args.today)
     run_date = expected.strftime("%Y-%m-%d") if expected is not None else china_now().date().isoformat()
@@ -622,6 +648,7 @@ def run_daily_update(args):
                     run_paper_forward_smallcap(report, dry_run=args.dry_run)  # ADR-024 旁路
                     if args.dry_run or report.get("signal", {}).get("generated") or args.force:
                         run_paper_trade(report, dry_run=args.dry_run)
+                    run_paper_accounts_update(report, dry_run=args.dry_run)  # WS-D 执行侧旁路
                 else:
                     report["signal"] = {
                         "generated": False,
