@@ -96,6 +96,31 @@ function legacyDiagnosisPrompt(text, diagnosis) {
   return `${code} ${text}`;
 }
 
+function shouldKeepWorkspace(diagnosis) {
+  return Boolean(diagnosis?.thread?.id && diagnosis.thread.id !== initialDiagnosis.thread.id);
+}
+
+function diagnosisContext(diagnosis, selectedSkill) {
+  const base = { selectedSkillId: selectedSkill?.id || "" };
+  if (!shouldKeepWorkspace(diagnosis) && !(diagnosis.turns || []).length) return base;
+  return {
+    ...base,
+    currentThread: diagnosis.thread,
+    turns: diagnosis.turns || [],
+  };
+}
+
+function keepActiveWorkspace(result, activeDiagnosis) {
+  if (!shouldKeepWorkspace(activeDiagnosis)) return result;
+  return {
+    ...result,
+    thread: {
+      ...result.thread,
+      id: activeDiagnosis.thread.id,
+    },
+  };
+}
+
 function ThreadSidebar({ threads, activeId, onSelect, onNew }) {
   return (
     <aside className="sidebar" data-testid="thread-sidebar" aria-label="股票诊断线程">
@@ -560,22 +585,15 @@ export default function App() {
     if (!text || loading) return;
     setLoading(true);
     try {
-      const context = activeDiagnosis.thread?.code
-        ? {
-            currentThread: activeDiagnosis.thread,
-            turns: activeDiagnosis.turns || [],
-            selectedSkillId: selectedSkill?.id || "",
-          }
-        : {
-            selectedSkillId: selectedSkill?.id || "",
-          };
-      const result = window.astock?.runDiagnosis
+      const context = diagnosisContext(activeDiagnosis, selectedSkill);
+      const rawResult = window.astock?.runDiagnosis
         ? await window.astock.runDiagnosis(
             structuredIpcAvailable(runtime)
               ? { prompt: text, context }
               : legacyDiagnosisPrompt(text, activeDiagnosis)
           )
         : browserPreviewDiagnosis(text, selectedSkill);
+      const result = keepActiveWorkspace(rawResult, activeDiagnosis);
       setDiagnoses((prev) => [result, ...prev.filter((item) => item.thread.id !== result.thread.id)]);
       setThreads((prev) => [
         {

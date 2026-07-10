@@ -210,9 +210,24 @@ function buildEvidence(profile) {
   ];
 }
 
-function strategyPrecheckDiagnosis(prompt, skill) {
+function existingThread(context = {}) {
+  return context.currentThread || context.thread || {};
+}
+
+function reusableThreadId(context = {}) {
+  const thread = existingThread(context);
+  return typeof thread.id === "string" && thread.id && thread.id !== "empty" ? thread.id : "";
+}
+
+function strategyPrecheckDiagnosis(prompt, skill, context = {}) {
+  const thread = existingThread(context);
   return {
-    thread: { id: `skill-${skill.id}-${Date.now()}`, name: "策略想法预检", code: "", status: "待模拟盘" },
+    thread: {
+      id: reusableThreadId(context) || `skill-${skill.id}-${Date.now()}`,
+      name: thread.name && thread.name !== "等待输入" ? thread.name : "策略想法预检",
+      code: thread.code || "",
+      status: "待模拟盘",
+    },
     taskSteps: [
       skillTaskStep(skill),
       { name: "记录策略想法", desc: "已把用户输入作为待验证假设保存到当前对话。", status: "done" },
@@ -242,9 +257,15 @@ function strategyPrecheckDiagnosis(prompt, skill) {
   };
 }
 
-function unresolvedDiagnosis(prompt, skill = null) {
+function unresolvedDiagnosis(prompt, skill = null, context = {}) {
+  const thread = existingThread(context);
   const diagnosis = {
-    thread: { id: `diagnosis-unresolved-${Date.now()}`, name: "待识别股票", code: "", status: "数据不足" },
+    thread: {
+      id: reusableThreadId(context) || `diagnosis-unresolved-${Date.now()}`,
+      name: thread.name && thread.name !== "等待输入" ? thread.name : "待识别股票",
+      code: thread.code || "",
+      status: "数据不足",
+    },
     taskSteps: TASK_STEPS.map((step, index) => (index === 0 ? { ...step, status: "blocked" } : { ...step, status: "pending" })),
     decision: {
       verdict: "数据不足",
@@ -272,15 +293,13 @@ function normalizeTurns(turns) {
 }
 
 function contextStockCode(context) {
-  const thread = context?.currentThread || context?.thread || {};
+  const thread = existingThread(context);
   return extractStockCode(thread.code || "");
 }
 
 function stableThreadId(profile, context) {
-  const thread = context?.currentThread || context?.thread || {};
-  if (thread.code === profile.code && typeof thread.id === "string" && thread.id) {
-    return thread.id;
-  }
+  const currentId = reusableThreadId(context);
+  if (currentId) return currentId;
   return `stock-${profile.code}`;
 }
 
@@ -386,7 +405,7 @@ function createDiagnosisService({ readClient, piBridge }) {
       const selectedSkill = requestedSkill || skillById(orchestration.selectedSkillId) || (toolResult.strategyPrecheckRequested ? skillById("strategy-precheck") : null);
 
       if (selectedSkill && selectedSkill.mode === "strategy_precheck") {
-        let diagnosis = strategyPrecheckDiagnosis(prompt, selectedSkill);
+        let diagnosis = strategyPrecheckDiagnosis(prompt, selectedSkill, context);
         diagnosis = attachPiOrchestration(diagnosis, orchestration, toolResult);
         diagnosis.turns = appendTurns(context, prompt, diagnosis);
         return explainWithPi(piBridge, diagnosis);
@@ -406,7 +425,7 @@ function createDiagnosisService({ readClient, piBridge }) {
       const code = promptCode || contextStockCode(context);
       if (!code) {
         if (resolveError) throw resolveError;
-        const diagnosis = unresolvedDiagnosis(prompt, selectedSkill);
+        const diagnosis = unresolvedDiagnosis(prompt, selectedSkill, context);
         diagnosis.turns = appendTurns(context, prompt, diagnosis);
         return diagnosis;
       }
