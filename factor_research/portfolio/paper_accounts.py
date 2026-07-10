@@ -252,8 +252,10 @@ def provision_from_recompose(recompose_fp: Path | None = None, *, now: datetime 
             rec_fp.write_text(json.dumps(meta.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
         accounts.append(meta.to_dict())
 
-    # 下榜:existing_dirs 里不在本轮 candidate_dirnames 的 → frozen(账本永久保留不删)
-    for dirname in existing_dirs - candidate_dirnames:
+    # 下榜:existing_dirs 里不在本轮 candidate_dirnames 的 → frozen(账本永久保留不删)。
+    # sorted() 而非裸 set 差集迭代:set 顺序依赖哈希种子,跨进程不稳定;这里排序
+    # 保证 provision_result["accounts"] 尾部的下榜段落顺序确定性可复现。
+    for dirname in sorted(existing_dirs - candidate_dirnames):
         rec_fp = root / dirname / "meta.json"
         meta = _read_meta(rec_fp)
         if meta is None:

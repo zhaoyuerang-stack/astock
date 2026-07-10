@@ -210,29 +210,55 @@ def test_blocked_account_has_no_nav_and_honest_deviation_reason(hermetic_root):
     print(f"✅ blocked 账户诚实空态:无 NAV/无假回撤/回测偏差原因可读:{acc.backtest_deviation['reason']}")
 
 
-# ─────────────────────────── 7. 顺序 = 后端产物顺序 ───────────────────────────
+# ─────────────────────────── 7. 顺序 = recompose 排名顺序(非目录字典序) ───────────────────────────
 
-def test_accounts_order_matches_directory_listing(hermetic_root):
+def test_accounts_order_matches_recompose_rank_not_alphabetical(hermetic_root):
+    """「排名靠前策略并排实测」——展示顺序必须是 recompose 排名顺序,不是账户
+    目录名的字典序。用 zzz-fam(排名靠前)vs aaa-fam(排名靠后)制造两者冲突的
+    场景:若实现退化成按目录名字典序(aaa < zzz),本用例必须挂,专治"顺序来源
+    看似正确、实则抄了错误的排序键"这类静默倒退。
+    """
     tmp_path, accounts_root, summary_fp = hermetic_root
     accounts_root.mkdir(parents=True, exist_ok=True)
     summary_fp.write_text(json.dumps({
         "generated_at": "2026-07-01T00:00:00+08:00",
         "provision": {"status": "ok", "reason": "",
                      "accounts": [
-                         {"family": "zzz-fam", "version": "v1.0", "status": "active"},
-                         {"family": "aaa-fam", "version": "v1.0", "status": "active"},
+                         {"family": "zzz-fam", "version": "v1.0", "status": "active"},  # 排名 #1
+                         {"family": "aaa-fam", "version": "v1.0", "status": "active"},  # 排名 #2
                      ]},
     }), encoding="utf-8")
-    _write_meta(accounts_root, "zzz-fam", "v1.0", "active")
+    # 故意反向创建目录(字典序 aaa < zzz),确保"顺序恰好和字典序一致"不会掩盖 bug。
     _write_meta(accounts_root, "aaa-fam", "v1.0", "active")
+    _write_meta(accounts_root, "zzz-fam", "v1.0", "active")
 
     view = spa.list_paper_accounts()
     names = [a.name for a in view.accounts]
-    # list_account_metas 按目录名 sorted() 排序("aaa-fam__v1.0" < "zzz-fam__v1.0")——
-    # 与 summary.json 里 provision.accounts 的顺序(zzz 在前)不同,证明本读层
-    # 顺序来自 list_account_metas(与 update_all 遍历顺序同源),不是照抄 summary 原文顺序。
-    assert names == ["aaa-fam.v1.0", "zzz-fam.v1.0"]
-    print(f"✅ 账户顺序 = list_account_metas 目录字典序:{names}")
+    assert names == ["zzz-fam.v1.0", "aaa-fam.v1.0"], \
+        f"展示顺序必须是 recompose 排名顺序(zzz 排名靠前);实际 {names}" \
+        "(若为 ['aaa-fam.v1.0', 'zzz-fam.v1.0'] 则说明退化成了目录字典序)"
+    print(f"✅ 账户顺序 = recompose 排名顺序(非目录字典序):{names}")
+
+
+def test_accounts_order_appends_unranked_accounts_without_dropping(hermetic_root):
+    """summary.json 里没出现的账户(防御性场景,理论上不该发生)不得被丢弃——
+    追加在已排名账户之后,保留可见性而非静默消失。
+    """
+    tmp_path, accounts_root, summary_fp = hermetic_root
+    accounts_root.mkdir(parents=True, exist_ok=True)
+    summary_fp.write_text(json.dumps({
+        "generated_at": "2026-07-01T00:00:00+08:00",
+        "provision": {"status": "ok", "reason": "",
+                     "accounts": [{"family": "ranked-fam", "version": "v1.0", "status": "active"}]},
+    }), encoding="utf-8")
+    _write_meta(accounts_root, "ranked-fam", "v1.0", "active")
+    _write_meta(accounts_root, "orphan-fam", "v1.0", "frozen")  # 不在 summary.provision.accounts 里
+
+    view = spa.list_paper_accounts()
+    names = [a.name for a in view.accounts]
+    assert names == ["ranked-fam.v1.0", "orphan-fam.v1.0"], \
+        f"未在 summary 排名列表里的账户应追加在末尾,不得丢失;实际 {names}"
+    print(f"✅ 未排名账户追加末尾不丢失:{names}")
 
 
 if __name__ == "__main__":

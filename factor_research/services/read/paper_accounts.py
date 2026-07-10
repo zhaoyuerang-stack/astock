@@ -155,9 +155,33 @@ def _account_view(meta: dict) -> PaperAccountView:
     )
 
 
+def _ranked_order(summary: dict, metas: list) -> list:
+    """展示顺序 = recompose paper_candidates 的排名顺序(后端产物顺序,R-PROD-001
+    「不得前端/引擎重算排名」),不是账户目录的字典序。
+
+    summary["provision"]["accounts"] 是 provision_from_recompose() 按 candidates
+    (排名靠前在前)顺序 append 出来的列表(新上榜 active/blocked + 尾部按
+    sorted(dirname) 追加的下榜 frozen 段)——用它的 (family, version) 顺序对
+    metas 重排;summary 里没出现的账户(理论上不该发生,防御性兜底)按
+    list_account_metas 原有顺序追加在最后,不丢账户也不假装有序。
+    """
+    rank_index: dict[tuple[str, str], int] = {}
+    for i, acc in enumerate(summary.get("provision", {}).get("accounts") or []):
+        fam, ver = acc.get("family"), acc.get("version")
+        if fam and ver and (fam, ver) not in rank_index:
+            rank_index[(fam, ver)] = i
+
+    def _key(meta):
+        idx = rank_index.get((meta.family, meta.version))
+        return (0, idx) if idx is not None else (1, 0)
+
+    # stable sort:rank_index 命中的按其顺序排在前面,未命中的保留原相对顺序排在后面。
+    return sorted(metas, key=_key)
+
+
 def list_paper_accounts() -> PaperAccountsListView:
-    """多账户并排展示的唯一读入口:顺序 = 账户目录字典序(list_account_metas 的
-    既有排序),前端不得重排名(R-PROD-001)。
+    """多账户并排展示的唯一读入口:顺序 = summary.json 里 recompose 排名顺序
+    (_ranked_order),前端不得重排名(R-PROD-001)。
     """
     from portfolio import paper_accounts as pa
 
@@ -185,7 +209,8 @@ def list_paper_accounts() -> PaperAccountsListView:
         )
 
     metas = pa.list_account_metas(_accounts_root())
-    accounts = [_account_view(m.to_dict()) for m in metas]
+    ordered = _ranked_order(summary, metas)
+    accounts = [_account_view(m.to_dict()) for m in ordered]
     return PaperAccountsListView(
         healthy=True, error="",
         generated_at=summary.get("generated_at", ""),
