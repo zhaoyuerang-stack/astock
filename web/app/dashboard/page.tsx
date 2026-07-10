@@ -6,13 +6,14 @@ import Card from "@/components/ui/Card";
 import StatusBanner from "@/components/ui/StatusBanner";
 import DataTable from "@/components/ui/DataTable";
 import { api, num, pct } from "@/lib/api";
-import type { TradePlanView, TradeReadinessView, RiskReport, MarketStateView, SystemConfigView, StrategyDetailView, TrustCalibrationView } from "@/lib/types";
+import type { TradePlanView, TradeReadinessView, RiskReport, MarketStateView, SystemConfigView, StrategyDetailView, TrustCalibrationView, PaperAccountsListView } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 import { GateCard, QuantMetricCard, HashCopy } from "@/components/ui/QuantComponents";
 import { useAppStore } from "@/lib/appStore";
 import TradeDecision from "@/components/desk/TradeDecision";
 import TrustCalibration from "@/components/governance/TrustCalibration";
+import PaperAccountsPanel from "@/components/paper/PaperAccountsPanel";
 
 type SignalRow = {
   dir: string;
@@ -38,6 +39,7 @@ export default function DashboardPage() {
   const [systemConfig, setSystemConfig] = useState<SystemConfigView | null>(null);
   const [strategyDetail, setStrategyDetail] = useState<StrategyDetailView | null>(null);
   const [trust, setTrust] = useState<TrustCalibrationView | null>(null);
+  const [paperAccounts, setPaperAccounts] = useState<PaperAccountsListView | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"positions" | "top25" | "filters" | "execRisk">("positions");
 
@@ -51,9 +53,11 @@ export default function DashboardPage() {
       api.systemConfig(),
       api.strategyDetail(selectedStrategyId, selectedStrategyVersion),
       // 信任校准是首屏补充信息,不得因其端点缺失/报错拖垮整个操作台(与 system-governance 一致的隔离)。
-      api.trustCalibration().catch(() => null)
+      api.trustCalibration().catch(() => null),
+      // 多账户实测同理:名单缺失/后端未部署不得拖垮整个操作台,由 PaperAccountsPanel 自行诚实呈现。
+      api.paperAccounts().catch(() => null)
     ])
-      .then(([m, tr, pp, rk, sc, sd, tc]) => {
+      .then(([m, tr, pp, rk, sc, sd, tc, pa]) => {
         setMarket(m);
         setReadiness(tr);
         setPaperPlan(pp);
@@ -61,6 +65,7 @@ export default function DashboardPage() {
         setSystemConfig(sc);
         setStrategyDetail(sd);
         setTrust(tc);
+        setPaperAccounts(pa);
 
         const activeFamily = (sc?.strategy?.family as string) || "illiquidity";
         const activeVersion = (sc?.strategy?.version as string) || "v3.1";
@@ -268,6 +273,17 @@ export default function DashboardPage() {
           precision={0}
         />
       </div>
+
+      {/* 2.5 排名靠前策略并排实测(WS-D 执行侧,R-PROD-001「不下单 ≠ 不实测」)——
+          与上方单账户生产策略 paper 卡片解耦:这里展示组合再构成 top-N 候选各自
+          独立的模拟盘账本,回答「该不该把某策略推向真仓」。 */}
+      <div className="flex items-center gap-2">
+        <h3 className="text-sm font-bold text-subink tracking-wider uppercase">排名靠前策略并排实测</h3>
+        <span className="px-2 py-0.5 rounded text-[10px] border border-[#BF5AF2]/30 text-[#BF5AF2] font-mono">
+          多账户 · paper
+        </span>
+      </div>
+      <PaperAccountsPanel data={paperAccounts} />
 
       {/* 3. 生產就緒度五項門禁檢查 */}
       <div className="space-y-3">

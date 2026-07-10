@@ -561,6 +561,50 @@ export interface PaperTradesView {
   total: number;
 }
 
+// ── paper 多账户并行实测(WS-D 执行侧,R-PROD-001「不下单 ≠ 不实测」)────────
+export interface PaperAccountNavPoint {
+  date: string;
+  nav: number;
+  total_return: number;
+}
+
+// 判别联合:available=false 只有 reason;available=true 才有完整偏差字段。
+export type PaperAccountBacktestDeviation =
+  | { available: false; reason: string }
+  | {
+      available: true;
+      window_start: string;
+      window_end: string;
+      paper_cumulative_return: number;
+      backtest_cumulative_return: number;
+      cumulative_deviation: number;
+      tracking_error: number | null;
+      common_days: number;
+    };
+
+export interface PaperAccountView {
+  name: string;
+  family: string;
+  version: string;
+  status: "active" | "frozen" | "blocked" | "degraded" | "unknown" | string;
+  reason: string;
+  opened_at: string;
+  frozen_at: string;
+  last_update_date: string;
+  nav_points: PaperAccountNavPoint[];
+  latest_nav: number;
+  total_return: number;
+  max_drawdown: number;
+  backtest_deviation: PaperAccountBacktestDeviation;
+}
+
+export interface PaperAccountsListView {
+  healthy: boolean;
+  error: string;
+  generated_at: string;
+  accounts: PaperAccountView[];
+}
+
 export interface TradeReadinessView {
   allowed_to_trade: boolean;
   data_status: string;
