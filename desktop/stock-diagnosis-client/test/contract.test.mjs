@@ -70,6 +70,7 @@ const requiredUiMarkers = [
   'data-testid="conversation-history"',
   'data-testid="visualization-entry"',
   'data-testid="visualization-workspace"',
+  'data-testid="conversation-end"',
   'data-testid="composer-skill-button"',
   'data-testid="skill-picker"',
   'data-testid="active-skill-bar"',
@@ -99,6 +100,8 @@ for (const marker of requiredUiMarkers) {
 
 assert(!rendererSurface.includes("600519-demo"), "renderer must not ship hard-coded demo diagnosis threads");
 assert(!rendererSurface.includes("seedThreads"), "renderer must not seed fake thread history");
+assert(!app.includes("slice(-8)"), "conversation history must not be visually clamped to the last eight turns");
+assert(app.includes("conversationEndRef"), "conversation history should auto-scroll as turns are appended");
 
 const parsedSkills = JSON.parse(skillCatalog);
 assert(parsedSkills.some((skill) => skill.id === "single-stock-diagnosis"), "skill catalog must include single-stock diagnosis");

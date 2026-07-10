@@ -502,6 +502,8 @@ input:focus-visible {
   max-width: min(680px, 88%);
   color: var(--text-2);
   font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 .turn.user .turn-content {

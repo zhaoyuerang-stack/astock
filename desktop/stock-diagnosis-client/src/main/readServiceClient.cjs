@@ -21,6 +21,11 @@ function extractStockCode(query) {
   const text = String(query || "").trim();
   const match = text.match(/(?<!\d)(\d{6})(?!\d)/);
   if (match) return match[1];
+  return null;
+}
+
+function resolveKnownStockAlias(query) {
+  const text = String(query || "").trim();
   for (const [name, code] of NAME_TO_CODE.entries()) {
     if (text.includes(name)) return code;
   }
@@ -34,7 +39,8 @@ function normalizeBaseUrl(baseUrl) {
 function extractStockCodeFromAgentResponse(result) {
   const output = result?.output || {};
   const evidence = Array.isArray(output.evidence) ? output.evidence : [];
-  return extractStockCode([output.summary, ...evidence].filter(Boolean).join("\n"));
+  const text = [output.summary, ...evidence].filter(Boolean).join("\n");
+  return extractStockCode(text) || resolveKnownStockAlias(text);
 }
 
 async function resolveStockCodeWithPython(query, options = {}) {
@@ -90,6 +96,9 @@ function createReadServiceClient(options = {}) {
     const viaPython = await resolveStockCodeFn(query).catch(() => null);
     if (viaPython) return viaPython;
 
+    const viaAlias = resolveKnownStockAlias(query);
+    if (viaAlias) return viaAlias;
+
     if (!enableAgentResolve) return null;
 
     const agentResult = await requestJson("/agent/ask", {
@@ -133,6 +142,7 @@ module.exports = {
   PYTHON_RESOLVE_TIMEOUT_MS,
   extractStockCode,
   extractStockCodeFromAgentResponse,
+  resolveKnownStockAlias,
   resolveStockCodeWithPython,
   createReadServiceClient,
 };
