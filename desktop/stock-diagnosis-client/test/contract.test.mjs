@@ -16,6 +16,7 @@ const requiredFiles = [
   "src/renderer/main.jsx",
   "src/renderer/styles.css",
   "src/renderer/index.html",
+  "src/renderer/visualizations/VisualizationWorkspace.jsx",
 ];
 
 for (const relative of requiredFiles) {
@@ -46,26 +47,34 @@ assert(piBridge.includes("--no-session"), "Pi bridge must keep diagnosis prompts
 assert(!piBridge.includes("bash"), "Pi bridge must not enable arbitrary shell tools");
 
 const app = readFileSync(join(root, "src/renderer/App.jsx"), "utf8");
+const visualization = readFileSync(join(root, "src/renderer/visualizations/VisualizationWorkspace.jsx"), "utf8");
+const rendererSurface = `${app}\n${visualization}`;
 const requiredUiMarkers = [
   'data-testid="thread-sidebar"',
   'data-testid="diagnosis-workspace"',
   'data-testid="evidence-panel"',
   'data-testid="bottom-composer"',
   'data-testid="decision-card"',
+  'data-testid="conversation-workspace"',
   'data-testid="conversation-history"',
+  'data-testid="visualization-entry"',
+  'data-testid="visualization-workspace"',
   "问一只股票，或继续推进当前诊断",
   "如果未持有",
   "如果已持有",
   "连续追问",
+  "当前对话流",
+  "图形化展示",
+  "不展示伪造曲线",
   "等待输入",
   "本地数据服务不可用",
 ];
 
 for (const marker of requiredUiMarkers) {
-  assert(app.includes(marker), `Missing required UI marker/copy: ${marker}`);
+  assert(rendererSurface.includes(marker), `Missing required UI marker/copy: ${marker}`);
 }
 
-assert(!app.includes("600519-demo"), "renderer must not ship hard-coded demo diagnosis threads");
-assert(!app.includes("seedThreads"), "renderer must not seed fake thread history");
+assert(!rendererSurface.includes("600519-demo"), "renderer must not ship hard-coded demo diagnosis threads");
+assert(!rendererSurface.includes("seedThreads"), "renderer must not seed fake thread history");
 
 console.log("desktop client contract passed");
