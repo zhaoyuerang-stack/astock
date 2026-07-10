@@ -1,8 +1,9 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("astock", {
-  runDiagnosis(prompt) {
-    return ipcRenderer.invoke("diagnosis:run", prompt);
+  apiVersion: 2,
+  runDiagnosis(payload) {
+    return ipcRenderer.invoke("diagnosis:run", payload);
   },
   getRuntimeStatus() {
     return ipcRenderer.invoke("runtime:status");
