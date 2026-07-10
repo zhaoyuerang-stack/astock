@@ -40,8 +40,10 @@ desktop/stock-diagnosis-client/AStock Lens.app
 
 The launcher opens a visible Terminal session, starts the local Python read service on `127.0.0.1:8011`, then starts the Electron + React client. Runtime logs and pid files are written under `.runtime/` and are ignored by git.
 
-If Electron's macOS runtime binary is missing, the launcher tries `npm rebuild electron` once. On networks that block Electron's default binary host, run this one-time repair from `desktop/stock-diagnosis-client/`:
+If Electron's macOS runtime binary is missing, the launcher tries `npm rebuild electron` once with `https://npmmirror.com/mirrors/electron/` and a default 180 second timeout. On networks that still block the download, run this one-time repair from `desktop/stock-diagnosis-client/`:
 
 ```bash
 ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npm rebuild electron
 ```
+
+Set `ASTOCK_ELECTRON_REBUILD_TIMEOUT_SECONDS` if the first binary download needs a longer timeout.
