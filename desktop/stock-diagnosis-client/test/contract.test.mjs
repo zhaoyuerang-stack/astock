@@ -79,6 +79,11 @@ const requiredUiMarkers = [
   "diagnosisContext",
   "keepActiveWorkspace",
   "pendingDiagnosis",
+  "conversationTurnsForDisplay",
+  "ensureResultTurns",
+  "sameThreadIdentity",
+  "upsertThreadList",
+  "dedupeThreadList",
   "正在编排 Skill",
   "问一只股票，或继续推进当前诊断",
   "如果未持有",
@@ -102,6 +107,7 @@ assert(!rendererSurface.includes("600519-demo"), "renderer must not ship hard-co
 assert(!rendererSurface.includes("seedThreads"), "renderer must not seed fake thread history");
 assert(!app.includes("slice(-8)"), "conversation history must not be visually clamped to the last eight turns");
 assert(app.includes("conversationEndRef"), "conversation history should auto-scroll as turns are appended");
+assert(app.includes("diagnosisConversationReply"), "diagnosed workspaces must synthesize an assistant turn when result turns are missing");
 
 const parsedSkills = JSON.parse(skillCatalog);
 assert(parsedSkills.some((skill) => skill.id === "single-stock-diagnosis"), "skill catalog must include single-stock diagnosis");

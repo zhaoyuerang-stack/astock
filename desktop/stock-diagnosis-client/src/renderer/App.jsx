@@ -146,6 +146,89 @@ function pendingDiagnosis(diagnosis, text, selectedSkill) {
   };
 }
 
+function sameThreadIdentity(left = {}, right = {}) {
+  if (left.id && right.id && left.id === right.id) return true;
+  if (left.code && right.code && left.code === right.code) return true;
+  return false;
+}
+
+function upsertDiagnosisList(items, diagnosis, replacedThread = null) {
+  return [
+    diagnosis,
+    ...items.filter((item) => (
+      !sameThreadIdentity(item.thread, diagnosis.thread)
+      && !(replacedThread && sameThreadIdentity(item.thread, replacedThread))
+    )),
+  ];
+}
+
+function upsertThreadList(items, thread, replacedThread = null) {
+  return [
+    thread,
+    ...items.filter((item) => (
+      !sameThreadIdentity(item, thread)
+      && !(replacedThread && sameThreadIdentity(item, replacedThread))
+    )),
+  ];
+}
+
+function dedupeThreadList(items, preferredId = "") {
+  return items.reduce((result, thread) => {
+    const existingIndex = result.findIndex((item) => sameThreadIdentity(item, thread));
+    if (existingIndex === -1) return [...result, thread];
+    if (thread.id === preferredId) {
+      return result.map((item, index) => (index === existingIndex ? thread : item));
+    }
+    return result;
+  }, []);
+}
+
+function evidenceLines(items = [], limit = 3) {
+  return items
+    .filter(Boolean)
+    .slice(0, limit)
+    .map((item) => `- ${item}`)
+    .join("\n");
+}
+
+function diagnosisConversationReply(diagnosis) {
+  if (!shouldKeepWorkspace(diagnosis) && diagnosis.decision?.verdict === "等待输入") return "";
+  if (diagnosis.piExplanation) return diagnosis.piExplanation;
+
+  const decision = diagnosis.decision || {};
+  const thread = diagnosis.thread || {};
+  const objectName = thread.code ? `${thread.name} ${thread.code}` : thread.name || "当前对象";
+  const checked = evidenceLines((diagnosis.risks || []).length ? diagnosis.risks : diagnosis.evidence);
+
+  if (!thread.code) {
+    return `${decision.summary || "还没有识别到股票代码。"}\n\n你可以继续补充股票名称或 6 位代码，我会在同一个工作空间里继续。`;
+  }
+
+  return `${objectName} 已完成本地诊断。\n\n${decision.summary || decision.note || "当前只展示已读取证据。"}\n\n已检查:\n${checked || "- 当前证据不足。"}\n\n继续追问时，我会沿用这个对象和当前证据边界。`;
+}
+
+function conversationTurnsForDisplay(diagnosis) {
+  const turns = Array.isArray(diagnosis.turns)
+    ? diagnosis.turns.filter((turn) => turn && typeof turn.content === "string")
+    : [];
+  if (turns.length) return turns;
+
+  const reply = diagnosisConversationReply(diagnosis);
+  return reply ? [{ role: "assistant", content: reply, synthesized: true }] : [];
+}
+
+function ensureResultTurns(result, pending) {
+  if (Array.isArray(result.turns) && result.turns.length) return result;
+  const pendingTurns = Array.isArray(pending?.turns)
+    ? pending.turns.filter((turn) => turn && !turn.pending)
+    : [];
+  const reply = diagnosisConversationReply(result);
+  return {
+    ...result,
+    turns: reply ? [...pendingTurns, { role: "assistant", content: reply, synthesized: true }] : pendingTurns,
+  };
+}
+
 function ThreadSidebar({ threads, activeId, onSelect, onNew }) {
   return (
     <aside className="sidebar" data-testid="thread-sidebar" aria-label="股票诊断线程">
@@ -317,7 +400,7 @@ const starterPrompts = [
 ];
 
 function ConversationWorkspace({ diagnosis, onOpenVisual }) {
-  const turns = diagnosis.turns || [];
+  const turns = conversationTurnsForDisplay(diagnosis);
   const hasTurns = turns.length > 0;
   const conversationEndRef = useRef(null);
   const lastStep = [...(diagnosis.taskSteps || [])].reverse().find((step) => step.status === "done") || diagnosis.taskSteps?.[0];
@@ -605,6 +688,7 @@ export default function App() {
   const inputRef = useRef(null);
 
   const activeDiagnosis = diagnoses.find((item) => item.thread.id === activeId) || initialDiagnosis;
+  const visibleThreads = dedupeThreadList(threads, activeId);
   const selectedSkill = skillById.get(selectedSkillId) || null;
 
   useEffect(() => {
@@ -615,18 +699,16 @@ export default function App() {
     event.preventDefault();
     const text = prompt.trim();
     if (!text || loading) return;
+    let pending = null;
     setLoading(true);
     try {
       const context = diagnosisContext(activeDiagnosis, selectedSkill);
-      const pending = pendingDiagnosis(activeDiagnosis, text, selectedSkill);
-      setDiagnoses((prev) => [pending, ...prev.filter((item) => item.thread.id !== pending.thread.id)]);
-      setThreads((prev) => [
-        {
-          ...pending.thread,
-          updated: "刚刚",
-        },
-        ...prev.filter((thread) => thread.id !== pending.thread.id),
-      ]);
+      pending = pendingDiagnosis(activeDiagnosis, text, selectedSkill);
+      setDiagnoses((prev) => upsertDiagnosisList(prev, pending));
+      setThreads((prev) => upsertThreadList(prev, {
+        ...pending.thread,
+        updated: "刚刚",
+      }));
       setActiveId(pending.thread.id);
       setViewMode("conversation");
       setPrompt("");
@@ -637,35 +719,37 @@ export default function App() {
               : legacyDiagnosisPrompt(text, activeDiagnosis)
           )
         : browserPreviewDiagnosis(text, selectedSkill);
-      const result = keepActiveWorkspace(rawResult, activeDiagnosis);
-      setDiagnoses((prev) => [result, ...prev.filter((item) => item.thread.id !== result.thread.id)]);
-      setThreads((prev) => [
-        {
-          ...result.thread,
-          updated: "刚刚",
-        },
-        ...prev.filter((thread) => thread.id !== result.thread.id),
-      ]);
+      const result = ensureResultTurns(keepActiveWorkspace(rawResult, activeDiagnosis), pending);
+      setDiagnoses((prev) => upsertDiagnosisList(prev, result, pending?.thread));
+      setThreads((prev) => upsertThreadList(prev, {
+        ...result.thread,
+        updated: "刚刚",
+      }, pending?.thread));
       setActiveId(result.thread.id);
       setViewMode("conversation");
       setSelectedSkillId(result.activeSkills?.[0]?.id || selectedSkill?.id || "");
     } catch (error) {
-      const result = keepActiveWorkspace(unavailableDiagnosis(text, error?.message || String(error), selectedSkill), activeDiagnosis);
+      const result = ensureResultTurns(
+        keepActiveWorkspace(unavailableDiagnosis(text, error?.message || String(error), selectedSkill), activeDiagnosis),
+        pending
+      );
       if (shouldKeepWorkspace(activeDiagnosis)) {
+        const baseTurns = Array.isArray(pending?.turns)
+          ? pending.turns.filter((turn) => turn && !turn.pending)
+          : [
+              ...(activeDiagnosis.turns || []),
+              { role: "user", content: text },
+            ];
         result.turns = [
-          ...(activeDiagnosis.turns || []),
-          { role: "user", content: text },
+          ...baseTurns,
           { role: "assistant", content: `本地数据服务不可用: ${error?.message || String(error)}` },
         ];
       }
-      setDiagnoses((prev) => [result, ...prev.filter((item) => item.thread.id !== result.thread.id)]);
-      setThreads((prev) => [
-        {
-          ...result.thread,
-          updated: "刚刚",
-        },
-        ...prev.filter((thread) => thread.id !== result.thread.id),
-      ]);
+      setDiagnoses((prev) => upsertDiagnosisList(prev, result, pending?.thread));
+      setThreads((prev) => upsertThreadList(prev, {
+        ...result.thread,
+        updated: "刚刚",
+      }, pending?.thread));
       setActiveId(result.thread.id);
       setViewMode("conversation");
       setSelectedSkillId(result.activeSkills?.[0]?.id || selectedSkill?.id || "");
@@ -677,7 +761,7 @@ export default function App() {
   return (
     <div className="app-frame">
       <ThreadSidebar
-        threads={threads}
+        threads={visibleThreads}
         activeId={activeId}
         onSelect={(threadId) => {
           setActiveId(threadId);
