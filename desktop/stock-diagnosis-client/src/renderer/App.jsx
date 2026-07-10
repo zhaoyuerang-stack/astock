@@ -1,67 +1,64 @@
 import { useEffect, useRef, useState } from "react";
 
-const demoDiagnosis = {
-  thread: { id: "600519-demo", name: "贵州茅台", code: "600519", status: "观察" },
+const initialDiagnosis = {
+  thread: { id: "empty", name: "等待输入", code: "", status: "等待输入" },
   taskSteps: [
-    { name: "识别股票", desc: "解析名称、代码和市场。", status: "done" },
-    { name: "检查数据新鲜度", desc: "确认可用交易日、PIT 对齐和缺口。", status: "done" },
-    { name: "读取风险快照", desc: "汇总流动性、波动、行业和估值风险。", status: "done" },
-    { name: "生成保守诊断卡", desc: "拆分未持有与已持有两种动作语境。", status: "done" },
+    { name: "识别股票", desc: "等待输入股票名称或 6 位代码。", status: "pending" },
+    { name: "检查数据新鲜度", desc: "提交后读取本地 Python read service。", status: "pending" },
+    { name: "读取风险快照", desc: "汇总真实股价、估值、收益和资金流。", status: "pending" },
+    { name: "生成保守诊断卡", desc: "拆分未持有与已持有两种动作语境。", status: "pending" },
   ],
   decision: {
-    verdict: "观察",
-    note: "有证据支撑继续跟踪，但缺少足够安全边际。",
-    summary: "估值、流动性和趋势状态未给出明确进场信号。当前更适合作为观察对象，而不是交易动作。",
-    notHeld: "等待更清晰的风险补偿；不要因为品牌确定性替代买入条件。",
-    held: "控制仓位，继续观察趋势和估值修复，不把诊断卡当作加仓指令。",
+    verdict: "等待输入",
+    note: "还没有读取任何股票画像。",
+    summary: "输入股票名或 6 位代码后，客户端会先解析代码，再从本地 Python read service 读取真实数据。",
+    notHeld: "先输入目标股票，再进入观察池判断。",
+    held: "先读取本地画像，再讨论持有风险。",
   },
-  risks: [
-    "20 日收益和 60 日收益未形成一致方向。",
-    "消费基本面修复节奏仍需验证。",
-    "诊断只覆盖当前可用数据，不包含盘中交易执行。",
-  ],
-  evidence: [
-    "股票画像: 贵州茅台 600519",
-    "最新价格数据日期: 2026-07-08",
-    "来源: price/daily/600519.parquet",
-    "来源: daily_basic/daily_basic_all.parquet",
-  ],
+  risks: ["尚未选择股票。"],
+  evidence: ["尚未读取本地数据。"],
   limits: [
     "本结果不构成交易建议。",
-    "当前版本只读本地数据，不连接交易执行。",
-    "Agent 只能解释证据，不能替代确定性读模型。",
+    "客户端只读本地数据，不连接交易执行。",
   ],
-  sourceChips: ["数据截至 2026-07-08", "PIT 检查", "风险快照", "read-only"],
+  sourceChips: ["等待输入", "read-only"],
   piExplanation: "",
 };
 
-const seedThreads = [
-  { id: "600519-demo", name: "贵州茅台", code: "600519", status: "观察", updated: "刚刚" },
-  { id: "300750-demo", name: "宁德时代", code: "300750", status: "谨慎持有", updated: "12 分钟前" },
-  { id: "601012-demo", name: "隆基绿能", code: "601012", status: "数据不足", updated: "昨天" },
-];
-
 function statusClass(status) {
   if (status === "谨慎持有") return "hold";
+  if (status === "等待输入") return "waiting";
+  if (status === "错误") return "error";
   if (status === "数据不足") return "insufficient";
   return "observe";
 }
 
-function fallbackDiagnosis(prompt) {
-  const base = structuredClone(demoDiagnosis);
-  base.thread = { id: `local-${Date.now()}`, name: "待接本地 API", code: "", status: "数据不足" };
-  base.decision = {
-    verdict: "数据不足",
-    note: "当前运行在浏览器预览模式，未连接 Electron preload。",
-    summary: `用户问题：“${prompt}”。启动 Electron 后会通过本地 Python read service 返回真实证据。`,
-    notHeld: "先不要进入候选。",
-    held: "先不要按预览模式调整仓位。",
+function unavailableDiagnosis(prompt, message) {
+  return {
+    thread: { id: `error-${Date.now()}`, name: "本地数据服务不可用", code: "", status: "错误" },
+    taskSteps: [
+      { name: "识别股票", desc: "请求已收到。", status: "done" },
+      { name: "连接本地数据服务", desc: "读取 Python read service 失败。", status: "blocked" },
+      { name: "读取风险快照", desc: "未读取到真实数据。", status: "pending" },
+      { name: "生成保守诊断卡", desc: "已停止，避免用假数据填充。", status: "blocked" },
+    ],
+    decision: {
+      verdict: "错误",
+      note: "本地数据服务不可用。",
+      summary: `用户问题：“${prompt}”。客户端没有拿到真实数据，因此不会展示 demo 结论。错误: ${message}`,
+      notHeld: "先不要进入候选。",
+      held: "先不要按当前失败结果调整仓位。",
+    },
+    risks: ["未读取到本地 Python read service。", "当前界面没有使用假数据兜底。"],
+    evidence: [`用户输入: ${prompt}`, `错误: ${message}`],
+    limits: ["需要启动本地 read service 后才能诊断。"],
+    sourceChips: ["offline", "no-demo"],
+    piExplanation: "",
   };
-  base.risks = ["未连接 Electron 主进程。", "未读取本地 Python read service。"];
-  base.evidence = [`用户输入: ${prompt}`];
-  base.limits = ["浏览器预览只用于界面检查。"];
-  base.sourceChips = ["preview", "read-only"];
-  return base;
+}
+
+function browserPreviewDiagnosis(prompt) {
+  return unavailableDiagnosis(prompt, "未连接 Electron preload，请通过 AStock Lens.app 打开。");
 }
 
 function ThreadSidebar({ threads, activeId, onSelect, onNew }) {
@@ -81,6 +78,12 @@ function ThreadSidebar({ threads, activeId, onSelect, onNew }) {
         </button>
       </div>
       <div className="thread-list">
+        {threads.length === 0 && (
+          <div className="thread-empty">
+            <div>暂无诊断线程</div>
+            <div>从底部输入股票名或代码开始。</div>
+          </div>
+        )}
         {threads.map((thread) => (
           <button
             key={thread.id}
@@ -161,7 +164,9 @@ function TaskTimeline({ steps }) {
         <div className="timeline">
           {steps.map((step) => (
             <div className="step" key={step.name}>
-              <div className={`step-dot ${step.status}`}>{step.status === "blocked" ? "!" : "✓"}</div>
+              <div className={`step-dot ${step.status}`}>
+                {step.status === "done" ? "✓" : step.status === "blocked" ? "!" : "·"}
+              </div>
               <div>
                 <div className="step-name">{step.name}</div>
                 <div className="step-desc">{step.desc}</div>
@@ -218,7 +223,10 @@ function EvidencePanel({ diagnosis, runtime }) {
         </ul>
       </div>
       <div className="prototype-note">
-        <div>Read service: {runtime?.readServiceUrl || "http://127.0.0.1:8011"}</div>
+        <div>
+          Read service: {runtime?.readServiceUrl || "http://127.0.0.1:8011"}
+          {runtime?.readService ? ` (${runtime.readService.available ? "ready" : "offline"})` : ""}
+        </div>
         <div>Pi: {runtime?.pi?.available ? "available" : "not connected"}</div>
       </div>
     </aside>
@@ -240,8 +248,8 @@ function Workspace({ diagnosis, prompt, setPrompt, onSubmit, loading, inputRef, 
           </div>
         </div>
         <div className="top-meta">
-          <span className="status-dot" aria-hidden="true"></span>
-          <span>{runtime?.pi?.available ? "Pi ready" : "Local API mode"}</span>
+          <span className={`status-dot ${runtime?.readService?.available === false ? "offline" : ""}`} aria-hidden="true"></span>
+          <span>{runtime?.readService?.available === false ? "Read service offline" : "Local API mode"}</span>
         </div>
       </header>
       <section className="workspace-scroll" aria-label="当前诊断任务">
@@ -273,15 +281,15 @@ function Workspace({ diagnosis, prompt, setPrompt, onSubmit, loading, inputRef, 
 }
 
 export default function App() {
-  const [diagnoses, setDiagnoses] = useState([demoDiagnosis]);
-  const [threads, setThreads] = useState(seedThreads);
-  const [activeId, setActiveId] = useState(demoDiagnosis.thread.id);
+  const [diagnoses, setDiagnoses] = useState([initialDiagnosis]);
+  const [threads, setThreads] = useState([]);
+  const [activeId, setActiveId] = useState(initialDiagnosis.thread.id);
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [runtime, setRuntime] = useState(null);
   const inputRef = useRef(null);
 
-  const activeDiagnosis = diagnoses.find((item) => item.thread.id === activeId) || diagnoses[0];
+  const activeDiagnosis = diagnoses.find((item) => item.thread.id === activeId) || initialDiagnosis;
 
   useEffect(() => {
     window.astock?.getRuntimeStatus?.().then(setRuntime).catch(() => undefined);
@@ -295,7 +303,7 @@ export default function App() {
     try {
       const result = window.astock?.runDiagnosis
         ? await window.astock.runDiagnosis(text)
-        : fallbackDiagnosis(text);
+        : browserPreviewDiagnosis(text);
       setDiagnoses((prev) => [result, ...prev.filter((item) => item.thread.id !== result.thread.id)]);
       setThreads((prev) => [
         {
@@ -306,6 +314,17 @@ export default function App() {
       ]);
       setActiveId(result.thread.id);
       setPrompt("");
+    } catch (error) {
+      const result = unavailableDiagnosis(text, error?.message || String(error));
+      setDiagnoses((prev) => [result, ...prev.filter((item) => item.thread.id !== result.thread.id)]);
+      setThreads((prev) => [
+        {
+          ...result.thread,
+          updated: "刚刚",
+        },
+        ...prev.filter((thread) => thread.id !== result.thread.id),
+      ]);
+      setActiveId(result.thread.id);
     } finally {
       setLoading(false);
     }
@@ -317,7 +336,11 @@ export default function App() {
         threads={threads}
         activeId={activeId}
         onSelect={setActiveId}
-        onNew={() => inputRef.current?.focus()}
+        onNew={() => {
+          setActiveId(initialDiagnosis.thread.id);
+          setPrompt("");
+          inputRef.current?.focus();
+        }}
       />
       <Workspace
         diagnosis={activeDiagnosis}

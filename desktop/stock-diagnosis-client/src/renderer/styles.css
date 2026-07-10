@@ -214,6 +214,28 @@ input:disabled {
   background: rgba(255, 255, 255, 0.04);
 }
 
+.badge.waiting {
+  color: var(--blue);
+  border-color: rgba(108, 167, 255, 0.42);
+  background: rgba(108, 167, 255, 0.08);
+}
+
+.badge.error {
+  color: var(--red);
+  border-color: rgba(225, 107, 107, 0.45);
+  background: rgba(225, 107, 107, 0.08);
+}
+
+.thread-empty {
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  color: var(--text-3);
+  padding: 14px;
+  font-size: 12px;
+  display: grid;
+  gap: 4px;
+}
+
 .sidebar-footer,
 .prototype-note {
   padding: 12px;
@@ -261,6 +283,11 @@ input:disabled {
   border-radius: 999px;
   background: var(--green);
   box-shadow: 0 0 0 3px rgba(118, 200, 147, 0.1);
+}
+
+.status-dot.offline {
+  background: var(--red);
+  box-shadow: 0 0 0 3px rgba(225, 107, 107, 0.1);
 }
 
 .workspace-scroll {
@@ -332,6 +359,16 @@ input:disabled {
   background: rgba(255, 255, 255, 0.04);
 }
 
+.verdict-box.waiting {
+  border-color: rgba(108, 167, 255, 0.38);
+  background: rgba(108, 167, 255, 0.075);
+}
+
+.verdict-box.error {
+  border-color: rgba(225, 107, 107, 0.42);
+  background: rgba(225, 107, 107, 0.075);
+}
+
 .verdict-label {
   color: var(--text-3);
   font-size: 11px;
@@ -351,6 +388,14 @@ input:disabled {
 
 .verdict-box.insufficient .verdict {
   color: var(--text-2);
+}
+
+.verdict-box.waiting .verdict {
+  color: var(--blue);
+}
+
+.verdict-box.error .verdict {
+  color: var(--red);
 }
 
 .verdict-note,
@@ -458,6 +503,10 @@ input:disabled {
 
 .step-dot.blocked {
   color: var(--red);
+}
+
+.step-dot.pending {
+  color: var(--text-3);
 }
 
 .step-name {

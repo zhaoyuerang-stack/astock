@@ -102,6 +102,8 @@ class StockProfileView(BaseModel):
     """Single-stock data profile backed by data_lake."""
     code: str
     name: str = ""
+    price_cny: float | None = None
+    basic_date: str | None = None
     latest_price: dict = Field(default_factory=dict)
     returns: dict = Field(default_factory=dict)
     daily_basic: dict = Field(default_factory=dict)
