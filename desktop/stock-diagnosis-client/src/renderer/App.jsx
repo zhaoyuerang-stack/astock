@@ -49,7 +49,7 @@ function statusClass(status) {
   if (status === "谨慎持有") return "hold";
   if (status === "等待输入") return "waiting";
   if (status === "错误") return "error";
-  if (status === "数据不足") return "insufficient";
+  if (status === "数据不足" || status === "待模拟盘") return "insufficient";
   return "observe";
 }
 

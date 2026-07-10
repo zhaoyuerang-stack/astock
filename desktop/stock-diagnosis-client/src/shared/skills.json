@@ -8,7 +8,8 @@
     "promptHint": "输入股票名或 6 位代码，例如：诊断 600519 最大风险。",
     "boundary": "只读本地股票画像，不给买卖指令，不连接交易执行。",
     "requiresStock": true,
-    "mode": "stock_profile"
+    "mode": "stock_profile",
+    "piSkillFile": "piSkills/single-stock-diagnosis.md"
   },
   {
     "id": "valuation-snapshot",
@@ -19,7 +20,8 @@
     "promptHint": "输入目标股票，例如：600519 当前估值贵不贵。",
     "boundary": "只做相对证据归纳，不输出目标价或确定性估值结论。",
     "requiresStock": true,
-    "mode": "stock_profile"
+    "mode": "stock_profile",
+    "piSkillFile": "piSkills/valuation-snapshot.md"
   },
   {
     "id": "holding-risk-check",
@@ -30,7 +32,8 @@
     "promptHint": "输入持仓对象，例如：我持有 300750，什么情况要降仓。",
     "boundary": "只生成风险清单和复核条件，不替代仓位决策。",
     "requiresStock": true,
-    "mode": "stock_profile"
+    "mode": "stock_profile",
+    "piSkillFile": "piSkills/holding-risk-check.md"
   },
   {
     "id": "strategy-precheck",
@@ -41,6 +44,7 @@
     "promptHint": "描述策略想法，例如：低估值 + 资金流转正，每周调仓。",
     "boundary": "当前只做策略想法预检；Shadow 模拟盘 read model 接入前不生成收益曲线。",
     "requiresStock": false,
-    "mode": "strategy_precheck"
+    "mode": "strategy_precheck",
+    "piSkillFile": "piSkills/strategy-precheck.md"
   }
 ]

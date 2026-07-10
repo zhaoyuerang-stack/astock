@@ -127,6 +127,57 @@ test("diagnosis service records selected stock skills from the local registry", 
   assert(result.limits.some((item) => item.includes("Skill 边界")));
 });
 
+test("diagnosis service lets Pi orchestrate a whitelisted stock skill plan", async () => {
+  const { createDiagnosisService } = await import("../src/main/diagnosisService.cjs");
+  const profileCalls = [];
+  const service = createDiagnosisService({
+    readClient: {
+      async resolveStockCode() {
+        throw new Error("direct resolver should not run when Pi supplied profile code");
+      },
+      async getStockProfile(code) {
+        profileCalls.push(code);
+        return {
+          code,
+          name: "贵州茅台",
+          price_cny: 1182.19,
+          basic_date: "20260709",
+          latest_price: { date: "2026-07-09", close: 8352.0053 },
+          returns: { ret_20d: -0.041, ret_60d: -0.153 },
+          daily_basic: { pe_ttm: 17.8666, pb: 5.4554, ps_ttm: 8.5848, total_mv: 147783396.6704 },
+          moneyflow: {},
+          data_sources: ["price/daily/600519.parquet"],
+          warnings: [],
+        };
+      },
+    },
+    piBridge: {
+      async orchestrateSkillExecution() {
+        return {
+          ready: true,
+          selectedSkillId: "valuation-snapshot",
+          toolRequests: [{ tool: "get_stock_profile", args: { code: "600519" } }],
+          blockedToolRequests: [],
+          rationale: "用户询问估值，先读取股票画像。",
+        };
+      },
+      async explainDiagnosis() {
+        return { ready: false, text: "" };
+      },
+    },
+  });
+
+  const result = await service.runDiagnosis("茅台估值贵不贵");
+
+  assert.deepEqual(profileCalls, ["600519"]);
+  assert.equal(result.activeSkills[0].id, "valuation-snapshot");
+  assert.equal(result.agentTrace.orchestrator, "pi");
+  assert(result.taskSteps[0].name.includes("Pi agent 编排"));
+  assert(result.evidence.some((item) => item.includes("白名单工具 get_stock_profile")));
+  assert(result.limits.some((item) => item.includes("Pi agent 工具白名单")));
+  assert(result.sourceChips.includes("tool-whitelist"));
+});
+
 test("diagnosis service supports strategy precheck skill without fake backtest data", async () => {
   const { createDiagnosisService } = await import("../src/main/diagnosisService.cjs");
   const service = createDiagnosisService({
@@ -151,6 +202,7 @@ test("diagnosis service supports strategy precheck skill without fake backtest d
   });
 
   assert.equal(result.thread.name, "策略想法预检");
+  assert.equal(result.thread.status, "待模拟盘");
   assert.equal(result.activeSkills[0].id, "strategy-precheck");
   assert(result.decision.summary.includes("不会生成伪收益曲线"));
   assert(result.limits.some((item) => item.includes("不执行回测")));
@@ -160,15 +212,34 @@ test("diagnosis service supports strategy precheck skill without fake backtest d
 test("Pi bridge uses an ephemeral no-tools command by default", async () => {
   const { buildPiArgs } = await import("../src/main/piBridge.cjs");
 
-  const args = buildPiArgs("解释当前诊断", { model: "openai/gpt-4o-mini" });
+  const args = buildPiArgs("解释当前诊断", { model: "openai/gpt-4o-mini", skillPaths: ["/tmp/safe-skill.md"] });
 
   assert(args.includes("--no-tools"));
   assert(args.includes("--no-session"));
   assert(args.includes("--mode"));
   assert(args.includes("text"));
+  assert(args.includes("--skill"));
+  assert(args.includes("/tmp/safe-skill.md"));
   assert(args.includes("-p"));
   assert(!args.includes("bash"));
   assert(!args.includes("write"));
+});
+
+test("Pi bridge sanitizes skill orchestration plans to whitelisted tools", async () => {
+  const { sanitizeOrchestrationPlan } = await import("../src/main/piBridge.cjs");
+  const plan = sanitizeOrchestrationPlan(JSON.stringify({
+    selectedSkillId: "valuation-snapshot",
+    toolRequests: [
+      { tool: "get_stock_profile", args: { code: "600519" } },
+      { tool: "bash", args: { cmd: "curl example.com" } },
+    ],
+    rationale: "read profile",
+  }), [{ id: "valuation-snapshot" }]);
+
+  assert.equal(plan.selectedSkillId, "valuation-snapshot");
+  assert.deepEqual(plan.toolRequests, [{ tool: "get_stock_profile", args: { code: "600519" } }]);
+  assert.equal(plan.blockedToolRequests.length, 1);
+  assert.equal(plan.blockedToolRequests[0].tool, "bash");
 });
 
 test("read service client resolves common stock names before hitting the local API", async () => {
