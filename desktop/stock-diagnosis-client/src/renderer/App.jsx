@@ -50,6 +50,7 @@ function statusClass(status) {
   if (status === "等待输入") return "waiting";
   if (status === "错误") return "error";
   if (status === "数据不足" || status === "待模拟盘") return "insufficient";
+  if (status === "处理中") return "waiting";
   return "observe";
 }
 
@@ -118,6 +119,30 @@ function keepActiveWorkspace(result, activeDiagnosis) {
       ...result.thread,
       id: activeDiagnosis.thread.id,
     },
+  };
+}
+
+function pendingDiagnosis(diagnosis, text, selectedSkill) {
+  const skillName = selectedSkill?.name || "默认诊断";
+  return {
+    ...diagnosis,
+    thread: {
+      ...diagnosis.thread,
+      status: "处理中",
+    },
+    taskSteps: [
+      {
+        name: "Pi agent 编排中",
+        desc: `正在按 ${skillName} 准备白名单工具计划，并等待本地证据返回。`,
+        status: "pending",
+      },
+      ...(diagnosis.taskSteps || []),
+    ],
+    turns: [
+      ...(diagnosis.turns || []),
+      { role: "user", content: text },
+      { role: "assistant", content: "正在编排 Skill、调用本地 read service，并检查证据边界。", pending: true },
+    ],
   };
 }
 
@@ -312,7 +337,7 @@ function ConversationWorkspace({ diagnosis, onOpenVisual }) {
         <div className="flow-label">连续追问</div>
         {hasTurns ? (
           turns.slice(-8).map((turn, index) => (
-            <div className={`turn ${turn.role}`} key={`${turn.role}-${index}-${turn.content}`}>
+            <div className={`turn ${turn.role} ${turn.pending ? "pending" : ""}`} key={`${turn.role}-${index}-${turn.content}`}>
               <div className="turn-role">{turn.role === "user" ? "你" : "AStock Lens"}</div>
               <div className="turn-content">{turn.content}</div>
             </div>
@@ -586,6 +611,18 @@ export default function App() {
     setLoading(true);
     try {
       const context = diagnosisContext(activeDiagnosis, selectedSkill);
+      const pending = pendingDiagnosis(activeDiagnosis, text, selectedSkill);
+      setDiagnoses((prev) => [pending, ...prev.filter((item) => item.thread.id !== pending.thread.id)]);
+      setThreads((prev) => [
+        {
+          ...pending.thread,
+          updated: "刚刚",
+        },
+        ...prev.filter((thread) => thread.id !== pending.thread.id),
+      ]);
+      setActiveId(pending.thread.id);
+      setViewMode("conversation");
+      setPrompt("");
       const rawResult = window.astock?.runDiagnosis
         ? await window.astock.runDiagnosis(
             structuredIpcAvailable(runtime)
@@ -605,9 +642,15 @@ export default function App() {
       setActiveId(result.thread.id);
       setViewMode("conversation");
       setSelectedSkillId(result.activeSkills?.[0]?.id || selectedSkill?.id || "");
-      setPrompt("");
     } catch (error) {
-      const result = unavailableDiagnosis(text, error?.message || String(error), selectedSkill);
+      const result = keepActiveWorkspace(unavailableDiagnosis(text, error?.message || String(error), selectedSkill), activeDiagnosis);
+      if (shouldKeepWorkspace(activeDiagnosis)) {
+        result.turns = [
+          ...(activeDiagnosis.turns || []),
+          { role: "user", content: text },
+          { role: "assistant", content: `本地数据服务不可用: ${error?.message || String(error)}` },
+        ];
+      }
       setDiagnoses((prev) => [result, ...prev.filter((item) => item.thread.id !== result.thread.id)]);
       setThreads((prev) => [
         {

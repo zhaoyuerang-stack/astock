@@ -77,6 +77,8 @@ const requiredUiMarkers = [
   "legacyDiagnosisPrompt",
   "diagnosisContext",
   "keepActiveWorkspace",
+  "pendingDiagnosis",
+  "正在编排 Skill",
   "问一只股票，或继续推进当前诊断",
   "如果未持有",
   "如果已持有",

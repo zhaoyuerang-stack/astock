@@ -507,6 +507,11 @@ input:focus-visible {
   color: var(--text);
 }
 
+.turn.pending .turn-content {
+  border-style: dashed;
+  color: var(--text-3);
+}
+
 .card {
   background: var(--panel);
   border: 1px solid var(--line);
