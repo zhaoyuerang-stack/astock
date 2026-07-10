@@ -11,8 +11,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routers import (agent, agent_control, backtest, data, experiments, factors, inbox,
-                         paper, portfolio, risk, settings, state, strategies, system,
-                         trade_readiness, governance)
+                         paper, paper_accounts, portfolio, risk, settings, state, strategies,
+                         system, trade_readiness, governance)
 
 app = FastAPI(title="Quant Research Platform API", version="0.0-phase0")
 
@@ -32,6 +32,7 @@ app.include_router(data.router)
 app.include_router(state.router)
 app.include_router(portfolio.router)
 app.include_router(paper.router)
+app.include_router(paper_accounts.router)
 app.include_router(risk.router)
 app.include_router(experiments.router)
 app.include_router(agent.router)
