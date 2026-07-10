@@ -337,10 +337,10 @@ input:focus-visible {
 }
 
 .conversation-layout {
-  max-width: 960px;
+  max-width: 920px;
   margin: 0 auto;
   display: grid;
-  gap: 14px;
+  gap: 18px;
 }
 
 .summary-grid {
@@ -349,7 +349,6 @@ input:focus-visible {
   gap: 14px;
 }
 
-.conversation-workspace,
 .visual-header,
 .viz-panel,
 .viz-metric {
@@ -362,9 +361,17 @@ input:focus-visible {
   min-height: 430px;
   display: flex;
   flex-direction: column;
+  background: transparent;
 }
 
-.conversation-main-header,
+.conversation-main-header {
+  padding: 2px 0 14px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
 .visual-header {
   padding: 18px 20px;
   border-bottom: 1px solid var(--line-soft);
@@ -415,21 +422,19 @@ input:focus-visible {
 
 .conversation-flow {
   flex: 1;
-  padding: 18px 20px;
+  border-top: 1px solid var(--line-soft);
+  padding: 16px 0 18px;
   display: grid;
   align-content: start;
-  gap: 12px;
+  gap: 14px;
 }
 
 .empty-conversation {
   min-height: 264px;
-  border: 1px dashed var(--line);
-  border-radius: var(--radius);
-  background: var(--panel-3);
-  padding: 24px;
+  padding: 28px 0;
   display: grid;
   align-content: center;
-  gap: 18px;
+  gap: 20px;
 }
 
 .empty-title {
@@ -450,21 +455,23 @@ input:focus-visible {
 }
 
 .prompt-example {
-  border: 1px solid var(--line-soft);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.025);
+  border-top: 1px solid var(--line-soft);
   color: var(--text-2);
-  padding: 10px 11px;
+  padding: 10px 0 0;
   font-size: 12px;
+}
+
+.prompt-example:first-child {
+  border-top: 0;
+  padding-top: 0;
 }
 
 .system-task-strip {
   border-top: 1px solid var(--line-soft);
-  padding: 12px 20px;
+  padding: 12px 0 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-  background: var(--panel-3);
 }
 
 .strip-title {
@@ -493,22 +500,19 @@ input:focus-visible {
 
 .turn-content {
   max-width: min(680px, 88%);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--panel-2);
   color: var(--text-2);
-  padding: 9px 11px;
   font-size: 12px;
 }
 
 .turn.user .turn-content {
   background: rgba(108, 167, 255, 0.1);
-  border-color: rgba(108, 167, 255, 0.35);
+  border: 1px solid rgba(108, 167, 255, 0.35);
+  border-radius: var(--radius);
   color: var(--text);
+  padding: 9px 11px;
 }
 
 .turn.pending .turn-content {
-  border-style: dashed;
   color: var(--text-3);
 }
 
