@@ -75,6 +75,8 @@ const requiredUiMarkers = [
   'data-testid="active-skill-bar"',
   "structuredIpcAvailable",
   "legacyDiagnosisPrompt",
+  "diagnosisContext",
+  "keepActiveWorkspace",
   "问一只股票，或继续推进当前诊断",
   "如果未持有",
   "如果已持有",
