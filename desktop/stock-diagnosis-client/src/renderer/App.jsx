@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import VisualizationWorkspace from "./visualizations/VisualizationWorkspace.jsx";
 
 const initialDiagnosis = {
   thread: { id: "empty", name: "等待输入", code: "", status: "等待输入" },
@@ -76,7 +77,7 @@ function ThreadSidebar({ threads, activeId, onSelect, onNew }) {
       <div className="sidebar-toolbar">
         <button className="new-thread" type="button" onClick={onNew}>
           <span aria-hidden="true">+</span>
-          <span>新诊断</span>
+          <span>新对象</span>
         </button>
       </div>
       <div className="thread-list">
@@ -104,7 +105,7 @@ function ThreadSidebar({ threads, activeId, onSelect, onNew }) {
         ))}
       </div>
       <div className="sidebar-footer">
-        <div>股票诊断线程</div>
+        <div>对象线程</div>
         <div className="mono">Local engine · read-only</div>
       </div>
     </aside>
@@ -181,36 +182,88 @@ function TaskTimeline({ steps }) {
   );
 }
 
-function ConversationHistory({ turns = [] }) {
-  if (!turns.length) return null;
+const starterPrompts = [
+  "诊断 600519，现在只适合观察还是可以进入候选？",
+  "如果我已经持有宁德时代，哪些证据会触发减仓？",
+  "我想验证低估值 + 资金流策略，当前系统能先检查什么？",
+];
+
+function ConversationWorkspace({ diagnosis, onOpenVisual }) {
+  const turns = diagnosis.turns || [];
+  const hasTurns = turns.length > 0;
+  const lastStep = [...(diagnosis.taskSteps || [])].reverse().find((step) => step.status === "done") || diagnosis.taskSteps?.[0];
+
   return (
-    <section className="card conversation-card" data-testid="conversation-history">
-      <div className="card-header">
+    <section className="conversation-workspace" data-testid="conversation-workspace">
+      <div className="conversation-main-header">
         <div>
-          <div className="card-title">连续追问</div>
-          <div className="card-subtitle">围绕当前股票保留上下文，不新开线程。</div>
+          <div className="workspace-kicker">当前对话流</div>
+          <div className="workspace-title">用对话推进诊断和策略验证</div>
+          <div className="workspace-subtitle">中间区域优先保留给用户、模型和系统任务沟通；图形化结果收纳到独立视图。</div>
         </div>
+        <button className="secondary-button" data-testid="visualization-entry" type="button" onClick={onOpenVisual}>
+          图形化展示
+        </button>
       </div>
-      <div className="conversation-list">
-        {turns.slice(-8).map((turn, index) => (
-          <div className={`turn ${turn.role}`} key={`${turn.role}-${index}-${turn.content}`}>
-            <div className="turn-role">{turn.role === "user" ? "你" : "AStock Lens"}</div>
-            <div className="turn-content">{turn.content}</div>
+      <div className="conversation-flow" data-testid="conversation-history">
+        <div className="flow-label">连续追问</div>
+        {hasTurns ? (
+          turns.slice(-8).map((turn, index) => (
+            <div className={`turn ${turn.role}`} key={`${turn.role}-${index}-${turn.content}`}>
+              <div className="turn-role">{turn.role === "user" ? "你" : "AStock Lens"}</div>
+              <div className="turn-content">{turn.content}</div>
+            </div>
+          ))
+        ) : (
+          <div className="empty-conversation">
+            <div>
+              <div className="empty-title">先告诉系统你关心的对象或想法</div>
+              <div className="empty-copy">可以是一只股票、一个持仓问题，或一个需要验证的策略假设。</div>
+            </div>
+            <div className="prompt-examples" aria-label="可输入示例">
+              {starterPrompts.map((item) => (
+                <div className="prompt-example" key={item}>{item}</div>
+              ))}
+            </div>
           </div>
-        ))}
+        )}
+      </div>
+      <div className="system-task-strip" aria-label="系统任务状态">
+        <div>
+          <div className="strip-label">系统当前状态</div>
+          <div className="strip-title">{diagnosis.thread.status}</div>
+        </div>
+        <div>
+          <div className="strip-label">当前对象</div>
+          <div className="strip-title">{diagnosis.thread.code ? `${diagnosis.thread.name} ${diagnosis.thread.code}` : "等待输入"}</div>
+        </div>
+        <div>
+          <div className="strip-label">最近完成</div>
+          <div className="strip-title">{lastStep?.name || "等待任务"}</div>
+        </div>
       </div>
     </section>
   );
 }
 
-function EvidencePanel({ diagnosis, runtime }) {
+function EvidencePanel({ diagnosis, runtime, onOpenVisual }) {
   return (
     <aside className="evidence" data-testid="evidence-panel" aria-label="证据与 Agent 上下文">
       <div className="panel-section">
         <div className="panel-heading">
-          <span>证据</span>
+          <span>上下文</span>
           <span className={`badge ${statusClass(diagnosis.decision.verdict)}`}>当前线程</span>
         </div>
+        <div className="context-object">
+          <div className="context-name">{diagnosis.thread.code ? `${diagnosis.thread.name} ${diagnosis.thread.code}` : "未选择对象"}</div>
+          <div className="context-desc">{diagnosis.decision.note}</div>
+        </div>
+        <button className="panel-action" type="button" onClick={onOpenVisual}>
+          打开图形化视图
+        </button>
+      </div>
+      <div className="panel-section">
+        <div className="panel-heading">证据来源</div>
         <div className="chip-row">
           {diagnosis.sourceChips.map((chip) => (
             <span className="chip" key={chip}>
@@ -239,11 +292,11 @@ function EvidencePanel({ diagnosis, runtime }) {
         </div>
       )}
       <div className="panel-section">
-        <div className="panel-heading">可追问</div>
+        <div className="panel-heading">可继续追问</div>
         <ul className="question-list">
           <li>这只股票最大的下行风险是什么？</li>
           <li>如果我已经持有，什么情况需要降低仓位？</li>
-          <li>这个结论依赖哪些数据，哪些还没覆盖？</li>
+          <li>我这个策略想法，系统现在能验证到哪一步？</li>
         </ul>
       </div>
       <div className="prototype-note">
@@ -257,7 +310,14 @@ function EvidencePanel({ diagnosis, runtime }) {
   );
 }
 
-function Workspace({ diagnosis, prompt, setPrompt, onSubmit, loading, inputRef, runtime }) {
+function Workspace({ diagnosis, prompt, setPrompt, onSubmit, loading, inputRef, runtime, viewMode, setViewMode }) {
+  const readServiceOffline = runtime?.readService?.available === false;
+  const runtimeLabel = runtime?.readService
+    ? readServiceOffline
+      ? "Read service offline"
+      : "Local API mode"
+    : "Checking local API";
+
   return (
     <main className="workspace" data-testid="diagnosis-workspace">
       <header className="topbar">
@@ -271,17 +331,47 @@ function Workspace({ diagnosis, prompt, setPrompt, onSubmit, loading, inputRef, 
             <span>本地诊断</span>
           </div>
         </div>
-        <div className="top-meta">
-          <span className={`status-dot ${runtime?.readService?.available === false ? "offline" : ""}`} aria-hidden="true"></span>
-          <span>{runtime?.readService?.available === false ? "Read service offline" : "Local API mode"}</span>
+        <div className="top-actions">
+          <div className="view-switch" aria-label="工作区视图">
+            <button
+              className={viewMode === "conversation" ? "active" : ""}
+              type="button"
+              aria-pressed={viewMode === "conversation"}
+              onClick={() => setViewMode("conversation")}
+            >
+              对话
+            </button>
+            <button
+              className={viewMode === "visualization" ? "active" : ""}
+              type="button"
+              aria-pressed={viewMode === "visualization"}
+              onClick={() => setViewMode("visualization")}
+            >
+              图形化展示
+            </button>
+          </div>
+          <div className="top-meta">
+            <span className={`status-dot ${readServiceOffline ? "offline" : ""}`} aria-hidden="true"></span>
+            <span>{runtimeLabel}</span>
+          </div>
         </div>
       </header>
       <section className="workspace-scroll" aria-label="当前诊断任务">
-        <ConversationHistory turns={diagnosis.turns} />
-        <div className="diagnosis-grid">
-          <DecisionCard diagnosis={diagnosis} />
-          <TaskTimeline steps={diagnosis.taskSteps} />
-        </div>
+        {viewMode === "visualization" ? (
+          <VisualizationWorkspace
+            diagnosis={diagnosis}
+            runtime={runtime}
+            onBackToConversation={() => setViewMode("conversation")}
+          />
+        ) : (
+          <div className="conversation-layout">
+            <ConversationWorkspace diagnosis={diagnosis} onOpenVisual={() => setViewMode("visualization")} />
+            <div className="summary-grid">
+              <DecisionCard diagnosis={diagnosis} />
+              <TaskTimeline steps={diagnosis.taskSteps} />
+            </div>
+          </div>
+        )}
       </section>
       <footer className="composer-shell" data-testid="bottom-composer">
         <form className="composer" onSubmit={onSubmit}>
@@ -312,6 +402,7 @@ export default function App() {
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [runtime, setRuntime] = useState(null);
+  const [viewMode, setViewMode] = useState("conversation");
   const inputRef = useRef(null);
 
   const activeDiagnosis = diagnoses.find((item) => item.thread.id === activeId) || initialDiagnosis;
@@ -344,6 +435,7 @@ export default function App() {
         ...prev.filter((thread) => thread.id !== result.thread.id),
       ]);
       setActiveId(result.thread.id);
+      setViewMode("conversation");
       setPrompt("");
     } catch (error) {
       const result = unavailableDiagnosis(text, error?.message || String(error));
@@ -356,6 +448,7 @@ export default function App() {
         ...prev.filter((thread) => thread.id !== result.thread.id),
       ]);
       setActiveId(result.thread.id);
+      setViewMode("conversation");
     } finally {
       setLoading(false);
     }
@@ -366,9 +459,13 @@ export default function App() {
       <ThreadSidebar
         threads={threads}
         activeId={activeId}
-        onSelect={setActiveId}
+        onSelect={(threadId) => {
+          setActiveId(threadId);
+          setViewMode("conversation");
+        }}
         onNew={() => {
           setActiveId(initialDiagnosis.thread.id);
+          setViewMode("conversation");
           setPrompt("");
           inputRef.current?.focus();
         }}
@@ -381,8 +478,10 @@ export default function App() {
         loading={loading}
         inputRef={inputRef}
         runtime={runtime}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
       />
-      <EvidencePanel diagnosis={activeDiagnosis} runtime={runtime} />
+      <EvidencePanel diagnosis={activeDiagnosis} runtime={runtime} onOpenVisual={() => setViewMode("visualization")} />
     </div>
   );
 }
