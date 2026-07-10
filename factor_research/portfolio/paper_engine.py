@@ -7,6 +7,13 @@
   · 等权 1/top_n,A股 100 股整数倍;成交/估值全用不复权价(daily_raw 的 raw_*)
   · 成本走 app_config.settings 的 CostModelConfig
 注意:本模块无 chdir / sys.path 副作用,可被 API 进程安全 import。
+
+账户路径参数化(WS-D 执行侧,paper 多账户并行实测):load_account / save_account /
+append_trades / upsert_nav 现接受可选 ``account_fp`` / ``trades_fp`` / ``nav_fp`` 覆盖
+入参,默认值 = 现有单账户常量(ACCOUNT_FP/TRADES_FP/NAV_FP)。legacy 调用方
+(scripts/ops/paper_trade.py、services/read/paper.py)零改动、零行为变化 ——
+它们不传新参数,继续读写同一份 paper/account.json 等文件。多账户管理器
+(portfolio/paper_accounts.py)显式传入每账户独立路径,实现账本隔离。
 """
 from __future__ import annotations
 
@@ -218,38 +225,44 @@ def load_names():
     return {}
 
 
-def load_account():
-    if ACCOUNT_FP.exists():
-        return json.loads(ACCOUNT_FP.read_text())
+def load_account(account_fp: Path | None = None):
+    """account_fp=None(默认)→ 读单账户 legacy 路径 ACCOUNT_FP,行为与重构前逐字节一致。
+    多账户管理器传入各自 <account_dir>/account.json 实现账本隔离。"""
+    fp = account_fp or ACCOUNT_FP
+    if fp.exists():
+        return json.loads(fp.read_text())
     return {"init_capital": INIT_CAPITAL, "inception": None, "cash": INIT_CAPITAL,
             "positions": {}, "pending": None, "last_date": None}
 
 
-def save_account(acc):
-    PAPER.mkdir(exist_ok=True)
-    ACCOUNT_FP.write_text(json.dumps(acc, ensure_ascii=False, indent=2))
+def save_account(acc, account_fp: Path | None = None):
+    fp = account_fp or ACCOUNT_FP
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    fp.write_text(json.dumps(acc, ensure_ascii=False, indent=2))
 
 
-def append_trades(rows):
-    PAPER.mkdir(exist_ok=True)
-    new = not TRADES_FP.exists()
-    with TRADES_FP.open("a", newline="") as f:
+def append_trades(rows, trades_fp: Path | None = None):
+    fp = trades_fp or TRADES_FP
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    new = not fp.exists()
+    with fp.open("a", newline="") as f:
         w = csv.writer(f)
         if new:
             w.writerow(["date", "code", "name", "side", "shares", "price", "notional", "cost", "cash_after"])
         w.writerows(rows)
 
 
-def upsert_nav(date, nav, cash, pos_value, ret):
-    PAPER.mkdir(exist_ok=True)
+def upsert_nav(date, nav, cash, pos_value, ret, nav_fp: Path | None = None):
+    fp = nav_fp or NAV_FP
+    fp.parent.mkdir(parents=True, exist_ok=True)
     rows = {}
-    if NAV_FP.exists():
-        with NAV_FP.open() as f:
+    if fp.exists():
+        with fp.open() as f:
             for r in csv.DictReader(f):
                 rows[r["date"]] = r
     rows[date] = {"date": date, "nav": f"{nav:.2f}", "cash": f"{cash:.2f}",
                   "position_value": f"{pos_value:.2f}", "total_return": f"{ret:.6f}"}
-    with NAV_FP.open("w", newline="") as f:
+    with fp.open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=["date", "nav", "cash", "position_value", "total_return"])
         w.writeheader()
         for d in sorted(rows):
