@@ -84,6 +84,18 @@ function browserPreviewDiagnosis(prompt, selectedSkill = null) {
   return unavailableDiagnosis(prompt, "未连接 Electron preload，请通过 AStock Lens.app 打开。", selectedSkill);
 }
 
+function structuredIpcAvailable(runtime) {
+  const preloadVersion = Number(window.astock?.apiVersion || 0);
+  const runtimeVersion = Number(runtime?.apiVersion || 0);
+  return Math.max(preloadVersion, runtimeVersion) >= 2;
+}
+
+function legacyDiagnosisPrompt(text, diagnosis) {
+  const code = diagnosis.thread?.code || "";
+  if (!code || text.includes(code)) return text;
+  return `${code} ${text}`;
+}
+
 function ThreadSidebar({ threads, activeId, onSelect, onNew }) {
   return (
     <aside className="sidebar" data-testid="thread-sidebar" aria-label="股票诊断线程">
@@ -558,7 +570,11 @@ export default function App() {
             selectedSkillId: selectedSkill?.id || "",
           };
       const result = window.astock?.runDiagnosis
-        ? await window.astock.runDiagnosis({ prompt: text, context })
+        ? await window.astock.runDiagnosis(
+            structuredIpcAvailable(runtime)
+              ? { prompt: text, context }
+              : legacyDiagnosisPrompt(text, activeDiagnosis)
+          )
         : browserPreviewDiagnosis(text, selectedSkill);
       setDiagnoses((prev) => [result, ...prev.filter((item) => item.thread.id !== result.thread.id)]);
       setThreads((prev) => [

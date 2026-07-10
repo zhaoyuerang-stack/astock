@@ -36,6 +36,7 @@ assert(pkg.scripts.test.includes("node --test"), "test script must use node:test
 
 const preload = readFileSync(join(root, "src/main/preload.cjs"), "utf8");
 assert(preload.includes("contextBridge.exposeInMainWorld"), "preload must expose a narrow API through contextBridge");
+assert(preload.includes("apiVersion: 2"), "preload must expose the structured IPC API version");
 assert(preload.includes("runDiagnosis"), "preload must expose runDiagnosis");
 assert(!preload.includes("ipcRenderer.send("), "preload must avoid unbounded fire-and-forget IPC");
 
@@ -44,6 +45,7 @@ assert(main.includes("contextIsolation: true"), "Electron window must enable con
 assert(main.includes("nodeIntegration: false"), "Electron window must disable nodeIntegration");
 assert(main.includes("diagnosis:run"), "main process must register diagnosis IPC");
 assert(main.includes("runtime:status"), "main process must expose runtime status IPC");
+assert(main.includes("apiVersion"), "runtime status must include IPC API version");
 assert(main.includes("readService"), "runtime status must include read service health");
 
 const piBridge = readFileSync(join(root, "src/main/piBridge.cjs"), "utf8");
@@ -71,6 +73,8 @@ const requiredUiMarkers = [
   'data-testid="composer-skill-button"',
   'data-testid="skill-picker"',
   'data-testid="active-skill-bar"',
+  "structuredIpcAvailable",
+  "legacyDiagnosisPrompt",
   "问一只股票，或继续推进当前诊断",
   "如果未持有",
   "如果已持有",

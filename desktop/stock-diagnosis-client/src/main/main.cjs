@@ -7,6 +7,7 @@ const { createPiBridge } = require("./piBridge.cjs");
 const readClient = createReadServiceClient();
 const piBridge = createPiBridge();
 const diagnosisService = createDiagnosisService({ readClient, piBridge });
+const IPC_API_VERSION = 2;
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -45,6 +46,7 @@ ipcMain.handle("runtime:status", async () => {
     readClient.getHealth(),
   ]);
   return {
+    apiVersion: IPC_API_VERSION,
     readServiceUrl: readClient.baseUrl,
     readService,
     pi,
