@@ -90,6 +90,73 @@ test("diagnosis service keeps follow-up questions in the current stock thread", 
   assert.equal(result.turns.at(-2).content, "最大下行风险是什么");
 });
 
+test("diagnosis service records selected stock skills from the local registry", async () => {
+  const { createDiagnosisService } = await import("../src/main/diagnosisService.cjs");
+  const service = createDiagnosisService({
+    readClient: {
+      async getStockProfile(code) {
+        return {
+          code,
+          name: "贵州茅台",
+          price_cny: 1182.19,
+          basic_date: "20260709",
+          latest_price: { date: "2026-07-09", close: 8352.0053 },
+          returns: { ret_20d: -0.041, ret_60d: -0.153 },
+          daily_basic: { pe_ttm: 17.8666, pb: 5.4554, ps_ttm: 8.5848, total_mv: 147783396.6704 },
+          moneyflow: {},
+          data_sources: ["price/daily/600519.parquet"],
+          warnings: [],
+        };
+      },
+    },
+    piBridge: {
+      async explainDiagnosis() {
+        return { ready: false, text: "" };
+      },
+    },
+  });
+
+  const result = await service.runDiagnosis("600519 当前估值贵不贵", {
+    selectedSkillId: "valuation-snapshot",
+  });
+
+  assert.equal(result.activeSkills[0].id, "valuation-snapshot");
+  assert(result.taskSteps[0].name.includes("估值快照"));
+  assert(result.evidence[0].includes("选中 Skill: 估值快照"));
+  assert(result.sourceChips[0].includes("Skill: 估值"));
+  assert(result.limits.some((item) => item.includes("Skill 边界")));
+});
+
+test("diagnosis service supports strategy precheck skill without fake backtest data", async () => {
+  const { createDiagnosisService } = await import("../src/main/diagnosisService.cjs");
+  const service = createDiagnosisService({
+    readClient: {
+      async resolveStockCode() {
+        return null;
+      },
+      async getStockProfile() {
+        throw new Error("strategy precheck must not fetch a stock profile");
+      },
+    },
+    piBridge: {
+      async explainDiagnosis() {
+        return { ready: false, text: "" };
+      },
+    },
+  });
+
+  const result = await service.runDiagnosis("低估值 + 资金流转正，每周调仓", {
+    selectedSkillId: "strategy-precheck",
+    currentThread: { id: "stock-600519", code: "600519", name: "贵州茅台" },
+  });
+
+  assert.equal(result.thread.name, "策略想法预检");
+  assert.equal(result.activeSkills[0].id, "strategy-precheck");
+  assert(result.decision.summary.includes("不会生成伪收益曲线"));
+  assert(result.limits.some((item) => item.includes("不执行回测")));
+  assert(result.sourceChips.includes("no-fake-curve"));
+});
+
 test("Pi bridge uses an ephemeral no-tools command by default", async () => {
   const { buildPiArgs } = await import("../src/main/piBridge.cjs");
 

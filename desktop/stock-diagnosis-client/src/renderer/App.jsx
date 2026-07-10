@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import skillDefinitions from "../shared/skills.json";
 import VisualizationWorkspace from "./visualizations/VisualizationWorkspace.jsx";
 
 const initialDiagnosis = {
@@ -23,9 +24,26 @@ const initialDiagnosis = {
     "客户端只读本地数据，不连接交易执行。",
   ],
   sourceChips: ["等待输入", "read-only"],
+  activeSkills: [],
   piExplanation: "",
   turns: [],
 };
+
+const skillById = new Map(skillDefinitions.map((skill) => [skill.id, skill]));
+
+function publicSkill(skill) {
+  if (!skill) return null;
+  return {
+    id: skill.id,
+    name: skill.name,
+    shortName: skill.shortName,
+    category: skill.category,
+    description: skill.description,
+    boundary: skill.boundary,
+    requiresStock: Boolean(skill.requiresStock),
+    mode: skill.mode,
+  };
+}
 
 function statusClass(status) {
   if (status === "谨慎持有") return "hold";
@@ -35,7 +53,8 @@ function statusClass(status) {
   return "observe";
 }
 
-function unavailableDiagnosis(prompt, message) {
+function unavailableDiagnosis(prompt, message, selectedSkill = null) {
+  const activeSkills = selectedSkill ? [publicSkill(selectedSkill)] : [];
   return {
     thread: { id: `error-${Date.now()}`, name: "本地数据服务不可用", code: "", status: "错误" },
     taskSteps: [
@@ -52,16 +71,17 @@ function unavailableDiagnosis(prompt, message) {
       held: "先不要按当前失败结果调整仓位。",
     },
     risks: ["未读取到本地 Python read service。", "当前界面没有使用假数据兜底。"],
-    evidence: [`用户输入: ${prompt}`, `错误: ${message}`],
-    limits: ["需要启动本地 read service 后才能诊断。"],
-    sourceChips: ["offline", "no-demo"],
+    evidence: [...(selectedSkill ? [`选中 Skill: ${selectedSkill.name}`] : []), `用户输入: ${prompt}`, `错误: ${message}`],
+    limits: ["需要启动本地 read service 后才能诊断。", ...(selectedSkill ? [`Skill 边界: ${selectedSkill.boundary}`] : [])],
+    sourceChips: [...(selectedSkill ? [`Skill: ${selectedSkill.shortName || selectedSkill.name}`] : []), "offline", "no-demo"],
+    activeSkills,
     piExplanation: "",
     turns: [{ role: "user", content: prompt }, { role: "assistant", content: `本地数据服务不可用: ${message}` }],
   };
 }
 
-function browserPreviewDiagnosis(prompt) {
-  return unavailableDiagnosis(prompt, "未连接 Electron preload，请通过 AStock Lens.app 打开。");
+function browserPreviewDiagnosis(prompt, selectedSkill = null) {
+  return unavailableDiagnosis(prompt, "未连接 Electron preload，请通过 AStock Lens.app 打开。", selectedSkill);
 }
 
 function ThreadSidebar({ threads, activeId, onSelect, onNew }) {
@@ -182,6 +202,52 @@ function TaskTimeline({ steps }) {
   );
 }
 
+function SkillPicker({ skills, selectedSkillId, onSelect, onClose }) {
+  return (
+    <div className="skill-popover" id="skill-picker" data-testid="skill-picker" role="dialog" aria-label="选择 Skill">
+      <div className="skill-popover-header">
+        <div>
+          <div className="skill-popover-title">选择 Skill</div>
+          <div className="skill-popover-subtitle">像插件一样为当前问题附加专业诊断方式。</div>
+        </div>
+        <button className="skill-close" type="button" aria-label="关闭 Skill 菜单" onClick={onClose}>
+          x
+        </button>
+      </div>
+      <div className="skill-list">
+        {skills.map((skill) => (
+          <button
+            className={`skill-option ${selectedSkillId === skill.id ? "active" : ""}`}
+            type="button"
+            key={skill.id}
+            onClick={() => onSelect(skill.id)}
+          >
+            <span className="skill-option-top">
+              <span className="skill-name">{skill.name}</span>
+              <span className="skill-category">{skill.category}</span>
+            </span>
+            <span className="skill-desc">{skill.description}</span>
+            <span className="skill-hint">{skill.promptHint}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ActiveSkillBar({ skill, onClear }) {
+  if (!skill) return null;
+  return (
+    <div className="active-skill-bar" data-testid="active-skill-bar">
+      <div>
+        <span className="active-skill-label">已启用 Skill</span>
+        <span className="active-skill-name">{skill.name}</span>
+      </div>
+      <button type="button" onClick={onClear}>移除</button>
+    </div>
+  );
+}
+
 const starterPrompts = [
   "诊断 600519，现在只适合观察还是可以进入候选？",
   "如果我已经持有宁德时代，哪些证据会触发减仓？",
@@ -247,6 +313,7 @@ function ConversationWorkspace({ diagnosis, onOpenVisual }) {
 }
 
 function EvidencePanel({ diagnosis, runtime, onOpenVisual }) {
+  const activeSkills = diagnosis.activeSkills || [];
   return (
     <aside className="evidence" data-testid="evidence-panel" aria-label="证据与 Agent 上下文">
       <div className="panel-section">
@@ -261,6 +328,21 @@ function EvidencePanel({ diagnosis, runtime, onOpenVisual }) {
         <button className="panel-action" type="button" onClick={onOpenVisual}>
           打开图形化视图
         </button>
+      </div>
+      <div className="panel-section">
+        <div className="panel-heading">Skill</div>
+        {activeSkills.length ? (
+          <div className="active-skill-list">
+            {activeSkills.map((skill) => (
+              <div className="active-skill-card" key={skill.id}>
+                <div className="active-skill-title">{skill.name}</div>
+                <div className="active-skill-desc">{skill.description}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="panel-copy">点击输入框左侧加号，可以为当前问题启用单股诊断、估值快照、持仓风险检查或策略预检。</p>
+        )}
       </div>
       <div className="panel-section">
         <div className="panel-heading">证据来源</div>
@@ -310,7 +392,23 @@ function EvidencePanel({ diagnosis, runtime, onOpenVisual }) {
   );
 }
 
-function Workspace({ diagnosis, prompt, setPrompt, onSubmit, loading, inputRef, runtime, viewMode, setViewMode }) {
+function Workspace({
+  diagnosis,
+  prompt,
+  setPrompt,
+  onSubmit,
+  loading,
+  inputRef,
+  runtime,
+  viewMode,
+  setViewMode,
+  skills,
+  selectedSkill,
+  selectedSkillId,
+  onSelectSkill,
+  onClearSkill,
+}) {
+  const [skillMenuOpen, setSkillMenuOpen] = useState(false);
   const readServiceOffline = runtime?.readService?.available === false;
   const runtimeLabel = runtime?.readService
     ? readServiceOffline
@@ -374,22 +472,53 @@ function Workspace({ diagnosis, prompt, setPrompt, onSubmit, loading, inputRef, 
         )}
       </section>
       <footer className="composer-shell" data-testid="bottom-composer">
-        <form className="composer" onSubmit={onSubmit}>
-          <button className="icon-button" type="button" aria-label="添加上下文">
-            +
-          </button>
-          <input
-            ref={inputRef}
-            value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
-            placeholder="问一只股票，或继续推进当前诊断…"
-            aria-label="诊断输入"
-            disabled={loading}
+        <div className="composer-stack">
+          {skillMenuOpen && (
+            <SkillPicker
+              skills={skills}
+              selectedSkillId={selectedSkillId}
+              onSelect={(skillId) => {
+                onSelectSkill(skillId);
+                setSkillMenuOpen(false);
+                inputRef.current?.focus();
+              }}
+              onClose={() => setSkillMenuOpen(false)}
+            />
+          )}
+          <ActiveSkillBar
+            skill={selectedSkill}
+            onClear={() => {
+              onClearSkill();
+              setSkillMenuOpen(false);
+              inputRef.current?.focus();
+            }}
           />
-          <button className="send-button" type="submit" disabled={loading}>
-            {loading ? "诊断中" : "发送"}
-          </button>
-        </form>
+          <form className="composer" onSubmit={onSubmit}>
+            <button
+              className={`icon-button ${selectedSkill ? "active" : ""}`}
+              data-testid="composer-skill-button"
+              type="button"
+              title="添加 Skill"
+              aria-label="添加 Skill"
+              aria-expanded={skillMenuOpen}
+              aria-controls="skill-picker"
+              onClick={() => setSkillMenuOpen((open) => !open)}
+            >
+              +
+            </button>
+            <input
+              ref={inputRef}
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder={selectedSkill ? `${selectedSkill.name}: ${selectedSkill.promptHint}` : "问一只股票，或继续推进当前诊断…"}
+              aria-label="诊断输入"
+              disabled={loading}
+            />
+            <button className="send-button" type="submit" disabled={loading}>
+              {loading ? "诊断中" : "发送"}
+            </button>
+          </form>
+        </div>
       </footer>
     </main>
   );
@@ -403,9 +532,11 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [runtime, setRuntime] = useState(null);
   const [viewMode, setViewMode] = useState("conversation");
+  const [selectedSkillId, setSelectedSkillId] = useState("");
   const inputRef = useRef(null);
 
   const activeDiagnosis = diagnoses.find((item) => item.thread.id === activeId) || initialDiagnosis;
+  const selectedSkill = skillById.get(selectedSkillId) || null;
 
   useEffect(() => {
     window.astock?.getRuntimeStatus?.().then(setRuntime).catch(() => undefined);
@@ -421,11 +552,14 @@ export default function App() {
         ? {
             currentThread: activeDiagnosis.thread,
             turns: activeDiagnosis.turns || [],
+            selectedSkillId: selectedSkill?.id || "",
           }
-        : {};
+        : {
+            selectedSkillId: selectedSkill?.id || "",
+          };
       const result = window.astock?.runDiagnosis
         ? await window.astock.runDiagnosis({ prompt: text, context })
-        : browserPreviewDiagnosis(text);
+        : browserPreviewDiagnosis(text, selectedSkill);
       setDiagnoses((prev) => [result, ...prev.filter((item) => item.thread.id !== result.thread.id)]);
       setThreads((prev) => [
         {
@@ -436,9 +570,10 @@ export default function App() {
       ]);
       setActiveId(result.thread.id);
       setViewMode("conversation");
+      setSelectedSkillId(result.activeSkills?.[0]?.id || selectedSkill?.id || "");
       setPrompt("");
     } catch (error) {
-      const result = unavailableDiagnosis(text, error?.message || String(error));
+      const result = unavailableDiagnosis(text, error?.message || String(error), selectedSkill);
       setDiagnoses((prev) => [result, ...prev.filter((item) => item.thread.id !== result.thread.id)]);
       setThreads((prev) => [
         {
@@ -449,6 +584,7 @@ export default function App() {
       ]);
       setActiveId(result.thread.id);
       setViewMode("conversation");
+      setSelectedSkillId(result.activeSkills?.[0]?.id || selectedSkill?.id || "");
     } finally {
       setLoading(false);
     }
@@ -462,10 +598,13 @@ export default function App() {
         onSelect={(threadId) => {
           setActiveId(threadId);
           setViewMode("conversation");
+          const nextDiagnosis = diagnoses.find((item) => item.thread.id === threadId);
+          setSelectedSkillId(nextDiagnosis?.activeSkills?.[0]?.id || "");
         }}
         onNew={() => {
           setActiveId(initialDiagnosis.thread.id);
           setViewMode("conversation");
+          setSelectedSkillId("");
           setPrompt("");
           inputRef.current?.focus();
         }}
@@ -480,6 +619,11 @@ export default function App() {
         runtime={runtime}
         viewMode={viewMode}
         setViewMode={setViewMode}
+        skills={skillDefinitions}
+        selectedSkill={selectedSkill}
+        selectedSkillId={selectedSkillId}
+        onSelectSkill={setSelectedSkillId}
+        onClearSkill={() => setSelectedSkillId("")}
       />
       <EvidencePanel diagnosis={activeDiagnosis} runtime={runtime} onOpenVisual={() => setViewMode("visualization")} />
     </div>
