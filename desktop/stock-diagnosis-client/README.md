@@ -47,3 +47,9 @@ ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npm rebuild electron
 ```
 
 Set `ASTOCK_ELECTRON_REBUILD_TIMEOUT_SECONDS` if the first binary download needs a longer timeout.
+
+If macOS kills Electron with `SIGKILL`, the downloaded `Electron.app` signature is usually damaged. The launcher verifies and repairs this with a local ad-hoc signature. Manual repair:
+
+```bash
+codesign --force --deep --sign - node_modules/electron/dist/Electron.app
+```

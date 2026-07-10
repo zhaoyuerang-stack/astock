@@ -35,12 +35,16 @@ test("macOS launcher app bundle opens the local desktop client", () => {
   assert(launcherText.includes('curl -fsS "$READ_SERVICE_HEALTH"'), "launcher must check the local read service");
   assert(launcherText.includes("python3 -m uvicorn api.main:app"), "launcher must start the Python read service");
   assert(launcherText.includes("electron_runtime_is_available"), "launcher must verify Electron runtime before launching");
+  assert(launcherText.includes("electron_app_path"), "launcher must resolve Electron.app for macOS checks");
   assert(launcherText.includes('require("electron")'), "launcher must verify Electron without starting the GUI binary");
   assert(launcherText.includes("run_with_timeout"), "launcher must not hang indefinitely while repairing Electron");
   assert(launcherText.includes("ASTOCK_ELECTRON_REBUILD_TIMEOUT_SECONDS"), "launcher must expose Electron repair timeout");
   assert(launcherText.includes("https://npmmirror.com/mirrors/electron/"), "launcher must default to a reliable Electron mirror");
   assert(launcherText.includes("npm_config_electron_mirror"), "launcher must pass the mirror through npm config");
   assert(launcherText.includes("--foreground-scripts"), "launcher must show Electron rebuild output");
+  assert(launcherText.includes("codesign --verify --deep --strict"), "launcher must detect broken Electron code signatures");
+  assert(launcherText.includes("codesign --force --deep --sign -"), "launcher must repair broken Electron code signatures");
+  assert(launcherText.includes("xattr -dr com.apple.quarantine"), "launcher must clear quarantine before signing");
   assert(launcherText.includes("npm run dev"), "launcher must start the Electron + React client");
   assert(!launcherText.includes("git add -A"), "launcher must not run broad git commands");
   assert(!launcherText.includes("git reset"), "launcher must not run destructive git commands");

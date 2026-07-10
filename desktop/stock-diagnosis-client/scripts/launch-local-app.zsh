@@ -92,6 +92,14 @@ electron_runtime_is_available() {
   node -e 'const { existsSync } = require("node:fs"); const electronPath = require("electron"); if (!existsSync(electronPath)) process.exit(1);' >/dev/null 2>&1
 }
 
+electron_app_path() {
+  cd "$CLIENT_ROOT"
+  local electron_binary
+  electron_binary="$(node -e 'process.stdout.write(require("electron"))')"
+  cd "$(dirname "$electron_binary")/../.."
+  pwd
+}
+
 ensure_electron_runtime() {
   cd "$CLIENT_ROOT"
   if electron_runtime_is_available; then
@@ -125,6 +133,43 @@ MESSAGE
   return 1
 }
 
+ensure_electron_codesign() {
+  cd "$CLIENT_ROOT"
+  if ! command -v codesign >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local electron_app
+  electron_app="$(electron_app_path)" || return 0
+
+  if codesign --verify --deep --strict "$electron_app" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  print_header "Repairing Electron code signature"
+  echo "macOS rejected Electron's downloaded app bundle signature."
+  echo "Applying a local ad-hoc signature for development launch."
+
+  xattr -dr com.apple.quarantine "$electron_app" >/dev/null 2>&1 || true
+
+  if codesign --force --deep --sign - "$electron_app" && codesign --verify --deep --strict "$electron_app" >/dev/null 2>&1; then
+    echo "Electron code signature repaired."
+    return 0
+  fi
+
+  cat <<'MESSAGE'
+
+Electron code signature repair failed.
+
+Run this once from the desktop client directory:
+
+  codesign --force --deep --sign - node_modules/electron/dist/Electron.app
+
+Then double-click AStock Lens.app again.
+MESSAGE
+  return 1
+}
+
 launch_desktop_client() {
   cd "$CLIENT_ROOT"
   export ASTOCK_READ_SERVICE_URL="$READ_SERVICE_URL"
@@ -139,4 +184,5 @@ echo "Read service: $READ_SERVICE_URL"
 start_read_service
 ensure_node_deps
 ensure_electron_runtime
+ensure_electron_codesign
 launch_desktop_client
