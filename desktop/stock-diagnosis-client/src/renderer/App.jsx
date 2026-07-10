@@ -23,6 +23,7 @@ const initialDiagnosis = {
   ],
   sourceChips: ["等待输入", "read-only"],
   piExplanation: "",
+  turns: [],
 };
 
 function statusClass(status) {
@@ -54,6 +55,7 @@ function unavailableDiagnosis(prompt, message) {
     limits: ["需要启动本地 read service 后才能诊断。"],
     sourceChips: ["offline", "no-demo"],
     piExplanation: "",
+    turns: [{ role: "user", content: prompt }, { role: "assistant", content: `本地数据服务不可用: ${message}` }],
   };
 }
 
@@ -179,6 +181,28 @@ function TaskTimeline({ steps }) {
   );
 }
 
+function ConversationHistory({ turns = [] }) {
+  if (!turns.length) return null;
+  return (
+    <section className="card conversation-card" data-testid="conversation-history">
+      <div className="card-header">
+        <div>
+          <div className="card-title">连续追问</div>
+          <div className="card-subtitle">围绕当前股票保留上下文，不新开线程。</div>
+        </div>
+      </div>
+      <div className="conversation-list">
+        {turns.slice(-8).map((turn, index) => (
+          <div className={`turn ${turn.role}`} key={`${turn.role}-${index}-${turn.content}`}>
+            <div className="turn-role">{turn.role === "user" ? "你" : "AStock Lens"}</div>
+            <div className="turn-content">{turn.content}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function EvidencePanel({ diagnosis, runtime }) {
   return (
     <aside className="evidence" data-testid="evidence-panel" aria-label="证据与 Agent 上下文">
@@ -253,6 +277,7 @@ function Workspace({ diagnosis, prompt, setPrompt, onSubmit, loading, inputRef, 
         </div>
       </header>
       <section className="workspace-scroll" aria-label="当前诊断任务">
+        <ConversationHistory turns={diagnosis.turns} />
         <div className="diagnosis-grid">
           <DecisionCard diagnosis={diagnosis} />
           <TaskTimeline steps={diagnosis.taskSteps} />
@@ -301,8 +326,14 @@ export default function App() {
     if (!text || loading) return;
     setLoading(true);
     try {
+      const context = activeDiagnosis.thread?.code
+        ? {
+            currentThread: activeDiagnosis.thread,
+            turns: activeDiagnosis.turns || [],
+          }
+        : {};
       const result = window.astock?.runDiagnosis
-        ? await window.astock.runDiagnosis(text)
+        ? await window.astock.runDiagnosis({ prompt: text, context })
         : browserPreviewDiagnosis(text);
       setDiagnoses((prev) => [result, ...prev.filter((item) => item.thread.id !== result.thread.id)]);
       setThreads((prev) => [

@@ -304,6 +304,47 @@ input:disabled {
   margin: 0 auto;
 }
 
+.conversation-card {
+  max-width: 1040px;
+  margin: 0 auto 16px;
+}
+
+.conversation-list {
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.turn {
+  display: grid;
+  gap: 5px;
+}
+
+.turn.user {
+  justify-items: end;
+}
+
+.turn-role {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.turn-content {
+  max-width: min(680px, 88%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  color: var(--text-2);
+  padding: 9px 11px;
+  font-size: 12px;
+}
+
+.turn.user .turn-content {
+  background: rgba(108, 167, 255, 0.1);
+  border-color: rgba(108, 167, 255, 0.35);
+  color: var(--text);
+}
+
 .card {
   background: var(--panel);
   border: 1px solid var(--line);

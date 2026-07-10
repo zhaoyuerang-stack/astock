@@ -141,15 +141,54 @@ function unresolvedDiagnosis(prompt) {
   };
 }
 
+function normalizeTurns(turns) {
+  if (!Array.isArray(turns)) return [];
+  return turns
+    .filter((turn) => turn && typeof turn.content === "string" && ["user", "assistant"].includes(turn.role))
+    .map((turn) => ({ role: turn.role, content: turn.content.slice(0, 800) }))
+    .slice(-10);
+}
+
+function contextStockCode(context) {
+  const thread = context?.currentThread || context?.thread || {};
+  return extractStockCode(thread.code || "");
+}
+
+function stableThreadId(profile, context) {
+  const thread = context?.currentThread || context?.thread || {};
+  if (thread.code === profile.code && typeof thread.id === "string" && thread.id) {
+    return thread.id;
+  }
+  return `stock-${profile.code}`;
+}
+
+function appendTurns(context, prompt, diagnosis) {
+  return [
+    ...normalizeTurns(context?.turns || context?.messages),
+    { role: "user", content: String(prompt || "").slice(0, 800) },
+    { role: "assistant", content: diagnosis.decision.summary },
+  ];
+}
+
 function createDiagnosisService({ readClient, piBridge }) {
   if (!readClient) throw new Error("readClient is required");
 
   return {
-    async runDiagnosis(prompt) {
-      const code = readClient.resolveStockCode
-        ? await readClient.resolveStockCode(prompt)
-        : extractStockCode(prompt);
+    async runDiagnosis(prompt, context = {}) {
+      let resolveError;
+      const promptCode = await (async () => {
+        try {
+          return readClient.resolveStockCode
+            ? await readClient.resolveStockCode(prompt)
+            : extractStockCode(prompt);
+        } catch (error) {
+          resolveError = error;
+          return null;
+        }
+      })();
+      const code = promptCode || contextStockCode(context);
       if (!code) {
+        if (resolveError) throw resolveError;
         return unresolvedDiagnosis(prompt);
       }
 
@@ -157,7 +196,7 @@ function createDiagnosisService({ readClient, piBridge }) {
       const decision = buildDecision(profile);
       const diagnosis = {
         thread: {
-          id: `${profile.code}-${Date.now()}`,
+          id: stableThreadId(profile, context),
           name: profile.name || profile.code,
           code: profile.code,
           status: decision.verdict,
@@ -180,6 +219,7 @@ function createDiagnosisService({ readClient, piBridge }) {
         ],
         piExplanation: "",
       };
+      diagnosis.turns = appendTurns(context, prompt, diagnosis);
 
       if (piBridge?.explainDiagnosis) {
         const explanation = await piBridge.explainDiagnosis(diagnosis);
