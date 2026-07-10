@@ -5,6 +5,8 @@
 
 ## 🔴 进行中 / 优先
 
+- [ ] **【全球数据 Wave 1】可审计数据源接入与清洗** — 现有 global-data 只有 catalog、PIT 声明和 provider probe，未接入真实 endpoint mapping 或 source-specific 清洗；不得用于因子/策略。先实现 `alfred_macro_v1`（含 vintage/available_at）和 `global_etf_price_v1`（含交易所时区、OHLC、公司行动语义）的 raw snapshot -> normalizer -> validator/quarantine -> canonical writer 闭环。完整任务、字段契约、验收测试和拆分 commit 见 `docs/superpowers/plans/2026-07-10-global-data-source-onboarding.md`。谁：数据基础设施 + 研究侧共同验收。
+
 - [ ] **【2026-09-30 复核】small-cap-size/v2.0 纸面前向实验(ADR-024)** — 06-22 启动的人工 override 纸面前向(零真金,DSR=0.086 未过门,主仓继续防守)。跟踪器 `scripts/research/paper_forward_smallcap.py` 已接进日更旁路(每日自动累积快照到 `reports/experiments/smallcap_v2_paper_forward.jsonl`)。**到 ~2026-09 底(≥3 月前向)复核**:前向兑现(夏普稳、回撤受控、未破 MA16 防守)→ 证据增强(n_periods↑,DSR 可能真过)→ 再议小额真仓 + 走正式 promote;前向塌陷/破防守 → 证否、停实验。**注:复核前绝不因「纸面好看」就绕 DSR 门登记在册(R-LLM-001/§12.3)。** 谁:用户 + 走 workflow。
 - [ ] **【并行设计】冠军因子 L1~L3 审计并行化改造** — 06-28 发现演化收尾时的 Top K 冠军因子 L3 审计为串行，单线程排队 Walk-Forward 耗时 15-20 分钟成为新瓶颈。已在 `factory/autoresearch/islands.py` 完成多核并行化重构（父进程顺序写盘以防止文件锁死锁），语法编译已通过。待随下一次大规模进化寻优启动进行实跑效果与性能验证。谁:研究侧 + 走 workflow。
 
