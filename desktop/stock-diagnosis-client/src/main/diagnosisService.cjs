@@ -8,6 +8,8 @@ const TASK_STEPS = [
   { name: "读取风险快照", desc: "汇总流动性、波动、行业和估值风险。", status: "done" },
   { name: "生成保守诊断卡", desc: "拆分未持有与已持有两种动作语境。", status: "done" },
 ];
+const MAX_CONTEXT_TURNS = 40;
+const MAX_TURN_CHARS = 1200;
 
 function pct(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) return "未知";
@@ -284,12 +286,16 @@ function unresolvedDiagnosis(prompt, skill = null, context = {}) {
   return withSkillContext(diagnosis, skill);
 }
 
+function clipTurnText(value, limit = MAX_TURN_CHARS) {
+  return String(value || "").slice(0, limit);
+}
+
 function normalizeTurns(turns) {
   if (!Array.isArray(turns)) return [];
   return turns
     .filter((turn) => turn && typeof turn.content === "string" && ["user", "assistant"].includes(turn.role))
-    .map((turn) => ({ role: turn.role, content: turn.content.slice(0, 800) }))
-    .slice(-10);
+    .map((turn) => ({ role: turn.role, content: clipTurnText(turn.content) }))
+    .slice(-MAX_CONTEXT_TURNS);
 }
 
 function contextStockCode(context) {
@@ -303,11 +309,67 @@ function stableThreadId(profile, context) {
   return `stock-${profile.code}`;
 }
 
+function stockLabel(diagnosis) {
+  const thread = diagnosis.thread || {};
+  if (thread.code) return `${thread.name || "当前股票"} ${thread.code}`;
+  return thread.name || "当前对象";
+}
+
+function compactEvidence(items = [], limit = 3) {
+  return items
+    .filter(Boolean)
+    .slice(0, limit)
+    .map((item) => `- ${item}`)
+    .join("\n");
+}
+
+function promptIntent(prompt) {
+  const text = String(prompt || "");
+  if (/风险|下行|回撤|减仓|止损|亏|跌/.test(text)) return "risk";
+  if (/估值|贵|便宜|PE|PB|PS|市盈|市净|市销/.test(text)) return "valuation";
+  if (/持有|仓位|卖|买|候选|加仓|进入/.test(text)) return "position";
+  if (/策略|回测|模拟盘|因子|调仓|股票池/.test(text)) return "strategy";
+  return "general";
+}
+
+function buildAssistantReply(prompt, diagnosis) {
+  if (diagnosis.piExplanation) return clipTurnText(diagnosis.piExplanation, 1800);
+
+  const decision = diagnosis.decision || {};
+  const risks = compactEvidence(diagnosis.risks || [], 3);
+  const evidence = compactEvidence(diagnosis.evidence || [], 3);
+  const label = stockLabel(diagnosis);
+  const boundary = "我不会把这段诊断当作交易指令，只按已读取证据推进。";
+
+  if (!diagnosis.thread?.code) {
+    return `${decision.summary || "还没有识别到股票代码。"}\n\n${boundary}`;
+  }
+
+  if (decision.verdict === "待模拟盘") {
+    return `${decision.summary}\n\n下一步需要把策略想法落成可验证定义：股票池、因子、调仓频率、交易成本、样本区间和失败条件。没有这些之前，不展示收益曲线。`;
+  }
+
+  const intent = promptIntent(prompt);
+  if (intent === "risk") {
+    return `${label} 的追问我先按“下行风险”处理。\n\n已检查的主要风险:\n${risks || "- 当前风险证据不足。"}\n\n保守结论: ${decision.held || decision.summary}\n${boundary}`;
+  }
+
+  if (intent === "valuation") {
+    return `${label} 的估值问题只能基于本地 read service 已返回的快照讨论。\n\n已检查证据:\n${evidence || "- 当前估值证据不足。"}\n\n保守结论: ${decision.summary}\n${boundary}`;
+  }
+
+  if (intent === "position") {
+    return `${label} 现在不能直接简化成买或卖。\n\n如果未持有: ${decision.notHeld || "先等待证据补齐。"}\n如果已持有: ${decision.held || "先控制仓位并复核风险。"}\n\n依据:\n${risks || evidence || "- 当前证据不足。"}\n${boundary}`;
+  }
+
+  return `${decision.summary}\n\n已检查证据:\n${evidence || risks || "- 当前证据不足。"}\n\n如果未持有: ${decision.notHeld || "先等待证据补齐。"}\n如果已持有: ${decision.held || "先控制仓位并复核风险。"}\n${boundary}`;
+}
+
 function appendTurns(context, prompt, diagnosis) {
   return [
     ...normalizeTurns(context?.turns || context?.messages),
-    { role: "user", content: String(prompt || "").slice(0, 800) },
-    { role: "assistant", content: diagnosis.decision.summary },
+    { role: "user", content: clipTurnText(prompt) },
+    { role: "assistant", content: buildAssistantReply(prompt, diagnosis) },
   ];
 }
 
@@ -381,10 +443,10 @@ async function executeWhitelistedToolRequests(readClient, toolRequests = [], pro
   return result;
 }
 
-async function explainWithPi(piBridge, diagnosis) {
+async function explainWithPi(piBridge, diagnosis, prompt, context) {
   if (!piBridge?.explainDiagnosis) return diagnosis;
   try {
-    const explanation = await piBridge.explainDiagnosis(diagnosis);
+    const explanation = await piBridge.explainDiagnosis(diagnosis, { prompt, context });
     if (explanation?.text) {
       return { ...diagnosis, piExplanation: explanation.text };
     }
@@ -407,8 +469,9 @@ function createDiagnosisService({ readClient, piBridge }) {
       if (selectedSkill && selectedSkill.mode === "strategy_precheck") {
         let diagnosis = strategyPrecheckDiagnosis(prompt, selectedSkill, context);
         diagnosis = attachPiOrchestration(diagnosis, orchestration, toolResult);
+        diagnosis = await explainWithPi(piBridge, diagnosis, prompt, context);
         diagnosis.turns = appendTurns(context, prompt, diagnosis);
-        return explainWithPi(piBridge, diagnosis);
+        return diagnosis;
       }
 
       let resolveError;
@@ -460,8 +523,9 @@ function createDiagnosisService({ readClient, piBridge }) {
       };
       diagnosis = withSkillContext(diagnosis, selectedSkill);
       diagnosis = attachPiOrchestration(diagnosis, orchestration, toolResult);
+      diagnosis = await explainWithPi(piBridge, diagnosis, prompt, context);
       diagnosis.turns = appendTurns(context, prompt, diagnosis);
-      return explainWithPi(piBridge, diagnosis);
+      return diagnosis;
     },
   };
 }
@@ -473,4 +537,5 @@ module.exports = {
   chooseVerdict,
   executeWhitelistedToolRequests,
   normalizeSelectedSkill,
+  buildAssistantReply,
 };

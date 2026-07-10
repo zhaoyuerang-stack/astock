@@ -319,7 +319,14 @@ const starterPrompts = [
 function ConversationWorkspace({ diagnosis, onOpenVisual }) {
   const turns = diagnosis.turns || [];
   const hasTurns = turns.length > 0;
+  const conversationEndRef = useRef(null);
   const lastStep = [...(diagnosis.taskSteps || [])].reverse().find((step) => step.status === "done") || diagnosis.taskSteps?.[0];
+
+  useEffect(() => {
+    if (hasTurns) {
+      conversationEndRef.current?.scrollIntoView({ block: "end" });
+    }
+  }, [hasTurns, turns.length, turns.at(-1)?.content]);
 
   return (
     <section className="conversation-workspace" data-testid="conversation-workspace">
@@ -336,7 +343,7 @@ function ConversationWorkspace({ diagnosis, onOpenVisual }) {
       <div className="conversation-flow" data-testid="conversation-history">
         <div className="flow-label">连续追问</div>
         {hasTurns ? (
-          turns.slice(-8).map((turn, index) => (
+          turns.map((turn, index) => (
             <div className={`turn ${turn.role} ${turn.pending ? "pending" : ""}`} key={`${turn.role}-${index}-${turn.content}`}>
               <div className="turn-role">{turn.role === "user" ? "你" : "AStock Lens"}</div>
               <div className="turn-content">{turn.content}</div>
@@ -355,6 +362,7 @@ function ConversationWorkspace({ diagnosis, onOpenVisual }) {
             </div>
           </div>
         )}
+        <div ref={conversationEndRef} data-testid="conversation-end" />
       </div>
       <div className="system-task-strip" aria-label="系统任务状态">
         <div>
@@ -574,7 +582,6 @@ function Workspace({
               onChange={(event) => setPrompt(event.target.value)}
               placeholder={selectedSkill ? `${selectedSkill.name}: ${selectedSkill.promptHint}` : "问一只股票，或继续推进当前诊断…"}
               aria-label="诊断输入"
-              disabled={loading}
             />
             <button className="send-button" type="submit" disabled={loading}>
               {loading ? "诊断中" : "发送"}

@@ -6,6 +6,10 @@ test("diagnosis service builds a conservative stock diagnosis from a read-servic
   const calls = [];
   const service = createDiagnosisService({
     readClient: {
+      async resolveStockCode(query) {
+        assert.equal(query, "帮我看看贵州茅台还能不能买");
+        return "600519";
+      },
       async getStockProfile(code) {
         calls.push(code);
         return {
@@ -88,6 +92,90 @@ test("diagnosis service keeps follow-up questions in the current stock thread", 
   assert.equal(result.thread.code, "600519");
   assert.equal(result.turns.length, 3);
   assert.equal(result.turns.at(-2).content, "最大下行风险是什么");
+  assert(result.turns.at(-1).content.includes("下行风险"));
+});
+
+test("diagnosis service keeps longer conversation history for active threads", async () => {
+  const { createDiagnosisService } = await import("../src/main/diagnosisService.cjs");
+  const service = createDiagnosisService({
+    readClient: {
+      async resolveStockCode() {
+        return null;
+      },
+      async getStockProfile(code) {
+        return {
+          code,
+          name: "贵州茅台",
+          price_cny: 1182.19,
+          basic_date: "20260709",
+          latest_price: { date: "2026-07-09", close: 8352.0053 },
+          returns: { ret_20d: -0.041, ret_60d: -0.153 },
+          daily_basic: {},
+          moneyflow: {},
+          data_sources: ["price/daily/600519.parquet"],
+          warnings: [],
+        };
+      },
+    },
+    piBridge: {
+      async explainDiagnosis() {
+        return { ready: false, text: "" };
+      },
+    },
+  });
+  const turns = Array.from({ length: 12 }, (_, index) => ({
+    role: index % 2 === 0 ? "user" : "assistant",
+    content: `历史消息 ${index}`,
+  }));
+
+  const result = await service.runDiagnosis("继续看最大风险", {
+    currentThread: { id: "stock-600519", code: "600519", name: "贵州茅台" },
+    turns,
+  });
+
+  assert.equal(result.turns.length, 14);
+  assert.equal(result.turns[0].content, "历史消息 0");
+  assert.equal(result.turns.at(-2).content, "继续看最大风险");
+});
+
+test("diagnosis service uses Pi explanation as the assistant reply when available", async () => {
+  const { createDiagnosisService } = await import("../src/main/diagnosisService.cjs");
+  const piText = "基于已读取证据，当前主要问题是 20 日和 60 日收益都偏弱；先按观察处理，不生成交易指令。";
+  const service = createDiagnosisService({
+    readClient: {
+      async resolveStockCode() {
+        return "600519";
+      },
+      async getStockProfile(code) {
+        return {
+          code,
+          name: "贵州茅台",
+          price_cny: 1182.19,
+          basic_date: "20260709",
+          latest_price: { date: "2026-07-09", close: 8352.0053 },
+          returns: { ret_20d: -0.041, ret_60d: -0.153 },
+          daily_basic: {},
+          moneyflow: {},
+          data_sources: ["price/daily/600519.parquet"],
+          warnings: [],
+        };
+      },
+    },
+    piBridge: {
+      async explainDiagnosis(_diagnosis, options) {
+        assert.equal(options.prompt, "600519 最大风险是什么");
+        assert.equal(options.context.currentThread.code, "600519");
+        return { ready: true, text: piText };
+      },
+    },
+  });
+
+  const result = await service.runDiagnosis("600519 最大风险是什么", {
+    currentThread: { id: "stock-600519", code: "600519", name: "贵州茅台" },
+  });
+
+  assert.equal(result.piExplanation, piText);
+  assert.equal(result.turns.at(-1).content, piText);
 });
 
 test("diagnosis service keeps an unresolved workspace when a stock is later identified", async () => {
@@ -282,13 +370,60 @@ test("Pi bridge sanitizes skill orchestration plans to whitelisted tools", async
   assert.equal(plan.blockedToolRequests[0].tool, "bash");
 });
 
-test("read service client resolves common stock names before hitting the local API", async () => {
-  const { extractStockCode } = await import("../src/main/readServiceClient.cjs");
+test("read service client parses six-digit codes without relying on aliases", async () => {
+  const { extractStockCode, resolveKnownStockAlias } = await import("../src/main/readServiceClient.cjs");
 
-  assert.equal(extractStockCode("帮我看看贵州茅台还能不能买"), "600519");
-  assert.equal(extractStockCode("宁德时代今天风险大吗"), "300750");
+  assert.equal(extractStockCode("帮我看看贵州茅台还能不能买"), null);
   assert.equal(extractStockCode("601012 可以观察吗"), "601012");
   assert.equal(extractStockCode("完全不知道是哪只票"), null);
+  assert.equal(resolveKnownStockAlias("宁德时代今天风险大吗"), "300750");
+});
+
+test("read service client prefers the local Python resolver for stock names", async () => {
+  const { createReadServiceClient } = await import("../src/main/readServiceClient.cjs");
+  const calls = [];
+  const client = createReadServiceClient({
+    resolveStockCodeFn: async (query) => {
+      assert.equal(query, "宁德时代今天风险大吗");
+      return "300750";
+    },
+    fetchFn: async (url) => {
+      calls.push(String(url));
+      return {
+        ok: true,
+        async json() {
+          return { code: "300750", name: "宁德时代", latest_price: { date: "2026-07-09" }, returns: {}, data_sources: [] };
+        },
+      };
+    },
+  });
+
+  const profile = await client.getStockProfile("宁德时代今天风险大吗");
+
+  assert.equal(profile.code, "300750");
+  assert(calls[0].endsWith("/data/stocks/300750"));
+});
+
+test("read service client uses local aliases only as a resolver fallback", async () => {
+  const { createReadServiceClient } = await import("../src/main/readServiceClient.cjs");
+  const calls = [];
+  const client = createReadServiceClient({
+    resolveStockCodeFn: async () => null,
+    fetchFn: async (url) => {
+      calls.push(String(url));
+      return {
+        ok: true,
+        async json() {
+          return { code: "600519", name: "贵州茅台", latest_price: { date: "2026-07-09" }, returns: {}, data_sources: [] };
+        },
+      };
+    },
+  });
+
+  const profile = await client.getStockProfile("帮我看看贵州茅台还能不能买");
+
+  assert.equal(profile.code, "600519");
+  assert(calls[0].endsWith("/data/stocks/600519"));
 });
 
 test("read service client can resolve non-hardcoded stock names through the local Python resolver", async () => {

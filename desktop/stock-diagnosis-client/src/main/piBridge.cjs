@@ -17,6 +17,17 @@ function buildPiArgs(prompt, options = {}) {
   return args;
 }
 
+function compactTurns(turns = [], limit = 12) {
+  if (!Array.isArray(turns)) return [];
+  return turns
+    .filter((turn) => turn && ["user", "assistant"].includes(turn.role) && typeof turn.content === "string")
+    .slice(-limit)
+    .map((turn) => ({
+      role: turn.role,
+      content: turn.content.slice(0, 700),
+    }));
+}
+
 async function detectPi(command = "pi") {
   try {
     const { stdout } = await execFileAsync("which", [command], { timeout: 1500 });
@@ -36,7 +47,7 @@ function createPiBridge(options = {}) {
       return detectPi(command);
     },
 
-    async explainDiagnosis(diagnosis) {
+    async explainDiagnosis(diagnosis, options = {}) {
       const status = await detectPi(command);
       if (!status.available) {
         return { ready: false, text: "", error: status.error };
@@ -44,10 +55,16 @@ function createPiBridge(options = {}) {
 
       const prompt = [
         "你是股票诊断客户端里的解释层，只能解释已有证据，不能生成交易指令。",
-        "请用三句话解释这个保守诊断，并保留限制边界。",
+        "请直接回答用户当前追问，不要复述 UI 卡片标题。",
+        "如果用户是在连续追问同一只股票，请结合 recentTurns 和 currentThread，但结论必须只来自 evidence/risks/limits。",
+        "输出 3 到 6 句中文，保留边界，不要编造行情、估值、收益、资金流或回测。",
         JSON.stringify({
+          currentUserPrompt: String(options.prompt || ""),
+          recentTurns: compactTurns(options.context?.turns || options.context?.messages),
+          currentThread: options.context?.currentThread || options.context?.thread || diagnosis.thread,
           stock: diagnosis.thread,
           verdict: diagnosis.decision.verdict,
+          risks: diagnosis.risks,
           evidence: diagnosis.evidence,
           limits: diagnosis.limits,
         }),
@@ -145,6 +162,7 @@ function buildSkillOrchestrationPrompt({ prompt, context = {}, skills = [], sele
       userPrompt: String(prompt || ""),
       selectedSkillId: selectedSkill?.id || "",
       currentThread: context.currentThread || context.thread || null,
+      recentTurns: compactTurns(context.turns || context.messages),
       skills: skills.map(publicSkillForPrompt),
     }),
   ].join("\n");
@@ -210,6 +228,7 @@ module.exports = {
   ALLOWED_SKILL_TOOLS,
   buildPiArgs,
   buildSkillOrchestrationPrompt,
+  compactTurns,
   createPiBridge,
   detectPi,
   sanitizeOrchestrationPlan,
