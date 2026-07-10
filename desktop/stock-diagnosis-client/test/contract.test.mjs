@@ -18,6 +18,10 @@ const requiredFiles = [
   "src/renderer/index.html",
   "src/renderer/visualizations/VisualizationWorkspace.jsx",
   "src/shared/skills.json",
+  "src/main/piSkills/single-stock-diagnosis.md",
+  "src/main/piSkills/valuation-snapshot.md",
+  "src/main/piSkills/holding-risk-check.md",
+  "src/main/piSkills/strategy-precheck.md",
 ];
 
 for (const relative of requiredFiles) {
@@ -45,6 +49,9 @@ assert(main.includes("readService"), "runtime status must include read service h
 const piBridge = readFileSync(join(root, "src/main/piBridge.cjs"), "utf8");
 assert(piBridge.includes("--no-tools"), "Pi bridge must disable Pi tools by default");
 assert(piBridge.includes("--no-session"), "Pi bridge must keep diagnosis prompts ephemeral by default");
+assert(piBridge.includes("orchestrateSkillExecution"), "Pi bridge must expose skill orchestration");
+assert(piBridge.includes("ALLOWED_SKILL_TOOLS"), "Pi bridge must define a tool whitelist");
+assert(piBridge.includes("record_strategy_precheck"), "Pi bridge must include strategy precheck as a whitelisted tool");
 assert(!piBridge.includes("bash"), "Pi bridge must not enable arbitrary shell tools");
 
 const app = readFileSync(join(root, "src/renderer/App.jsx"), "utf8");

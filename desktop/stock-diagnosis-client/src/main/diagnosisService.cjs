@@ -1,4 +1,5 @@
 const { extractStockCode } = require("./readServiceClient.cjs");
+const { ALLOWED_SKILL_TOOLS } = require("./piBridge.cjs");
 const skillDefinitions = require("../shared/skills.json");
 
 const TASK_STEPS = [
@@ -70,6 +71,10 @@ function normalizeSelectedSkill(context = {}) {
   return skillDefinitions.find((skill) => skill.id === requestedId) || null;
 }
 
+function skillById(skillId) {
+  return skillDefinitions.find((skill) => skill.id === skillId) || null;
+}
+
 function skillTaskStep(skill) {
   return {
     name: `启用 Skill: ${skill.name}`,
@@ -90,6 +95,42 @@ function withSkillContext(diagnosis, skill) {
     evidence: [`选中 Skill: ${skill.name}`, ...(diagnosis.evidence || [])],
     limits: [...(diagnosis.limits || []), `Skill 边界: ${skill.boundary}`],
     sourceChips: [`Skill: ${skill.shortName || skill.name}`, ...(diagnosis.sourceChips || [])],
+  };
+}
+
+function attachPiOrchestration(diagnosis, orchestration, toolResult = {}) {
+  if (!orchestration?.ready) return diagnosis;
+  const blockedTools = orchestration.blockedToolRequests || [];
+  return {
+    ...diagnosis,
+    agentTrace: {
+      orchestrator: "pi",
+      selectedSkillId: orchestration.selectedSkillId || diagnosis.activeSkills?.[0]?.id || "",
+      toolWhitelist: ALLOWED_SKILL_TOOLS,
+      toolRequests: orchestration.toolRequests || [],
+      blockedToolRequests: blockedTools,
+      rationale: orchestration.rationale || "",
+    },
+    taskSteps: [
+      {
+        name: "Pi agent 编排 Skill",
+        desc: `已按白名单工具计划执行；允许工具: ${ALLOWED_SKILL_TOOLS.join(", ")}。`,
+        status: "done",
+      },
+      ...(diagnosis.taskSteps || []),
+    ],
+    evidence: [
+      `Pi agent 编排: ${orchestration.rationale || "已返回白名单工具计划"}`,
+      ...(toolResult.toolEvidence || []),
+      ...(toolResult.toolErrors || []).map((item) => `白名单工具失败: ${item}`),
+      ...(diagnosis.evidence || []),
+    ],
+    limits: [
+      ...(diagnosis.limits || []),
+      `Pi agent 工具白名单: ${ALLOWED_SKILL_TOOLS.join(", ")}。`,
+      ...blockedTools.map((item) => `已阻止 Pi 请求的非白名单工具: ${item.tool}`),
+    ],
+    sourceChips: ["Pi agent", "tool-whitelist", ...(diagnosis.sourceChips || [])],
   };
 }
 
@@ -171,7 +212,7 @@ function buildEvidence(profile) {
 
 function strategyPrecheckDiagnosis(prompt, skill) {
   return {
-    thread: { id: `skill-${skill.id}-${Date.now()}`, name: "策略想法预检", code: "", status: "数据不足" },
+    thread: { id: `skill-${skill.id}-${Date.now()}`, name: "策略想法预检", code: "", status: "待模拟盘" },
     taskSteps: [
       skillTaskStep(skill),
       { name: "记录策略想法", desc: "已把用户输入作为待验证假设保存到当前对话。", status: "done" },
@@ -179,7 +220,7 @@ function strategyPrecheckDiagnosis(prompt, skill) {
       { name: "连接 Shadow 模拟盘", desc: "等待后端 read model 暴露组合净值、回撤、换手和失败样本。", status: "pending" },
     ],
     decision: {
-      verdict: "数据不足",
+      verdict: "待模拟盘",
       note: "策略想法已记录，但还没有进入可审计模拟盘。",
       summary: "当前只能做策略预检：拆清楚假设、数据需求和验证边界；不会生成伪收益曲线。",
       notHeld: "不要把该策略直接作为候选，先补齐可验证定义和失败条件。",
@@ -251,20 +292,108 @@ function appendTurns(context, prompt, diagnosis) {
   ];
 }
 
+async function requestPiOrchestration(piBridge, prompt, context, selectedSkill) {
+  if (!piBridge?.orchestrateSkillExecution) {
+    return { ready: false, toolRequests: [], blockedToolRequests: [] };
+  }
+  try {
+    return await piBridge.orchestrateSkillExecution({
+      prompt,
+      context,
+      skills: skillDefinitions,
+      selectedSkill,
+    });
+  } catch (error) {
+    return { ready: false, error: error.message, toolRequests: [], blockedToolRequests: [] };
+  }
+}
+
+async function executeWhitelistedToolRequests(readClient, toolRequests = [], prompt, context = {}) {
+  const result = {
+    resolvedCode: "",
+    profile: null,
+    strategyPrecheckRequested: false,
+    toolEvidence: [],
+    toolErrors: [],
+  };
+
+  for (const request of toolRequests) {
+    if (request.tool === "resolve_stock_code") {
+      try {
+        const query = String(request.args?.query || prompt || "");
+        const code = await (readClient.resolveStockCode
+          ? readClient.resolveStockCode(query)
+          : extractStockCode(query));
+        if (code) {
+          result.resolvedCode = code;
+          result.toolEvidence.push(`白名单工具 resolve_stock_code: ${code}`);
+        } else {
+          result.toolEvidence.push("白名单工具 resolve_stock_code: 未识别股票代码");
+        }
+      } catch (error) {
+        result.toolErrors.push(`resolve_stock_code: ${error.message}`);
+      }
+      continue;
+    }
+
+    if (request.tool === "get_stock_profile") {
+      try {
+        const requestedCode = extractStockCode(request.args?.code || "") || result.resolvedCode || contextStockCode(context);
+        const codeOrQuery = requestedCode || String(request.args?.query || prompt || "");
+        if (!codeOrQuery) {
+          result.toolErrors.push("get_stock_profile 缺少股票代码或查询文本");
+          continue;
+        }
+        result.profile = await readClient.getStockProfile(codeOrQuery);
+        result.resolvedCode = result.profile?.code || requestedCode || "";
+        result.toolEvidence.push(`白名单工具 get_stock_profile: ${result.profile?.name || result.resolvedCode} ${result.resolvedCode}`);
+      } catch (error) {
+        result.toolErrors.push(`get_stock_profile: ${error.message}`);
+      }
+      continue;
+    }
+
+    if (request.tool === "record_strategy_precheck") {
+      result.strategyPrecheckRequested = true;
+      result.toolEvidence.push("白名单工具 record_strategy_precheck: 已记录策略想法，等待 Shadow 模拟盘 read model。");
+    }
+  }
+
+  return result;
+}
+
+async function explainWithPi(piBridge, diagnosis) {
+  if (!piBridge?.explainDiagnosis) return diagnosis;
+  try {
+    const explanation = await piBridge.explainDiagnosis(diagnosis);
+    if (explanation?.text) {
+      return { ...diagnosis, piExplanation: explanation.text };
+    }
+  } catch (_error) {
+    return diagnosis;
+  }
+  return diagnosis;
+}
+
 function createDiagnosisService({ readClient, piBridge }) {
   if (!readClient) throw new Error("readClient is required");
 
   return {
     async runDiagnosis(prompt, context = {}) {
-      const selectedSkill = normalizeSelectedSkill(context);
+      const requestedSkill = normalizeSelectedSkill(context);
+      const orchestration = await requestPiOrchestration(piBridge, prompt, context, requestedSkill);
+      const toolResult = await executeWhitelistedToolRequests(readClient, orchestration.toolRequests, prompt, context);
+      const selectedSkill = requestedSkill || skillById(orchestration.selectedSkillId) || (toolResult.strategyPrecheckRequested ? skillById("strategy-precheck") : null);
+
       if (selectedSkill && selectedSkill.mode === "strategy_precheck") {
-        const diagnosis = strategyPrecheckDiagnosis(prompt, selectedSkill);
+        let diagnosis = strategyPrecheckDiagnosis(prompt, selectedSkill);
+        diagnosis = attachPiOrchestration(diagnosis, orchestration, toolResult);
         diagnosis.turns = appendTurns(context, prompt, diagnosis);
-        return diagnosis;
+        return explainWithPi(piBridge, diagnosis);
       }
 
       let resolveError;
-      const promptCode = await (async () => {
+      const promptCode = toolResult.resolvedCode || await (async () => {
         try {
           return readClient.resolveStockCode
             ? await readClient.resolveStockCode(prompt)
@@ -282,7 +411,7 @@ function createDiagnosisService({ readClient, piBridge }) {
         return diagnosis;
       }
 
-      const profile = await readClient.getStockProfile(code);
+      const profile = toolResult.profile || await readClient.getStockProfile(code);
       const decision = buildDecision(profile);
       let diagnosis = {
         thread: {
@@ -311,15 +440,9 @@ function createDiagnosisService({ readClient, piBridge }) {
         piExplanation: "",
       };
       diagnosis = withSkillContext(diagnosis, selectedSkill);
+      diagnosis = attachPiOrchestration(diagnosis, orchestration, toolResult);
       diagnosis.turns = appendTurns(context, prompt, diagnosis);
-
-      if (piBridge?.explainDiagnosis) {
-        const explanation = await piBridge.explainDiagnosis(diagnosis);
-        if (explanation?.text) {
-          diagnosis.piExplanation = explanation.text;
-        }
-      }
-      return diagnosis;
+      return explainWithPi(piBridge, diagnosis);
     },
   };
 }
@@ -329,5 +452,6 @@ module.exports = {
   createDiagnosisService,
   buildDecision,
   chooseVerdict,
+  executeWhitelistedToolRequests,
   normalizeSelectedSkill,
 };
