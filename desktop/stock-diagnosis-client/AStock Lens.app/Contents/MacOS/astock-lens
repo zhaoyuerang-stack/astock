@@ -1,0 +1,14 @@
+#!/bin/zsh
+set -euo pipefail
+
+CLIENT_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+LAUNCHER="$CLIENT_ROOT/scripts/launch-local-app.zsh"
+
+quoted_root="$(printf "%q" "$CLIENT_ROOT")"
+quoted_launcher="$(printf "%q" "$LAUNCHER")"
+
+/usr/bin/osascript \
+  -e 'tell application "Terminal"' \
+  -e 'activate' \
+  -e "do script \"cd $quoted_root && /bin/zsh $quoted_launcher\"" \
+  -e 'end tell'
