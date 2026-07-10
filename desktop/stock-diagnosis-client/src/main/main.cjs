@@ -32,8 +32,11 @@ function createWindow() {
   }
 }
 
-ipcMain.handle("diagnosis:run", async (_event, prompt) => {
-  return diagnosisService.runDiagnosis(String(prompt || ""));
+ipcMain.handle("diagnosis:run", async (_event, payload) => {
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    return diagnosisService.runDiagnosis(String(payload.prompt || ""), payload.context || {});
+  }
+  return diagnosisService.runDiagnosis(String(payload || ""));
 });
 
 ipcMain.handle("runtime:status", async () => {

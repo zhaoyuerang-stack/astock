@@ -32,6 +32,7 @@ test("diagnosis service builds a conservative stock diagnosis from a read-servic
   const result = await service.runDiagnosis("帮我看看贵州茅台还能不能买");
 
   assert.deepEqual(calls, ["600519"]);
+  assert.equal(result.thread.id, "stock-600519");
   assert.equal(result.thread.code, "600519");
   assert.equal(result.thread.name, "贵州茅台");
   assert.equal(result.decision.verdict, "观察");
@@ -42,6 +43,51 @@ test("diagnosis service builds a conservative stock diagnosis from a read-servic
   assert(result.evidence.some((item) => item.includes("资金流净额")));
   assert(result.evidence.some((item) => item.includes("price/daily/600519.parquet")));
   assert(result.limits.some((item) => item.includes("不构成交易建议")));
+  assert.equal(result.turns.at(-2).role, "user");
+  assert.equal(result.turns.at(-1).role, "assistant");
+});
+
+test("diagnosis service keeps follow-up questions in the current stock thread", async () => {
+  const { createDiagnosisService } = await import("../src/main/diagnosisService.cjs");
+  const calls = [];
+  const service = createDiagnosisService({
+    readClient: {
+      async resolveStockCode() {
+        return null;
+      },
+      async getStockProfile(code) {
+        calls.push(code);
+        return {
+          code,
+          name: "贵州茅台",
+          price_cny: 1182.19,
+          basic_date: "20260709",
+          latest_price: { date: "2026-07-09", close: 8352.0053 },
+          returns: { ret_20d: -0.041, ret_60d: -0.153 },
+          daily_basic: { pe_ttm: 17.8666, pb: 5.4554, ps_ttm: 8.5848, total_mv: 147783396.6704 },
+          moneyflow: { net_mf_amount: -39120.75 },
+          data_sources: ["price/daily/600519.parquet"],
+          warnings: [],
+        };
+      },
+    },
+    piBridge: {
+      async explainDiagnosis() {
+        return { ready: false, text: "" };
+      },
+    },
+  });
+
+  const result = await service.runDiagnosis("最大下行风险是什么", {
+    currentThread: { id: "stock-600519", code: "600519", name: "贵州茅台" },
+    turns: [{ role: "user", content: "600519 最近怎么样" }],
+  });
+
+  assert.deepEqual(calls, ["600519"]);
+  assert.equal(result.thread.id, "stock-600519");
+  assert.equal(result.thread.code, "600519");
+  assert.equal(result.turns.length, 3);
+  assert.equal(result.turns.at(-2).content, "最大下行风险是什么");
 });
 
 test("Pi bridge uses an ephemeral no-tools command by default", async () => {

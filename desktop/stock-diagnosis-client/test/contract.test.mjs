@@ -52,9 +52,11 @@ const requiredUiMarkers = [
   'data-testid="evidence-panel"',
   'data-testid="bottom-composer"',
   'data-testid="decision-card"',
+  'data-testid="conversation-history"',
   "问一只股票，或继续推进当前诊断",
   "如果未持有",
   "如果已持有",
+  "连续追问",
   "等待输入",
   "本地数据服务不可用",
 ];
