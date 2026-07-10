@@ -29,3 +29,19 @@ npm run dev
 Set `ASTOCK_READ_SERVICE_URL` to point at a different local API endpoint.
 
 If dependencies were installed with `--ignore-scripts`, Electron's runtime binary may be missing. Run `npm rebuild electron` once in this directory before launching the desktop window.
+
+## Double-click Launch
+
+Open the app from Finder:
+
+```text
+desktop/stock-diagnosis-client/AStock Lens.app
+```
+
+The launcher opens a visible Terminal session, starts the local Python read service on `127.0.0.1:8011`, then starts the Electron + React client. Runtime logs and pid files are written under `.runtime/` and are ignored by git.
+
+If Electron's macOS runtime binary is missing, the launcher tries `npm rebuild electron` once. On networks that block Electron's default binary host, run this one-time repair from `desktop/stock-diagnosis-client/`:
+
+```bash
+ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npm rebuild electron
+```
