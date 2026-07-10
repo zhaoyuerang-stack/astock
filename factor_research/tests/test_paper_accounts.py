@@ -7,7 +7,8 @@
   1. stale 名单(>14 天)/ 缺失文件 → fail-closed 真拒,provision=0 且状态可读
   2. 账本隔离:先证明「共享可变状态」的坏实现真的会红(A 污染 B),
      再证明本模块的实现不会(正确实现必须绿)
-  3. 无 executable_spec 的版本 → 诚实 blocked(no_executable_spec),不产假 NAV
+  3. 无 executable_spec 的版本 → 诚实 blocked(no_executable_spec),不产假 NAV;
+     as_of 不在注入价格面板交易日索引里 → 诚实 degraded(no_price_data),不产假 NAV
   4. 确定性:同输入两次 update_all 产出逐字节相同的账本文件
   5. 下榜 → frozen,历史账本不可变(update_all 跳过,文件字节不变)
 用法(cwd=factor_research): python3 -m pytest tests/test_paper_accounts.py -q
@@ -321,6 +322,29 @@ def test_unknown_candidate_name_not_in_registry(tmp_registry, tmp_path):
     assert result["status"] == "ok"
     assert result["accounts"][0]["status"] == "unknown"
     print("✅ 名单里的名字在台账里不存在 → unknown,不臆测拆分/不开户")
+
+
+def test_update_account_degraded_when_as_of_missing_from_price_panel(tmp_registry, tmp_path, patch_prices):
+    """有合法 executable_spec,但注入的价格面板不含 as_of 交易日
+    (no_price_data)——跳过当日更新,不产假 NAV,状态可读为 degraded。
+    """
+    accounts_root = tmp_path / "accounts"
+    prices = _synthetic_panel()
+    spec = _valid_spec(version="v1.0")
+    _set_registry(tmp_registry, [_version_record("v1.0", spec)])
+    fp = _write_recompose(tmp_path, ["synth-fam.v1.0"])
+    result = pa.provision_from_recompose(fp, accounts_root=accounts_root)
+    assert result["accounts"][0]["status"] == "active"
+
+    not_a_trading_day = "2099-01-01"  # 远超合成面板日期范围,必然不在 prices.close.index
+    res = pa.update_account("synth-fam", "v1.0", spec, prices, not_a_trading_day,
+                            accounts_root=accounts_root)
+    assert res["status"] == "degraded"
+    assert "no_price_data" in res["reason"]
+    paths = pa.AccountPaths.for_version("synth-fam", "v1.0", accounts_root)
+    assert not paths.nav_fp.exists(), "degraded 账户不得产生 nav.csv(不产假 NAV)"
+    assert not paths.trades_fp.exists(), "degraded 账户不得产生任何成交记录"
+    print(f"✅ as_of 不在价格面板交易日索引里 → degraded,原因可读:{res['reason']},未产生假 NAV")
 
 
 # ─────────────────────────── 4. 确定性 ───────────────────────────
