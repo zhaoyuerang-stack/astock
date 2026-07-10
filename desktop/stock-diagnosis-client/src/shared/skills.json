@@ -1,0 +1,46 @@
+[
+  {
+    "id": "single-stock-diagnosis",
+    "name": "单股诊断",
+    "shortName": "单股",
+    "category": "诊断",
+    "description": "围绕一只股票读取本地画像，生成保守诊断卡和可追问证据。",
+    "promptHint": "输入股票名或 6 位代码，例如：诊断 600519 最大风险。",
+    "boundary": "只读本地股票画像，不给买卖指令，不连接交易执行。",
+    "requiresStock": true,
+    "mode": "stock_profile"
+  },
+  {
+    "id": "valuation-snapshot",
+    "name": "估值快照",
+    "shortName": "估值",
+    "category": "估值",
+    "description": "优先检查 PE、PB、PS、市值和收益证据，帮助判断估值压力。",
+    "promptHint": "输入目标股票，例如：600519 当前估值贵不贵。",
+    "boundary": "只做相对证据归纳，不输出目标价或确定性估值结论。",
+    "requiresStock": true,
+    "mode": "stock_profile"
+  },
+  {
+    "id": "holding-risk-check",
+    "name": "持仓风险检查",
+    "shortName": "持仓风险",
+    "category": "风控",
+    "description": "站在已持有用户视角，优先整理下行风险、仓位动作边界和复核点。",
+    "promptHint": "输入持仓对象，例如：我持有 300750，什么情况要降仓。",
+    "boundary": "只生成风险清单和复核条件，不替代仓位决策。",
+    "requiresStock": true,
+    "mode": "stock_profile"
+  },
+  {
+    "id": "strategy-precheck",
+    "name": "策略预检",
+    "shortName": "策略",
+    "category": "策略",
+    "description": "把用户策略想法拆成可验证假设、数据需求、回测边界和下一步读模型。",
+    "promptHint": "描述策略想法，例如：低估值 + 资金流转正，每周调仓。",
+    "boundary": "当前只做策略想法预检；Shadow 模拟盘 read model 接入前不生成收益曲线。",
+    "requiresStock": false,
+    "mode": "strategy_precheck"
+  }
+]

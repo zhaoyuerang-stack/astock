@@ -1,4 +1,5 @@
 const { extractStockCode } = require("./readServiceClient.cjs");
+const skillDefinitions = require("../shared/skills.json");
 
 const TASK_STEPS = [
   { name: "识别股票", desc: "解析名称、代码和市场。", status: "done" },
@@ -44,6 +45,52 @@ function chooseVerdict(profile) {
     return "谨慎持有";
   }
   return "观察";
+}
+
+function publicSkill(skill) {
+  if (!skill) return null;
+  return {
+    id: skill.id,
+    name: skill.name,
+    shortName: skill.shortName,
+    category: skill.category,
+    description: skill.description,
+    boundary: skill.boundary,
+    requiresStock: Boolean(skill.requiresStock),
+    mode: skill.mode,
+  };
+}
+
+function normalizeSelectedSkill(context = {}) {
+  const requestedId = typeof context.selectedSkillId === "string"
+    ? context.selectedSkillId
+    : typeof context.selectedSkill?.id === "string"
+      ? context.selectedSkill.id
+      : "";
+  return skillDefinitions.find((skill) => skill.id === requestedId) || null;
+}
+
+function skillTaskStep(skill) {
+  return {
+    name: `启用 Skill: ${skill.name}`,
+    desc: skill.description,
+    status: "done",
+  };
+}
+
+function withSkillContext(diagnosis, skill) {
+  if (!skill) {
+    return { ...diagnosis, activeSkills: diagnosis.activeSkills || [] };
+  }
+  const skillInfo = publicSkill(skill);
+  return {
+    ...diagnosis,
+    activeSkills: [skillInfo],
+    taskSteps: [skillTaskStep(skill), ...(diagnosis.taskSteps || [])],
+    evidence: [`选中 Skill: ${skill.name}`, ...(diagnosis.evidence || [])],
+    limits: [...(diagnosis.limits || []), `Skill 边界: ${skill.boundary}`],
+    sourceChips: [`Skill: ${skill.shortName || skill.name}`, ...(diagnosis.sourceChips || [])],
+  };
 }
 
 function buildDecision(profile) {
@@ -122,8 +169,40 @@ function buildEvidence(profile) {
   ];
 }
 
-function unresolvedDiagnosis(prompt) {
+function strategyPrecheckDiagnosis(prompt, skill) {
   return {
+    thread: { id: `skill-${skill.id}-${Date.now()}`, name: "策略想法预检", code: "", status: "数据不足" },
+    taskSteps: [
+      skillTaskStep(skill),
+      { name: "记录策略想法", desc: "已把用户输入作为待验证假设保存到当前对话。", status: "done" },
+      { name: "拆解验证口径", desc: "下一步需要明确因子、股票池、调仓频率、成本和样本区间。", status: "pending" },
+      { name: "连接 Shadow 模拟盘", desc: "等待后端 read model 暴露组合净值、回撤、换手和失败样本。", status: "pending" },
+    ],
+    decision: {
+      verdict: "数据不足",
+      note: "策略想法已记录，但还没有进入可审计模拟盘。",
+      summary: "当前只能做策略预检：拆清楚假设、数据需求和验证边界；不会生成伪收益曲线。",
+      notHeld: "不要把该策略直接作为候选，先补齐可验证定义和失败条件。",
+      held: "已有持仓不要按该策略想法调整仓位，先等待 Shadow 模拟盘证据。",
+    },
+    risks: [
+      "缺少可执行的股票池、调仓频率、交易成本和样本区间。",
+      "后端尚未暴露用户策略 Shadow 模拟盘 read model。",
+    ],
+    evidence: [`选中 Skill: ${skill.name}`, `用户输入: ${prompt}`],
+    limits: [
+      "本结果不构成交易建议。",
+      "当前只做策略想法预检，不执行回测，不生成收益曲线。",
+      `Skill 边界: ${skill.boundary}`,
+    ],
+    sourceChips: [`Skill: ${skill.shortName || skill.name}`, "strategy-precheck", "no-fake-curve", "read-only"],
+    activeSkills: [publicSkill(skill)],
+    piExplanation: "",
+  };
+}
+
+function unresolvedDiagnosis(prompt, skill = null) {
+  const diagnosis = {
     thread: { id: `diagnosis-unresolved-${Date.now()}`, name: "待识别股票", code: "", status: "数据不足" },
     taskSteps: TASK_STEPS.map((step, index) => (index === 0 ? { ...step, status: "blocked" } : { ...step, status: "pending" })),
     decision: {
@@ -137,8 +216,10 @@ function unresolvedDiagnosis(prompt) {
     evidence: [`用户输入: ${prompt}`],
     limits: ["本结果不构成交易建议。", "未读取本地 Python read service 的股票画像。"],
     sourceChips: ["待澄清", "read-only"],
+    activeSkills: [],
     piExplanation: "",
   };
+  return withSkillContext(diagnosis, skill);
 }
 
 function normalizeTurns(turns) {
@@ -175,6 +256,13 @@ function createDiagnosisService({ readClient, piBridge }) {
 
   return {
     async runDiagnosis(prompt, context = {}) {
+      const selectedSkill = normalizeSelectedSkill(context);
+      if (selectedSkill && selectedSkill.mode === "strategy_precheck") {
+        const diagnosis = strategyPrecheckDiagnosis(prompt, selectedSkill);
+        diagnosis.turns = appendTurns(context, prompt, diagnosis);
+        return diagnosis;
+      }
+
       let resolveError;
       const promptCode = await (async () => {
         try {
@@ -189,12 +277,14 @@ function createDiagnosisService({ readClient, piBridge }) {
       const code = promptCode || contextStockCode(context);
       if (!code) {
         if (resolveError) throw resolveError;
-        return unresolvedDiagnosis(prompt);
+        const diagnosis = unresolvedDiagnosis(prompt, selectedSkill);
+        diagnosis.turns = appendTurns(context, prompt, diagnosis);
+        return diagnosis;
       }
 
       const profile = await readClient.getStockProfile(code);
       const decision = buildDecision(profile);
-      const diagnosis = {
+      let diagnosis = {
         thread: {
           id: stableThreadId(profile, context),
           name: profile.name || profile.code,
@@ -217,8 +307,10 @@ function createDiagnosisService({ readClient, piBridge }) {
           "风险快照",
           "read-only",
         ],
+        activeSkills: [],
         piExplanation: "",
       };
+      diagnosis = withSkillContext(diagnosis, selectedSkill);
       diagnosis.turns = appendTurns(context, prompt, diagnosis);
 
       if (piBridge?.explainDiagnosis) {
@@ -237,4 +329,5 @@ module.exports = {
   createDiagnosisService,
   buildDecision,
   chooseVerdict,
+  normalizeSelectedSkill,
 };
