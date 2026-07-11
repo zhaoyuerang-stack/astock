@@ -27,3 +27,25 @@ factor_research/paper/
 
 # MCP 配置含 token,禁止提交
 .mcp.json
+
+# ── 2026-07-10 落地 AGENTS.md 判定规则 ──
+# 运行产物/缓存(可复现,不入库)
+*.profraw
+prototypes/**/.thumbnails/
+prototypes/**/.waveform-cache/
+prototypes/**/renders/
+prototypes/**/*.wav
+
+# 探索区默认留本地(AGENTS.md:先归档/转正再提交;MODULE_STATUS 例外)
+factor_research/scratch/*
+!factor_research/scratch/MODULE_STATUS.md
+
+# 本地 agent/IDE 状态
+.agents/
+.superpowers/
+.workbuddy/
+*.code-workspace
+
+# 私有/本机配置与凭证(永不入库)
+project.private.config.json
+desktop/stock-diagnosis-client/auth.json
