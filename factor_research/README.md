@@ -133,6 +133,16 @@ npm run dev
 
 前端默认调用 `http://127.0.0.1:8011`，页面覆盖总览、数据、风险、组合、模拟盘、实验室和设置。安装 launchd 后，`com.astcok.api` 和 `com.astcok.web` 会分别常驻 `:8011` 和 `:3000`。
 
+如果想要一个可复用的仓库脚本，直接用：
+
+```bash
+cd /Users/kiki/astcok/factor_research
+scripts/ops/dev_serve.sh api
+scripts/ops/dev_serve.sh web
+```
+
+可通过环境变量覆盖端口和前端 API 基址，例如 `API_PORT=8012`、`WEB_PORT=3001`、`NEXT_PUBLIC_API_BASE=http://127.0.0.1:8012`。
+
 ## 复测真实口径策略
 
 运行 `data_lake` 口径复测：

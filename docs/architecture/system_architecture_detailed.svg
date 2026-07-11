@@ -1,0 +1,223 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1280" viewBox="0 0 1800 1280">
+  <defs>
+    <style>
+      .bg { fill: #f7f8fb; }
+      .title { font-family: Arial, "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 34px; font-weight: 700; fill: #151922; }
+      .subtitle { font-family: Arial, "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 15px; fill: #596273; }
+      .band-title { font-family: Arial, "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 19px; font-weight: 700; fill: #202634; }
+      .box-title { font-family: Arial, "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 16px; font-weight: 700; fill: #172033; }
+      .box-text { font-family: Arial, "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 12px; fill: #4a5364; }
+      .note { font-family: Arial, "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 12px; fill: #6a7280; }
+      .band { stroke-width: 1.2; rx: 14; }
+      .box { fill: #ffffff; stroke: #cad2df; stroke-width: 1.2; rx: 9; }
+      .box-core { fill: #fffdf6; stroke: #d7b46a; stroke-width: 1.4; rx: 9; }
+      .box-prod { fill: #f7fbff; stroke: #81a9d9; stroke-width: 1.3; rx: 9; }
+      .box-risk { fill: #fff8f8; stroke: #d38c8c; stroke-width: 1.3; rx: 9; }
+      .arrow { stroke: #6f7c91; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .arrow-soft { stroke: #a0a9b7; stroke-width: 1.4; fill: none; marker-end: url(#arrow-soft); }
+      .guard { fill: #eef7f1; stroke: #88b796; stroke-width: 1.2; rx: 9; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L8,3 z" fill="#6f7c91"/>
+    </marker>
+    <marker id="arrow-soft" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L8,3 z" fill="#a0a9b7"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1800" height="1280"/>
+  <text class="title" x="60" y="58">A股全市场因子量化研究系统架构图</text>
+  <text class="subtitle" x="60" y="86">当前系统模块视图：数据基础设施 → 因子/策略工厂 → 统一回测与门禁 → 台账/组合/生产 → Services/API/Web。核心原则：研究判断由确定性代码与统一引擎完成。</text>
+
+  <!-- External -->
+  <rect class="band" x="60" y="120" width="1680" height="80" fill="#edf2fa" stroke="#c6d4e8"/>
+  <text class="band-title" x="82" y="152">外部输入</text>
+  <rect class="box" x="220" y="135" width="260" height="48"/>
+  <text class="box-title" x="238" y="157">市场与财务数据源</text>
+  <text class="box-text" x="238" y="175">Tencent / Sina / Eastmoney / Exchange / Tushare / ETF</text>
+  <rect class="box" x="520" y="135" width="240" height="48"/>
+  <text class="box-title" x="538" y="157">LLM / NLP 输入</text>
+  <text class="box-text" x="538" y="175">研报 PDF / 逻辑链抽取 / 候选草案</text>
+
+  <!-- Data -->
+  <rect class="band" x="60" y="230" width="1680" height="130" fill="#eef7ff" stroke="#c7daee"/>
+  <text class="band-title" x="82" y="262">1. 数据基础设施</text>
+  <rect class="box" x="220" y="250" width="245" height="82"/>
+  <text class="box-title" x="238" y="274">data_lake/</text>
+  <text class="box-text" x="238" y="294">price / market / financials / capital</text>
+  <text class="box-text" x="238" y="312">moneyflow / holder / index / macro / ETF</text>
+  <rect class="box" x="500" y="250" width="235" height="82"/>
+  <text class="box-title" x="518" y="274">lake/</text>
+  <text class="box-text" x="518" y="294">load_lake / sources / validator</text>
+  <text class="box-text" x="518" y="312">invariants / fingerprint / units</text>
+  <rect class="box" x="770" y="250" width="230" height="82"/>
+  <text class="box-title" x="788" y="274">scripts/data/</text>
+  <text class="box-text" x="788" y="294">增量更新 / 建湖 / Tushare</text>
+  <text class="box-text" x="788" y="312">ETF update / repair</text>
+  <rect class="box" x="1035" y="250" width="230" height="82"/>
+  <text class="box-title" x="1053" y="274">runtime/artifacts.py</text>
+  <text class="box-text" x="1053" y="294">data_lake / reports / signals</text>
+  <text class="box-text" x="1053" y="312">paper 路径统一表达</text>
+
+  <!-- Factor -->
+  <rect class="band" x="60" y="390" width="1680" height="130" fill="#f1fbf5" stroke="#cae2d1"/>
+  <text class="band-title" x="82" y="422">2. 因子与特征层</text>
+  <rect class="box" x="220" y="410" width="245" height="82"/>
+  <text class="box-title" x="238" y="434">factors/</text>
+  <text class="box-text" x="238" y="454">small_cap / large_cap / hq_momentum</text>
+  <text class="box-text" x="238" y="472">veto / capital_flow / shareholder</text>
+  <rect class="box" x="500" y="410" width="235" height="82"/>
+  <text class="box-title" x="518" y="434">factors/alpha/</text>
+  <text class="box-text" x="518" y="454">DSL base / transforms</text>
+  <text class="box-text" x="518" y="472">builtins / search</text>
+  <rect class="box" x="770" y="410" width="230" height="82"/>
+  <text class="box-title" x="788" y="434">factor_store/</text>
+  <text class="box-text" x="788" y="454">store / scoring</text>
+  <text class="box-text" x="788" y="472">core_backfill</text>
+  <rect class="box" x="1035" y="410" width="230" height="82"/>
+  <text class="box-title" x="1053" y="434">research_toolkit/</text>
+  <text class="box-text" x="1053" y="454">HostSpec / ControlArtifact</text>
+  <text class="box-text" x="1053" y="472">Veto policy helpers</text>
+
+  <!-- Core -->
+  <rect class="band" x="60" y="550" width="1680" height="150" fill="#fff7e6" stroke="#e4c783"/>
+  <text class="band-title" x="82" y="582">3. 统一引擎层</text>
+  <rect class="box-core" x="220" y="572" width="270" height="92"/>
+  <text class="box-title" x="238" y="596">core.engine.BacktestEngine</text>
+  <text class="box-text" x="238" y="616">唯一回测权威</text>
+  <text class="box-text" x="238" y="634">Signal / PricePanel / CostModel</text>
+  <text class="box-text" x="238" y="652">真实成本 / 融资 / anomalies</text>
+  <rect class="box" x="525" y="572" width="240" height="92"/>
+  <text class="box-title" x="543" y="596">core/analysis/</text>
+  <text class="box-text" x="543" y="616">nine_gates / walk_forward</text>
+  <text class="box-text" x="543" y="634">rolling_origin / policy</text>
+  <rect class="box" x="800" y="572" width="230" height="92"/>
+  <text class="box-title" x="818" y="596">engine/</text>
+  <text class="box-text" x="818" y="616">metrics / factor_analysis</text>
+  <text class="box-text" x="818" y="634">neutralize / composer / portfolio</text>
+  <rect class="box" x="1065" y="572" width="220" height="92"/>
+  <text class="box-title" x="1083" y="596">core/overlays + risk</text>
+  <text class="box-text" x="1083" y="616">moving_average / pure_trend</text>
+  <text class="box-text" x="1083" y="634">dual_valve</text>
+
+  <!-- Strategy and Factory side by side -->
+  <rect class="band" x="60" y="730" width="805" height="210" fill="#f7f2ff" stroke="#d5c7ec"/>
+  <text class="band-title" x="82" y="762">4A. 策略构造层</text>
+  <rect class="box" x="100" y="785" width="230" height="92"/>
+  <text class="box-title" x="118" y="809">strategies/</text>
+  <text class="box-text" x="118" y="829">small_cap / large_cap</text>
+  <text class="box-text" x="118" y="847">hq_momentum / size_earnings</text>
+  <text class="box-text" x="118" y="865">industry_rotation / catalog</text>
+  <rect class="box" x="365" y="785" width="220" height="92"/>
+  <text class="box-title" x="383" y="809">ExecutableStrategySpec</text>
+  <text class="box-text" x="383" y="829">core/strategy_spec.py</text>
+  <text class="box-text" x="383" y="847">不可变策略规格</text>
+  <rect class="box" x="620" y="785" width="205" height="92"/>
+  <text class="box-title" x="638" y="809">strategies/executable.py</text>
+  <text class="box-text" x="638" y="829">build_executable_strategy</text>
+  <text class="box-text" x="638" y="847">部署策略构造</text>
+
+  <rect class="band" x="895" y="730" width="845" height="210" fill="#f3f8ff" stroke="#c8d9ef"/>
+  <text class="band-title" x="917" y="762">4B. 研究工厂与 AutoResearch</text>
+  <rect class="box" x="930" y="785" width="210" height="92"/>
+  <text class="box-title" x="948" y="809">factory/ontology</text>
+  <text class="box-text" x="948" y="829">Hypothesis / Experiment</text>
+  <text class="box-text" x="948" y="847">Decision / Protocol</text>
+  <rect class="box" x="1170" y="785" width="220" height="92"/>
+  <text class="box-title" x="1188" y="809">factory/lines</text>
+  <text class="box-text" x="1188" y="829">L0 IC / L1 BT / L2 regime</text>
+  <text class="box-text" x="1188" y="847">L3 WF / veto triage</text>
+  <rect class="box" x="1420" y="785" width="275" height="92"/>
+  <text class="box-title" x="1438" y="809">factory/autoresearch</text>
+  <text class="box-text" x="1438" y="829">DSL AST / islands / novelty</text>
+  <text class="box-text" x="1438" y="847">walk-forward / repositories</text>
+  <rect class="box" x="930" y="890" width="210" height="36"/>
+  <text class="box-title" x="948" y="913">metasearch</text>
+  <rect class="box" x="1170" y="890" width="220" height="36"/>
+  <text class="box-title" x="1188" y="913">research_ledger</text>
+  <rect class="box" x="1420" y="890" width="275" height="36"/>
+  <text class="box-title" x="1438" y="913">factory/pool + repositories</text>
+
+  <!-- Workflow / Registry -->
+  <rect class="band" x="60" y="970" width="1680" height="120" fill="#fff4f4" stroke="#eccaca"/>
+  <text class="band-title" x="82" y="1002">5. 晋级、9-Gate、台账与治理</text>
+  <rect class="box-risk" x="220" y="990" width="270" height="72"/>
+  <text class="box-title" x="238" y="1014">workflow/</text>
+  <text class="box-text" x="238" y="1034">promote / phase1_synthetic / phase2</text>
+  <text class="box-text" x="238" y="1052">phase3_wf / phase4_register</text>
+  <rect class="box-risk" x="525" y="990" width="240" height="72"/>
+  <text class="box-title" x="543" y="1014">nine_gate_runner</text>
+  <text class="box-text" x="543" y="1034">可复用 9-Gate 审计</text>
+  <rect class="box-risk" x="800" y="990" width="230" height="72"/>
+  <text class="box-title" x="818" y="1014">strategy_registry.py</text>
+  <text class="box-text" x="818" y="1034">register_family / register</text>
+  <text class="box-text" x="818" y="1052">唯一台账写入口</text>
+  <rect class="box-risk" x="1065" y="990" width="235" height="72"/>
+  <text class="box-title" x="1083" y="1014">strategy_versions.json</text>
+  <text class="box-text" x="1083" y="1034">family / version / evidence</text>
+  <rect class="box-risk" x="1335" y="990" width="230" height="72"/>
+  <text class="box-title" x="1353" y="1014">governance/</text>
+  <text class="box-text" x="1353" y="1034">holdout boundary / fingerprint</text>
+
+  <!-- Production / Product -->
+  <rect class="band" x="60" y="1120" width="805" height="110" fill="#f5f7fb" stroke="#cdd5e2"/>
+  <text class="band-title" x="82" y="1152">6A. 组合、执行与生产</text>
+  <rect class="box-prod" x="100" y="1170" width="170" height="42"/>
+  <text class="box-title" x="118" y="1195">portfolio/</text>
+  <rect class="box-prod" x="300" y="1170" width="170" height="42"/>
+  <text class="box-title" x="318" y="1195">run_daily.py</text>
+  <rect class="box-prod" x="500" y="1170" width="145" height="42"/>
+  <text class="box-title" x="518" y="1195">signals/</text>
+  <rect class="box-prod" x="675" y="1170" width="145" height="42"/>
+  <text class="box-title" x="693" y="1195">paper/</text>
+
+  <rect class="band" x="895" y="1120" width="845" height="110" fill="#eefaf8" stroke="#c3ded8"/>
+  <text class="band-title" x="917" y="1152">6B. Services / API / Web</text>
+  <rect class="box" x="930" y="1170" width="170" height="42"/>
+  <text class="box-title" x="948" y="1195">services/read</text>
+  <rect class="box" x="1130" y="1170" width="180" height="42"/>
+  <text class="box-title" x="1148" y="1195">services/actions</text>
+  <rect class="box" x="1340" y="1170" width="145" height="42"/>
+  <text class="box-title" x="1358" y="1195">api/routers</text>
+  <rect class="box" x="1515" y="1170" width="180" height="42"/>
+  <text class="box-title" x="1533" y="1195">Next.js web</text>
+
+  <!-- arrows vertical -->
+  <path class="arrow" d="M350 183 L350 248"/>
+  <path class="arrow" d="M618 332 L618 410"/>
+  <path class="arrow" d="M618 492 L618 572"/>
+  <path class="arrow" d="M355 664 L355 785"/>
+  <path class="arrow" d="M1035 664 L1035 785"/>
+  <path class="arrow" d="M1280 877 L1280 990"/>
+  <path class="arrow" d="M355 877 L355 990"/>
+  <path class="arrow" d="M900 1062 L900 1170"/>
+  <path class="arrow" d="M385 1062 L385 1170"/>
+
+  <!-- arrows horizontal/key -->
+  <path class="arrow-soft" d="M465 291 L500 291"/>
+  <path class="arrow-soft" d="M735 291 L770 291"/>
+  <path class="arrow-soft" d="M465 451 L500 451"/>
+  <path class="arrow-soft" d="M765 618 L800 618"/>
+  <path class="arrow-soft" d="M490 618 L525 618"/>
+  <path class="arrow-soft" d="M865 831 L930 831"/>
+  <path class="arrow-soft" d="M1140 831 L1170 831"/>
+  <path class="arrow-soft" d="M1390 831 L1420 831"/>
+  <path class="arrow-soft" d="M490 1026 L525 1026"/>
+  <path class="arrow-soft" d="M765 1026 L800 1026"/>
+  <path class="arrow-soft" d="M1030 1026 L1065 1026"/>
+  <path class="arrow-soft" d="M270 1191 L300 1191"/>
+  <path class="arrow-soft" d="M470 1191 L500 1191"/>
+  <path class="arrow-soft" d="M645 1191 L675 1191"/>
+  <path class="arrow-soft" d="M1100 1191 L1130 1191"/>
+  <path class="arrow-soft" d="M1310 1191 L1340 1191"/>
+  <path class="arrow-soft" d="M1485 1191 L1515 1191"/>
+
+  <!-- Guards -->
+  <rect class="guard" x="1335" y="565" width="305" height="110"/>
+  <text class="box-title" x="1353" y="590">CI / 守卫</text>
+  <text class="box-text" x="1353" y="612">scripts/ci/check_layer_deps.py</text>
+  <text class="box-text" x="1353" y="630">check_lake_writers / holdout / registry evidence</text>
+  <text class="box-text" x="1353" y="648">check_no_legacy_data / scripts/test_all.sh</text>
+
+  <text class="note" x="60" y="1260">边界：data(lake) → factors → core.engine → strategies / factory / workflow → registry → production → services → api → web。生产不依赖研究探索层；API 不直接读写运行产物。</text>
+</svg>
