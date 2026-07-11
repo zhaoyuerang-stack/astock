@@ -277,76 +277,6 @@ function ThreadSidebar({ threads, activeId, onSelect, onNew }) {
   );
 }
 
-function DecisionCard({ diagnosis }) {
-  const decision = diagnosis.decision;
-  return (
-    <section className="card" data-testid="decision-card">
-      <div className="card-header">
-        <div>
-          <div className="card-title">保守单股诊断卡</div>
-          <div className="card-subtitle">结论只来自已检查证据，保留证据边界。</div>
-        </div>
-        <span className={`badge ${statusClass(decision.verdict)}`}>{decision.verdict}</span>
-      </div>
-      <div className="card-body">
-        <div className="decision-hero">
-          <div className={`verdict-box ${statusClass(decision.verdict)}`}>
-            <div className="verdict-label">当前结论</div>
-            <div className="verdict">{decision.verdict}</div>
-            <div className="verdict-note">{decision.note}</div>
-          </div>
-          <div>
-            <p className="decision-copy">{decision.summary}</p>
-            <div className="action-grid">
-              <div className="action-card">
-                <div className="action-title">如果未持有</div>
-                <div className="action-text">{decision.notHeld}</div>
-              </div>
-              <div className="action-card">
-                <div className="action-title">如果已持有</div>
-                <div className="action-text">{decision.held}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <ul className="risk-list" aria-label="主要风险">
-          {diagnosis.risks.map((risk) => (
-            <li key={risk}>{risk}</li>
-          ))}
-        </ul>
-      </div>
-    </section>
-  );
-}
-
-function TaskTimeline({ steps }) {
-  return (
-    <section className="card" data-testid="task-timeline">
-      <div className="card-header">
-        <div>
-          <div className="card-title">任务步骤</div>
-          <div className="card-subtitle">Agent 推进诊断，不替代裁决。</div>
-        </div>
-      </div>
-      <div className="card-body">
-        <div className="timeline">
-          {steps.map((step) => (
-            <div className="step" key={step.name}>
-              <div className={`step-dot ${step.status}`}>
-                {step.status === "done" ? "✓" : step.status === "blocked" ? "!" : "·"}
-              </div>
-              <div>
-                <div className="step-name">{step.name}</div>
-                <div className="step-desc">{step.desc}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function SkillPicker({ skills, selectedSkillId, onSelect, onClose }) {
   return (
     <div className="skill-popover" id="skill-picker" data-testid="skill-picker" role="dialog" aria-label="选择 Skill">
@@ -393,17 +323,10 @@ function ActiveSkillBar({ skill, onClear }) {
   );
 }
 
-const starterPrompts = [
-  "诊断 600519，现在只适合观察还是可以进入候选？",
-  "如果我已经持有宁德时代，哪些证据会触发减仓？",
-  "我想验证低估值 + 资金流策略，当前系统能先检查什么？",
-];
-
-function ConversationWorkspace({ diagnosis, onOpenVisual }) {
+function ConversationWorkspace({ diagnosis }) {
   const turns = conversationTurnsForDisplay(diagnosis);
   const hasTurns = turns.length > 0;
   const conversationEndRef = useRef(null);
-  const lastStep = [...(diagnosis.taskSteps || [])].reverse().find((step) => step.status === "done") || diagnosis.taskSteps?.[0];
 
   useEffect(() => {
     if (hasTurns) {
@@ -413,18 +336,7 @@ function ConversationWorkspace({ diagnosis, onOpenVisual }) {
 
   return (
     <section className="conversation-workspace" data-testid="conversation-workspace">
-      <div className="conversation-main-header">
-        <div>
-          <div className="workspace-kicker">当前对话流</div>
-          <div className="workspace-title">用对话推进诊断和策略验证</div>
-          <div className="workspace-subtitle">中间区域优先保留给用户、模型和系统任务沟通；图形化结果收纳到独立视图。</div>
-        </div>
-        <button className="secondary-button" data-testid="visualization-entry" type="button" onClick={onOpenVisual}>
-          图形化展示
-        </button>
-      </div>
       <div className="conversation-flow" data-testid="conversation-history">
-        <div className="flow-label">连续追问</div>
         {hasTurns ? (
           turns.map((turn, index) => (
             <div className={`turn ${turn.role} ${turn.pending ? "pending" : ""}`} key={`${turn.role}-${index}-${turn.content}`}>
@@ -433,115 +345,11 @@ function ConversationWorkspace({ diagnosis, onOpenVisual }) {
             </div>
           ))
         ) : (
-          <div className="empty-conversation">
-            <div>
-              <div className="empty-title">先告诉系统你关心的对象或想法</div>
-              <div className="empty-copy">可以是一只股票、一个持仓问题，或一个需要验证的策略假设。</div>
-            </div>
-            <div className="prompt-examples" aria-label="可输入示例">
-              {starterPrompts.map((item) => (
-                <div className="prompt-example" key={item}>{item}</div>
-              ))}
-            </div>
-          </div>
+          <div className="empty-chat-line">从底部输入股票、持仓问题或策略想法开始。</div>
         )}
         <div ref={conversationEndRef} data-testid="conversation-end" />
       </div>
-      <div className="system-task-strip" aria-label="系统任务状态">
-        <div>
-          <div className="strip-label">系统当前状态</div>
-          <div className="strip-title">{diagnosis.thread.status}</div>
-        </div>
-        <div>
-          <div className="strip-label">当前对象</div>
-          <div className="strip-title">{diagnosis.thread.code ? `${diagnosis.thread.name} ${diagnosis.thread.code}` : "等待输入"}</div>
-        </div>
-        <div>
-          <div className="strip-label">最近完成</div>
-          <div className="strip-title">{lastStep?.name || "等待任务"}</div>
-        </div>
-      </div>
     </section>
-  );
-}
-
-function EvidencePanel({ diagnosis, runtime, onOpenVisual }) {
-  const activeSkills = diagnosis.activeSkills || [];
-  return (
-    <aside className="evidence" data-testid="evidence-panel" aria-label="证据与 Agent 上下文">
-      <div className="panel-section">
-        <div className="panel-heading">
-          <span>上下文</span>
-          <span className={`badge ${statusClass(diagnosis.decision.verdict)}`}>当前线程</span>
-        </div>
-        <div className="context-object">
-          <div className="context-name">{diagnosis.thread.code ? `${diagnosis.thread.name} ${diagnosis.thread.code}` : "未选择对象"}</div>
-          <div className="context-desc">{diagnosis.decision.note}</div>
-        </div>
-        <button className="panel-action" type="button" onClick={onOpenVisual}>
-          打开图形化视图
-        </button>
-      </div>
-      <div className="panel-section">
-        <div className="panel-heading">Skill</div>
-        {activeSkills.length ? (
-          <div className="active-skill-list">
-            {activeSkills.map((skill) => (
-              <div className="active-skill-card" key={skill.id}>
-                <div className="active-skill-title">{skill.name}</div>
-                <div className="active-skill-desc">{skill.description}</div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="panel-copy">点击输入框左侧加号，可以为当前问题启用单股诊断、估值快照、持仓风险检查或策略预检。</p>
-        )}
-      </div>
-      <div className="panel-section">
-        <div className="panel-heading">证据来源</div>
-        <div className="chip-row">
-          {diagnosis.sourceChips.map((chip) => (
-            <span className="chip" key={chip}>
-              {chip}
-            </span>
-          ))}
-        </div>
-        <ul className="evidence-list">
-          {diagnosis.evidence.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      </div>
-      <div className="panel-section">
-        <div className="panel-heading">限制</div>
-        <ul className="evidence-list">
-          {diagnosis.limits.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      </div>
-      {diagnosis.piExplanation && (
-        <div className="panel-section">
-          <div className="panel-heading">Pi 解释</div>
-          <p className="panel-copy">{diagnosis.piExplanation}</p>
-        </div>
-      )}
-      <div className="panel-section">
-        <div className="panel-heading">可继续追问</div>
-        <ul className="question-list">
-          <li>这只股票最大的下行风险是什么？</li>
-          <li>如果我已经持有，什么情况需要降低仓位？</li>
-          <li>我这个策略想法，系统现在能验证到哪一步？</li>
-        </ul>
-      </div>
-      <div className="prototype-note">
-        <div>
-          Read service: {runtime?.readServiceUrl || "http://127.0.0.1:8011"}
-          {runtime?.readService ? ` (${runtime.readService.available ? "ready" : "offline"})` : ""}
-        </div>
-        <div>Pi: {runtime?.pi?.available ? "available" : "not connected"}</div>
-      </div>
-    </aside>
   );
 }
 
@@ -594,6 +402,7 @@ function Workspace({
             </button>
             <button
               className={viewMode === "visualization" ? "active" : ""}
+              data-testid="visualization-entry"
               type="button"
               aria-pressed={viewMode === "visualization"}
               onClick={() => setViewMode("visualization")}
@@ -616,11 +425,7 @@ function Workspace({
           />
         ) : (
           <div className="conversation-layout">
-            <ConversationWorkspace diagnosis={diagnosis} onOpenVisual={() => setViewMode("visualization")} />
-            <div className="summary-grid">
-              <DecisionCard diagnosis={diagnosis} />
-              <TaskTimeline steps={diagnosis.taskSteps} />
-            </div>
+            <ConversationWorkspace diagnosis={diagnosis} />
           </div>
         )}
       </section>
@@ -793,7 +598,6 @@ export default function App() {
         onSelectSkill={setSelectedSkillId}
         onClearSkill={() => setSelectedSkillId("")}
       />
-      <EvidencePanel diagnosis={activeDiagnosis} runtime={runtime} onOpenVisual={() => setViewMode("visualization")} />
     </div>
   );
 }

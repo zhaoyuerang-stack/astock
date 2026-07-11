@@ -63,9 +63,7 @@ const rendererSurface = `${app}\n${visualization}\n${skillCatalog}`;
 const requiredUiMarkers = [
   'data-testid="thread-sidebar"',
   'data-testid="diagnosis-workspace"',
-  'data-testid="evidence-panel"',
   'data-testid="bottom-composer"',
-  'data-testid="decision-card"',
   'data-testid="conversation-workspace"',
   'data-testid="conversation-history"',
   'data-testid="visualization-entry"',
@@ -86,10 +84,6 @@ const requiredUiMarkers = [
   "dedupeThreadList",
   "正在编排 Skill",
   "问一只股票，或继续推进当前诊断",
-  "如果未持有",
-  "如果已持有",
-  "连续追问",
-  "当前对话流",
   "图形化展示",
   "选择 Skill",
   "已启用 Skill",
@@ -108,6 +102,16 @@ assert(!rendererSurface.includes("seedThreads"), "renderer must not seed fake th
 assert(!app.includes("slice(-8)"), "conversation history must not be visually clamped to the last eight turns");
 assert(app.includes("conversationEndRef"), "conversation history should auto-scroll as turns are appended");
 assert(app.includes("diagnosisConversationReply"), "diagnosed workspaces must synthesize an assistant turn when result turns are missing");
+assert(!app.includes('data-testid="evidence-panel"'), "conversation shell must not render a persistent right evidence sidebar");
+assert(!app.includes('data-testid="decision-card"'), "conversation shell must not render the diagnosis card under the chat");
+assert(!app.includes('data-testid="task-timeline"'), "conversation shell must not render a task timeline card under the chat");
+assert(!app.includes('className="summary-grid"'), "conversation shell must keep the center workspace chat-only");
+assert(!app.includes('className="system-task-strip"'), "conversation shell must not render status strips inside the chat canvas");
+assert(!app.includes('className="conversation-main-header"'), "conversation shell must not render a secondary explanatory header");
+assert(!app.includes('className="empty-conversation"'), "empty conversation state must not render a card-like prompt block");
+assert(!app.includes('className="prompt-example"'), "empty conversation state must not render example cards");
+assert(!app.includes("当前对话流"), "conversation shell must avoid persistent explanatory copy");
+assert(!app.includes("连续追问"), "conversation shell must avoid persistent explanatory copy");
 
 const parsedSkills = JSON.parse(skillCatalog);
 assert(parsedSkills.some((skill) => skill.id === "single-stock-diagnosis"), "skill catalog must include single-stock diagnosis");
