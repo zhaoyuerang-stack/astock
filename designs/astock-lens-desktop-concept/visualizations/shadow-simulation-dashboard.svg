@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
+  <title id="title">Shadow 模拟盘图形化展示</title>
+  <desc id="desc">AStock Lens 图形化结果子目录，用于展示用户策略想法的 Shadow 模拟盘净值、回撤、持仓和交易流水。</desc>
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="20" stdDeviation="28" flood-color="#0f172a" flood-opacity="0.14"/>
+    </filter>
+    <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2563eb" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#2563eb" stop-opacity="0"/>
+    </linearGradient>
+    <style>
+      .bg { fill: #edf2f7; }
+      .window { fill: #ffffff; stroke: #d8dee8; stroke-width: 1; }
+      .chrome { fill: #f5f7fb; }
+      .line { stroke: #e2e8f0; stroke-width: 1; }
+      .card { fill: #ffffff; stroke: #d7dee9; stroke-width: 1; }
+      .soft { fill: #fbfdff; stroke: #d7dee9; stroke-width: 1; }
+      .text { fill: #111827; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Noto Sans SC", sans-serif; letter-spacing: 0; }
+      .muted { fill: #64748b; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Noto Sans SC", sans-serif; letter-spacing: 0; }
+      .mono { fill: #334155; font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0; }
+      .h1 { font-size: 30px; font-weight: 760; }
+      .h2 { font-size: 20px; font-weight: 720; }
+      .h3 { font-size: 15px; font-weight: 700; }
+      .body { font-size: 14px; font-weight: 470; }
+      .caption { font-size: 12px; font-weight: 560; }
+      .blue { fill: #2563eb; }
+      .green { fill: #15803d; }
+      .amber { fill: #b45309; }
+      .red { fill: #b91c1c; }
+      .blue-soft { fill: #eff6ff; stroke: #bfdbfe; stroke-width: 1; }
+      .green-soft { fill: #effdf4; stroke: #bbf7d0; stroke-width: 1; }
+      .amber-soft { fill: #fff7ed; stroke: #fed7aa; stroke-width: 1; }
+      .red-soft { fill: #fef2f2; stroke: #fecaca; stroke-width: 1; }
+      .grid { stroke: #e7edf5; stroke-width: 1; }
+      .chart { fill: none; stroke: #2563eb; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+      .drawdown { fill: none; stroke: #b91c1c; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1600" height="1000"/>
+  <g filter="url(#shadow)">
+    <rect class="window" x="58" y="54" width="1484" height="890" rx="22"/>
+    <rect class="chrome" x="58" y="54" width="1484" height="52" rx="22"/>
+    <path d="M58 84 Q58 54 88 54 H1512 Q1542 54 1542 84 V106 H58 Z" class="chrome"/>
+    <circle cx="88" cy="80" r="7" fill="#ef4444"/>
+    <circle cx="111" cy="80" r="7" fill="#f59e0b"/>
+    <circle cx="134" cy="80" r="7" fill="#22c55e"/>
+    <text class="muted caption" x="800" y="85" text-anchor="middle">visualizations / shadow-simulation-dashboard</text>
+  </g>
+
+  <g transform="translate(104 134)">
+    <text class="text h1" x="0" y="0">Shadow 模拟盘图形化展示</text>
+    <text class="muted body" x="0" y="30">这是从主对话区跳出的结果视图，承载图表和数据表，不挤占用户沟通空间。</text>
+    <g transform="translate(1030 -20)">
+      <rect class="blue-soft" x="0" y="0" width="110" height="30" rx="15"/>
+      <text class="blue caption" x="55" y="20" text-anchor="middle">返回对话</text>
+      <rect class="green-soft" x="124" y="0" width="112" height="30" rx="15"/>
+      <text class="green caption" x="180" y="20" text-anchor="middle">只读模拟</text>
+      <rect class="amber-soft" x="250" y="0" width="124" height="30" rx="15"/>
+      <text class="amber caption" x="312" y="20" text-anchor="middle">未通过验证</text>
+    </g>
+  </g>
+
+  <g transform="translate(104 202)">
+    <rect class="green-soft" x="0" y="0" width="210" height="88" rx="16"/>
+    <text class="green caption" x="22" y="30">当前净值</text>
+    <text class="text h1" x="22" y="66">1.032</text>
+    <rect class="card" x="232" y="0" width="210" height="88" rx="16"/>
+    <text class="muted caption" x="254" y="30">最大回撤</text>
+    <text class="text h1" x="254" y="66">-3.8%</text>
+    <rect class="card" x="464" y="0" width="210" height="88" rx="16"/>
+    <text class="muted caption" x="486" y="30">换手估计</text>
+    <text class="text h1" x="486" y="66">0.42x</text>
+    <rect class="card" x="696" y="0" width="210" height="88" rx="16"/>
+    <text class="muted caption" x="718" y="30">持仓数量</text>
+    <text class="text h1" x="718" y="66">20</text>
+    <rect class="red-soft" x="928" y="0" width="360" height="88" rx="16"/>
+    <text class="red caption" x="950" y="30">边界</text>
+    <text class="text h3" x="950" y="61">仅为 Shadow 演示，不构成交易建议</text>
+  </g>
+
+  <g transform="translate(104 326)">
+    <rect class="card" x="0" y="0" width="856" height="362" rx="18"/>
+    <text class="text h2" x="28" y="42">净值与回撤</text>
+    <text class="muted caption" x="28" y="66">图形视图只展示模拟结果，结论仍回到主对话区解释。</text>
+    <g transform="translate(40 102)">
+      <line class="grid" x1="0" y1="0" x2="760" y2="0"/>
+      <line class="grid" x1="0" y1="54" x2="760" y2="54"/>
+      <line class="grid" x1="0" y1="108" x2="760" y2="108"/>
+      <line class="grid" x1="0" y1="162" x2="760" y2="162"/>
+      <line class="grid" x1="0" y1="216" x2="760" y2="216"/>
+      <path d="M0 214 L0 150 C62 134, 94 166, 138 139 S229 103, 276 116 S365 60, 438 82 S530 42, 610 52 S705 22, 760 35 L760 248 L0 248 Z" fill="url(#area)"/>
+      <path class="chart" d="M0 150 C62 134, 94 166, 138 139 S229 103, 276 116 S365 60, 438 82 S530 42, 610 52 S705 22, 760 35"/>
+      <path class="drawdown" d="M0 222 C80 226, 126 238, 190 216 S302 246, 378 226 S496 238, 586 208 S690 218, 760 196"/>
+      <text class="muted caption" x="0" y="278">蓝线：Shadow 净值</text>
+      <text class="red caption" x="150" y="278">红线：回撤压力</text>
+    </g>
+  </g>
+
+  <g transform="translate(992 326)">
+    <rect class="card" x="0" y="0" width="446" height="362" rx="18"/>
+    <text class="text h2" x="28" y="42">当前持仓</text>
+    <text class="muted caption" x="28" y="66">示例展示，不在主沟通区展开。</text>
+    <g transform="translate(28 96)">
+      <rect class="soft" x="0" y="0" width="390" height="36" rx="10"/>
+      <text class="muted caption" x="16" y="23">股票</text>
+      <text class="muted caption" x="160" y="23">权重</text>
+      <text class="muted caption" x="246" y="23">入选原因</text>
+      <text class="text body" x="16" y="70">汇川技术</text>
+      <text class="mono body" x="160" y="70">5.0%</text>
+      <text class="muted body" x="246" y="70">估值/流入</text>
+      <line class="line" x1="0" y1="88" x2="390" y2="88"/>
+      <text class="text body" x="16" y="116">东方雨虹</text>
+      <text class="mono body" x="160" y="116">4.6%</text>
+      <text class="muted body" x="246" y="116">资金流</text>
+      <line class="line" x1="0" y1="134" x2="390" y2="134"/>
+      <text class="text body" x="16" y="162">三一重工</text>
+      <text class="mono body" x="160" y="162">4.8%</text>
+      <text class="muted body" x="246" y="162">PB 改善</text>
+      <line class="line" x1="0" y1="180" x2="390" y2="180"/>
+      <text class="text body" x="16" y="208">海螺水泥</text>
+      <text class="mono body" x="160" y="208">4.2%</text>
+      <text class="muted body" x="246" y="208">估值分位</text>
+    </g>
+  </g>
+
+  <g transform="translate(104 724)">
+    <rect class="card" x="0" y="0" width="1334" height="154" rx="18"/>
+    <text class="text h2" x="28" y="42">最近调仓流水</text>
+    <g transform="translate(28 74)">
+      <rect class="soft" x="0" y="0" width="1278" height="34" rx="10"/>
+      <text class="muted caption" x="16" y="22">日期</text>
+      <text class="muted caption" x="166" y="22">动作</text>
+      <text class="muted caption" x="346" y="22">标的</text>
+      <text class="muted caption" x="546" y="22">原因</text>
+      <text class="muted caption" x="1050" y="22">状态</text>
+      <text class="mono body" x="16" y="68">2026-07-10</text>
+      <text class="text body" x="166" y="68">买入</text>
+      <text class="text body" x="346" y="68">汇川技术</text>
+      <text class="muted body" x="546" y="68">低估值分位 + 资金流改善，趋势过滤未触发</text>
+      <text class="green body" x="1050" y="68">模拟成交</text>
+    </g>
+  </g>
+</svg>

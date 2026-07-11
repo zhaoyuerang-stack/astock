@@ -1,0 +1,236 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
+  <title id="title">AStock Lens 桌面端对话优先设计</title>
+  <desc id="desc">AStock Lens v2 桌面端设计，中心区域主要用于用户通过模型与系统沟通，图形化展示入口被收纳到独立子目录。</desc>
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="22" stdDeviation="30" flood-color="#0f172a" flood-opacity="0.15"/>
+    </filter>
+    <filter id="soft" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="13" flood-color="#0f172a" flood-opacity="0.07"/>
+    </filter>
+    <style>
+      .bg { fill: #edf2f7; }
+      .window { fill: #ffffff; stroke: #d8dee8; stroke-width: 1; }
+      .chrome { fill: #f5f7fb; }
+      .side { fill: #f8fafc; }
+      .right { fill: #fbfcfe; }
+      .line { stroke: #e2e8f0; stroke-width: 1; }
+      .card { fill: #ffffff; stroke: #d7dee9; stroke-width: 1; }
+      .soft-card { fill: #fbfdff; stroke: #d7dee9; stroke-width: 1; }
+      .active-card { fill: #eef6ff; stroke: #93c5fd; stroke-width: 1.4; }
+      .text { fill: #111827; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Noto Sans SC", sans-serif; letter-spacing: 0; }
+      .inverse { fill: #ffffff; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Noto Sans SC", sans-serif; letter-spacing: 0; }
+      .muted { fill: #64748b; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Noto Sans SC", sans-serif; letter-spacing: 0; }
+      .subtle { fill: #94a3b8; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Noto Sans SC", sans-serif; letter-spacing: 0; }
+      .mono { fill: #334155; font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0; }
+      .h1 { font-size: 28px; font-weight: 760; }
+      .h2 { font-size: 20px; font-weight: 730; }
+      .h3 { font-size: 15px; font-weight: 700; }
+      .body { font-size: 14px; font-weight: 470; }
+      .caption { font-size: 12px; font-weight: 560; }
+      .tiny { font-size: 11px; font-weight: 560; }
+      .blue { fill: #2563eb; }
+      .green { fill: #15803d; }
+      .amber { fill: #b45309; }
+      .blue-soft { fill: #eff6ff; stroke: #bfdbfe; stroke-width: 1; }
+      .green-soft { fill: #effdf4; stroke: #bbf7d0; stroke-width: 1; }
+      .amber-soft { fill: #fff7ed; stroke: #fed7aa; stroke-width: 1; }
+      .gray-chip { fill: #f8fafc; stroke: #d7dee9; stroke-width: 1; }
+      .bubble-user { fill: #111827; }
+      .bubble-system { fill: #f8fafc; stroke: #d7dee9; stroke-width: 1; }
+      .bubble-task { fill: #eff6ff; stroke: #bfdbfe; stroke-width: 1; }
+      .avatar { fill: #111827; }
+      .avatar-system { fill: #2563eb; }
+      .check { fill: #15803d; }
+      .pending { fill: #94a3b8; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1600" height="1000"/>
+  <g filter="url(#shadow)">
+    <rect class="window" x="58" y="54" width="1484" height="890" rx="22"/>
+    <rect class="chrome" x="58" y="54" width="1484" height="52" rx="22"/>
+    <path d="M58 84 Q58 54 88 54 H1512 Q1542 54 1542 84 V106 H58 Z" class="chrome"/>
+    <circle cx="88" cy="80" r="7" fill="#ef4444"/>
+    <circle cx="111" cy="80" r="7" fill="#f59e0b"/>
+    <circle cx="134" cy="80" r="7" fill="#22c55e"/>
+    <text class="muted caption" x="800" y="85" text-anchor="middle">AStock Lens · Conversation-first workspace</text>
+  </g>
+
+  <clipPath id="clip">
+    <rect x="58" y="106" width="1484" height="838"/>
+  </clipPath>
+
+  <g clip-path="url(#clip)">
+    <rect class="side" x="58" y="106" width="286" height="838"/>
+    <line class="line" x1="344" y1="106" x2="344" y2="944"/>
+    <rect fill="#ffffff" x="344" y="106" width="882" height="838"/>
+    <line class="line" x1="1226" y1="106" x2="1226" y2="944"/>
+    <rect class="right" x="1226" y="106" width="316" height="838"/>
+
+    <!-- Sidebar -->
+    <g transform="translate(84 132)">
+      <rect x="0" y="0" width="46" height="46" rx="12" fill="#111827"/>
+      <text x="23" y="29" text-anchor="middle" class="inverse h3">AL</text>
+      <text x="62" y="19" class="text h2">AStock Lens</text>
+      <text x="62" y="40" class="muted caption">对象线程，不是窗口</text>
+    </g>
+
+    <g transform="translate(84 210)">
+      <rect class="soft-card" x="0" y="0" width="232" height="48" rx="12"/>
+      <text class="muted caption" x="16" y="20">主入口</text>
+      <text class="text h3" x="16" y="39">问股票 / 验策略 / 说想法</text>
+      <text class="blue h3" x="206" y="32" text-anchor="middle">＋</text>
+    </g>
+
+    <text class="muted caption" x="84" y="298">最近对象</text>
+    <g transform="translate(78 314)">
+      <rect class="active-card" x="0" y="0" width="244" height="88" rx="14"/>
+      <text class="text h3" x="18" y="26">低估值资金流策略</text>
+      <text class="mono caption" x="18" y="49">idea · draft</text>
+      <text class="muted caption" x="18" y="70">正在和系统补全规则</text>
+      <rect class="blue-soft" x="166" y="18" width="58" height="24" rx="12"/>
+      <text class="blue caption" x="195" y="35" text-anchor="middle">想法</text>
+    </g>
+    <g transform="translate(78 418)">
+      <rect class="card" x="0" y="0" width="244" height="66" rx="13"/>
+      <text class="text h3" x="18" y="27">贵州茅台</text>
+      <text class="mono caption" x="18" y="49">600519 · 观察</text>
+      <rect class="gray-chip" x="172" y="20" width="52" height="24" rx="12"/>
+      <text class="muted caption" x="198" y="37" text-anchor="middle">单股</text>
+    </g>
+    <g transform="translate(78 496)">
+      <rect class="card" x="0" y="0" width="244" height="66" rx="13"/>
+      <text class="text h3" x="18" y="27">small-cap-size</text>
+      <text class="mono caption" x="18" y="49">v2.0 · 验证未通过</text>
+      <rect class="amber-soft" x="158" y="20" width="66" height="24" rx="12"/>
+      <text class="amber caption" x="191" y="37" text-anchor="middle">策略</text>
+    </g>
+
+    <g transform="translate(84 820)">
+      <line class="line" x1="0" y1="0" x2="232" y2="0"/>
+      <text class="muted caption" x="0" y="29">本地优先 · 只读证据</text>
+      <text class="mono tiny" x="0" y="52">Pi explain-only · no trade</text>
+    </g>
+
+    <!-- Header -->
+    <g>
+      <rect fill="#ffffff" x="344" y="106" width="882" height="102"/>
+      <line class="line" x1="344" y1="208" x2="1226" y2="208"/>
+      <text class="text h1" x="392" y="154">和系统一起打磨一个投资想法</text>
+      <text class="muted body" x="392" y="182">中间区域优先用于对话、澄清、任务推进；图形化结果进入单独视图。</text>
+      <g transform="translate(918 132)">
+        <rect class="blue-soft" x="0" y="0" width="76" height="28" rx="14"/>
+        <text class="blue caption" x="38" y="19" text-anchor="middle">对话优先</text>
+        <rect class="gray-chip" x="86" y="0" width="68" height="28" rx="14"/>
+        <text class="muted caption" x="120" y="19" text-anchor="middle">read-only</text>
+        <rect class="amber-soft" x="164" y="0" width="72" height="28" rx="14"/>
+        <text class="amber caption" x="200" y="19" text-anchor="middle">待补全</text>
+      </g>
+    </g>
+
+    <!-- Main conversation-first workspace -->
+    <g transform="translate(392 236)">
+      <rect class="card" x="0" y="0" width="786" height="586" rx="20" filter="url(#soft)"/>
+      <text class="text h2" x="28" y="40">当前对话流</text>
+      <text class="muted caption" x="28" y="64">用户通过模型与系统沟通，系统把自然语言变成可验证任务。</text>
+
+      <!-- user message -->
+      <g transform="translate(28 96)">
+        <rect class="avatar" x="0" y="0" width="34" height="34" rx="10"/>
+        <text class="inverse tiny" x="17" y="22" text-anchor="middle">你</text>
+        <rect class="bubble-user" x="50" y="0" width="610" height="76" rx="18"/>
+        <text class="inverse body" x="76" y="31">我想做一个策略：低估值、资金流改善，</text>
+        <text class="inverse body" x="76" y="54">但不要下跌趋势太强，每周调仓一次。</text>
+      </g>
+
+      <!-- system response -->
+      <g transform="translate(28 198)">
+        <rect class="avatar-system" x="0" y="0" width="34" height="34" rx="10"/>
+        <text class="inverse tiny" x="17" y="22" text-anchor="middle">AL</text>
+        <rect class="bubble-system" x="50" y="0" width="666" height="138" rx="18"/>
+        <text class="text h3" x="76" y="33">我先把这个想法拆成 3 个可验证问题。</text>
+        <text class="muted body" x="76" y="64">1. “低估值”用 PE、PB 还是组合分位？</text>
+        <text class="muted body" x="76" y="90">2. “资金流改善”看 3 日、5 日还是 20 日？</text>
+        <text class="muted body" x="76" y="116">3. 趋势过滤用 20/60 日收益，还是回撤阈值？</text>
+      </g>
+
+      <!-- task card -->
+      <g transform="translate(78 368)">
+        <rect class="bubble-task" x="0" y="0" width="666" height="126" rx="18"/>
+        <text class="blue h3" x="24" y="34">系统任务</text>
+        <g transform="translate(24 58)">
+          <circle class="check" cx="8" cy="8" r="8"/>
+          <text class="text caption" x="28" y="13">已识别对象：用户策略想法</text>
+          <circle class="check" cx="258" cy="8" r="8"/>
+          <text class="text caption" x="278" y="13">已选择 Skill：idea-parser</text>
+          <circle class="pending" cx="8" cy="50" r="8"/>
+          <text class="muted caption" x="28" y="55">等待用户补充阈值后再进入 Shadow 模拟</text>
+        </g>
+      </g>
+
+      <!-- visual link bar -->
+      <g transform="translate(78 520)">
+        <rect class="soft-card" x="0" y="0" width="666" height="44" rx="14"/>
+        <text class="muted caption" x="22" y="27">图形化结果已收纳：</text>
+        <text class="blue caption" x="150" y="27">visualizations / shadow-simulation-dashboard</text>
+        <text class="muted caption" x="474" y="27">不占用主沟通区</text>
+      </g>
+    </g>
+
+    <!-- Composer -->
+    <g transform="translate(420 854)">
+      <rect fill="#ffffff" stroke="#cbd5e1" stroke-width="1.4" x="0" y="0" width="738" height="62" rx="20" filter="url(#soft)"/>
+      <rect class="gray-chip" x="18" y="16" width="32" height="30" rx="10"/>
+      <text class="blue h3" x="34" y="37" text-anchor="middle">＋</text>
+      <text class="muted body" x="70" y="38">继续说明你的想法，或问“这个策略还缺什么？”</text>
+      <rect fill="#111827" x="646" y="12" width="76" height="38" rx="12"/>
+      <text class="inverse caption" x="684" y="36" text-anchor="middle">发送</text>
+    </g>
+
+    <!-- Right context panel -->
+    <g transform="translate(1254 132)">
+      <text class="text h2" x="0" y="0">上下文</text>
+      <text class="muted caption" x="0" y="24">只保留对当前沟通有帮助的信息。</text>
+
+      <g transform="translate(0 58)">
+        <rect class="card" x="0" y="0" width="242" height="108" rx="14"/>
+        <text class="text h3" x="18" y="30">当前对象</text>
+        <text class="muted caption" x="18" y="58">类型：用户策略想法</text>
+        <text class="muted caption" x="18" y="82">状态：草案，等待补全规则</text>
+      </g>
+
+      <g transform="translate(0 190)">
+        <rect class="card" x="0" y="0" width="242" height="126" rx="14"/>
+        <text class="text h3" x="18" y="30">启用 Skill</text>
+        <rect class="blue-soft" x="18" y="48" width="90" height="28" rx="14"/>
+        <text class="blue caption" x="63" y="67" text-anchor="middle">idea-parser</text>
+        <rect class="gray-chip" x="18" y="84" width="104" height="28" rx="14"/>
+        <text class="muted caption" x="70" y="103" text-anchor="middle">data-trust</text>
+      </g>
+
+      <g transform="translate(0 340)">
+        <rect class="card" x="0" y="0" width="242" height="146" rx="14"/>
+        <text class="text h3" x="18" y="30">系统边界</text>
+        <text class="muted caption" x="18" y="58">· 不直接宣布策略有效</text>
+        <text class="muted caption" x="18" y="82">· 不接交易执行</text>
+        <text class="muted caption" x="18" y="106">· 缺规则时先追问</text>
+        <text class="muted caption" x="18" y="130">· 验证前只做 Shadow</text>
+      </g>
+
+      <g transform="translate(0 510)">
+        <rect class="card" x="0" y="0" width="242" height="140" rx="14"/>
+        <text class="text h3" x="18" y="30">可追问</text>
+        <text class="blue caption" x="18" y="58">低估值用哪个指标？</text>
+        <text class="blue caption" x="18" y="82">先模拟会看到什么？</text>
+        <text class="blue caption" x="18" y="106">怎么判断是否过拟合？</text>
+      </g>
+
+      <g transform="translate(0 682)">
+        <rect class="blue-soft" x="0" y="0" width="242" height="58" rx="14"/>
+        <text class="blue h3" x="18" y="25">打开图形化视图</text>
+        <text class="muted caption" x="18" y="45">visualizations 子目录</text>
+      </g>
+    </g>
+  </g>
+</svg>

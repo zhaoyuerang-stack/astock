@@ -1,0 +1,337 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
+  <title id="title">AStock Lens 桌面端整体产品概念图</title>
+  <desc id="desc">一个本地优先、证据驱动、可追问的投资诊断工作台。左侧对象线程同时支持单股诊断、策略验证和用户想法模拟盘，中间展示用户想法到 Shadow 模拟盘，右侧展示证据、边界和 Skill。</desc>
+  <defs>
+    <filter id="windowShadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="22" stdDeviation="28" flood-color="#0f172a" flood-opacity="0.16"/>
+    </filter>
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#0f172a" flood-opacity="0.08"/>
+    </filter>
+    <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2563eb" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#2563eb" stop-opacity="0"/>
+    </linearGradient>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      .bg { fill: #eef2f7; }
+      .window { fill: #f8fafc; stroke: #d8dee8; stroke-width: 1; }
+      .titlebar { fill: #f3f6fb; }
+      .sidebar { fill: #f7f9fc; }
+      .panel { fill: #ffffff; stroke: #d7dee9; stroke-width: 1; }
+      .panel-soft { fill: #fbfcfe; stroke: #d7dee9; stroke-width: 1; }
+      .divider { stroke: #e3e8f0; stroke-width: 1; }
+      .text { fill: #111827; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Noto Sans SC", sans-serif; }
+      .muted { fill: #64748b; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Noto Sans SC", sans-serif; }
+      .subtle { fill: #94a3b8; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Noto Sans SC", sans-serif; }
+      .mono { fill: #334155; font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; }
+      .h1 { font-size: 30px; font-weight: 760; letter-spacing: 0; }
+      .h2 { font-size: 19px; font-weight: 720; letter-spacing: 0; }
+      .h3 { font-size: 15px; font-weight: 690; letter-spacing: 0; }
+      .body { font-size: 14px; font-weight: 450; letter-spacing: 0; }
+      .caption { font-size: 12px; font-weight: 520; letter-spacing: 0; }
+      .tiny { font-size: 11px; font-weight: 520; letter-spacing: 0; }
+      .badge { font-size: 12px; font-weight: 650; letter-spacing: 0; }
+      .active { fill: #eaf2ff; stroke: #9ec5ff; stroke-width: 1; }
+      .blue { fill: #2563eb; }
+      .blue-soft { fill: #eff6ff; stroke: #bfdbfe; stroke-width: 1; }
+      .green { fill: #15803d; }
+      .green-soft { fill: #eefbf2; stroke: #bbf7d0; stroke-width: 1; }
+      .amber { fill: #b45309; }
+      .amber-soft { fill: #fff7ed; stroke: #fed7aa; stroke-width: 1; }
+      .red { fill: #b91c1c; }
+      .red-soft { fill: #fef2f2; stroke: #fecaca; stroke-width: 1; }
+      .chip { fill: #f8fafc; stroke: #d7dee9; stroke-width: 1; }
+      .line { fill: none; stroke: #2563eb; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+      .gridline { stroke: #e7edf5; stroke-width: 1; }
+      .connector { stroke: #cbd5e1; stroke-width: 2; stroke-linecap: round; }
+      .dot { fill: #2563eb; stroke: #ffffff; stroke-width: 3; }
+      .step-done { fill: #15803d; }
+      .step-current { fill: #2563eb; }
+      .step-pending { fill: #94a3b8; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1600" height="1000"/>
+
+  <g filter="url(#windowShadow)">
+    <rect class="window" x="58" y="54" width="1484" height="890" rx="22"/>
+    <rect class="titlebar" x="58" y="54" width="1484" height="52" rx="22"/>
+    <path d="M58 84 Q58 54 88 54 H1512 Q1542 54 1542 84 V106 H58 Z" fill="#f3f6fb"/>
+    <circle cx="88" cy="80" r="7" fill="#ef4444"/>
+    <circle cx="111" cy="80" r="7" fill="#f59e0b"/>
+    <circle cx="134" cy="80" r="7" fill="#22c55e"/>
+    <text class="muted caption" x="782" y="85" text-anchor="middle">AStock Lens · 本地投资诊断与验证工作台</text>
+  </g>
+
+  <clipPath id="appClip">
+    <rect x="58" y="106" width="1484" height="838" rx="0"/>
+  </clipPath>
+
+  <g clip-path="url(#appClip)">
+    <rect class="sidebar" x="58" y="106" width="292" height="838"/>
+    <line class="divider" x1="350" y1="106" x2="350" y2="944"/>
+    <rect fill="#ffffff" x="350" y="106" width="850" height="838"/>
+    <line class="divider" x1="1200" y1="106" x2="1200" y2="944"/>
+    <rect fill="#fbfcfe" x="1200" y="106" width="342" height="838"/>
+
+    <!-- Sidebar -->
+    <g>
+      <g transform="translate(84 132)">
+        <rect x="0" y="0" width="48" height="48" rx="12" fill="#111827"/>
+        <text class="text h3" x="24" y="30" fill="#ffffff" text-anchor="middle">AL</text>
+        <text class="text h2" x="62" y="20">AStock Lens</text>
+        <text class="muted caption" x="62" y="42">对象线程 · Skill 工作流</text>
+      </g>
+
+      <g transform="translate(84 210)">
+        <rect class="panel-soft" x="0" y="0" width="238" height="48" rx="12"/>
+        <text class="muted caption" x="16" y="20">主入口</text>
+        <text class="text h3" x="16" y="39">新诊断 / 新验证 / 新想法</text>
+        <text class="blue h3" x="210" y="32" text-anchor="middle">＋</text>
+      </g>
+
+      <text class="muted caption" x="84" y="296">股票诊断</text>
+      <g transform="translate(78 310)">
+        <rect class="chip" x="0" y="0" width="248" height="62" rx="12"/>
+        <text class="text h3" x="18" y="24">贵州茅台</text>
+        <text class="mono caption" x="18" y="45">600519 · 观察</text>
+        <rect class="blue-soft" x="175" y="18" width="54" height="24" rx="12"/>
+        <text class="blue badge" x="202" y="35" text-anchor="middle">单股</text>
+      </g>
+      <g transform="translate(78 382)">
+        <rect class="chip" x="0" y="0" width="248" height="62" rx="12"/>
+        <text class="text h3" x="18" y="24">宁德时代</text>
+        <text class="mono caption" x="18" y="45">300750 · 风险升高</text>
+        <rect class="amber-soft" x="175" y="18" width="54" height="24" rx="12"/>
+        <text class="amber badge" x="202" y="35" text-anchor="middle">持仓</text>
+      </g>
+
+      <text class="muted caption" x="84" y="482">策略验证</text>
+      <g transform="translate(78 496)">
+        <rect class="chip" x="0" y="0" width="248" height="62" rx="12"/>
+        <text class="text h3" x="18" y="24">small-cap-size</text>
+        <text class="mono caption" x="18" y="45">v2.0 · DSR 未通过</text>
+        <rect class="red-soft" x="158" y="18" width="71" height="24" rx="12"/>
+        <text class="red badge" x="193.5" y="35" text-anchor="middle">验证中</text>
+      </g>
+
+      <text class="muted caption" x="84" y="596">想法 / 模拟盘</text>
+      <g transform="translate(78 610)">
+        <rect class="active" x="0" y="0" width="248" height="82" rx="14"/>
+        <text class="text h3" x="18" y="25">低估值资金流策略</text>
+        <text class="mono caption" x="18" y="47">Shadow · NAV 1.032</text>
+        <text class="muted caption" x="18" y="68">想法已结构化，模拟中</text>
+        <rect class="green-soft" x="166" y="18" width="63" height="24" rx="12"/>
+        <text class="green badge" x="197.5" y="35" text-anchor="middle">模拟盘</text>
+      </g>
+
+      <g transform="translate(84 824)">
+        <line class="divider" x1="0" y1="0" x2="238" y2="0"/>
+        <text class="muted caption" x="0" y="28">本地优先 · 只读证据</text>
+        <text class="mono tiny" x="0" y="50">127.0.0.1:8011 · Pi explain-only</text>
+      </g>
+    </g>
+
+    <!-- Main workspace header -->
+    <g>
+      <rect fill="#ffffff" x="350" y="106" width="850" height="96"/>
+      <line class="divider" x1="350" y1="202" x2="1200" y2="202"/>
+      <text class="text h1" x="386" y="154">低估值资金流策略</text>
+      <text class="muted body" x="386" y="181">用户想法 → 结构化规则 → 影子模拟盘 → 策略验证</text>
+      <g transform="translate(780 132)">
+        <rect class="amber-soft" x="0" y="0" width="78" height="28" rx="14"/>
+        <text class="amber badge" x="39" y="19" text-anchor="middle">想法草案</text>
+        <rect class="green-soft" x="88" y="0" width="66" height="28" rx="14"/>
+        <text class="green badge" x="121" y="19" text-anchor="middle">可模拟</text>
+        <rect class="chip" x="164" y="0" width="74" height="28" rx="14"/>
+        <text class="muted badge" x="201" y="19" text-anchor="middle">read-only</text>
+      </g>
+    </g>
+
+    <!-- Central scroll content -->
+    <g transform="translate(386 230)">
+      <!-- Idea card -->
+      <rect class="panel" x="0" y="0" width="778" height="184" rx="16" filter="url(#softShadow)"/>
+      <text class="text h2" x="24" y="36">用户想法卡</text>
+      <text class="muted caption" x="24" y="60">把一句模糊策略先翻译成可检查对象，不直接宣布有效。</text>
+      <rect class="panel-soft" x="24" y="82" width="332" height="76" rx="12"/>
+      <text class="muted caption" x="42" y="110">用户原话</text>
+      <text class="text body" x="42" y="136">选低估值、资金流改善、下跌趋势别太强，</text>
+      <text class="text body" x="42" y="156">每周调仓一次。</text>
+      <path class="connector" d="M376 120 H422"/>
+      <circle class="dot" cx="422" cy="120" r="6"/>
+      <rect class="blue-soft" x="446" y="82" width="306" height="76" rx="12"/>
+      <text class="blue caption" x="464" y="110">系统结构化理解</text>
+      <text class="text body" x="464" y="136">PE/PB 排序 + 资金流 5 日改善 + 趋势过滤</text>
+      <text class="text body" x="464" y="156">周频 · Top 20 · 成本锁定</text>
+
+      <!-- Rule breakdown -->
+      <g transform="translate(0 210)">
+        <rect class="panel" x="0" y="0" width="374" height="226" rx="16"/>
+        <text class="text h2" x="24" y="36">规则拆解</text>
+        <g transform="translate(24 62)">
+          <rect class="chip" x="0" y="0" width="326" height="34" rx="10"/>
+          <text class="muted caption" x="14" y="22">选股条件</text>
+          <text class="text caption" x="116" y="22">低估值 + 资金流改善</text>
+          <rect class="chip" x="0" y="46" width="326" height="34" rx="10"/>
+          <text class="muted caption" x="14" y="68">排除条件</text>
+          <text class="text caption" x="116" y="68">趋势破坏 / 数据缺失</text>
+          <rect class="chip" x="0" y="92" width="326" height="34" rx="10"/>
+          <text class="muted caption" x="14" y="114">调仓频率</text>
+          <text class="text caption" x="116" y="114">每周 · T+1 执行</text>
+          <rect class="amber-soft" x="0" y="138" width="326" height="34" rx="10"/>
+          <text class="amber caption" x="14" y="160">待补全</text>
+          <text class="text caption" x="116" y="160">低估值阈值、持仓数量</text>
+        </g>
+      </g>
+
+      <!-- Validation route -->
+      <g transform="translate(404 210)">
+        <rect class="panel" x="0" y="0" width="374" height="226" rx="16"/>
+        <text class="text h2" x="24" y="36">验证路线</text>
+        <text class="muted caption" x="24" y="60">从想法到可信策略，分阶段降级或前进。</text>
+        <g transform="translate(30 96)">
+          <line class="connector" x1="22" y1="18" x2="292" y2="18"/>
+          <circle class="step-done" cx="22" cy="18" r="10"/>
+          <text class="text tiny" x="22" y="52" text-anchor="middle">补规则</text>
+          <circle class="step-done" cx="88" cy="18" r="10"/>
+          <text class="text tiny" x="88" y="52" text-anchor="middle">数据检查</text>
+          <circle class="step-current" cx="156" cy="18" r="10"/>
+          <text class="blue tiny" x="156" y="52" text-anchor="middle">快速回测</text>
+          <circle class="step-current" cx="224" cy="18" r="10"/>
+          <text class="blue tiny" x="224" y="52" text-anchor="middle">Shadow</text>
+          <circle class="step-pending" cx="292" cy="18" r="10"/>
+          <text class="muted tiny" x="292" y="52" text-anchor="middle">9-Gate</text>
+        </g>
+        <rect class="panel-soft" x="24" y="166" width="326" height="36" rx="10"/>
+        <text class="muted caption" x="40" y="189">下一步</text>
+        <text class="text caption" x="112" y="189">确认阈值后启动影子模拟</text>
+      </g>
+
+      <!-- Shadow simulation -->
+      <g transform="translate(0 462)">
+        <rect class="panel" x="0" y="0" width="778" height="244" rx="16" filter="url(#softShadow)"/>
+        <text class="text h2" x="24" y="38">Shadow 模拟盘演示</text>
+        <text class="muted caption" x="24" y="62">只读影子账户，不连接交易；用于看机械执行会发生什么。</text>
+
+        <g transform="translate(24 88)">
+          <rect class="green-soft" x="0" y="0" width="116" height="58" rx="12"/>
+          <text class="green caption" x="14" y="22">当前净值</text>
+          <text class="text h2" x="14" y="46">1.032</text>
+          <rect class="chip" x="132" y="0" width="116" height="58" rx="12"/>
+          <text class="muted caption" x="146" y="22">最大回撤</text>
+          <text class="text h2" x="146" y="46">-3.8%</text>
+          <rect class="chip" x="264" y="0" width="116" height="58" rx="12"/>
+          <text class="muted caption" x="278" y="22">换手估计</text>
+          <text class="text h2" x="278" y="46">0.42x</text>
+        </g>
+
+        <g transform="translate(24 166)">
+          <line class="gridline" x1="0" y1="0" x2="360" y2="0"/>
+          <line class="gridline" x1="0" y1="34" x2="360" y2="34"/>
+          <line class="gridline" x1="0" y1="68" x2="360" y2="68"/>
+          <path d="M0 82 L0 55 C45 45, 72 66, 108 49 S170 38, 206 44 S268 18, 316 28 S348 20, 360 15 L360 100 L0 100 Z" fill="url(#chartFill)"/>
+          <path class="line" d="M0 55 C45 45, 72 66, 108 49 S170 38, 206 44 S268 18, 316 28 S348 20, 360 15"/>
+          <text class="muted tiny" x="0" y="122">影子净值曲线</text>
+        </g>
+
+        <g transform="translate(426 88)">
+          <text class="text h3" x="0" y="0">当前持仓示例</text>
+          <g transform="translate(0 20)">
+            <rect class="panel-soft" x="0" y="0" width="312" height="32" rx="8"/>
+            <text class="muted tiny" x="14" y="20">股票</text>
+            <text class="muted tiny" x="160" y="20">权重</text>
+            <text class="muted tiny" x="230" y="20">原因</text>
+            <line class="divider" x1="0" y1="42" x2="312" y2="42"/>
+            <text class="text caption" x="14" y="62">汇川技术</text>
+            <text class="mono caption" x="160" y="62">5.0%</text>
+            <text class="muted caption" x="230" y="62">估值/流入</text>
+            <line class="divider" x1="0" y1="78" x2="312" y2="78"/>
+            <text class="text caption" x="14" y="98">三一重工</text>
+            <text class="mono caption" x="160" y="98">4.8%</text>
+            <text class="muted caption" x="230" y="98">PB 改善</text>
+            <line class="divider" x1="0" y1="114" x2="312" y2="114"/>
+            <text class="text caption" x="14" y="134">东方雨虹</text>
+            <text class="mono caption" x="160" y="134">4.6%</text>
+            <text class="muted caption" x="230" y="134">资金流</text>
+          </g>
+        </g>
+      </g>
+    </g>
+
+    <!-- Right evidence panel -->
+    <g transform="translate(1230 132)">
+      <text class="text h2" x="0" y="0">证据与边界</text>
+      <text class="muted caption" x="0" y="24">所有结论必须能回到数据和 Skill。</text>
+
+      <g transform="translate(0 54)">
+        <text class="muted caption" x="0" y="0">启用 Skill</text>
+        <g transform="translate(0 14)">
+          <rect class="blue-soft" x="0" y="0" width="88" height="28" rx="14"/>
+          <text class="blue badge" x="44" y="19" text-anchor="middle">idea-parser</text>
+          <rect class="green-soft" x="96" y="0" width="116" height="28" rx="14"/>
+          <text class="green badge" x="154" y="19" text-anchor="middle">paper-simulation</text>
+          <rect class="chip" x="0" y="38" width="84" height="28" rx="14"/>
+          <text class="muted badge" x="42" y="57" text-anchor="middle">cost-check</text>
+        </g>
+      </g>
+
+      <g transform="translate(0 160)">
+        <rect class="panel" x="0" y="0" width="282" height="132" rx="14"/>
+        <text class="text h3" x="18" y="30">已用数据</text>
+        <text class="muted caption" x="18" y="56">· price/daily 后复权收益</text>
+        <text class="muted caption" x="18" y="80">· daily_basic 估值/市值</text>
+        <text class="muted caption" x="18" y="104">· moneyflow 资金流</text>
+      </g>
+
+      <g transform="translate(0 314)">
+        <rect class="panel" x="0" y="0" width="282" height="132" rx="14"/>
+        <text class="text h3" x="18" y="30">缺失定义</text>
+        <text class="amber caption" x="18" y="56">· 低估值阈值未确认</text>
+        <text class="amber caption" x="18" y="80">· 持仓数量未确认</text>
+        <text class="amber caption" x="18" y="104">· 资金流窗口需固定</text>
+      </g>
+
+      <g transform="translate(0 468)">
+        <rect class="panel" x="0" y="0" width="282" height="156" rx="14"/>
+        <text class="text h3" x="18" y="30">失败风险</text>
+        <text class="muted caption" x="18" y="56">· 可能只是小盘/行业暴露</text>
+        <text class="muted caption" x="18" y="80">· 换手成本可能吞噬收益</text>
+        <text class="muted caption" x="18" y="104">· 需要防未来函数检查</text>
+        <text class="muted caption" x="18" y="128">· 未通过 9-Gate 前不可实战</text>
+      </g>
+
+      <g transform="translate(0 648)">
+        <rect class="panel" x="0" y="0" width="282" height="118" rx="14"/>
+        <text class="text h3" x="18" y="30">下一步追问</text>
+        <text class="blue caption" x="18" y="56">为什么今天没有调仓？</text>
+        <text class="blue caption" x="18" y="80">如果改成月调仓会怎样？</text>
+        <text class="blue caption" x="18" y="104">它和小盘策略重复吗？</text>
+      </g>
+    </g>
+
+    <!-- Composer -->
+    <g transform="translate(430 860)">
+      <rect fill="#ffffff" stroke="#cbd5e1" stroke-width="1.4" x="0" y="0" width="690" height="58" rx="18" filter="url(#softShadow)"/>
+      <rect class="chip" x="18" y="15" width="30" height="28" rx="9"/>
+      <text class="muted h3" x="33" y="36" text-anchor="middle">＋</text>
+      <text class="muted body" x="66" y="36">问一只股票、验证一个策略，或描述你的投资想法…</text>
+      <rect fill="#111827" x="600" y="10" width="74" height="38" rx="12"/>
+      <text class="text badge" x="637" y="34" text-anchor="middle" fill="#ffffff">发送</text>
+    </g>
+
+    <!-- Concept strip -->
+    <g transform="translate(386 812)">
+      <rect class="panel-soft" x="0" y="0" width="778" height="32" rx="10"/>
+      <text class="muted caption" x="18" y="21">产品主线：</text>
+      <text class="text caption" x="88" y="21">单股诊断是入口</text>
+      <text class="subtle caption" x="205" y="21">·</text>
+      <text class="text caption" x="224" y="21">策略验证是专业壁垒</text>
+      <text class="subtle caption" x="371" y="21">·</text>
+      <text class="text caption" x="390" y="21">用户想法模拟盘是粘性</text>
+    </g>
+  </g>
+</svg>

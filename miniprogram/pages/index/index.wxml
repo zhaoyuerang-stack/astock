@@ -1,0 +1,126 @@
+<view class="page">
+  <!-- 额度条 -->
+  <view class="quota-bar">
+    <view class="quota-left">
+      <text class="quota-label">本月额度</text>
+      <text class="mono quota-num">{{tokenBalance}}</text>
+      <text class="quota-total">/ {{tokenQuota}} token</text>
+    </view>
+    <view class="plan-tag {{plan}}">{{planText}}</view>
+  </view>
+
+  <!-- 免责条 -->
+  <view class="disclaimer-bar">研究方法学工具 · 不构成投资建议</view>
+
+  <!-- 对话区 -->
+  <scroll-view class="chat-area" scroll-y scroll-into-view="{{scrollAnchor}}" scroll-with-animation enhanced show-scrollbar="{{false}}">
+    <view class="msg-list">
+      <!-- 助手欢迎 -->
+      <view class="msg bot">
+        <view class="avatar bot">AI</view>
+        <view class="bubble bot">
+          <text>你好,我是策略审计助手。描述你的策略,我帮你跑 9-Gate 机构级审计。</text>
+          <view class="chips">
+            <view class="chip" bindtap="onChipTap" data-text="动量因子月调仓">动量因子月调仓</view>
+            <view class="chip" bindtap="onChipTap" data-text="价值+质量双因子">价值+质量双因子</view>
+            <view class="chip" bindtap="onChipTap" data-text="小市值低流动性">小市值低流动性</view>
+            <view class="chip" bindtap="onChipTap" data-text="反转策略周调仓">反转策略周调仓</view>
+          </view>
+          <view class="ts">{{welcomeTime}}</view>
+        </view>
+      </view>
+
+      <!-- 消息循环 -->
+      <block wx:for="{{messages}}" wx:key="id">
+        <!-- 用户消息 -->
+        <view wx:if="{{item.role === 'user'}}" class="msg user" id="msg-{{item.id}}">
+          <view class="avatar user">我</view>
+          <view class="bubble user">
+            <text>{{item.text}}</text>
+            <view class="ts user-ts">{{item.time}}</view>
+          </view>
+        </view>
+
+        <!-- 助手消息 -->
+        <view wx:else class="msg bot" id="msg-{{item.id}}">
+          <view class="avatar bot">AI</view>
+          <view class="bubble bot">
+            <text wx:if="{{item.text}}">{{item.text}}</text>
+
+            <!-- Spec 确认卡 -->
+            <view wx:if="{{item.type === 'spec'}}" class="inset-card">
+              <view class="inset-header">
+                <text class="inset-title">审计参数</text>
+                <text class="inset-tag amber">{{spec.auditType}} · {{spec.tokenCost}} token</text>
+              </view>
+              <view class="inset-body">
+                <view class="inset-row"><text class="k">股票池</text><text class="v">{{spec.spec.universe}}</text></view>
+                <view class="inset-row"><text class="k">调仓频率</text><text class="v">{{spec.spec.rebalance}}</text></view>
+                <view class="inset-row"><text class="k">因子</text><text class="v">{{spec.spec.factors}}</text></view>
+                <view class="inset-row"><text class="k">持仓数</text><text class="v mono num">{{spec.spec.holdings}}</text></view>
+                <view class="inset-row"><text class="k">权重</text><text class="v">{{spec.spec.weighting}}</text></view>
+                <view class="inset-row"><text class="k">中性化</text><text class="v">{{spec.spec.neutralization}}</text></view>
+                <view class="inset-row"><text class="k">成本模型</text><text class="v">{{spec.spec.costModel}}</text></view>
+                <view class="inset-row"><text class="k">样本</text><text class="v">{{spec.spec.sample}}</text></view>
+              </view>
+            </view>
+
+            <!-- Job 卡 -->
+            <view wx:if="{{item.type === 'job'}}" class="inset-card">
+              <view class="inset-header">
+                <text class="inset-title">任务 {{job.jobId}}</text>
+                <text class="inset-tag warn">运行中</text>
+              </view>
+              <view class="inset-body">
+                <view class="inset-row"><text class="k">预计耗时</text><text class="v mono num">{{job.estimatedTime}}</text></view>
+                <view class="inset-row"><text class="k">消耗</text><text class="v mono num">{{job.tokenCost}} token · 余额 {{job.tokenBalanceAfter}}</text></view>
+                <view class="progress-bar"><view class="progress-fill"></view></view>
+                <view class="inset-row"><text class="k">当前阶段</text><text class="v">{{job.currentStage}}</text></view>
+              </view>
+            </view>
+
+            <!-- Result 卡 -->
+            <view wx:if="{{item.type === 'result'}}" class="inset-card result-card">
+              <view class="inset-header result-header">
+                <text class="inset-title danger">裁决</text>
+                <text class="inset-tag danger">不可行</text>
+              </view>
+              <view class="inset-body">
+                <view class="verdict-text">FALSIFIED</view>
+                <view class="verdict-reason">9 门中 4 门未通过。DSR p=0.086 无法排除过拟合,成本衰减吃掉 40% alpha。</view>
+                <view class="verdict-link" bindtap="goReport">查看完整 9-Gate 报告 ›</view>
+              </view>
+            </view>
+
+            <!-- 确认按钮组 -->
+            <view wx:if="{{item.type === 'spec'}}" class="chips">
+              <view class="chip primary" bindtap="onConfirmSubmit">确认提交</view>
+              <view class="chip" bindtap="onModifyCancel">修改参数</view>
+              <view class="chip" bindtap="onModifyCancel">取消</view>
+            </view>
+
+            <view class="ts">{{item.time}}</view>
+          </view>
+        </view>
+      </block>
+    </view>
+  </scroll-view>
+
+  <!-- 输入栏 -->
+  <view class="input-bar">
+    <view class="input-row">
+      <view class="input-field">
+        <input
+          class="input"
+          placeholder="描述你的策略..."
+          placeholder-class="input-placeholder"
+          value="{{inputText}}"
+          bindinput="onInput"
+          bindconfirm="onSend"
+          confirm-type="send"
+        />
+      </view>
+      <button class="send-btn {{inputText ? '' : 'disabled'}}" bindtap="onSend">发送</button>
+    </view>
+  </view>
+</view>

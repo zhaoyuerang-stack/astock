@@ -1,0 +1,8 @@
+{
+  "navigationBarTitleText": "策略审计助手",
+  "navigationBarBackgroundColor": "#F1EFE8",
+  "navigationBarTextStyle": "black",
+  "backgroundColor": "#F1EFE8",
+  "enablePullDownRefresh": false,
+  "usingComponents": {}
+}

@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<!--
+Assumptions:
+- This prototype fixes the previous UX error: users enter strategy ideas like WeChat, through text or voice, not through a form-first workflow.
+- Credit estimation appears only after the assistant has understood the idea and asked for missing constraints.
+- The page is a product interaction prototype; numbers are sample UI copy and must be wired to real tenant, usage, and credit ledgers before production.
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>策略审计助手 · 微信式输入原型</title>
+  <style>
+    :root {
+      --wechat: #07c160;
+      --wechat-dark: #0b7f45;
+      --bg: #edf1f4;
+      --chat-bg: #ededed;
+      --panel: #ffffff;
+      --ink: #111827;
+      --muted: #667085;
+      --faint: #98a2b3;
+      --line: #d8dee5;
+      --soft: #f7f9fb;
+      --blue: #1e6091;
+      --blue-soft: #e7f1fa;
+      --amber: #9a6416;
+      --amber-soft: #fff4dc;
+      --red: #b42318;
+      --red-soft: #feeceb;
+      --green-soft: #e7f7ef;
+      --shadow: 0 22px 70px rgba(16, 24, 40, 0.14);
+      --radius: 8px;
+      --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--sans);
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, rgba(17, 24, 39, 0.045) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(17, 24, 39, 0.045) 1px, transparent 1px),
+        var(--bg);
+      background-size: 40px 40px;
+    }
+
+    button, input {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .stage {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(360px, 414px) minmax(360px, 540px);
+      gap: 42px;
+      align-items: center;
+      justify-content: center;
+      padding: 42px;
+    }
+
+    .phone-shell {
+      width: 390px;
+      height: 844px;
+      padding: 12px;
+      border-radius: 38px;
+      background: #101820;
+      box-shadow: var(--shadow);
+    }
+
+    .phone-screen {
+      height: 100%;
+      border-radius: 28px;
+      overflow: hidden;
+      background: var(--chat-bg);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mini-header {
+      height: 52px;
+      flex: 0 0 auto;
+      display: grid;
+      grid-template-columns: 40px 1fr 80px;
+      align-items: center;
+      padding: 0 12px;
+      background: #f7f7f7;
+      border-bottom: 1px solid #d6d6d6;
+    }
+
+    .header-icon {
+      width: 30px;
+      height: 30px;
+      border: 0;
+      background: transparent;
+      color: #4b5563;
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .title-block {
+      text-align: center;
+      min-width: 0;
+    }
+
+    .title {
+      font-size: 16px;
+      line-height: 1.1;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      margin-top: 3px;
+      font-size: 10px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .header-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .capsule {
+      width: 70px;
+      height: 28px;
+      border: 1px solid #c7c7cc;
+      border-radius: 99px;
+      background: rgba(255, 255, 255, 0.72);
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      color: #3f3f46;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .credit-strip {
+      flex: 0 0 auto;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+      padding: 9px 14px;
+      background: #fbfcfd;
+      border-bottom: 1px solid var(--line);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .credit-strip b {
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .chat {
+      flex: 1;
+      overflow: auto;
+      padding: 14px 12px 12px;
+    }
+
+    .chat::-webkit-scrollbar {
+      width: 0;
+    }
+
+    .time-divider {
+      width: fit-content;
+      margin: 0 auto 14px;
+      padding: 3px 8px;
+      color: #8a8f98;
+      background: rgba(255, 255, 255, 0.55);
+      border-radius: 4px;
+      font-size: 11px;
+    }
+
+    .message {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      align-items: flex-start;
+    }
+
+    .message.user {
+      flex-direction: row-reverse;
+    }
+
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 6px;
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .avatar.bot {
+      background: #123625;
+    }
+
+    .avatar.user {
+      background: #2f6bda;
+    }
+
+    .bubble {
+      max-width: 276px;
+      padding: 9px 11px;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.55;
+      position: relative;
+      word-break: break-word;
+    }
+
+    .bot .bubble {
+      background: #fff;
+      border-top-left-radius: 2px;
+    }
+
+    .user .bubble {
+      background: #95ec69;
+      border-top-right-radius: 2px;
+    }
+
+    .voice-bubble {
+      min-width: 184px;
+      height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-weight: 700;
+    }
+
+    .wave {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      height: 18px;
+    }
+
+    .wave i {
+      width: 3px;
+      border-radius: 99px;
+      background: #1f2937;
+      opacity: 0.8;
+    }
+
+    .wave i:nth-child(1) { height: 6px; }
+    .wave i:nth-child(2) { height: 12px; }
+    .wave i:nth-child(3) { height: 18px; }
+    .wave i:nth-child(4) { height: 10px; }
+    .wave i:nth-child(5) { height: 14px; }
+
+    .transcript {
+      margin-top: 8px;
+      padding: 8px 9px;
+      border: 1px solid #b7e1c9;
+      background: rgba(255, 255, 255, 0.48);
+      border-radius: 7px;
+      color: #1f2937;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .card {
+      margin-top: 8px;
+      border: 1px solid var(--line);
+      background: #fbfcfd;
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .card-head {
+      padding: 11px 12px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .card-sub {
+      margin-top: 3px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .badge {
+      flex: 0 0 auto;
+      padding: 4px 7px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 800;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--muted);
+    }
+
+    .badge.green {
+      color: var(--wechat-dark);
+      border-color: #b9dfc9;
+      background: var(--green-soft);
+    }
+
+    .badge.amber {
+      color: var(--amber);
+      border-color: #eed39f;
+      background: var(--amber-soft);
+    }
+
+    .rule-list {
+      padding: 6px 12px 10px;
+    }
+
+    .rule {
+      display: grid;
+      grid-template-columns: 68px 1fr;
+      gap: 10px;
+      padding: 7px 0;
+      border-bottom: 1px solid #edf1f5;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .rule:last-child {
+      border-bottom: 0;
+    }
+
+    .rule b {
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 9px;
+    }
+
+    .chip {
+      border: 1px solid #bcd9cb;
+      background: #fff;
+      color: var(--wechat-dark);
+      border-radius: 99px;
+      padding: 6px 9px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .cost {
+      padding: 12px;
+    }
+
+    .cost-main {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+
+    .credits {
+      font-size: 28px;
+      line-height: 1;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .credits small {
+      display: block;
+      margin-top: 5px;
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .cost-lines {
+      border-top: 1px solid #e9eef3;
+      padding-top: 6px;
+    }
+
+    .cost-line {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .cost-line strong {
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1.4fr;
+      gap: 8px;
+      padding: 0 12px 12px;
+    }
+
+    .secondary, .primary {
+      border-radius: 7px;
+      padding: 10px 8px;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .secondary {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .primary {
+      border: 1px solid var(--wechat-dark);
+      background: var(--wechat-dark);
+      color: #fff;
+    }
+
+    .composer {
+      flex: 0 0 auto;
+      background: #f6f6f6;
+      border-top: 1px solid #d6d6d6;
+      padding: 8px 8px 12px;
+    }
+
+    .mode-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 4px 7px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .mode-tabs {
+      display: inline-flex;
+      padding: 2px;
+      border: 1px solid #d0d5dd;
+      border-radius: 99px;
+      background: #fff;
+      gap: 2px;
+    }
+
+    .mode-tabs button {
+      border: 0;
+      border-radius: 99px;
+      background: transparent;
+      padding: 4px 10px;
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .mode-tabs button.active {
+      background: var(--wechat);
+      color: #fff;
+    }
+
+    .input-row {
+      display: grid;
+      grid-template-columns: 34px 1fr 34px;
+      gap: 7px;
+      align-items: center;
+    }
+
+    .round {
+      width: 34px;
+      height: 34px;
+      border-radius: 99px;
+      border: 1px solid #c7c7cc;
+      background: #fff;
+      color: #4b5563;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+    }
+
+    .input-box, .voice-input {
+      min-height: 36px;
+      border: 1px solid #c7c7cc;
+      background: #fff;
+      border-radius: 6px;
+      padding: 8px 10px;
+      color: #6b7280;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+    }
+
+    .voice-input {
+      justify-content: center;
+      font-weight: 800;
+      color: #111827;
+      user-select: none;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .inspector {
+      max-width: 540px;
+    }
+
+    .inspector h1 {
+      margin: 0;
+      font-size: 35px;
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+
+    .inspector .lead {
+      margin: 14px 0 22px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .ux-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .ux-card {
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.76);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      min-height: 120px;
+    }
+
+    .ux-card .k {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .ux-card .v {
+      font-size: 20px;
+      font-weight: 900;
+      line-height: 1.18;
+    }
+
+    .ux-card .note {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .flow {
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .flow-title {
+      font-weight: 900;
+      margin-bottom: 12px;
+    }
+
+    .flow-step {
+      display: grid;
+      grid-template-columns: 26px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .flow-step:last-child {
+      border-bottom: 0;
+    }
+
+    .num {
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      background: var(--soft);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    .flow-step b {
+      display: block;
+      font-size: 13px;
+    }
+
+    .flow-step span {
+      display: block;
+      margin-top: 3px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .tag {
+      padding: 4px 8px;
+      border-radius: 99px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .tag.green {
+      color: var(--wechat-dark);
+      background: var(--green-soft);
+      border-color: #b9dfc9;
+    }
+
+    .tag.amber {
+      color: var(--amber);
+      background: var(--amber-soft);
+      border-color: #eed39f;
+    }
+
+    .critique {
+      margin-top: 14px;
+      padding: 12px;
+      border: 1px dashed #b8c4d0;
+      border-radius: var(--radius);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 940px) {
+      .stage {
+        grid-template-columns: 1fr;
+        padding: 24px;
+      }
+
+      .phone-shell, .inspector {
+        margin: 0 auto;
+      }
+    }
+
+    @media (max-width: 460px) {
+      .stage {
+        padding: 0;
+        background: #101820;
+      }
+
+      .phone-shell {
+        width: 100vw;
+        height: 100vh;
+        border-radius: 0;
+        padding: 0;
+        box-shadow: none;
+      }
+
+      .phone-screen {
+        border-radius: 0;
+      }
+
+      .inspector {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <section class="phone-shell" aria-label="微信式小程序策略审计原型">
+      <div class="phone-screen">
+        <header class="mini-header">
+          <button class="header-icon" aria-label="返回">‹</button>
+          <div class="title-block">
+            <div class="title">策略审计助手</div>
+            <div class="subtitle">可语音输入 · 先理解再计费</div>
+          </div>
+          <div class="header-actions" aria-label="小程序菜单">
+            <div class="capsule"><span>···</span><span>○</span></div>
+          </div>
+        </header>
+
+        <div class="credit-strip">
+          <span>个人租户 KIKI-001</span>
+          <span>可用 <b>2,640</b> credits</span>
+        </div>
+
+        <section class="chat" aria-label="对话区">
+          <div class="time-divider">今天 10:31</div>
+
+          <div class="message bot">
+            <div class="avatar bot">审</div>
+            <div class="bubble">
+              直接说你的策略想法就行。我会先帮你翻译成可验证规则，发现条件不清楚会追问；正式回测前才会让你确认 credit。
+              <div class="chips">
+                <button class="chip">我想测一个动量策略</button>
+                <button class="chip">帮我审计估值反转</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="message user">
+            <div class="avatar user">我</div>
+            <div>
+              <div class="bubble voice-bubble">
+                <span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+                <span>12''</span>
+              </div>
+              <div class="transcript">语音转文字：买最近 20 日上涨、成交量放大、估值不要太高、流动性好的股票。</div>
+            </div>
+          </div>
+
+          <div class="message bot">
+            <div class="avatar bot">审</div>
+            <div class="bubble">
+              我理解你的想法是「动量 + 放量 + 估值过滤 + 流动性过滤」。还差两个关键条件，否则回测口径会漂移。
+              <div class="chips">
+                <button class="chip">每周调仓</button>
+                <button class="chip">每月调仓</button>
+                <button class="chip">持有 20 只</button>
+                <button class="chip">持有 50 只</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="message user">
+            <div class="avatar user">我</div>
+            <div class="bubble">每周调仓，持有前 20 只，默认扣成本。</div>
+          </div>
+
+          <div class="message bot">
+            <div class="avatar bot">审</div>
+            <div class="bubble">
+              好，我先按下面规则审计。你可以改，也可以直接进入费用确认。
+              <div class="card">
+                <div class="card-head">
+                  <div>
+                    <div class="card-title">已翻译为受控规则</div>
+                    <div class="card-sub">不执行用户代码，只执行受控 DSL</div>
+                  </div>
+                  <span class="badge green">可审计</span>
+                </div>
+                <div class="rule-list">
+                  <div class="rule"><b>选股</b><span>20 日收益率靠前，20 日成交额均值上升。</span></div>
+                  <div class="rule"><b>过滤</b><span>PE 分位低于 60%，排除 ST、停牌、成交额不足。</span></div>
+                  <div class="rule"><b>组合</b><span>每周调仓，等权持有前 20 只，T+1 执行。</span></div>
+                  <div class="rule"><b>成本</b><span>默认包含佣金、滑点、换手和不可交易约束。</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="message bot">
+            <div class="avatar bot">审</div>
+            <div class="bubble">
+              标准审计预计如下。确认后先冻结，完成后按实际消耗结算，多余 credits 自动退回。
+              <div class="card">
+                <div class="card-head">
+                  <div>
+                    <div class="card-title">费用确认</div>
+                    <div class="card-sub">Reserve → Capture，不成功不扣满额</div>
+                  </div>
+                  <span class="badge amber">待确认</span>
+                </div>
+                <div class="cost">
+                  <div class="cost-main">
+                    <div class="credits">363<small>预计冻结 credits</small></div>
+                    <span class="badge green">余额足够</span>
+                  </div>
+                  <div class="cost-lines">
+                    <div class="cost-line"><span>策略解析</span><strong>18</strong></div>
+                    <div class="cost-line"><span>可行性检查</span><strong>35</strong></div>
+                    <div class="cost-line"><span>回测计算</span><strong>120</strong></div>
+                    <div class="cost-line"><span>样本外验证</span><strong>160</strong></div>
+                    <div class="cost-line"><span>报告生成</span><strong>30</strong></div>
+                  </div>
+                </div>
+                <div class="actions">
+                  <button class="secondary">先快速审计</button>
+                  <button class="primary">冻结 363 并开始</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <footer class="composer">
+          <div class="mode-row">
+            <span>输入策略想法</span>
+            <div class="mode-tabs" aria-label="输入模式">
+              <button id="textMode" class="active">文字</button>
+              <button id="voiceMode">语音</button>
+            </div>
+          </div>
+          <div class="input-row">
+            <button class="round" aria-label="切换输入">⌘</button>
+            <div id="textInput" class="input-box">例如：我想测一个低估值反转策略</div>
+            <div id="voiceInput" class="voice-input hidden">按住 说话</div>
+            <button class="round" aria-label="更多">＋</button>
+          </div>
+        </footer>
+      </div>
+    </section>
+
+    <aside class="inspector" aria-label="设计说明">
+      <h1>入口必须像微信：先说话，再确认规则，最后才谈 credits。</h1>
+      <p class="lead">上一版的问题是把系统账务逻辑放到了用户动作之前。新版把用户路径改为聊天流：语音/文字输入、系统追问缺失条件、生成受控规则、弹出费用确认卡。商业模式没有消失，只是放到用户已经建立理解之后。</p>
+
+      <section class="ux-grid">
+        <div class="ux-card">
+          <div class="k">默认行为</div>
+          <div class="v">打字 / 按住说话</div>
+          <div class="note">底部输入栏常驻，和微信聊天心智一致。</div>
+        </div>
+        <div class="ux-card">
+          <div class="k">系统职责</div>
+          <div class="v">先追问，不急着跑</div>
+          <div class="note">缺调仓频率、持仓数量、成本口径时先补齐。</div>
+        </div>
+        <div class="ux-card">
+          <div class="k">计费时机</div>
+          <div class="v">确认后冻结</div>
+          <div class="note">credit 卡片是对话结果，不是页面起点。</div>
+        </div>
+        <div class="ux-card">
+          <div class="k">安全边界</div>
+          <div class="v">受控 DSL</div>
+          <div class="note">用户表达自由，系统执行受控，避免任意代码风险。</div>
+        </div>
+      </section>
+
+      <section class="flow">
+        <div class="flow-title">新版体验链路</div>
+        <div class="flow-step">
+          <div class="num">01</div>
+          <div><b>输入</b><span>用户打字或语音说出策略想法。</span></div>
+          <span class="tag green">自然</span>
+        </div>
+        <div class="flow-step">
+          <div class="num">02</div>
+          <div><b>理解</b><span>系统转写、抽取条件、发现缺失字段。</span></div>
+          <span class="tag">低成本</span>
+        </div>
+        <div class="flow-step">
+          <div class="num">03</div>
+          <div><b>追问</b><span>用快捷选项补齐调仓、持仓、成本等口径。</span></div>
+          <span class="tag green">降低负担</span>
+        </div>
+        <div class="flow-step">
+          <div class="num">04</div>
+          <div><b>确认</b><span>展示受控规则和 credit 预估。</span></div>
+          <span class="tag amber">冻结前</span>
+        </div>
+        <div class="flow-step">
+          <div class="num">05</div>
+          <div><b>审计</b><span>冻结 credit 后进入 tenant 隔离的异步任务。</span></div>
+          <span class="tag">后台</span>
+        </div>
+      </section>
+
+      <div class="critique">
+        对抗性审查：这个版本仍要防两个风险。第一，聊天流不能让用户误以为这是荐股助手，所以文案必须一直叫「审计」而不是「推荐」。第二，语音识别后的规则必须让用户确认，否则转写错误会直接污染回测口径。
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    const textMode = document.getElementById("textMode");
+    const voiceMode = document.getElementById("voiceMode");
+    const textInput = document.getElementById("textInput");
+    const voiceInput = document.getElementById("voiceInput");
+
+    textMode.addEventListener("click", () => {
+      textMode.classList.add("active");
+      voiceMode.classList.remove("active");
+      textInput.classList.remove("hidden");
+      voiceInput.classList.add("hidden");
+    });
+
+    voiceMode.addEventListener("click", () => {
+      voiceMode.classList.add("active");
+      textMode.classList.remove("active");
+      voiceInput.classList.remove("hidden");
+      textInput.classList.add("hidden");
+    });
+
+    voiceInput.addEventListener("mousedown", () => {
+      voiceInput.textContent = "正在听...";
+      voiceInput.style.background = "#e7f7ef";
+      voiceInput.style.borderColor = "#97d6b2";
+    });
+
+    voiceInput.addEventListener("mouseup", () => {
+      voiceInput.textContent = "按住 说话";
+      voiceInput.style.background = "#fff";
+      voiceInput.style.borderColor = "#c7c7cc";
+    });
+
+    window.addEventListener("load", () => {
+      const chat = document.querySelector(".chat");
+      chat.scrollTop = chat.scrollHeight;
+    });
+  </script>
+</body>
+</html>

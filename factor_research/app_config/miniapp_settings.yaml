@@ -1,0 +1,58 @@
+# 小程序专用配置 —— 微信小程序 SaaS(策略可行性审计)
+# 修改后无需重启代码,services.read.miniapp_auth 启动时读取。
+# ⚠️ 镜像文件:实际运行于 factor_research/app_config/miniapp_settings.yaml,修改请同步两边。
+
+# 微信小程序凭据(从微信公众平台获取)。
+# 留空 → 开发模式:wx_login 用 code 哈希生成伪 openid,不调微信 API(本地联调可用)。
+wechat:
+  appid: ""        # 例: wx0123456789abcdef
+  secret: ""       # 例: a1b2c3d4e5f6...
+
+# 会话
+session:
+  ttl_seconds: 7200          # access_token 有效期(秒)
+  refresh_ttl_seconds: 2592000  # refresh_token 有效期(30 天)
+
+# 用户额度(新用户默认值)
+quota:
+  default_plan: free         # free | pro | max
+  free_quota: 3              # 体验版每月 token
+  pro_quota: 30              # 基础会员每月 token
+  max_quota: 120             # 专业版每月 token
+  audit_cost: 3              # 单次审计消耗 token
+
+# 限流(openid 维度,滑动窗口)
+rate_limit:
+  per_openid_per_day: 200    # 每 openid 每天总请求数
+  audit_per_day: 5           # 每 openid 每天审计次数
+
+# 脱敏规则(MINIPROGRAM_ARCHITECTURE §合规四道防线)
+desensitization:
+  # 指令词 → 研究观察池话术(信号非指令)
+  action_map:
+    BUY: "进入研究观察池"
+    SELL: "移出研究观察池"
+    HOLD: "维持观察"
+  # 关键词黑名单(命中即拒绝/替换,合规风险)
+  keyword_blacklist:
+    - "必涨"
+    - "稳赚"
+    - "内幕"
+    - "荐股"
+    - "跟单"
+    - "包赚"
+    - "涨停板"
+    - "代客理财"
+    - "保本"
+  # 免责声明(每条响应注入)
+  disclaimer: "本工具为研究方法学分析工具,审计结果基于公开市场历史数据,不构成任何投资建议。"
+
+# 订阅消息模板(微信公众平台申请后填入)
+subscribe_templates:
+  daily_brief: ""        # 每日策略简报
+  decay_alert: ""        # 衰减告警
+  audit_complete: ""     # 审计完成通知
+
+# 持久化目录(相对 factor_research/ 根)
+storage:
+  data_dir: "data_lake/miniapp"

@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<!--
+Assumptions:
+- Retail users want the next actionable view after a strategy audit: "which stocks match this strategy today?"
+- Compliance language avoids direct "buy" commands. The UI says "research candidates", "matches strategy", and "tradability passed".
+- All stock rows are sample data for layout only, not real recommendations.
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>策略审计 · 股票候选页原型</title>
+  <style>
+    :root {
+      --bg: #eef2f5;
+      --screen: #f5f7f9;
+      --panel: #ffffff;
+      --soft: #f7f9fb;
+      --ink: #111827;
+      --muted: #667085;
+      --faint: #98a2b3;
+      --line: #d8dee5;
+      --line-strong: #c4ced8;
+      --green: #0b7f45;
+      --green-soft: #e6f6ee;
+      --blue: #1d5f94;
+      --blue-soft: #e7f1fa;
+      --amber: #99640f;
+      --amber-soft: #fff3d8;
+      --red: #b42318;
+      --red-soft: #feeceb;
+      --shadow: 0 22px 70px rgba(16, 24, 40, 0.14);
+      --radius: 8px;
+      --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--sans);
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, rgba(17, 24, 39, 0.045) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(17, 24, 39, 0.045) 1px, transparent 1px),
+        var(--bg);
+      background-size: 40px 40px;
+    }
+
+    button {
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .stage {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(360px, 414px) minmax(360px, 540px);
+      gap: 42px;
+      align-items: center;
+      justify-content: center;
+      padding: 42px;
+    }
+
+    .phone-shell {
+      width: 390px;
+      height: 844px;
+      padding: 12px;
+      border-radius: 38px;
+      background: #101820;
+      box-shadow: var(--shadow);
+    }
+
+    .phone-screen {
+      height: 100%;
+      border-radius: 28px;
+      overflow: hidden;
+      background: var(--screen);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .mini-header {
+      height: 52px;
+      flex: 0 0 auto;
+      display: grid;
+      grid-template-columns: 42px 1fr 76px;
+      align-items: center;
+      padding: 0 12px;
+      background: #fdfdfd;
+      border-bottom: 1px solid #d6d6d6;
+    }
+
+    .header-icon {
+      width: 30px;
+      height: 30px;
+      border: 0;
+      background: transparent;
+      color: #4b5563;
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .title-block {
+      text-align: center;
+      min-width: 0;
+    }
+
+    .title {
+      font-size: 16px;
+      line-height: 1.15;
+      font-weight: 800;
+    }
+
+    .subtitle {
+      margin-top: 3px;
+      font-size: 10px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .capsule {
+      width: 68px;
+      height: 28px;
+      border: 1px solid #c7c7cc;
+      border-radius: 99px;
+      background: rgba(255, 255, 255, 0.72);
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      color: #3f3f46;
+      font-weight: 800;
+      letter-spacing: 0;
+      margin-left: auto;
+    }
+
+    .content {
+      flex: 1;
+      overflow: auto;
+      padding: 12px;
+    }
+
+    .content::-webkit-scrollbar { width: 0; }
+
+    .notice {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      margin-bottom: 10px;
+      border-radius: var(--radius);
+      border: 1px solid #ecd39e;
+      background: var(--amber-soft);
+      color: #7a4f0a;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 99px;
+      background: currentColor;
+      flex: 0 0 auto;
+    }
+
+    .summary {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .summary-main {
+      padding: 13px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .strategy-label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .strategy-name {
+      margin-top: 5px;
+      font-size: 16px;
+      font-weight: 900;
+    }
+
+    .verdict-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 10px 12px 12px;
+    }
+
+    .metric {
+      border: 1px solid #e4e9ef;
+      background: var(--soft);
+      border-radius: 7px;
+      padding: 9px 7px;
+      text-align: center;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 18px;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+    }
+
+    .metric span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .metric.good strong { color: var(--green); }
+    .metric.warn strong { color: var(--amber); }
+
+    .seg {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      background: #edf1f4;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+
+    .seg button {
+      border: 0;
+      border-radius: 6px;
+      padding: 9px 2px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .seg button.active {
+      background: var(--panel);
+      color: var(--ink);
+      box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .search {
+      height: 34px;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 7px;
+      color: var(--faint);
+      font-size: 13px;
+    }
+
+    .filter {
+      height: 34px;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 7px;
+      color: var(--ink);
+      padding: 0 10px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .stock-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+
+    .stock-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      padding: 12px;
+      border-bottom: 1px solid #edf1f5;
+    }
+
+    .stock-name {
+      font-size: 15px;
+      font-weight: 900;
+    }
+
+    .stock-code {
+      margin-top: 3px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .score {
+      min-width: 68px;
+      text-align: right;
+    }
+
+    .score strong {
+      display: block;
+      color: var(--green);
+      font-size: 18px;
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .score span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 0 12px 10px;
+    }
+
+    .tag {
+      border: 1px solid var(--line);
+      background: var(--soft);
+      color: var(--muted);
+      border-radius: 99px;
+      padding: 4px 7px;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .tag.green {
+      color: var(--green);
+      border-color: #b9dfc9;
+      background: var(--green-soft);
+    }
+
+    .tag.amber {
+      color: var(--amber);
+      border-color: #eed39f;
+      background: var(--amber-soft);
+    }
+
+    .why {
+      padding: 0 12px 10px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .why-row {
+      display: grid;
+      grid-template-columns: 68px 1fr;
+      gap: 8px;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .why-row b {
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .action-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      padding: 10px 12px 12px;
+      border-top: 1px solid #edf1f5;
+    }
+
+    .secondary, .primary {
+      border-radius: 7px;
+      padding: 9px 6px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .secondary {
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .primary {
+      border: 1px solid var(--green);
+      background: var(--green);
+      color: #fff;
+    }
+
+    .blocked {
+      border-color: #f2c7c2;
+      background: #fffafa;
+    }
+
+    .blocked .score strong {
+      color: var(--red);
+    }
+
+    .bottom-nav {
+      height: 58px;
+      flex: 0 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      border-top: 1px solid #d6d6d6;
+      background: #fff;
+    }
+
+    .nav-item {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .nav-item i {
+      width: 18px;
+      height: 18px;
+      border-radius: 5px;
+      border: 1.5px solid currentColor;
+      display: block;
+    }
+
+    .nav-item.active {
+      color: var(--green);
+    }
+
+    .inspector {
+      max-width: 540px;
+    }
+
+    .inspector h1 {
+      margin: 0;
+      font-size: 35px;
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+
+    .inspector .lead {
+      margin: 14px 0 22px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .principles {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .principle {
+      padding: 14px;
+      min-height: 126px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.76);
+    }
+
+    .principle .k {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .principle .v {
+      font-size: 20px;
+      line-height: 1.2;
+      font-weight: 900;
+    }
+
+    .principle .note {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .flow {
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.8);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .flow-title {
+      font-weight: 900;
+      margin-bottom: 12px;
+    }
+
+    .flow-step {
+      display: grid;
+      grid-template-columns: 26px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .flow-step:last-child {
+      border-bottom: 0;
+    }
+
+    .num {
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      background: var(--soft);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    .flow-step b {
+      display: block;
+      font-size: 13px;
+    }
+
+    .flow-step span {
+      display: block;
+      margin-top: 3px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .flow-tag {
+      padding: 4px 8px;
+      border-radius: 99px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .flow-tag.green {
+      color: var(--green);
+      background: var(--green-soft);
+      border-color: #b9dfc9;
+    }
+
+    .flow-tag.amber {
+      color: var(--amber);
+      background: var(--amber-soft);
+      border-color: #eed39f;
+    }
+
+    .critique {
+      margin-top: 14px;
+      padding: 12px;
+      border: 1px dashed #b8c4d0;
+      border-radius: var(--radius);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 940px) {
+      .stage {
+        grid-template-columns: 1fr;
+        padding: 24px;
+      }
+
+      .phone-shell, .inspector {
+        margin: 0 auto;
+      }
+    }
+
+    @media (max-width: 460px) {
+      .stage {
+        padding: 0;
+        background: #101820;
+      }
+
+      .phone-shell {
+        width: 100vw;
+        height: 100vh;
+        border-radius: 0;
+        padding: 0;
+        box-shadow: none;
+      }
+
+      .phone-screen {
+        border-radius: 0;
+      }
+
+      .inspector {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <section class="phone-shell" aria-label="审计后股票候选页">
+      <div class="phone-screen">
+        <header class="mini-header">
+          <button class="header-icon" aria-label="返回">‹</button>
+          <div class="title-block">
+            <div class="title">今日候选股票</div>
+            <div class="subtitle">符合策略条件 · 非投资建议</div>
+          </div>
+          <div class="capsule"><span>···</span><span>○</span></div>
+        </header>
+
+        <section class="content">
+          <div class="notice">
+            <span class="dot"></span>
+            <span>示例数据。这里展示“符合策略条件的研究候选”，不是买入指令。</span>
+          </div>
+
+          <section class="summary">
+            <div class="summary-main">
+              <div class="strategy-label">来自策略审计</div>
+              <div class="strategy-name">20日动量 + 放量 + 估值过滤</div>
+            </div>
+            <div class="verdict-row">
+              <div class="metric good"><strong>18</strong><span>符合条件</span></div>
+              <div class="metric warn"><strong>7</strong><span>风险过滤</span></div>
+              <div class="metric"><strong>09:30</strong><span>下次刷新</span></div>
+            </div>
+          </section>
+
+          <div class="seg" aria-label="候选分类">
+            <button class="active">候选</button>
+            <button>被过滤</button>
+            <button>已持有</button>
+          </div>
+
+          <div class="toolbar">
+            <div class="search">搜索股票 / 代码</div>
+            <button class="filter">排序: 置信度</button>
+          </div>
+
+          <article class="stock-card">
+            <div class="stock-head">
+              <div>
+                <div class="stock-name">示例电气</div>
+                <div class="stock-code">600123.SH · 示例</div>
+              </div>
+              <div class="score">
+                <strong>86</strong>
+                <span>策略匹配</span>
+              </div>
+            </div>
+            <div class="tags">
+              <span class="tag green">可交易性通过</span>
+              <span class="tag green">未触发风控</span>
+              <span class="tag">中盘</span>
+            </div>
+            <div class="why">
+              <div class="why-row"><b>入选原因</b><span>20 日动量 +8.4%，成交额放大 1.6x，PE 分位 42%。</span></div>
+              <div class="why-row"><b>风险提示</b><span>近 5 日涨幅较快，不适合追高加仓。</span></div>
+              <div class="why-row"><b>持有视角</b><span>未持有: 加入观察；已持有: 等收盘信号确认。</span></div>
+            </div>
+            <div class="action-row">
+              <button class="secondary">加入观察</button>
+              <button class="primary">看单股审计</button>
+            </div>
+          </article>
+
+          <article class="stock-card">
+            <div class="stock-head">
+              <div>
+                <div class="stock-name">示例科技</div>
+                <div class="stock-code">300456.SZ · 示例</div>
+              </div>
+              <div class="score">
+                <strong>79</strong>
+                <span>策略匹配</span>
+              </div>
+            </div>
+            <div class="tags">
+              <span class="tag green">流动性通过</span>
+              <span class="tag amber">波动偏高</span>
+              <span class="tag">创业板</span>
+            </div>
+            <div class="why">
+              <div class="why-row"><b>入选原因</b><span>动量排名前 12%，成交额连续三周抬升。</span></div>
+              <div class="why-row"><b>风险提示</b><span>波动率处于近一年 78% 分位，仓位不宜过重。</span></div>
+              <div class="why-row"><b>持有视角</b><span>未持有: 等回撤后再观察；已持有: 不因单一信号加仓。</span></div>
+            </div>
+            <div class="action-row">
+              <button class="secondary">加入观察</button>
+              <button class="primary">看单股审计</button>
+            </div>
+          </article>
+
+          <article class="stock-card blocked">
+            <div class="stock-head">
+              <div>
+                <div class="stock-name">示例制造</div>
+                <div class="stock-code">002789.SZ · 示例</div>
+              </div>
+              <div class="score">
+                <strong>排除</strong>
+                <span>风险过滤</span>
+              </div>
+            </div>
+            <div class="tags">
+              <span class="tag amber">符合策略</span>
+              <span class="tag">成交不足</span>
+              <span class="tag">接近涨停</span>
+            </div>
+            <div class="why">
+              <div class="why-row"><b>入选原因</b><span>动量和估值条件满足，但可交易性不通过。</span></div>
+              <div class="why-row"><b>过滤原因</b><span>成交额低于流动性阈值，且接近涨停，不进入候选。</span></div>
+              <div class="why-row"><b>下一步</b><span>只保留观察，不进入今日候选清单。</span></div>
+            </div>
+            <div class="action-row">
+              <button class="secondary">查看原因</button>
+              <button class="primary">设提醒</button>
+            </div>
+          </article>
+        </section>
+
+        <nav class="bottom-nav" aria-label="底部导航">
+          <button class="nav-item"><i></i><span>审计</span></button>
+          <button class="nav-item active"><i></i><span>候选</span></button>
+          <button class="nav-item"><i></i><span>我的</span></button>
+        </nav>
+      </div>
+    </section>
+
+    <aside class="inspector" aria-label="产品设计说明">
+      <h1>策略审计只是建立信任，股票候选才承接散户的行动意图。</h1>
+      <p class="lead">散户看完“策略可行”后，下一句通常是“那今天选出了哪些股票”。所以审计报告后必须接一个候选池。但候选池不能粗暴写成买入列表，而要展示：为什么符合策略、今天是否可交易、单股风险有没有触发。</p>
+
+      <section class="principles">
+        <div class="principle">
+          <div class="k">用户问题</div>
+          <div class="v">今天有哪些票？</div>
+          <div class="note">策略解释之后必须给结果，否则用户觉得离实际太远。</div>
+        </div>
+        <div class="principle">
+          <div class="k">合规表达</div>
+          <div class="v">候选，不是买入</div>
+          <div class="note">用“研究候选”“符合条件”“加入观察”承接需求。</div>
+        </div>
+        <div class="principle">
+          <div class="k">可解释性</div>
+          <div class="v">每只股票给理由</div>
+          <div class="note">动量、放量、估值、流动性、风控逐项展开。</div>
+        </div>
+        <div class="principle">
+          <div class="k">下一步</div>
+          <div class="v">看单股审计</div>
+          <div class="note">从候选池进入单股卡，回答已持有/未持有的差异。</div>
+        </div>
+      </section>
+
+      <section class="flow">
+        <div class="flow-title">更完整的产品链路</div>
+        <div class="flow-step">
+          <div class="num">01</div>
+          <div><b>自然语言策略</b><span>用户用文字或语音描述想法。</span></div>
+          <span class="flow-tag">输入</span>
+        </div>
+        <div class="flow-step">
+          <div class="num">02</div>
+          <div><b>策略审计</b><span>判断规则是否经得起回测、成本、样本外。</span></div>
+          <span class="flow-tag green">信任</span>
+        </div>
+        <div class="flow-step">
+          <div class="num">03</div>
+          <div><b>今日候选池</b><span>展示符合策略且通过可交易性过滤的股票。</span></div>
+          <span class="flow-tag green">行动</span>
+        </div>
+        <div class="flow-step">
+          <div class="num">04</div>
+          <div><b>单股审计卡</b><span>解释为什么入选、风险在哪里、已持有怎么办。</span></div>
+          <span class="flow-tag amber">降误解</span>
+        </div>
+        <div class="flow-step">
+          <div class="num">05</div>
+          <div><b>观察池提醒</b><span>用户关注候选变化，而不是一键交易。</span></div>
+          <span class="flow-tag">留存</span>
+        </div>
+      </section>
+
+      <div class="critique">
+        对抗性审查：最容易翻车的是把“候选池”做成事实上的荐股榜。解决办法是每只股票必须同时展示入选理由和风险过滤，CTA 用“加入观察 / 看单股审计”，不做“一键买入”。
+      </div>
+    </aside>
+  </main>
+</body>
+</html>

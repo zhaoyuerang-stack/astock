@@ -1,0 +1,83 @@
+/**
+ * Design System Tokens (v3 · 浅色金融工具风格)
+ * 与 prototypes/DESIGN_SYSTEM.md 保持一致
+ */
+page {
+  /* 主色 */
+  --primary: #185FA5;
+  --primary-bg: #E6F1FB;
+  --primary-border: #B5D4F4;
+
+  /* 状态色 */
+  --success: #0F6E56;
+  --success-bg: #E1F5EE;
+  --warning: #BA7517;
+  --warning-bg: #FAEEDA;
+  --danger: #A32D2D;
+  --danger-bg: #FCEBEB;
+  --danger-border: #F7C1C1;
+
+  /* 中性色 */
+  --bg-page: #F1EFE8;
+  --bg-card: #FFFFFF;
+  --bg-subtle: #F8FAFC;
+  --text-primary: #2C2C2A;
+  --text-secondary: #5F5E5A;
+  --text-tertiary: #888780;
+  --border: #D3D1C7;
+  --border-light: #F1EFE8;
+  --border-strong: #B4B2A9;
+
+  /* 数据高亮 */
+  --data-amber: #854F0B;
+  --data-amber-bg: #FAEEDA;
+
+  /* 间距 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  /* 圆角 */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* 字体 */
+  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* 等宽数字(金融数据) */
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 通用卡片 */
+.card {
+  background: var(--bg-card);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+
+/* 免责条 */
+.disclaimer-bar {
+  background: var(--warning-bg);
+  color: var(--data-amber);
+  font-size: 10px;
+  padding: 5px 16px;
+  text-align: center;
+  border-bottom: 0.5px solid #FAC775;
+  letter-spacing: 0.2px;
+}

@@ -1,0 +1,180 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg-page);
+}
+.content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* 用户卡 */
+.profile-header {
+  background: var(--bg-card);
+  border-bottom: 0.5px solid var(--border);
+  padding: 22px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.profile-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--primary-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--primary);
+}
+.profile-info {
+  flex: 1;
+}
+.profile-name {
+  font-size: 15px;
+  font-weight: 500;
+}
+.profile-tenant {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 3px;
+}
+
+/* 套餐卡 */
+.plan-card {
+  margin: 16px;
+  padding: 16px;
+}
+.plan-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.plan-name {
+  font-size: 15px;
+  font-weight: 500;
+}
+.plan-tag {
+  font-size: 10px;
+  background: var(--primary-bg);
+  color: var(--primary);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  border: 0.5px solid var(--primary-border);
+  font-weight: 500;
+}
+.plan-tag.free {
+  background: var(--bg-subtle);
+  color: var(--text-secondary);
+  border-color: var(--border-strong);
+}
+.plan-quota-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-bottom: 5px;
+  letter-spacing: 0.3px;
+}
+.plan-bar {
+  height: 6px;
+  background: var(--bg-page);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.plan-bar-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.plan-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+.plan-info .strong {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* 段头 */
+.section-header {
+  padding: 16px 16px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+/* 菜单 */
+.menu {
+  margin: 0 16px;
+  padding: 0;
+  overflow: hidden;
+}
+.menu-row {
+  display: flex;
+  align-items: center;
+  padding: 13px 14px;
+  border-bottom: 0.5px solid var(--border-light);
+  font-size: 14px;
+  gap: 12px;
+}
+.menu-row:last-child {
+  border-bottom: none;
+}
+.menu-row:active {
+  background: var(--bg-subtle);
+}
+.menu-icon {
+  width: 20px;
+  height: 20px;
+  border: 0.5px solid var(--border-strong);
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+.menu-text {
+  flex: 1;
+  color: var(--text-primary);
+}
+.menu-badge {
+  font-size: 10px;
+  background: var(--warning-bg);
+  color: var(--data-amber);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 500;
+  border: 0.5px solid var(--warning);
+}
+.menu-arrow {
+  color: var(--border-strong);
+  font-size: 12px;
+}
+
+/* 续费 CTA */
+.renew-cta {
+  margin: 16px;
+  background: var(--primary);
+  color: #fff;
+  border: 0.5px solid var(--primary);
+  padding: 13px;
+  border-radius: var(--radius-md);
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.renew-cta::after {
+  border: none;
+}

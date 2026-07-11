@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<!--
+Assumptions:
+- This is a single-page visual prototype, not production code.
+- The page demonstrates the most important commercial checkpoint: translate an idea, estimate credits, reserve credits, then queue an audit job.
+- The product tone is audit/diagnostic, not trading recommendation.
+- All numbers are sample UI copy and must be wired to real tenant, usage, and credit ledgers before production.
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>策略审计 · Credit 确认页</title>
+  <style>
+    :root {
+      --bg: #eef2f5;
+      --panel: #ffffff;
+      --panel-soft: #f7f9fb;
+      --ink: #15202b;
+      --ink-muted: #667482;
+      --ink-faint: #98a3ad;
+      --line: #dce3ea;
+      --line-strong: #c7d0d9;
+      --green: #137a4b;
+      --green-soft: #e7f4ee;
+      --blue: #1d5f94;
+      --blue-soft: #e7f0f8;
+      --amber: #9a6416;
+      --amber-soft: #fff4df;
+      --red: #b23b35;
+      --red-soft: #fae9e7;
+      --shadow: 0 20px 60px rgba(21, 32, 43, 0.13);
+      --radius: 8px;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(90deg, rgba(21, 32, 43, 0.04) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(21, 32, 43, 0.04) 1px, transparent 1px),
+        var(--bg);
+      background-size: 40px 40px;
+      color: var(--ink);
+      font-family: var(--sans);
+    }
+
+    .workspace {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(360px, 438px) minmax(360px, 520px);
+      gap: 34px;
+      justify-content: center;
+      align-items: center;
+      padding: 42px;
+    }
+
+    .phone {
+      width: 390px;
+      height: 844px;
+      padding: 12px;
+      border-radius: 34px;
+      background: #0e151c;
+      box-shadow: var(--shadow);
+    }
+
+    .screen {
+      height: 100%;
+      overflow: hidden;
+      border-radius: 26px;
+      background: #f5f7f9;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .status {
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      font-size: 12px;
+      color: var(--ink);
+      font-weight: 600;
+      letter-spacing: 0;
+    }
+
+    .status .signal {
+      display: inline-flex;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .bar {
+      width: 18px;
+      height: 9px;
+      border: 1.5px solid var(--ink);
+      border-radius: 3px;
+      position: relative;
+    }
+
+    .bar::after {
+      content: "";
+      position: absolute;
+      right: -4px;
+      top: 2px;
+      width: 2px;
+      height: 3px;
+      background: var(--ink);
+      border-radius: 1px;
+    }
+
+    .nav {
+      height: 50px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      background: var(--panel);
+    }
+
+    .nav button,
+    .pill-button,
+    .ghost-button,
+    .primary-button,
+    .seg button {
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    .nav button {
+      width: 30px;
+      height: 30px;
+      border: 0;
+      background: transparent;
+      color: var(--ink-muted);
+      font-size: 18px;
+    }
+
+    .nav-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .tenant-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 99px;
+      background: var(--green);
+    }
+
+    .content {
+      flex: 1;
+      overflow: auto;
+      padding: 14px;
+    }
+
+    .content::-webkit-scrollbar {
+      width: 0;
+    }
+
+    .tenant-strip {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: var(--radius);
+      margin-bottom: 12px;
+    }
+
+    .eyebrow {
+      font-size: 11px;
+      line-height: 1;
+      color: var(--ink-faint);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .tenant-name {
+      margin-top: 6px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .credit-box {
+      min-width: 104px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--panel-soft);
+      text-align: right;
+    }
+
+    .credit-box strong {
+      display: block;
+      font-size: 18px;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+    }
+
+    .credit-box span {
+      display: block;
+      margin-top: 4px;
+      font-size: 10px;
+      color: var(--ink-muted);
+    }
+
+    .idea-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    .label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .state-badge {
+      font-size: 11px;
+      color: var(--blue);
+      background: var(--blue-soft);
+      border: 1px solid #c8ddec;
+      border-radius: 99px;
+      padding: 4px 8px;
+      font-weight: 700;
+    }
+
+    .idea-text {
+      margin: 0;
+      padding: 12px;
+      background: #fbfcfd;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      color: var(--ink);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .dsl-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .card-head {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .card-sub {
+      margin-top: 3px;
+      font-size: 11px;
+      color: var(--ink-muted);
+    }
+
+    .mini-link {
+      border: 0;
+      background: transparent;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .rule-list {
+      padding: 6px 14px 12px;
+    }
+
+    .rule {
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      gap: 10px;
+      padding: 9px 0;
+      border-bottom: 1px solid #edf1f4;
+    }
+
+    .rule:last-child {
+      border-bottom: 0;
+    }
+
+    .check {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      border: 1px solid #bcd9cb;
+      background: var(--green-soft);
+      color: var(--green);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 13px;
+    }
+
+    .rule strong {
+      display: block;
+      font-size: 13px;
+      line-height: 1.3;
+    }
+
+    .rule span {
+      display: block;
+      margin-top: 4px;
+      font-size: 12px;
+      color: var(--ink-muted);
+      line-height: 1.45;
+    }
+
+    .seg {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      background: #edf1f4;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+
+    .seg button {
+      border: 0;
+      border-radius: 6px;
+      padding: 9px 4px;
+      background: transparent;
+      color: var(--ink-muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .seg button.active {
+      background: var(--panel);
+      color: var(--ink);
+      box-shadow: 0 1px 2px rgba(21, 32, 43, 0.08);
+    }
+
+    .cost-card {
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: var(--panel);
+      overflow: hidden;
+    }
+
+    .cost-total {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .cost-total h2 {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .cost-total small {
+      display: block;
+      margin-top: 5px;
+      color: var(--ink-muted);
+      font-size: 11px;
+    }
+
+    .reserve {
+      color: var(--amber);
+      background: var(--amber-soft);
+      border: 1px solid #f3d8a5;
+      border-radius: 7px;
+      padding: 7px 9px;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .cost-lines {
+      padding: 8px 14px;
+    }
+
+    .cost-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 0;
+      font-size: 13px;
+      border-bottom: 1px solid #edf1f4;
+    }
+
+    .cost-line:last-child {
+      border-bottom: 0;
+    }
+
+    .cost-line span:first-child {
+      color: var(--ink-muted);
+    }
+
+    .cost-line span:last-child {
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .safety {
+      margin-top: 12px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .safety-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      padding: 10px;
+      border-radius: 7px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--ink-muted);
+    }
+
+    .safety-row b {
+      color: var(--ink);
+    }
+
+    .safety-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 5px;
+      background: var(--green-soft);
+      color: var(--green);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      flex: 0 0 auto;
+      font-size: 11px;
+    }
+
+    .bottom {
+      padding: 12px 14px 18px;
+      background: rgba(255, 255, 255, 0.92);
+      border-top: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: 1fr 1.35fr;
+      gap: 10px;
+    }
+
+    .ghost-button,
+    .primary-button {
+      border-radius: 8px;
+      padding: 12px 10px;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .ghost-button {
+      background: var(--panel);
+      border: 1px solid var(--line-strong);
+      color: var(--ink);
+    }
+
+    .primary-button {
+      background: #153d2a;
+      border: 1px solid #153d2a;
+      color: #ffffff;
+    }
+
+    .ops {
+      max-width: 520px;
+    }
+
+    .ops h1 {
+      margin: 0;
+      font-size: 34px;
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+
+    .ops .lead {
+      margin: 14px 0 22px;
+      color: var(--ink-muted);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .ops-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .ops-card {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(10px);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+
+    .ops-card .k {
+      color: var(--ink-muted);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .ops-card .v {
+      font-size: 21px;
+      font-weight: 850;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .ops-card .note {
+      margin-top: 7px;
+      font-size: 12px;
+      color: var(--ink-muted);
+      line-height: 1.45;
+    }
+
+    .pipeline {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.78);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    .pipeline-title {
+      font-weight: 850;
+      margin-bottom: 12px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 28px 1fr auto;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .step:last-child {
+      border-bottom: 0;
+    }
+
+    .num {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: var(--panel-soft);
+      border: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--ink-muted);
+    }
+
+    .step b {
+      display: block;
+      font-size: 13px;
+    }
+
+    .step span {
+      display: block;
+      margin-top: 3px;
+      font-size: 12px;
+      color: var(--ink-muted);
+    }
+
+    .tag {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 8px;
+      border-radius: 99px;
+      border: 1px solid var(--line);
+      color: var(--ink-muted);
+      background: var(--panel);
+      white-space: nowrap;
+    }
+
+    .tag.ok {
+      color: var(--green);
+      border-color: #bcd9cb;
+      background: var(--green-soft);
+    }
+
+    .tag.warn {
+      color: var(--amber);
+      border-color: #f3d8a5;
+      background: var(--amber-soft);
+    }
+
+    .caption {
+      margin-top: 14px;
+      padding: 12px;
+      border: 1px dashed #bfccd7;
+      border-radius: var(--radius);
+      color: var(--ink-muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 920px) {
+      .workspace {
+        grid-template-columns: 1fr;
+        padding: 20px;
+      }
+
+      .phone {
+        margin: 0 auto;
+      }
+
+      .ops {
+        max-width: 390px;
+        margin: 0 auto;
+      }
+    }
+
+    @media (max-width: 460px) {
+      .workspace {
+        padding: 0;
+        background: #0e151c;
+      }
+
+      .phone {
+        width: 100vw;
+        height: 100vh;
+        border-radius: 0;
+        padding: 0;
+      }
+
+      .screen {
+        border-radius: 0;
+      }
+
+      .ops {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="workspace">
+    <section class="phone" aria-label="小程序页面预览">
+      <div class="screen">
+        <div class="status">
+          <span>10:31</span>
+          <span class="signal">5G <span class="bar"></span></span>
+        </div>
+
+        <header class="nav">
+          <button aria-label="返回">‹</button>
+          <div class="nav-title"><span class="tenant-dot"></span>策略审计</div>
+          <button aria-label="更多">···</button>
+        </header>
+
+        <div class="content">
+          <section class="tenant-strip">
+            <div>
+              <div class="eyebrow">Tenant</div>
+              <div class="tenant-name">个人租户 · KIKI-001</div>
+            </div>
+            <div class="credit-box">
+              <strong id="balance">2,640</strong>
+              <span>可用 credits</span>
+            </div>
+          </section>
+
+          <section class="idea-card">
+            <div class="label-row">
+              <div class="eyebrow">用户策略想法</div>
+              <span class="state-badge">已完成低成本解析</span>
+            </div>
+            <p class="idea-text">买入最近 20 日上涨、成交量放大、估值不太高，且流动性足够的股票；每周调仓一次。</p>
+          </section>
+
+          <div class="seg" aria-label="审计深度">
+            <button data-plan="quick">快速</button>
+            <button class="active" data-plan="standard">标准</button>
+            <button data-plan="deep">深度</button>
+          </div>
+
+          <section class="cost-card">
+            <div class="cost-total">
+              <div>
+                <h2><span id="totalCredits">363</span> credits</h2>
+                <small id="planCopy">标准审计 · 样本外验证 + 报告</small>
+              </div>
+              <div class="reserve">先冻结</div>
+            </div>
+            <div class="cost-lines">
+              <div class="cost-line">
+                <span>策略解析</span>
+                <span id="parseCost">18</span>
+              </div>
+              <div class="cost-line">
+                <span>可行性检查</span>
+                <span id="feasibilityCost">35</span>
+              </div>
+              <div class="cost-line">
+                <span>回测计算</span>
+                <span id="backtestCost">120</span>
+              </div>
+              <div class="cost-line">
+                <span>样本外验证</span>
+                <span id="holdoutCost">160</span>
+              </div>
+              <div class="cost-line">
+                <span>报告生成</span>
+                <span id="reportCost">30</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="dsl-card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">系统翻译后的审计规则</div>
+                <div class="card-sub">确认规则后才会冻结 credit 并进入队列</div>
+              </div>
+              <button class="mini-link">修改</button>
+            </div>
+            <div class="rule-list">
+              <div class="rule">
+                <div class="check">✓</div>
+                <div>
+                  <strong>信号条件</strong>
+                  <span>20 日收益率排名靠前，20 日成交额均值上升，PE 分位数低于 60%。</span>
+                </div>
+              </div>
+              <div class="rule">
+                <div class="check">✓</div>
+                <div>
+                  <strong>交易约束</strong>
+                  <span>排除 ST、停牌、涨跌停不可交易、成交额不足股票；T+1 执行。</span>
+                </div>
+              </div>
+              <div class="rule">
+                <div class="check">✓</div>
+                <div>
+                  <strong>回测口径</strong>
+                  <span>每周调仓，等权前 20 只，默认含手续费、滑点和换手成本。</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="safety" aria-label="审计保护">
+            <div class="safety-row">
+              <div class="safety-icon">1</div>
+              <div><b>租户隔离</b>：任务、报告、账单均绑定 tenant_id / job_id，不从前端信任 tenant。</div>
+            </div>
+            <div class="safety-row">
+              <div class="safety-icon">2</div>
+              <div><b>按实际结算</b>：预估先冻结；任务完成后 capture 实际消耗，未用部分自动退回。</div>
+            </div>
+            <div class="safety-row">
+              <div class="safety-icon">3</div>
+              <div><b>不承诺收益</b>：报告只给审计结论、失效条件和风险证据，不输出强买强卖。</div>
+            </div>
+          </section>
+        </div>
+
+        <footer class="bottom">
+          <button class="ghost-button">保存草稿</button>
+          <button class="primary-button" id="confirmButton">冻结 363 credits 并审计</button>
+        </footer>
+      </div>
+    </section>
+
+    <aside class="ops" aria-label="产品与核算说明">
+      <h1>把「策略想法」变成可计费、可隔离、可追溯的审计任务。</h1>
+      <p class="lead">这一页不是普通提交表单，而是商业闭环的闸门：先把自然语言策略翻译成受控规则，再让用户确认 credit 预估，最后才冻结额度并进入异步审计队列。</p>
+
+      <div class="ops-grid">
+        <div class="ops-card">
+          <div class="k">租户上下文</div>
+          <div class="v">KIKI-001</div>
+          <div class="note">所有策略、任务、报告、账单必须带 tenant_id。</div>
+        </div>
+        <div class="ops-card">
+          <div class="k">结算模型</div>
+          <div class="v">Reserve → Capture</div>
+          <div class="note">失败释放冻结额，重试使用 idempotency_key。</div>
+        </div>
+        <div class="ops-card">
+          <div class="k">队列优先级</div>
+          <div class="v">Standard</div>
+          <div class="note">订阅等级决定并发与排队权重，不直接改变审计口径。</div>
+        </div>
+        <div class="ops-card">
+          <div class="k">用户可见单位</div>
+          <div class="v">Credit</div>
+          <div class="note">token、算力、数据查询在后台折算，不直接暴露给用户。</div>
+        </div>
+      </div>
+
+      <section class="pipeline">
+        <div class="pipeline-title">后台任务状态机</div>
+        <div class="step">
+          <div class="num">01</div>
+          <div><b>estimated</b><span>低成本解析和费用预估完成。</span></div>
+          <div class="tag ok">当前</div>
+        </div>
+        <div class="step">
+          <div class="num">02</div>
+          <div><b>reserved</b><span>冻结 credit，写入 credit_ledger。</span></div>
+          <div class="tag warn">确认后</div>
+        </div>
+        <div class="step">
+          <div class="num">03</div>
+          <div><b>queued / running</b><span>worker 携带 tenant context 执行审计。</span></div>
+          <div class="tag">异步</div>
+        </div>
+        <div class="step">
+          <div class="num">04</div>
+          <div><b>settling</b><span>usage_events 汇总为实际 credit 消耗。</span></div>
+          <div class="tag">核算</div>
+        </div>
+        <div class="step">
+          <div class="num">05</div>
+          <div><b>completed</b><span>生成审计报告，未用冻结额退回。</span></div>
+          <div class="tag ok">报告</div>
+        </div>
+      </section>
+
+      <div class="caption">
+        设计判断：首版小程序不应该先做「策略市场」或「排行榜」，应先把费用确认、审计口径、租户隔离和证据链跑通。否则商业模式会先于信任体系膨胀。
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    const plans = {
+      quick: {
+        total: 128,
+        copy: "快速审计 · 可行性 + 简版回测",
+        parse: 18,
+        feasibility: 35,
+        backtest: 55,
+        holdout: 0,
+        report: 20
+      },
+      standard: {
+        total: 363,
+        copy: "标准审计 · 样本外验证 + 报告",
+        parse: 18,
+        feasibility: 35,
+        backtest: 120,
+        holdout: 160,
+        report: 30
+      },
+      deep: {
+        total: 812,
+        copy: "深度审计 · 参数敏感性 + 对抗检查",
+        parse: 28,
+        feasibility: 54,
+        backtest: 210,
+        holdout: 260,
+        report: 80
+      }
+    };
+
+    const ids = {
+      total: document.getElementById("totalCredits"),
+      copy: document.getElementById("planCopy"),
+      parse: document.getElementById("parseCost"),
+      feasibility: document.getElementById("feasibilityCost"),
+      backtest: document.getElementById("backtestCost"),
+      holdout: document.getElementById("holdoutCost"),
+      report: document.getElementById("reportCost"),
+      confirm: document.getElementById("confirmButton")
+    };
+
+    document.querySelectorAll(".seg button").forEach((button) => {
+      button.addEventListener("click", () => {
+        const plan = plans[button.dataset.plan];
+        document.querySelectorAll(".seg button").forEach((b) => b.classList.remove("active"));
+        button.classList.add("active");
+        ids.total.textContent = plan.total;
+        ids.copy.textContent = plan.copy;
+        ids.parse.textContent = plan.parse;
+        ids.feasibility.textContent = plan.feasibility;
+        ids.backtest.textContent = plan.backtest;
+        ids.holdout.textContent = plan.holdout;
+        ids.report.textContent = plan.report;
+        ids.confirm.textContent = `冻结 ${plan.total} credits 并审计`;
+      });
+    });
+  </script>
+</body>
+</html>

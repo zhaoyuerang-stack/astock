@@ -1,0 +1,93 @@
+<view class="page" wx:if="{{result}}">
+  <view class="disclaimer-bar">研究方法学工具 · 不构成投资建议</view>
+
+  <scroll-view class="content" scroll-y enhanced show-scrollbar="{{false}}">
+    <!-- 裁决卡 -->
+    <view class="verdict-card {{result.verdict}}">
+      <view class="verdict-label">9-Gate 裁决</view>
+      <view class="verdict-title">{{verdictText}}</view>
+      <view class="verdict-sub">{{verdictSub}}</view>
+    </view>
+
+    <!-- 策略摘要 -->
+    <view class="summary-card card">
+      <view class="summary-row">
+        <text class="k">策略描述</text>
+        <text class="v">{{result.summary.description}}</text>
+      </view>
+      <view class="summary-row">
+        <text class="k">审计区间</text>
+        <text class="v">{{result.summary.auditRange}}</text>
+      </view>
+      <view class="summary-row">
+        <text class="k">样本外起点</text>
+        <text class="v">{{result.summary.oosStart}}</text>
+      </view>
+      <view class="summary-row">
+        <text class="k">审计类型</text>
+        <text class="v">{{result.summary.auditType}}</text>
+      </view>
+    </view>
+
+    <!-- KPI 4 格 -->
+    <view class="kpi-grid">
+      <view class="kpi up">
+        <view class="kpi-label">年化</view>
+        <view class="kpi-value mono">{{result.kpi.annual}}</view>
+      </view>
+      <view class="kpi up">
+        <view class="kpi-label">夏普</view>
+        <view class="kpi-value mono">{{result.kpi.sharpe}}</view>
+      </view>
+      <view class="kpi dn">
+        <view class="kpi-label">最大回撤</view>
+        <view class="kpi-value mono">{{result.kpi.maxDrawdown}}</view>
+      </view>
+      <view class="kpi dn">
+        <view class="kpi-label">DSR p值</view>
+        <view class="kpi-value mono">{{result.kpi.dsrP}}</view>
+      </view>
+    </view>
+
+    <!-- 逐门裁决 -->
+    <view class="gate-section card">
+      <view class="gate-header">
+        <text>逐门裁决</text>
+        <text class="mono gate-count">{{result.gateStats.pass}} 通过 · {{result.gateStats.warn}} 警告 · {{result.gateStats.fail}} 失败</text>
+      </view>
+      <view class="gate-row" wx:for="{{result.gates}}" wx:key="id">
+        <view class="gate-dot {{item.status}}"></view>
+        <view class="gate-name">
+          <text class="mono gate-id">{{item.id}}</text>
+          <text>{{item.name}}</text>
+        </view>
+        <view class="gate-status {{item.status}}">{{item.detail}}</view>
+      </view>
+    </view>
+
+    <!-- 原因卡 -->
+    <view class="why-card card">
+      <view class="why-title">{{whyTitle}}</view>
+      <view class="why-item" wx:for="{{result.reasons}}" wx:key="*this">
+        <text class="why-bullet">›</text>
+        <text class="why-text">{{item}}</text>
+      </view>
+    </view>
+
+    <!-- 详情入口 -->
+    <view class="detail-link" bindtap="onDetailTap">查看完整详情 · 净值 / 分组 / 三段样本</view>
+
+    <view style="height: 20px"></view>
+  </scroll-view>
+</view>
+
+<!-- 空状态 -->
+<view class="page empty" wx:else>
+  <view class="disclaimer-bar">研究方法学工具 · 不构成投资建议</view>
+  <view class="empty-state">
+    <view class="empty-icon">≡</view>
+    <view class="empty-title">还没有审计报告</view>
+    <view class="empty-desc">在「审计」Tab 描述你的策略,提交审计后报告会显示在这里。</view>
+    <button class="empty-cta" bindtap="goAudit">去审计</button>
+  </view>
+</view>

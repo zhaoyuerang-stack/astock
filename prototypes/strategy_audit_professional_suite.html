@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<!--
+Professional visual direction for the strategy audit mini program.
+Assumptions:
+- The product still starts from natural language / voice input.
+- The visual system must feel like a serious research audit tool, not a casual chat bot or stock-picking game.
+- All stock names and numbers are sample placeholders for layout, not investment advice.
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>策略审计小程序 · 专业视觉方向</title>
+  <style>
+    :root {
+      --canvas: #e9edf1;
+      --paper: #fbfaf7;
+      --paper-2: #f5f3ee;
+      --ink: #11151a;
+      --ink-2: #38424c;
+      --muted: #6f7984;
+      --faint: #9ba4ad;
+      --line: #d9dedf;
+      --line-strong: #b9c1c4;
+      --green: #115b3f;
+      --green-2: #dfeee7;
+      --blue: #244e73;
+      --blue-2: #e3edf4;
+      --amber: #8d5f16;
+      --amber-2: #f7ead1;
+      --red: #9d342c;
+      --red-2: #f4dfdd;
+      --black: #0c1116;
+      --shadow: 0 26px 84px rgba(17, 21, 26, 0.16);
+      --radius: 8px;
+      --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+      --serif: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--sans);
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, rgba(17, 21, 26, 0.045) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(17, 21, 26, 0.045) 1px, transparent 1px),
+        var(--canvas);
+      background-size: 44px 44px;
+    }
+
+    button {
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .page {
+      min-height: 100vh;
+      padding: 34px 38px;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 34px;
+      align-items: center;
+    }
+
+    .brief {
+      align-self: stretch;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 16px 0;
+    }
+
+    .brand {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 11px;
+      border: 1px solid var(--line-strong);
+      background: rgba(251, 250, 247, 0.74);
+      border-radius: 999px;
+      color: var(--ink-2);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .brand-mark {
+      width: 20px;
+      height: 20px;
+      border-radius: 5px;
+      background: var(--black);
+      position: relative;
+    }
+
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      inset: 5px;
+      border: 1px solid #c8d8d0;
+      border-radius: 3px;
+    }
+
+    h1 {
+      margin: 34px 0 16px;
+      font-family: var(--serif);
+      font-size: 42px;
+      line-height: 1.12;
+      letter-spacing: 0;
+      font-weight: 700;
+    }
+
+    .lead {
+      margin: 0;
+      color: var(--ink-2);
+      font-size: 15px;
+      line-height: 1.8;
+    }
+
+    .rules {
+      margin-top: 28px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .rule {
+      display: grid;
+      grid-template-columns: 26px 1fr;
+      gap: 10px;
+      align-items: start;
+      padding: 12px;
+      background: rgba(251, 250, 247, 0.72);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    .rule-index {
+      height: 24px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--paper);
+    }
+
+    .rule b {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .rule span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .anti {
+      margin-top: 20px;
+      padding: 12px;
+      border: 1px dashed #aeb8bd;
+      border-radius: var(--radius);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    .screens {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(260px, 320px));
+      gap: 22px;
+      justify-content: center;
+      align-items: start;
+    }
+
+    .phone-wrap {
+      display: grid;
+      gap: 10px;
+    }
+
+    .screen-label {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0;
+      font-style: italic;
+    }
+
+    .phone {
+      width: 320px;
+      height: 694px;
+      padding: 10px;
+      border-radius: 34px;
+      background: #10151b;
+      box-shadow: var(--shadow);
+    }
+
+    .screen {
+      height: 100%;
+      overflow: hidden;
+      border-radius: 25px;
+      background: var(--paper);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      height: 48px;
+      flex: 0 0 auto;
+      display: grid;
+      grid-template-columns: 34px 1fr 46px;
+      align-items: center;
+      padding: 0 10px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(251, 250, 247, 0.95);
+    }
+
+    .back,
+    .more {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 20px;
+      line-height: 1;
+      padding: 0;
+    }
+
+    .more {
+      font-size: 16px;
+      letter-spacing: 0.12em;
+    }
+
+    .top-title {
+      text-align: center;
+      min-width: 0;
+    }
+
+    .top-title b {
+      display: block;
+      font-size: 14px;
+      line-height: 1.1;
+    }
+
+    .top-title span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 9px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .body {
+      flex: 1;
+      overflow: auto;
+      padding: 12px;
+    }
+
+    .body::-webkit-scrollbar {
+      width: 0;
+    }
+
+    .caption-bar {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      background: var(--paper-2);
+      border-radius: var(--radius);
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+      margin-bottom: 10px;
+    }
+
+    .caption-bar strong {
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .hero-panel {
+      border: 1px solid var(--line-strong);
+      background: #fffefa;
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+
+    .eyebrow {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .hero-panel h2,
+    .report-hero h2 {
+      margin: 7px 0 0;
+      font-family: var(--serif);
+      font-size: 22px;
+      line-height: 1.16;
+      letter-spacing: 0;
+      font-weight: 700;
+    }
+
+    .hero-panel p {
+      margin: 10px 0 0;
+      color: var(--ink-2);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .input-panel {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .input-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .input-row:last-child {
+      border-bottom: 0;
+    }
+
+    .input-copy b {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .input-copy span {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .mode-button {
+      min-width: 66px;
+      border: 1px solid var(--line-strong);
+      background: var(--paper);
+      border-radius: 999px;
+      padding: 7px 9px;
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .mode-button.primary {
+      background: var(--black);
+      color: #fff;
+      border-color: var(--black);
+    }
+
+    .chat-note {
+      margin: 10px 0;
+      display: grid;
+      gap: 8px;
+    }
+
+    .chat-item {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px;
+      background: #fff;
+    }
+
+    .chat-item.user {
+      margin-left: 30px;
+      border-color: #b7d6c6;
+      background: var(--green-2);
+    }
+
+    .chat-item b {
+      display: block;
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+
+    .chat-item span {
+      color: var(--ink-2);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .cost-card {
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .cost-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .cost-head strong {
+      display: block;
+      font-size: 24px;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+    }
+
+    .cost-head span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .status-badge {
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: var(--amber-2);
+      border: 1px solid #e2c583;
+      color: var(--amber);
+      font-size: 11px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .cost-lines {
+      padding: 8px 12px 10px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .cost-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .cost-line b {
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .footer-action {
+      flex: 0 0 auto;
+      padding: 10px 12px 14px;
+      display: grid;
+      grid-template-columns: 1fr 1.25fr;
+      gap: 8px;
+      border-top: 1px solid var(--line);
+      background: rgba(251, 250, 247, 0.96);
+    }
+
+    .composer-footer {
+      flex: 0 0 auto;
+      padding: 9px 10px 13px;
+      display: grid;
+      grid-template-columns: 34px 1fr 48px;
+      gap: 8px;
+      align-items: center;
+      border-top: 1px solid var(--line);
+      background: rgba(251, 250, 247, 0.98);
+    }
+
+    .composer-mode {
+      width: 34px;
+      height: 34px;
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      border-radius: 999px;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .composer-field {
+      height: 36px;
+      display: flex;
+      align-items: center;
+      padding: 0 11px;
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      border-radius: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .send-button {
+      height: 36px;
+      border: 1px solid var(--green);
+      background: var(--green);
+      color: #fff;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .secondary,
+    .primary {
+      border-radius: 7px;
+      padding: 10px 6px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .secondary {
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .primary {
+      border: 1px solid var(--green);
+      background: var(--green);
+      color: #fff;
+    }
+
+    .report-hero {
+      border: 1px solid var(--line-strong);
+      background: #fffefa;
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+
+    .verdict {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      padding: 5px 8px;
+      border: 1px solid #d9c27c;
+      background: var(--amber-2);
+      color: var(--amber);
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .metric {
+      padding: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: var(--radius);
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      margin-bottom: 6px;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 19px;
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .metric.red strong {
+      color: var(--red);
+    }
+
+    .metric.green strong {
+      color: var(--green);
+    }
+
+    .gate-list {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .gate-row {
+      display: grid;
+      grid-template-columns: 42px 1fr auto;
+      gap: 8px;
+      align-items: center;
+      padding: 9px 10px;
+      border-bottom: 1px solid #edf0f0;
+      font-size: 11px;
+    }
+
+    .gate-row:last-child {
+      border-bottom: 0;
+    }
+
+    .gate-code {
+      font-family: var(--mono);
+      color: var(--muted);
+    }
+
+    .gate-row b {
+      display: block;
+      font-size: 12px;
+    }
+
+    .gate-row span {
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .gate-status {
+      padding: 4px 7px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 900;
+      border: 1px solid var(--line);
+    }
+
+    .gate-status.pass {
+      color: var(--green);
+      border-color: #b9dfc9;
+      background: var(--green-2);
+    }
+
+    .gate-status.warn {
+      color: var(--amber);
+      border-color: #e2c583;
+      background: var(--amber-2);
+    }
+
+    .gate-status.fail {
+      color: var(--red);
+      border-color: #ddb7b3;
+      background: var(--red-2);
+    }
+
+    .explain-box {
+      padding: 11px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+
+    .explain-box b {
+      display: block;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .explain-box p {
+      margin: 0;
+      color: var(--ink-2);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .candidate-summary {
+      border: 1px solid var(--line-strong);
+      background: #fffefa;
+      border-radius: var(--radius);
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+
+    .candidate-summary h2 {
+      margin: 6px 0 0;
+      font-family: var(--serif);
+      font-size: 20px;
+      line-height: 1.15;
+    }
+
+    .candidate-grid {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+    }
+
+    .candidate-count {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 7px;
+      padding: 8px 6px;
+      text-align: center;
+    }
+
+    .candidate-count strong {
+      display: block;
+      font-size: 17px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .candidate-count span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 9px;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      background: var(--paper-2);
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+
+    .tabs button {
+      border: 0;
+      border-radius: 6px;
+      padding: 8px 2px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .tabs button.active {
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 0 1px 2px rgba(17, 21, 26, 0.08);
+    }
+
+    .stock-list {
+      display: grid;
+      gap: 9px;
+    }
+
+    .stock {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .stock-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      padding: 11px 11px 8px;
+    }
+
+    .stock-name {
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .stock-code {
+      margin-top: 3px;
+      font-family: var(--mono);
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .stock-score {
+      text-align: right;
+    }
+
+    .stock-score strong {
+      display: block;
+      color: var(--green);
+      font-size: 18px;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stock-score span {
+      color: var(--muted);
+      font-size: 9px;
+    }
+
+    .stock-rationale {
+      padding: 0 11px 10px;
+      color: var(--ink-2);
+      font-size: 11px;
+      line-height: 1.55;
+    }
+
+    .stock-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      padding: 0 11px 10px;
+    }
+
+    .pill {
+      padding: 4px 6px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--paper-2);
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 900;
+    }
+
+    .pill.green {
+      color: var(--green);
+      border-color: #b9dfc9;
+      background: var(--green-2);
+    }
+
+    .pill.amber {
+      color: var(--amber);
+      border-color: #e2c583;
+      background: var(--amber-2);
+    }
+
+    .stock-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+      padding: 9px 11px 11px;
+      border-top: 1px solid #edf0f0;
+    }
+
+    .stock-actions button {
+      border-radius: 7px;
+      padding: 8px 4px;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .stock-actions .watch {
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .stock-actions .audit {
+      border: 1px solid var(--green);
+      background: var(--green);
+      color: #fff;
+    }
+
+    @media (max-width: 1260px) {
+      .page {
+        grid-template-columns: 1fr;
+      }
+
+      .brief {
+        max-width: 940px;
+        margin: 0 auto;
+      }
+
+      .screens {
+        grid-template-columns: repeat(3, minmax(260px, 320px));
+      }
+    }
+
+    @media (max-width: 1040px) {
+      .screens {
+        grid-template-columns: 1fr;
+      }
+
+      .phone-wrap {
+        justify-content: center;
+      }
+    }
+
+    @media (max-width: 430px) {
+      .page {
+        padding: 0;
+        display: block;
+      }
+
+      .brief {
+        display: none;
+      }
+
+      .screens {
+        display: block;
+      }
+
+      .phone-wrap:not(:first-child) {
+        display: none;
+      }
+
+      .screen-label {
+        display: none;
+      }
+
+      .phone {
+        width: 100vw;
+        height: 100vh;
+        border-radius: 0;
+        padding: 0;
+      }
+
+      .screen {
+        border-radius: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="brief">
+      <div>
+        <div class="brand"><span class="brand-mark"></span><span>STRATEGY AUDIT OS</span></div>
+        <h1>专业感来自秩序，不来自更重的装饰。</h1>
+        <p class="lead">新版视觉把产品从“聊天小助手”升级为“个人策略研究审计工具”。用户仍然可以语音或文字输入，但系统用报告式结构、审计状态、门禁指标和候选解释来建立可信度。</p>
+        <div class="rules">
+          <div class="rule">
+            <div class="rule-index">01</div>
+            <div><b>低饱和金融色</b><span>黑、纸白、森林绿、琥珀风险色；不做炒股软件式红绿噪音。</span></div>
+          </div>
+          <div class="rule">
+            <div class="rule-index">02</div>
+            <div><b>报告式排版</b><span>细线、表格、门禁、样本外和费用状态，让信息显得可复核。</span></div>
+          </div>
+          <div class="rule">
+            <div class="rule-index">03</div>
+            <div><b>用户动作克制</b><span>CTA 是“确认审计 / 加入观察 / 看单股审计”，不是“买入”。</span></div>
+          </div>
+          <div class="rule">
+            <div class="rule-index">04</div>
+            <div><b>散户也能看懂</b><span>保留候选股票和单股理由，但所有结论都绑定风险解释。</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="anti">对抗性审查：上一版最大问题是气质偏“微信聊天 + 股票列表”，可信度不足。新版不牺牲输入便利，但把视觉重心从气泡对话转向审计报告和候选证据。</div>
+    </section>
+
+    <section class="screens" aria-label="专业版三屏原型">
+      <div class="phone-wrap">
+        <div class="screen-label">01 · 自然语言输入，但视觉像研究入口</div>
+        <div class="phone">
+          <div class="screen">
+            <header class="topbar">
+              <button class="back">‹</button>
+              <div class="top-title"><b>策略审计</b><span>语音/文字输入 · 先理解后计费</span></div>
+              <button class="more">···</button>
+            </header>
+            <div class="body">
+              <div class="caption-bar"><span>个人租户 KIKI-001</span><span><strong>2,640</strong> credits</span></div>
+              <section class="hero-panel">
+                <div class="eyebrow">Audit Intake</div>
+                <h2>描述一个策略想法，系统先把它翻译成可审计规则。</h2>
+                <p>不会直接回测，也不会执行用户代码。缺少调仓、持仓或成本口径时，先追问。</p>
+              </section>
+
+              <section class="input-panel">
+                <div class="input-row">
+                  <div class="input-copy"><b>文字输入</b><span>适合精确描述条件、参数和持仓数量。</span></div>
+                  <button class="mode-button primary">打字</button>
+                </div>
+                <div class="input-row">
+                  <div class="input-copy"><b>语音输入</b><span>适合先说想法，系统转写后再确认。</span></div>
+                  <button class="mode-button">按住说话</button>
+                </div>
+              </section>
+
+              <section class="chat-note">
+                <div class="chat-item user"><b>用户</b><span>买最近 20 日上涨、成交量放大、估值不要太高、流动性好的股票。</span></div>
+                <div class="chat-item"><b>系统追问</b><span>调仓频率和持仓数量还不明确。每周调仓、持有前 20 只可以吗？</span></div>
+                <div class="chat-item user"><b>用户</b><span>每周调仓，持有前 20 只，默认扣成本。</span></div>
+              </section>
+
+              <section class="cost-card">
+                <div class="cost-head">
+                  <div><strong>363</strong><span>预计冻结 credits</span></div>
+                  <span class="status-badge">待确认</span>
+                </div>
+                <div class="cost-lines">
+                  <div class="cost-line"><span>解析 + 体检</span><b>53</b></div>
+                  <div class="cost-line"><span>标准回测</span><b>120</b></div>
+                  <div class="cost-line"><span>样本外验证</span><b>160</b></div>
+                  <div class="cost-line"><span>报告生成</span><b>30</b></div>
+                </div>
+              </section>
+            </div>
+            <footer class="composer-footer">
+              <button class="composer-mode" aria-label="切换语音输入">语</button>
+              <div class="composer-field">输入策略想法，或按左侧语音</div>
+              <button class="send-button">发送</button>
+            </footer>
+          </div>
+        </div>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="screen-label">02 · 审计报告像风控结论，而不是聊天回复</div>
+        <div class="phone">
+          <div class="screen">
+            <header class="topbar">
+              <button class="back">‹</button>
+              <div class="top-title"><b>审计报告</b><span>样本外 · 成本 · 多重测试</span></div>
+              <button class="more">···</button>
+            </header>
+            <div class="body">
+              <section class="report-hero">
+                <div class="eyebrow">Strategy Verdict</div>
+                <h2>证据不足，适合纸面观察，不建议直接实盘。</h2>
+                <div class="verdict">INCONCLUSIVE · DSR 未过线</div>
+              </section>
+
+              <div class="metrics">
+                <div class="metric green"><span>年化收益</span><strong>12.4%</strong></div>
+                <div class="metric"><span>夏普</span><strong>0.74</strong></div>
+                <div class="metric red"><span>最大回撤</span><strong>-24.8%</strong></div>
+                <div class="metric red"><span>DSR p-value</span><strong>0.091</strong></div>
+              </div>
+
+              <section class="gate-list">
+                <div class="gate-row">
+                  <div class="gate-code">G2</div>
+                  <div><b>防未来函数</b><span>T+1 / shift(1) 通过</span></div>
+                  <div class="gate-status pass">PASS</div>
+                </div>
+                <div class="gate-row">
+                  <div class="gate-code">G4</div>
+                  <div><b>多重测试惩罚</b><span>DSR p=0.091</span></div>
+                  <div class="gate-status fail">FAIL</div>
+                </div>
+                <div class="gate-row">
+                  <div class="gate-code">G6</div>
+                  <div><b>换手与成本</b><span>年化换手 18.6x</span></div>
+                  <div class="gate-status warn">WARN</div>
+                </div>
+                <div class="gate-row">
+                  <div class="gate-code">G7</div>
+                  <div><b>样本外衰减</b><span>OOS 收益降至 5.1%</span></div>
+                  <div class="gate-status warn">WARN</div>
+                </div>
+              </section>
+
+              <section class="explain-box">
+                <b>为什么不是“可用策略”</b>
+                <p>这个策略在部分年份有效，但成本后优势变薄，多重测试惩罚后统计证据不足。下一步应先降低换手，并观察候选池的前向表现。</p>
+              </section>
+            </div>
+            <footer class="footer-action">
+              <button class="secondary">看完整证据</button>
+              <button class="primary">看今日候选</button>
+            </footer>
+          </div>
+        </div>
+      </div>
+
+      <div class="phone-wrap">
+        <div class="screen-label">03 · 股票候选承接散户意图，但不做荐股榜</div>
+        <div class="phone">
+          <div class="screen">
+            <header class="topbar">
+              <button class="back">‹</button>
+              <div class="top-title"><b>今日候选</b><span>符合策略条件 · 非投资建议</span></div>
+              <button class="more">···</button>
+            </header>
+            <div class="body">
+              <section class="candidate-summary">
+                <div class="eyebrow">Research Candidates</div>
+                <h2>18 只股票符合策略条件，其中 7 只被风险过滤。</h2>
+                <div class="candidate-grid">
+                  <div class="candidate-count"><strong>18</strong><span>符合条件</span></div>
+                  <div class="candidate-count"><strong>11</strong><span>进入观察</span></div>
+                  <div class="candidate-count"><strong>09:30</strong><span>下次刷新</span></div>
+                </div>
+              </section>
+
+              <div class="tabs">
+                <button class="active">候选</button>
+                <button>被过滤</button>
+                <button>已持有</button>
+              </div>
+
+              <section class="stock-list">
+                <article class="stock">
+                  <div class="stock-head">
+                    <div>
+                      <div class="stock-name">示例电气</div>
+                      <div class="stock-code">600123.SH · 示例</div>
+                    </div>
+                    <div class="stock-score"><strong>86</strong><span>匹配度</span></div>
+                  </div>
+                  <div class="stock-rationale">20 日动量 +8.4%，成交额放大 1.6x，PE 分位 42%。近 5 日涨幅偏快，不适合追高。</div>
+                  <div class="stock-tags">
+                    <span class="pill green">可交易性通过</span>
+                    <span class="pill green">未触发风控</span>
+                    <span class="pill">中盘</span>
+                  </div>
+                  <div class="stock-actions">
+                    <button class="watch">加入观察</button>
+                    <button class="audit">单股审计</button>
+                  </div>
+                </article>
+
+                <article class="stock">
+                  <div class="stock-head">
+                    <div>
+                      <div class="stock-name">示例科技</div>
+                      <div class="stock-code">300456.SZ · 示例</div>
+                    </div>
+                    <div class="stock-score"><strong>79</strong><span>匹配度</span></div>
+                  </div>
+                  <div class="stock-rationale">动量排名前 12%，成交额连续三周抬升。波动率处于近一年 78% 分位，仓位不宜过重。</div>
+                  <div class="stock-tags">
+                    <span class="pill green">流动性通过</span>
+                    <span class="pill amber">波动偏高</span>
+                    <span class="pill">创业板</span>
+                  </div>
+                  <div class="stock-actions">
+                    <button class="watch">加入观察</button>
+                    <button class="audit">单股审计</button>
+                  </div>
+                </article>
+              </section>
+            </div>
+            <footer class="footer-action">
+              <button class="secondary">查看过滤原因</button>
+              <button class="primary">同步观察池</button>
+            </footer>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

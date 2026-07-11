@@ -1,0 +1,79 @@
+<view class="page">
+  <scroll-view class="content" scroll-y enhanced show-scrollbar="{{false}}">
+    <!-- 用户卡 -->
+    <view class="profile-header">
+      <view class="profile-avatar">{{user.avatar}}</view>
+      <view class="profile-info">
+        <view class="profile-name">{{user.nickname}}</view>
+        <view class="profile-tenant mono">租户 {{user.tenantId}} · {{user.joinedAt}} 加入</view>
+      </view>
+    </view>
+
+    <!-- 套餐卡 -->
+    <view class="plan-card card">
+      <view class="plan-row">
+        <text class="plan-name">{{planName}}</text>
+        <text class="plan-tag {{plan}}">生效中</text>
+      </view>
+      <view class="plan-quota-label">本月 token 额度</view>
+      <view class="plan-bar">
+        <view class="plan-bar-fill" style="width: {{quotaPercent}}%"></view>
+      </view>
+      <view class="plan-info">
+        <text>已用 <text class="mono strong">{{usedTokens}}</text> / {{tokenQuota}}</text>
+        <text>到期 <text class="mono strong">{{expireDate}}</text></text>
+      </view>
+    </view>
+
+    <!-- 订阅与额度 -->
+    <view class="section-header">订阅与额度</view>
+    <view class="menu card">
+      <view class="menu-row" bindtap="onBuyTokenPack">
+        <view class="menu-icon">+</view>
+        <text class="menu-text">购买 Token 包</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-row" bindtap="onUpgrade">
+        <view class="menu-icon">↑</view>
+        <text class="menu-text">升级到专业版 MAX</text>
+        <text class="menu-badge">¥99/月</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-row" bindtap="onSubscription">
+        <view class="menu-icon">↻</view>
+        <text class="menu-text">订阅管理 · 续费/取消</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-row" bindtap="onInvoices">
+        <view class="menu-icon">¥</view>
+        <text class="menu-text">账单与发票</text>
+        <text class="menu-arrow">›</text>
+      </view>
+    </view>
+
+    <!-- 审计与通知 -->
+    <view class="section-header">审计与通知</view>
+    <view class="menu card">
+      <view class="menu-row" bindtap="onHistory">
+        <view class="menu-icon">≡</view>
+        <text class="menu-text">我的审计历史</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-row" bindtap="onNotify">
+        <view class="menu-icon">◔</view>
+        <text class="menu-text">订阅消息设置</text>
+        <text class="menu-arrow">›</text>
+      </view>
+      <view class="menu-row" bindtap="onDisclaimer">
+        <view class="menu-icon">i</view>
+        <text class="menu-text">研究使用声明</text>
+        <text class="menu-arrow">›</text>
+      </view>
+    </view>
+
+    <!-- 续费 CTA -->
+    <button class="renew-cta" bindtap="onRenew">续费会员 · ¥29 / 月</button>
+
+    <view style="height: 20px"></view>
+  </scroll-view>
+</view>
