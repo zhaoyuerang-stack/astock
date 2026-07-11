@@ -60,6 +60,7 @@ _MODULES = (
     "factors.microstructure",
     "factors.shareholder",
     "factors.capital_flow",
+    "factors.industry_prosperity",
 )
 _discovered = False
 

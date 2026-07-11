@@ -17,6 +17,7 @@ LEGACY_ALIASES = {
     "illiq_sc": ("illiquidity", "v3.1", "equity_alpha"),
     "lc_mom": ("hq-momentum-hedged", "v1.0", "equity_alpha"),
     "reversal": ("reversal-composite", "v1.0", "equity_alpha"),
+    "small_sc": ("small-cap-size", "v2.0", "equity_alpha"),
 }
 
 

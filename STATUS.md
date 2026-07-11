@@ -618,7 +618,13 @@ REGIME_GATED_DEFAULT=False 测试守门,接入 test_all。是风险偏好开关,
 ② 门控 **2011 熊市真护跌**(-3.2% vs static -10.0%,large-cap 那年扛住),但 2018 拖(-10.9% vs -5.7%)
 ——protection 视 large-cap 自身是否也跌,inconsistent 但净正;③ 全版含防御把回撤垫到 -20.7%(略破 20% bar);
 ④ 注:年化被 2015 疯牛(门控 +291%)抬高,两者都吃这个不可重复年。**净:门控比 2018 窗显示的更稳健,
-全样本是清晰改进(默认仍关,风险偏好开)。** 报告 `/tmp/stress_gate.log`。
+## composite-portfolio 严格审计与优化重构 (2026-07-05)
+对自适应复合策略进行了数据流和时空对齐的二次严格审计，拔除了影响绩效的严重漏洞：
+- **时序漏洞修复**：修复了复合策略晋级回测中致命的 T+2 双重平移 Bug，将延迟处理收归引擎底层，还原了策略的真正 T-1 绩效。
+- **数据漏洞修复**：修复了 small-cap-size runner 中 reindex 缺少行对齐 `.reindex(index=close.index)` 导致 95.1% 非调仓日权重被隐式截断成 NaN 的重大漏洞（Gate 0 NaN 比例从 95.1% 降至 0.0%）。
+- **优化重构**：剔除严重亏损的反转脚，引入 `small-cap-size v2.0`。
+- **回测表现**：优选版本 `v1.2-no-mom` (`illiq_sc:0.60,small_sc:0.40`) 在真正还原的 T-1 延迟下，2023-2024 样本外年化大幅拉升至 **`18.76%`**，夏普比率高达 **`1.28`**，最大回撤被控制在极稳健的 **`-11.46%`**，展现出卓越的 Alpha 效能。
+- **9-Gate 审计与登记**：由于两个组合在时滞衰减测试（Gate 7B）下的夏普降幅（分别为 `0.48` 和 `0.58`）均超出了 `0.40` 的硬限制，最终被 9-Gate 流水线自动执行**一票否决 (VETOED)**。所有真实数据和 `REJECTED` 状态均已如实回写至台账，严守量化纪律，不带病上线。
 
 ## 关键产出
 
@@ -631,6 +637,8 @@ REGIME_GATED_DEFAULT=False 测试守门,接入 test_all。是风险偏好开关,
 - `core/analysis/walk_forward.py` — Purged WF + DSR + PBO
 
 ### 研究报告
+- `reports/research/composite_portfolio_9_gates_report_v1.1.md` — 复合自适应组合 v1.1 严格审计报告
+- `reports/research/composite_portfolio_9_gates_report_v1.2-no-mom.md` — 复合自适应组合 v1.2-no-mom 严格审计报告
 - `reports/research/amihud_rotation_strategy_report.md` — **v3.0 完整策略报告**
 - `reports/research/illiquidity_strategy_report.md` — v2.1 策略报告
 

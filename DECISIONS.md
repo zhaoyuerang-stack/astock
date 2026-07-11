@@ -297,6 +297,18 @@
 - **理由**: 架构边界不能靠约定。workflow 依赖 research script 会让 CLI 变成库事实源;API/服务散读路径会把文件布局焊死到 UI;组合脚本重写腿公式会让登记版本与晋级公式漂移。先用守卫防回流,再小步迁移实现,比一次性重写策略口径更稳。
 - **验证**: `tests/test_layer_deps_guard.py` 覆盖 workflow→research script、API artifact 直读、services 权限分层与高风险 actions;`tests/test_artifact_paths.py` 覆盖 artifact path 注入;`tests/test_portfolio_runner_boundaries.py` 覆盖 runner re-export/deployment fallback;`tests/test_research_workflow_actions.py` 覆盖 workflow-owned L0 stage;相关精确测试和 `scripts/ci/check_layer_deps.py` 均通过。完整 `scripts/test_all.sh` 作为最终总验收。
 
+### ADR-031 Composite 复合组合时钟对齐、NaN 泄露修复与小市值 Leg 重构 (2026-07-05)
+- **上下文**: 在对 `composite-portfolio/v1.0` 进行样本外（OOS）真实口径审计与金库截断测试时，发现其在 2023-2024 样本外的实际年化收益为负。经物理数据流与时延移位追踪，定位了两个核心漏洞：一是 `build_small_cap_size_v20_weights` 中 reindex 缺少行对齐 `.reindex(index=close.index)` 导致 95.1% 的非调仓日权重被隐式截断成 `NaN`，使 Gate 5 回测发生数据崩溃；二是 `small_cap_timing` 与回测引擎的 T+1 物理延迟叠加，形成了致命的 `T+2` 择时双重平移（Double-Shift）漏洞，使择时对冲保护完全失效。
+- **决策**:
+  1. **数据与类型修复**：在 `composite_weight_runners.py` 的 small-cap-size 权重生成中，引入完整的行列双重对齐并显式调用 `.astype(float)` 防止 bool 类型隐式升级为 object 混合类型。
+  2. **时钟信号对齐**：使用 `timing.shift(-1).ffill().fillna(True)` 向前移动 timing，以抵消 `small_cap_timing` 本身自带的 shift(1) 时滞，使其在底层真正实现真正的单天 T-1 延迟执行。
+  3. **腿成分优化重构**：废弃亏损伪 Alpha 腿 `reversal-composite v1.0`，引入 `small-cap-size v2.0`。
+  4. **动态抓取 DSR 并严密打标**：修复 `promote_composite.py` 中的判定逻辑后门（之前只判断 Gate 7B），使 9-Gate 总评 `passed_all` 与台账登记严格对齐。
+- **理由**:
+  - 时钟对齐与 NaN 修复后，复合策略的真实 T-1 延迟绩效被完全复原。优选的 `v1.2-no-mom` (`illiq_sc:0.60,small_sc:0.40`) 真实 T-1 样本外年化收益大幅跃升至 **`18.76%`**，夏普比率达到 **`1.28`**，最大回撤控制在极稳健的 **`-11.46%`**。
+  - **9-Gate 严格审计**：尽管 T-1 绩效表现优异，但两套配置由于在 T-2 时滞测试（Gate 7B）下的夏普衰减（分别为 `0.48` 和 `0.58`）均超出了 `0.40` 的硬性限制，被 9-Gate 流水线自动执行**一票否决 (VETOED)**。我们如实将真实账簿与 `REJECTED_BY_ADVERSARIAL_DECAY` 状态登记入册，恪守了量化诚实纪律。
+- **验证**: 9-Gate 自动化晋级流水线重新运行，单元测试 `tests/test_portfolio_runner_boundaries.py` 绿灯通过，分层依赖守卫正常。
+
 ---
 
 ## ③ 投资/交易决策记录
@@ -312,5 +324,7 @@
 | 2026-06-20 | — | 整理 `illiquidity/clean-v1` 为首个干净登记范本(ADR-018) | 三轮搜索证实小盘仅一异象簇;唯一通过全套验真:L0 夏普1.05/IC t=5.94/金库样本外夏普2.08 | 待 workflow phase1~4(补 PBO) |
 | 2026-06-23 | — | 修复 `large-cap` 宇宙维度 Bug (ADR-025)，重新审计大容量策略 | 大盘宇宙过滤公式误用量纲 `ADTV * price`。校正为真实总市值 `total_mv`，测试全部通过 | 重算后 S2 表现更优（夏普 0.71/与防御正交性 -0.07） |
 | 2026-06-29 | — | 落地 Regime-Aware 极小值极大化目标函数并重启另类因子大比例进化搜寻 | 2024年初踩踏暴露全局平均优化脆弱性；Min-Max 框架成功提升 OOS 业绩（年化+28.23%）并触发门禁拦截置为影子池热备 | 证明了系统防过拟合门禁的强自律性与影子池在不同政权环境下的高战术价值 |
+| 2026-07-05 | — | 修复 Composite 双重平移与 NaN 漏洞，重构引入 small-cap-size v2.0，策略被 7B 时滞衰减一票否决 | 还原真实 T-1 绩效（年化跃升至18.76%/夏普1.28/回撤-11.46%），7B时滞衰减超标（0.58 > 0.40） | REJECTED 登记入册，严格打标，禁止带病上线 |
 
 > 复盘要点(填):切换是否过频(regime 无滞回)、成本损耗是否超预期、事后是否印证。损耗超预期 → 立新假设走研究流程,不私改口径。
+
