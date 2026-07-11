@@ -174,6 +174,27 @@ INTERFACES = {
         "store": "institutional/pledge_stat_all.parquet",
         "fields": "ts_code,end_date,pledge_count,unrest_pledge,rest_pledge,total_share,pledge_ratio",
     },
+    "block_trade": {  # 大宗交易 → 折溢价信号
+        "mode": "by_date", "date_param": "trade_date", "keys": ["ts_code", "trade_date"],
+        "store": "event/block_trade_all.parquet",
+        "fields": "ts_code,trade_date,price,amount,vol,num,premium,buyer, seller",
+    },
+    "top10_holders": {  # 十大股东 → 机构/内部人持仓变化
+        "mode": "by_stock", "keys": ["ts_code", "end_date", "holder_name"],
+        "store": "holder/top10_holders_all.parquet",
+        "fields": "ts_code,ann_date,end_date,holder_name,holder_type,hold_amount,hold_ratio",
+    },
+    # ── 龙虎榜 (by_date, 快) ──
+    "top_list": {  # 龙虎榜个股
+        "mode": "by_date", "date_param": "trade_date", "keys": ["ts_code", "trade_date"],
+        "store": "event/top_list_all.parquet",
+        "fields": "trade_date,ts_code,name,reason,close,pct_change,amount",
+    },
+    "top_inst": {  # 龙虎榜席位明细 (最重要)
+        "mode": "by_date", "date_param": "trade_date", "keys": ["ts_code", "trade_date", "exalter"],
+        "store": "event/top_inst_all.parquet",
+        "fields": "trade_date,ts_code,exalter,buy,sell,net_buy,side,reason",
+    },
 }
 
 
