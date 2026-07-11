@@ -26,6 +26,15 @@ rets.to_csv(store / "family__v1.csv")
     assert scan_source(src, rel="lake/version_returns.py") == []
 
 
+def test_flags_direct_global_raw_write_outside_lake_layer():
+    src = """
+from pathlib import Path
+store = Path("data_lake") / "global_raw" / "alfred_macro_v1"
+raw.to_parquet(store / "payload.parquet")
+"""
+    assert scan_source(src, rel="workflow/global_probe.py") == ["workflow/global_probe.py"]
+
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-q"]))

@@ -21,6 +21,19 @@ data:
   warmup_start: "2010-01-01"
   default_start: "2018-01-01"
 
+# 全球多资产数据层:默认关闭、非生产阻塞。
+# OpenBB 只是 provider 入口之一;实际覆盖取决于本机安装的 provider 扩展和环境变量授权。
+global_data:
+  enabled: false
+  required: false
+  provider_mode: openbb
+  datasets: []
+  api_key_envs: {}
+  # Source approval is explicit and auditable. Keep empty until provider terms,
+  # credentials and PIT metadata have been reviewed.
+  source_admissions: {}
+  max_daily_failures: 0
+
 # Holdout 金库(LOOP_ENGINEERING §5.2):date >= start 永不用于搜索,仅晋级前唯一一次校验。
 # 搜索/研究回测必须截到 < start;改此日期 = 改变金库,须谨慎并记 DECISIONS。
 holdout:

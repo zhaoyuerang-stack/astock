@@ -13,6 +13,7 @@ DATA_ISSUE_CATEGORIES = (
     "AMOUNT_UNIT_SUSPECT",
     "FUNDAMENTAL_ALIGNMENT",
     "ETF_SOURCE_STALE",
+    "GLOBAL_DATA_STALE",
 )
 
 ISSUE_SEVERITY = {
@@ -23,15 +24,17 @@ ISSUE_SEVERITY = {
     "AMOUNT_UNIT_SUSPECT": "block_backtest",
     "FUNDAMENTAL_ALIGNMENT": "block_backtest",
     "ETF_SOURCE_STALE": "warn_only",
+    "GLOBAL_DATA_STALE": "warn_only",
 }
 
 AUTO_COMMANDS = {
     "STALE": "/opt/homebrew/bin/python3 scripts/ops/scheduled_daily_update.py --force",
     "MISSING_BAR": "/opt/homebrew/bin/python3 scripts/repair/revalidate.py",
     "ETF_SOURCE_STALE": "/opt/homebrew/bin/python3 scripts/data/fetch_cross_asset_etf.py",
+    "GLOBAL_DATA_STALE": "/opt/homebrew/bin/python3 scripts/data/update_global_data.py --all-enabled",
 }
 
-AUTO_REPAIR_ALLOWED = {"STALE", "ETF_SOURCE_STALE"}
+AUTO_REPAIR_ALLOWED = {"STALE", "ETF_SOURCE_STALE", "GLOBAL_DATA_STALE"}
 
 MANUAL_REVIEW = {
     "OHLC_INVALID": "Review source rows before writing repairs or quarantine ranges.",
@@ -54,6 +57,8 @@ def classify_issue(text: str) -> str | None:
         return "STALE"
     if "etf" in tl or "ETF" in t:
         return "ETF_SOURCE_STALE"
+    if "global_data" in tl or "openbb" in tl:
+        return "GLOBAL_DATA_STALE"
     if "amount" in tl or "moneyflow" in tl or "成交额" in t or "资金流" in t:
         return "AMOUNT_UNIT_SUSPECT"
     if ("fundamental" in tl or "daily_basic" in tl or "财务" in t
@@ -190,6 +195,19 @@ def build_scheduled_update_triage(report: dict, save_path: str | Path | None = N
         else:
             issues.append(_issue("FUNDAMENTAL_ALIGNMENT", ts.get("error", "tushare update failed"),
                                  source="scheduled_daily_update.tushare"))
+
+    gd = report.get("global_data_update", {}) or {}
+    if gd.get("ok") is False:
+        detail = gd.get("detail") or {}
+        if isinstance(detail, dict):
+            for dim, stat in detail.items():
+                if (stat or {}).get("ok"):
+                    continue
+                text = f"{dim}: {(stat or {}).get('error') or (stat or {}).get('status') or 'update_failed'}"
+                issues.append(_issue("GLOBAL_DATA_STALE", text, source="scheduled_daily_update.global_data"))
+        else:
+            issues.append(_issue("GLOBAL_DATA_STALE", gd.get("error", "global data update failed"),
+                                 source="scheduled_daily_update.global_data"))
 
     triage = _summarize(
         issues,

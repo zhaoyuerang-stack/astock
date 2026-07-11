@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from contracts.views import DataQualityView, StockProfileView
+from contracts.views import DataQualityView, GlobalDataCoverageView, GlobalDataSourcesView, StockProfileView
+from services.read.global_data import global_data_coverage, global_data_sources
 from services.read.state import data_quality
 from services.read.stocks import stock_profile
 
@@ -13,6 +14,16 @@ router = APIRouter(prefix="/data", tags=["data"])
 @router.get("/quality", response_model=DataQualityView)
 def quality(duckdb: bool = True) -> DataQualityView:
     return data_quality(with_duckdb=duckdb)
+
+
+@router.get("/global/sources", response_model=GlobalDataSourcesView)
+def global_sources() -> GlobalDataSourcesView:
+    return global_data_sources()
+
+
+@router.get("/global/coverage", response_model=GlobalDataCoverageView)
+def global_coverage() -> GlobalDataCoverageView:
+    return global_data_coverage()
 
 
 @router.get("/stocks/{code}", response_model=StockProfileView)

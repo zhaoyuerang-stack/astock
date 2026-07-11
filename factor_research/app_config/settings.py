@@ -56,6 +56,21 @@ class DataConfig:
 
 
 # ---------------------------------------------------------------------------
+# Global data defaults (optional multi-asset layer; non-blocking by default)
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class GlobalDataConfig:
+    enabled: bool = False
+    required: bool = False
+    provider_mode: str = "openbb"
+    datasets: tuple = ()
+    api_key_envs: dict[str, str] = field(default_factory=dict)
+    source_admissions: dict[str, dict[str, str]] = field(default_factory=dict)
+    max_daily_failures: int = 0
+
+
+# ---------------------------------------------------------------------------
 # Factory search defaults
 # ---------------------------------------------------------------------------
 
@@ -88,6 +103,7 @@ class Settings:
     cost: CostModelConfig = field(default_factory=CostModelConfig)
     strategy: StrategyConfig = field(default_factory=StrategyConfig)
     data: DataConfig = field(default_factory=DataConfig)
+    global_data: GlobalDataConfig = field(default_factory=GlobalDataConfig)
     factory: FactoryConfig = field(default_factory=FactoryConfig)
     notify: NotifyConfig = field(default_factory=NotifyConfig)
 
@@ -105,10 +121,18 @@ class Settings:
 
     @classmethod
     def _from_dict(cls, d: dict):
+        global_data = d.get("global_data", {}) or {}
         return cls(
             cost=CostModelConfig(**d.get("cost", {})),
             strategy=StrategyConfig(**d.get("strategy", {})),
             data=DataConfig(**d.get("data", {})),
+            global_data=GlobalDataConfig(
+                **{
+                    **global_data,
+                    "datasets": tuple(global_data.get("datasets", ())),
+                    "source_admissions": dict(global_data.get("source_admissions", {}) or {}),
+                }
+            ),
             factory=FactoryConfig(**d.get("factory", {})),
             notify=NotifyConfig(**d.get("notify", {})),
         )

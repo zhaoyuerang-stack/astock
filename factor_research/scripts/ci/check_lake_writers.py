@@ -2,7 +2,8 @@
 
 背景(2026-06-12 事故):ad-hoc 修复脚本直写 daily_all 且不更新 manifest,
 造成数据与台账失联;类比策略侧"台账唯一写入口 = strategy_registry"铁律,
-数据侧同样需要:**写 data_lake 核心区(price/fundamental/meta/capital)的
+数据侧同样需要:**写 data_lake 核心区(price/fundamental/meta/capital/global/global_raw/
+global_quarantine)的
 代码必须住在 lake/ 或 scripts/data/(含 scripts/repair/ 修复工具)**。
 
 静态检查:凡写方法(to_parquet/to_csv/write_text/write_bytes/open 写模式)且引用受保护湖路径、
@@ -21,9 +22,9 @@ ALLOWED_PREFIXES = ("lake/", "scripts/data/", "scripts/repair/", "tests/")
 # 历史欠债名单。必须保持为空;新增违规不允许用白名单掩盖。
 LEGACY = set()
 PROTECTED_LAKE = re.compile(
-    r"data_lake[/\"']\s*(?:/\s*)?(?:price|fundamental|meta|capital|version_returns)"
-    r"|data_lake/(?:price|fundamental|meta|capital|version_returns)"
-    r"|[\"']data_lake[\"']\s*\)?\s*/\s*[\"'](?:price|fundamental|meta|capital|version_returns)[\"']"
+    r"data_lake[/\"']\s*(?:/\s*)?(?:price|fundamental|meta|capital|global|global_raw|global_quarantine|version_returns)"
+    r"|data_lake/(?:price|fundamental|meta|capital|global|global_raw|global_quarantine|version_returns)"
+    r"|[\"']data_lake[\"']\s*\)?\s*/\s*[\"'](?:price|fundamental|meta|capital|global|global_raw|global_quarantine|version_returns)[\"']"
 )
 WRITE_METHODS = ("to_parquet", "to_csv", "write_text", "write_bytes")
 
@@ -45,7 +46,7 @@ def _mentions_protected_path(node: ast.AST) -> bool:
     joined = "/".join(strings)
     if PROTECTED_LAKE.search(joined):
         return True
-    protected_parts = {"price", "fundamental", "meta", "capital", "version_returns"}
+    protected_parts = {"price", "fundamental", "meta", "capital", "global", "global_raw", "global_quarantine", "version_returns"}
     return "data_lake" in strings and any(s in protected_parts for s in strings)
 
 

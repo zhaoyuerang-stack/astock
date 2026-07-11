@@ -119,7 +119,7 @@ def _alert_body(report: dict) -> str:
     failed_steps = [
         k for k in (
             "calendar_update", "price_update", "raw_update", "etf_update",
-            "fundamental_update", "tushare_incremental",
+            "fundamental_update", "tushare_incremental", "global_data_update",
         )
         if isinstance(report.get(k), dict) and report[k].get("ok") is False
     ]
@@ -240,6 +240,47 @@ def sample_quality_check():
     return {"checked": checked, "bad": bad, "ok": not bad}
 
 
+def compute_update_health(report: dict) -> dict:
+    price_ok = report.get("price_update", {}).get("ok", True)
+    fundamental_ok = report.get("fundamental_update", {}).get("ok", True)
+    etf_ok = report.get("etf_update", {}).get("ok", True)
+    raw_ok = report.get("raw_update", {}).get("ok", True)
+    tushare_inc_ok = report.get("tushare_incremental", {}).get("ok", True)
+    global_update = report.get("global_data_update", {}) or {}
+    global_update_ok = global_update.get("ok", True)
+    global_update_required = bool(global_update.get("required", False))
+    core_update_ok = price_ok and fundamental_ok and (global_update_ok or not global_update_required)
+    aux_update_ok = etf_ok and raw_ok and tushare_inc_ok and global_update_ok
+    required_update_ok = global_update_ok or not global_update_required
+    return {
+        "price_ok": bool(price_ok),
+        "fundamental_ok": bool(fundamental_ok),
+        "etf_ok": bool(etf_ok),
+        "raw_ok": bool(raw_ok),
+        "tushare_inc_ok": bool(tushare_inc_ok),
+        "global_update_ok": bool(global_update_ok),
+        "global_update_required": global_update_required,
+        "core_update_ok": bool(core_update_ok),
+        "aux_update_ok": bool(aux_update_ok),
+        "required_update_ok": bool(required_update_ok),
+    }
+
+
+def compute_final_status(
+    *,
+    fresh: bool,
+    signal_ok: bool,
+    aux_update_ok: bool,
+    required_update_ok: bool = True,
+    force: bool = False,
+) -> str:
+    if not required_update_ok:
+        return "failed"
+    if (fresh or force) and signal_ok:
+        return "ok" if aux_update_ok else "partial_ok"
+    return "failed"
+
+
 def attach_production_readiness(report):
     from runtime.production_readiness import get_production_readiness
 
@@ -338,6 +379,23 @@ def run_updates(report, dry_run=False):
     except Exception as exc:
         report["tushare_incremental"] = {"ok": False, "error": str(exc)}
         print(f"[update] tushare incremental failed: {exc}")
+        traceback.print_exc()
+
+    try:
+        print("[update] global multi-asset data (optional, non-blocking unless settings.global_data.required)")
+        from scripts.data.update_global_data import run_global_update
+        global_stats = run_global_update(root=ROOT, all_enabled=True, from_watermark=True)
+        report["global_data_update"] = global_stats
+        if global_stats.get("skipped"):
+            print(f"  [global_data] skipped: {global_stats.get('reason', '')}")
+        for dim, s in (global_stats.get("detail") or {}).items():
+            if (s or {}).get("ok"):
+                print(f"  [global_data] {dim}: latest={s.get('latest_date','')} rows={s.get('row_count',0)}")
+            else:
+                print(f"  [global_data] {dim}: ⚠ {s.get('error') or s.get('status') or 'failed'}")
+    except Exception as exc:
+        report["global_data_update"] = {"ok": False, "required": False, "error": str(exc)}
+        print(f"[update] global data failed: {exc}")
         traceback.print_exc()
 
     try:
@@ -584,14 +642,17 @@ def run_daily_update(args):
                 fresh = expected is not None and after_latest is not None and after_latest >= expected
                 report["data_fresh"] = bool(fresh)
 
-                # 区分核心更新失败 vs 辅助更新失败
-                price_ok = report.get("price_update", {}).get("ok", True)
-                fundamental_ok = report.get("fundamental_update", {}).get("ok", True)
-                etf_ok = report.get("etf_update", {}).get("ok", True)
-                raw_ok = report.get("raw_update", {}).get("ok", True)
-                tushare_inc_ok = report.get("tushare_incremental", {}).get("ok", True)
-                core_update_ok = price_ok and fundamental_ok
-                aux_update_ok = etf_ok and raw_ok and tushare_inc_ok
+                # 区分核心更新失败 vs 辅助更新失败。全球数据默认辅助,仅 required=true 时进入核心。
+                update_health = compute_update_health(report)
+                price_ok = update_health["price_ok"]
+                fundamental_ok = update_health["fundamental_ok"]
+                etf_ok = update_health["etf_ok"]
+                raw_ok = update_health["raw_ok"]
+                tushare_inc_ok = update_health["tushare_inc_ok"]
+                global_update_ok = update_health["global_update_ok"]
+                core_update_ok = update_health["core_update_ok"]
+                aux_update_ok = update_health["aux_update_ok"]
+                required_update_ok = update_health["required_update_ok"]
 
                 report["update_failed_but_data_fresh"] = bool(fresh and not core_update_ok)
                 report["aux_update_partial"] = bool(not aux_update_ok)
@@ -603,8 +664,14 @@ def run_daily_update(args):
                     ts_detail = report.get("tushare_incremental", {}).get("detail", {})
                     failed_dims = [d for d, v in ts_detail.items() if not v.get("ok")]
                     print(f"[freshness] tushare 日频维度部分失败({failed_dims}),不影响价量 freshness")
+                if not global_update_ok:
+                    gd_detail = report.get("global_data_update", {}).get("detail", {})
+                    failed_dims = [d for d, v in gd_detail.items() if not (v or {}).get("ok")]
+                    required = report.get("global_data_update", {}).get("required", False)
+                    print(f"[freshness] global 数据部分失败({failed_dims}),required={required}")
                 print(f"[freshness] after={report['latest_after_update']} fresh={fresh} "
-                      f"price_ok={price_ok} etf_ok={etf_ok} raw_ok={raw_ok} tushare_inc_ok={tushare_inc_ok}")
+                      f"price_ok={price_ok} etf_ok={etf_ok} raw_ok={raw_ok} "
+                      f"tushare_inc_ok={tushare_inc_ok} global_ok={global_update_ok}")
 
                 report["sample_quality"] = sample_quality_check()
                 print(f"[quality] sample_ok={report['sample_quality']['ok']} bad={report['sample_quality']['bad']}")
@@ -631,10 +698,13 @@ def run_daily_update(args):
 
                 signal_ok = bool(report.get("signal", {}).get("generated") or args.dry_run)
                 # ok = 核心数据新鲜 + 信号生成；partial_ok = 信号生成但辅助更新有失败
-                if (fresh or args.force) and signal_ok:
-                    report["status"] = "ok" if aux_update_ok else "partial_ok"
-                else:
-                    report["status"] = "failed"
+                report["status"] = compute_final_status(
+                    fresh=bool(fresh),
+                    signal_ok=signal_ok,
+                    aux_update_ok=bool(aux_update_ok),
+                    required_update_ok=bool(required_update_ok),
+                    force=bool(args.force),
+                )
                 # partial_ok 仍返回 0(不触发 launchd 报警),failed 返回 1
                 return 0 if report["status"] in ("ok", "partial_ok") else 1
             except Exception as exc:

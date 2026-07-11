@@ -98,6 +98,53 @@ class DataQualityView(BaseModel):
     duckdb: dict | None = None      # 可选:DuckDB 即席复核
 
 
+class GlobalDataSourceView(BaseModel):
+    """Optional global multi-asset data source status."""
+    dataset_id: str
+    source_id: str = ""
+    provider: str = ""
+    allowed_use: str = "research_only"
+    admission_status: str = ""
+    license_status: str = ""
+    availability_confidence: str = ""
+    asset_class: str = ""
+    frequency: str = ""
+    calendar: str = ""
+    timezone: str = ""
+    currency: str = ""
+    pit_policy: str = ""
+    status: str = "not_loaded"
+    required: bool = False
+    latest_date: str = ""
+    latest_observation: str = ""
+    latest_available: str = ""
+    last_good_ingest_id: str = ""
+    row_count: int = 0
+    coverage: dict = Field(default_factory=dict)
+    quality_status: str = ""
+    quarantine_count: int = 0
+    last_error: str = ""
+    updated_at: str = ""
+
+
+class GlobalDataSourcesView(BaseModel):
+    generated_at: str = ""
+    summary: dict = Field(default_factory=dict)
+    sources: list[GlobalDataSourceView] = Field(default_factory=list)
+
+
+class GlobalDataCoverageView(BaseModel):
+    generated_at: str = ""
+    summary: dict = Field(default_factory=dict)
+    datasets: list[dict] = Field(default_factory=list)
+
+
+class GlobalDataProbeRequest(BaseModel):
+    dataset_id: str = "macro_daily"
+    source_id: str = ""
+    provider_mode: str = ""
+
+
 class StockProfileView(BaseModel):
     """Single-stock data profile backed by data_lake."""
     code: str

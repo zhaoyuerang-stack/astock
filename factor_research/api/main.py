@@ -4,18 +4,21 @@
     cd factor_research && uvicorn api.main:app --reload
 或直接:
     cd factor_research && python3 -m api.main
+
+⚠️ 镜像文件:实际运行于 factor_research/api/main.py,修改请同步两边。
 """
 from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import (agent, backtest, data, experiments, factors, paper, portfolio,
+from api.routers import (agent, backtest, data, experiments, factors, miniapp, paper, portfolio,
                          risk, settings, state, strategies, system, trade_readiness, governance)
 
 app = FastAPI(title="Quant Research Platform API", version="0.0-phase0")
 
 # Phase 1:允许本地 Next.js 开发服务器跨域调用。3001 是 3000 被占用时的 fallback。
+# 小程序请求不校验 CORS(微信客户端发起),此处仍保留 Web 端跨域支持。
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -42,6 +45,7 @@ app.include_router(settings.router)
 app.include_router(trade_readiness.router)
 app.include_router(governance.router)
 app.include_router(system.router)
+app.include_router(miniapp.router)
 
 
 @app.get("/health")

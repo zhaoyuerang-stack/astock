@@ -14,6 +14,7 @@ from contracts.views import (
     AutoResearchReviewRequest,
     AutoResearchRunResponse,
     FunnelView,
+    GlobalDataProbeRequest,
     HypothesisView,
     PromotionReadinessView,
     RegisteredExperimentView,
@@ -34,6 +35,7 @@ from services.actions.autoresearch import (
 )
 from services.actions.autoresearch_llm import run_autoresearch_llm
 from services.actions.autoresearch_search import run_autoresearch_island_search
+from services.actions.global_data import run_global_data_probe
 from services.actions.jobs import get_action_job, list_action_jobs, submit_action_job
 from services.actions.research_workspace import (
     InvalidTransition,
@@ -243,6 +245,31 @@ def get_experiment_job(job_id: str) -> ActionJobView:
 @router.get("/jobs", response_model=list[ActionJobView])
 def get_experiment_jobs() -> list[ActionJobView]:
     return list_action_jobs()
+
+
+@router.post("/global-data/probe", response_model=ActionJobView)
+def post_global_data_probe(
+    body: GlobalDataProbeRequest,
+    _confirmed: None = Depends(require_action_token),
+) -> ActionJobView:
+    job = submit_action_job(
+        "global_data.probe",
+        run_global_data_probe,
+        dataset_id=body.dataset_id,
+        source_id=body.source_id,
+        provider_mode=body.provider_mode,
+        job_context={
+            "dataset_id": body.dataset_id,
+            "source_id": body.source_id,
+            "provider_mode": body.provider_mode,
+        },
+    )
+    audit_action(
+        "submit global data probe",
+        f"job_id={job.job_id} dataset_id={body.dataset_id} source_id={body.source_id}",
+        status=job.status,
+    )
+    return job
 
 
 @router.post("/autoresearch/run-seeds", response_model=ActionJobView)
