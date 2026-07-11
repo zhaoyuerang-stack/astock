@@ -14,7 +14,7 @@
 1. 阅读本文件的 `P0 / P1` 规则。
 2. 阅读 `STATUS.md`，确认当前进度、最近失败项、未完成任务。
 3. 运行或要求查看 `git status --short`，确认工作树是否已有他人改动（多 agent 共享工作树）。
-4. 判断任务类型：`data / factor / engine / strategy / workflow / registry / production / web / docs`。
+4. 判断任务类型：`data / factor / engine / strategy / workflow / registry / production / web / docs`；命中 `docs/agent_skills/` 固定剧本的任务**先读剧本再动手**（尤其：接入/回填新数据源 → 必读 [`data_source_onboarding.md`](factor_research/docs/agent_skills/data_source_onboarding.md) 按 S0-S7 执行，临场自创接入流程 = 工程事故源）。
 5. 只修改本任务相关文件；不得顺手重构无关模块。
 6. 修改前说明计划；修改后运行对应检查(§13)。
 7. 提交前只显式 stage 本次文件，必须检查 `git diff --cached --stat` 和 `git diff --cached`。
