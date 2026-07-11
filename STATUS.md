@@ -1,8 +1,13 @@
 # STATUS — 当前进度
 
-> 更新:2026-07-03。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
+> 更新:2026-07-10。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
+
+**2026-07-10(新数据源接入固定剧本 data-source-onboarding,纯文档)**:
+  · **补的缺口**:接入纪律散在 data_infrastructure/data_dimensions/LESSONS/CLAUDE §9 四处,agent 被叫去"接入 XX 源"只能临场拼流程(封禁/单位错/幸存者偏差/未来函数每次重踩);backlog 条目的 playbook 只指 probe-signal-source(信息体检),「外部源→data_lake canonical」工程接入这半段没有 canonical 剧本。
+  · **新增** `docs/agent_skills/data_source_onboarding.md`:固定流水线 S0-S7 逐步 fail-closed——S0 立项五判(信息假设对方向登记簿/PIT 可得性/全市场含退市覆盖/配额封禁账/停发预案)→ S1 小样本探针(单位·主键·时间戳·退市股·极值 top3)→ S2 契约声明(接入=INTERFACES/Fetcher 注册非新脚本;**时间轴口径三选一强制声明进加载层路由**,拿不准选最晚可见)→ S3 回填(canonical writer+manifest,限速铁律)→ S4 质量门(PIT 抽查/量纲对账/第二源 reconcile,不过不进加载层)→ S5 统一加载入口 → S6 增量+data_dimensions 登记+backlog 销账 → S7 交棒 probe-signal-source(数据健康≠信息有价值)。含雷区速查表(全部指向 LESSONS 已踩坑)。
+  · **路由接线**:CLAUDE.md §2 两处技能清单 + §9 数据纪律加强制入口;data_infrastructure.md 头部指针;data_source_backlog.json readme 写明「先 onboarding 后 probe」执行顺序。零新代码/守卫(元系统冻结:强制仍靠既有 check_lake_writers 等守卫;本剧本直接服务 TASKS「第一批新维度接入」与 backlog 待接条目)。
 
 **2026-07-03(孤岛回收四项:拥挤归因 + 保质期复核环 + 基本面质量因子族 + 被丢信号销账)**:
   · **拥挤 → 衰减归因**:`capacity.strategy_pool_crowding`(零调用方孤岛回收)接进 `decay_monitor` 周度——池级(等权"策略组合"复用 calculate_crowding_score)+ 逐腿 `max_pair_corr` 点名"和谁拥挤"(阈值单源 = governance.marginal.REDUNDANT_CORR)。对抗测试抓到真设计缺陷:逐腿对池均值相关会被正交腿稀释漏检双胞胎(corr 0.99 的孪生对池仅 0.64),已改两两口径。<2 腿/样本不足诚实拒判不给 0 分假绿。测试 5/5。

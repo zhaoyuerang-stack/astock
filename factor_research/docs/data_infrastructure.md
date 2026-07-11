@@ -1,6 +1,7 @@
 # 数据基础设施架构
 
 > 数据湖 + 统一加载层 + 质量校验 + 增量更新
+> **接入新数据源**:必须走固定剧本 [`agent_skills/data_source_onboarding.md`](agent_skills/data_source_onboarding.md)(立项五判→探针→契约声明→回填→质量门→加载层→登记,逐步 fail-closed),不得临场拼流程。
 
 ## 架构图
 
