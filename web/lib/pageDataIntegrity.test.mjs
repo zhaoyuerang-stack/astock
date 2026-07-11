@@ -87,3 +87,13 @@ test("dashboard wires the trust-calibration banner from the backend (no fake)", 
   assert.match(component, /status=\{data\.banner_status\}/);
   assert.doesNotMatch(component, /status="(ready|blocked|attention)"/);
 });
+
+test("data health and experiments pages expose global data infrastructure controls", () => {
+  const dataHealth = read("app/data-health/page.tsx");
+  assert.match(dataHealth, /api\.globalDataSources\(\)/);
+  assert.match(dataHealth, /globalSources/);
+
+  const experiments = read("app/experiments/page.tsx");
+  assert.match(experiments, /launchGlobalDataProbe/);
+  assert.match(experiments, /全球数据探测/);
+});

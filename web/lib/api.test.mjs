@@ -65,6 +65,71 @@ test("protected AutoResearch posts include local action token and job polling re
   ]);
 });
 
+test("global data API exposes source health and protected probe job", async () => {
+  const calls = [];
+  const { api } = await importFreshApi();
+
+  globalThis.fetch = async (url, init = {}) => {
+    const path = String(url).replace("http://api.test", "");
+    calls.push({ path, init });
+
+    if (path === "/data/global/sources") {
+      return jsonResponse({
+        generated_at: "2026-07-08T00:00:00Z",
+        summary: { total: 1, available: 0, missing_credentials: 1 },
+        sources: [{
+          dataset_id: "macro_daily",
+          provider: "openbb",
+          asset_class: "macro",
+          frequency: "daily",
+          status: "missing_credentials",
+          required: false,
+          latest_date: "",
+          row_count: 0,
+          last_error: "missing API key",
+        }],
+      });
+    }
+
+    if (path === "/settings/action-token") {
+      return jsonResponse({ header: "X-Action-Token", token: "global-token", source: "file" });
+    }
+
+    if (path === "/experiments/global-data/probe") {
+      assert.equal(init.method, "POST");
+      assert.equal(init.headers["X-Action-Token"], "global-token");
+      assert.deepEqual(JSON.parse(init.body), {
+        dataset_id: "macro_daily",
+        source_id: "alfred_macro_v1",
+        provider_mode: "alfred",
+      });
+      return jsonResponse({
+        job_id: "global-data-probe-abc123",
+        kind: "global_data.probe",
+        status: "queued",
+        created_at: "2026-07-08T00:00:00Z",
+      });
+    }
+
+    throw new Error(`unexpected fetch ${path}`);
+  };
+
+  const sources = await api.globalDataSources();
+  assert.equal(sources.sources[0].dataset_id, "macro_daily");
+
+  const job = await api.launchGlobalDataProbe({
+    dataset_id: "macro_daily",
+    source_id: "alfred_macro_v1",
+    provider_mode: "alfred",
+  });
+  assert.equal(job.kind, "global_data.probe");
+  assert.deepEqual(calls.map((c) => c.path), [
+    "/data/global/sources",
+    "/settings/action-token",
+    "/experiments/global-data/probe",
+  ]);
+});
+
 test("protected settings posts use the action token header without exposing it in body", async () => {
   const calls = [];
   const { api } = await importFreshApi();

@@ -83,6 +83,46 @@ export interface DataQualityView {
   } | null;
 }
 
+export interface GlobalDataSourceView {
+  dataset_id: string;
+  source_id: string;
+  provider: string;
+  allowed_use: string;
+  admission_status: string;
+  license_status: string;
+  availability_confidence: string;
+  asset_class: string;
+  frequency: string;
+  calendar: string;
+  timezone: string;
+  currency: string;
+  pit_policy: string;
+  status: string;
+  required: boolean;
+  latest_date: string;
+  latest_observation: string;
+  latest_available: string;
+  last_good_ingest_id: string;
+  row_count: number;
+  coverage: Record<string, unknown>;
+  quality_status: string;
+  quarantine_count: number;
+  last_error: string;
+  updated_at: string;
+}
+
+export interface GlobalDataSourcesView {
+  generated_at: string;
+  summary: Record<string, number>;
+  sources: GlobalDataSourceView[];
+}
+
+export interface GlobalDataCoverageView {
+  generated_at: string;
+  summary: Record<string, number>;
+  datasets: Record<string, any>[];
+}
+
 export interface FactorHealthView {
   name: string;
   sharpe: number;

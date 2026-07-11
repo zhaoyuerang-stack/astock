@@ -5,7 +5,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import Card from "@/components/ui/Card";
 import DataTable from "@/components/ui/DataTable";
 import { api, pct } from "@/lib/api";
-import type { DataQualityView } from "@/lib/types";
+import type { DataQualityView, GlobalDataSourcesView } from "@/lib/types";
 import { useAgent } from "@/lib/agentStore";
 import { useAutoRefresh } from "@/lib/useAutoRefresh";
 import { latestDateFromRange } from "@/lib/freshness";
@@ -30,8 +30,8 @@ type SourceHealthRow = {
   source: string;
   domain: string;
   latestDate: string;
-  latency: string;
-  failureRate: string;
+  quality: string;
+  detail: string;
   status: "active" | "warning" | "inactive";
 };
 
@@ -45,14 +45,24 @@ export default function DataHealthPage() {
   const setContext = useAgent((s) => s.setContext);
 
   const [dq, setDq] = useState<DataQualityView | null>(null);
+  const [globalSources, setGlobalSources] = useState<GlobalDataSourcesView | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setErr(null);
-    api.dataQuality()
-      .then((data) => {
+    Promise.all([
+      api.dataQuality(),
+      api.globalDataSources().catch(() => null),
+    ])
+      .then(([data, sources]) => {
         setDq(data);
+        setGlobalSources(sources);
         const latestDate = latestDateFromRange(data.duckdb?.date_range);
+        const sourceSummary = sources?.summary ?? {};
+        const unavailable = (sourceSummary.failed ?? 0)
+          + (sourceSummary.fetch_failed ?? 0)
+          + (sourceSummary.provider_unavailable ?? 0)
+          + (sourceSummary.missing_credentials ?? 0);
 
         setContext({
           page: "data-health",
@@ -62,6 +72,7 @@ export default function DataHealthPage() {
             `最新可交易日對齊: ${latestDate}`,
             `PIT 數據庫驗證率: ${(data.clean_ratio * 100).toFixed(1)}%`,
             `質量異常數: 嚴重問題 ${data.severe_count}只 · 正常跳變 ${data.jump_count}只`,
+            `全球數據源: ${sourceSummary.available ?? 0}/${sourceSummary.total ?? 0} 可用, ${unavailable} 項需授權或補映射`,
           ],
           risk: data.severe_count > 0 ? [`發現 ${data.severe_count} 只個股具有負價或 OHLC 一致性硬傷，可能影響今日操作信號`] : [],
           recommendation: [
@@ -81,7 +92,23 @@ export default function DataHealthPage() {
 
   const latestDate = latestDateFromRange(dq?.duckdb?.date_range);
   const pipelines: PipelineStatusRow[] = [];
-  const dataSources: SourceHealthRow[] = [];
+  const sourceSummary = globalSources?.summary ?? {};
+  const sourceProblems = (globalSources?.sources ?? []).filter((source) => !["available", "partial_ok"].includes(source.status)).length;
+  const sourceBadge = !globalSources
+    ? "unknown"
+    : sourceProblems > 0
+      ? "warning"
+      : (sourceSummary.available ?? 0) > 0
+        ? "active"
+        : "warning";
+  const dataSources: SourceHealthRow[] = (globalSources?.sources ?? []).map((source) => ({
+    source: source.source_id ? `${source.source_id} / ${source.dataset_id}` : source.dataset_id,
+    domain: `${source.asset_class} · ${source.allowed_use}`,
+    latestDate: source.latest_available || source.latest_date || "—",
+    quality: source.quality_status || source.status,
+    detail: source.last_error || (source.quarantine_count > 0 ? `quarantine ${source.quarantine_count}` : source.availability_confidence || "—"),
+    status: ["available", "partial_ok"].includes(source.status) ? "active" : source.status === "source_not_admitted" ? "warning" : "inactive",
+  }));
   const activeIssues: ActiveIssueRow[] = (dq?.flagged_sample ?? []).map((item) => ({
     code: item.code,
     type: item.issues.join("、"),
@@ -184,9 +211,11 @@ export default function DataHealthPage() {
         <div className="p-4 bg-navy border border-line rounded-lg text-center">
           <div className="text-[11px] text-subink uppercase font-bold tracking-wider">數據源狀態</div>
           <div className="mt-2.5">
-            {getStatusBadge("unknown")}
+            {getStatusBadge(sourceBadge)}
           </div>
-          <div className="text-[10px] text-[#5F728A] mt-2">后端未提供来源状态</div>
+          <div className="text-[10px] text-[#5F728A] mt-2">
+            {globalSources ? `${sourceSummary.available ?? 0}/${sourceSummary.total ?? 0} global sources` : "等待全球来源状态"}
+          </div>
         </div>
       </div>
 
@@ -263,8 +292,10 @@ export default function DataHealthPage() {
             getRowKey={(r) => r.source}
             columns={[
               { key: "source", header: "來源渠道", className: "text-[#E6EDF7] font-bold", render: (r) => r.source },
-              { key: "latestDate", header: "最新日期", className: "font-mono text-subink", render: (r) => r.latestDate },
-              { key: "latency", header: "拉取延遲", align: "right", className: "font-mono text-[#E6EDF7]", render: (r) => r.latency },
+              { key: "domain", header: "資產域", className: "text-subink", render: (r) => r.domain },
+              { key: "latestDate", header: "最新可見", className: "font-mono text-subink", render: (r) => r.latestDate },
+              { key: "quality", header: "質量狀態", align: "right", className: "font-mono text-[#E6EDF7]", render: (r) => r.quality },
+              { key: "detail", header: "授權 / 清洗說明", className: "text-subink text-[11px] max-w-[180px] truncate", render: (r) => r.detail },
               {
                 key: "status",
                 header: "在線狀態",

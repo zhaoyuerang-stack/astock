@@ -68,7 +68,7 @@ export default function ExperimentsPage() {
     }
   }
 
-  async function launch(mode: "seed" | "llm" | "island") {
+  async function launch(mode: "seed" | "llm" | "island" | "global-data") {
     setBusy(`create:${mode}`);
     setError("");
     try {
@@ -76,7 +76,9 @@ export default function ExperimentsPage() {
         ? await api.runAutoresearchSeeds({ limit: 5, max_stage: "l1" })
         : mode === "llm"
           ? await api.runAutoresearchLLM({ n: 5, max_stage: "l1" })
-          : await api.runIslandSearch({ islands: 4, generations: 3, population: 8 });
+          : mode === "global-data"
+            ? await api.launchGlobalDataProbe({ dataset_id: "macro_daily", source_id: "alfred_macro_v1", provider_mode: "alfred" })
+            : await api.runIslandSearch({ islands: 4, generations: 3, population: 8 });
       await api.waitForExperimentJob(job.job_id, { timeoutMs: JOB_TIMEOUT_MS });
       await load();
     } catch (e) {
@@ -173,6 +175,13 @@ export default function ExperimentsPage() {
               disabled={!!busy}
             >
               🏝️ 启动多数据岛屿搜索
+            </button>
+            <button
+              onClick={() => launch("global-data")}
+              className="w-full text-left px-3 py-2 rounded hover:bg-jilan text-[12px] font-medium text-ink disabled:opacity-50"
+              disabled={!!busy}
+            >
+              全球数据探测
             </button>
           </div>
         </details>

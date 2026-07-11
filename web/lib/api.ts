@@ -12,6 +12,8 @@ import type {
   AutoResearchReviewItemView,
   BacktestResult,
   DataQualityView,
+  GlobalDataCoverageView,
+  GlobalDataSourcesView,
   LLMConfigView,
   LLMTestResult,
   FactorHealthView,
@@ -142,6 +144,8 @@ export const api = {
     get<StrategyDetailView>(`/strategies/${encodeURIComponent(family)}/${encodeURIComponent(version)}`),
   factors: () => get<FactorView[]>("/factors"),
   dataQuality: () => get<DataQualityView>("/data/quality"),
+  globalDataSources: () => get<GlobalDataSourcesView>("/data/global/sources"),
+  globalDataCoverage: () => get<GlobalDataCoverageView>("/data/global/coverage"),
   strategyHealth: () => get<FactorHealthView[]>("/state/health"),
   marketState: () => get<MarketStateView>("/state/market"),
   portfolio: () => get<PortfolioView>("/portfolio"),
@@ -227,6 +231,12 @@ export const api = {
     );
     return protectedPost<ActionJobView>(`/experiments/autoresearch/run-seeds?${q.toString()}`, {});
   },
+  launchGlobalDataProbe: (body: { dataset_id?: string; source_id?: string; provider_mode?: string } = {}) =>
+    protectedPost<ActionJobView>("/experiments/global-data/probe", {
+      dataset_id: body.dataset_id ?? "macro_daily",
+      source_id: body.source_id ?? "",
+      provider_mode: body.provider_mode ?? "",
+    }),
   experimentJob: (jobId: string) => get<ActionJobView>(`/experiments/jobs/${encodeURIComponent(jobId)}`),
   waitForExperimentJob,
   agentAsk: (request: string, context: Record<string, unknown> = {}, messages: AgentMessage[] = []) =>
