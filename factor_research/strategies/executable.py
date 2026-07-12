@@ -17,6 +17,23 @@ from strategies.catalog import (
     resolve_timing_builder,
 )
 from strategies.small_cap import build_rebalance_weights
+from research_toolkit import apply_veto_filter
+
+
+def select_holdings(factor_row: pd.Series, veto_row, top_n: int, veto_q: float) -> list:
+    """生产日信号的当日选股——与回测调仓同源(apply_veto_filter 语义)。
+
+    run_daily 此前手写 veto 过滤 + nlargest(公式复制,2026-07-11 review);
+    本函数是唯一入口。语义与 build_rebalance_weights 对齐:
+      · veto 缺失或 veto_q<=0 → 退化 nlargest;
+      · veto 过滤后存活 < top_n → 返回空(凑不满不出仓,与回测一致)。
+    """
+    f = pd.Series(factor_row).dropna()
+    veto = pd.Series(veto_row).dropna() if veto_row is not None else pd.Series(dtype=float)
+    if veto.empty or veto_q <= 0:
+        return f.nlargest(top_n).index.tolist()
+    weights = apply_veto_filter(f, veto, top_n=top_n, veto_q=veto_q)
+    return weights.index.tolist()
 
 
 @dataclass(frozen=True)

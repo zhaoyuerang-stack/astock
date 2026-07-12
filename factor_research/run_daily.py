@@ -24,7 +24,7 @@ import pandas as pd
 
 from core.engine import PricePanel
 from strategies.small_cap import load_price_panels
-from strategies.executable import build_executable_strategy
+from strategies.executable import build_executable_strategy, select_holdings
 from lake.load_lake import load_raw_close
 from lake.validator import DataValidator
 from app_config.settings import get_settings
@@ -239,25 +239,22 @@ def main():
     else:
         print(f"  ℹ️ BULL regime → 按 Band exposure 配置 illiq 股票")
 
-    # ④ 持仓清单
+    # ④ 持仓清单 —— 经 canonical select_holdings(与回测 apply_veto_filter 同源,禁手写复制)
     print("\n[4/6] 持仓清单...")
-    f = factor.loc[last].dropna()
     active = close.loc[last].dropna().index
+    f = factor.loc[last].reindex(active).dropna()
 
-    # Apply Salience Veto Filter: veto bottom 30% of faded_st_cov (highest salience / bubble stocks)
     if faded_st_cov is not None and last in faded_st_cov.index:
         veto_factor = faded_st_cov.loc[last].reindex(active).dropna()
     else:
         veto_factor = pd.Series(dtype=float)
-    if len(veto_factor):
-        threshold = veto_factor.quantile(0.30)
-        non_veto_stocks = veto_factor[veto_factor > threshold].index
-        f = f.reindex(non_veto_stocks).dropna()
-        print(f"  [Veto] Candidate pool filtered from {len(active)} to {len(non_veto_stocks)} stocks (vetoed {len(active)-len(non_veto_stocks)} stocks)")
 
     top_n = int(spec.selection["top_n"])
     rebalance_days = int(spec.selection["rebalance_days"])
-    holdings = f.nlargest(top_n).index.tolist()
+    veto_q = float(executable.diagnostics.get("veto_q") or 0.0)
+    holdings = select_holdings(f, veto_factor, top_n=top_n, veto_q=veto_q)
+    if len(veto_factor) and veto_q > 0:
+        print(f"  [Veto] apply_veto_filter(veto_q={veto_q:.2f}): 候选池 {len(active)} 只 → 选出 {len(holdings)} 只")
 
     # ⑤ 调仓判断
     print("\n[5/6] 调仓判断...")
