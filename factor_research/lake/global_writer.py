@@ -237,9 +237,12 @@ def _write_global_dataset(
         "provider": source.provider if source else spec.provider,
         "asset_class": spec.asset_class,
         "frequency": spec.frequency,
-        "calendar": spec.calendar,
-        "timezone": spec.timezone,
-        "currency": spec.currency,
+        # Dataset specs may intentionally be provider-neutral (for example,
+        # SOURCE_EXCHANGE). The manifest is an audit record for the concrete
+        # ingest and must retain the selected source contract.
+        "calendar": source.calendar if source else spec.calendar,
+        "timezone": source.timezone if source else spec.timezone,
+        "currency": source.currency if source else spec.currency,
         "pit_policy": spec.pit_policy,
         "required": spec.required,
         "path": str(path),

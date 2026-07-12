@@ -254,7 +254,7 @@ def test_global_writer_manifest_and_price_loader(tmp_path):
         "adjustment_version": ["raw-v1", "raw-v1", "raw-v1", "raw-v1"],
         "currency": ["USD", "USD", "USD", "USD"],
     })
-    source = get_source_spec("global_etf_price_v1")
+    source = get_source_spec("global_cboe_us_price_v1")
     canonical = normalize_global_frame(
         frame,
         source=source,
@@ -275,6 +275,9 @@ def test_global_writer_manifest_and_price_loader(tmp_path):
     manifest = read_global_manifest(root=tmp_path)
     assert manifest["datasets"]["market_price_daily"]["row_count"] == 4
     assert manifest["datasets"]["market_price_daily"]["latest_date"] == "2026-07-07"
+    assert manifest["datasets"]["market_price_daily"]["calendar"] == "US_EQUITIES"
+    assert manifest["datasets"]["market_price_daily"]["timezone"] == "America/New_York"
+    assert manifest["datasets"]["market_price_daily"]["currency"] == "USD"
 
     with pytest.raises(ValueError, match="adjustment_basis"):
         load_global_price_panel("market_price_daily", root=tmp_path, field="close")
