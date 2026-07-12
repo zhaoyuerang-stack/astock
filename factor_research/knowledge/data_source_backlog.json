@@ -64,7 +64,8 @@
       "source": "tushare forecast / express(业绩预告/快报)",
       "thesis": "公告日对齐的盈余惊喜是基本面族空白区(information_map 已指基本面族最独立)的事件版;须严格按公告日对齐(R-DATA-003)。",
       "evidence": [
-        "reports/research/metasearch_findings_20260623.md(基本面族距价格族 MI 2.8-2.9)"
+        "reports/research/metasearch_findings_20260623.md(基本面族距价格族 MI 2.8-2.9)",
+        "reports/research/probe_expectation_gap_20260712.md(相关证据:估值条件化变体 guidance_gap 已 probe——残差 OOS 留存 68% 但 ICIR 0.14 太弱且 size 相关 0.44;**纯 SUE 口径仍待独立 probe**,本条目保持开放)"
       ],
       "playbook": "probe-signal-source",
       "orthogonality_hint": "基本面事件族,与 frontier BOOST 方向一致"

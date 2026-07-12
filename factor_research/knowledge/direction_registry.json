@@ -81,6 +81,42 @@
       "created": "2026-07-02",
       "expires": "2026-12-29",
       "prompt_note": "信息地图显示基本面族(净利增速/ROE/账面市值比)距现有价格类因子池 MI 距离 2.8-2.9,是最独立的空白区;优先提基本面 × 价格量能的跨信息源组合,而非价格族内部换皮。"
+    },
+    {
+      "id": "expectation-gap-trailing-oos-collapse",
+      "direction": "隐含预期差(兑现口径):估值隐含增速 vs 已兑现 netprofit_yoy 的差/比",
+      "status": "falsified",
+      "action": "DEPRIORITIZE",
+      "scope_factors": [
+        "implied_growth_gap",
+        "peg_inverse"
+      ],
+      "evidence": [
+        "reports/research/probe_expectation_gap_20260712.md(全市场 probe:残差 IS ICIR 0.30 → OOS 归零/翻负,留存 −0%/7%;正交保留率 211-231%,真正交但不泛化)",
+        "reports/research/probe_expectation_gap_implied_growth_gap.json",
+        "reports/research/probe_expectation_gap_peg_inverse.json"
+      ],
+      "revival_condition": "湖内新增分析师一致预期/预期修正类数据源('预期'腿从已兑现的陈旧 yoy 换成真前瞻预期)后整族重测",
+      "created": "2026-07-12",
+      "expires": "2027-01-08",
+      "prompt_note": "估值(pe_ttm)隐含增速与已兑现增速(netprofit_yoy)作差/作比的『预期差』口径已 probe:正交性极好(残差比原始强)但 OOS(2023-2024)塌缩翻负——已兑现 yoy 是市场消化过的陈旧信息。不要再提『PE 隐含增速 vs 历史 yoy』类候选;湖内有真前瞻预期数据后才值得重开。"
+    },
+    {
+      "id": "expectation-gap-guidance-weak",
+      "direction": "隐含预期差(指引口径):业绩预告/快报指引 vs 估值隐含要求(guidance_gap)",
+      "status": "weak",
+      "action": "DEPRIORITIZE",
+      "scope_factors": [
+        "guidance_gap"
+      ],
+      "evidence": [
+        "reports/research/probe_expectation_gap_20260712.md(唯一残差 OOS 不塌成员:留存 68%,但 OOS 残差 IC 0.0089/ICIR 0.14 落入 northbound-holder『真正交但太弱』量级带;原始形态 size 相关 0.44、正交保留率仅 66%)",
+        "reports/research/probe_expectation_gap_guidance_gap.json"
+      ],
+      "revival_condition": "backlog forecast-express 纯 SUE 口径独立 probe 显示强 OOS 后,重测其估值条件化变体(必须内建 size 中性化)",
+      "created": "2026-07-12",
+      "expires": "2027-01-08",
+      "prompt_note": "业绩指引相对估值要求的预期差(guidance_gap)残差流 OOS 不塌(留存 68%)但量级太弱(ICIR 0.14),且近半是大盘暴露的伪装(size 相关 0.44);不作主腿候选。若提基本面事件族,先走纯 SUE 口径再谈估值条件化。"
     }
   ]
 }
