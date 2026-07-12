@@ -6,7 +6,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 # Align to project root
-PROJECT_ROOT = Path("/Users/kiki/astcok/factor_research")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 os.chdir(PROJECT_ROOT)
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))

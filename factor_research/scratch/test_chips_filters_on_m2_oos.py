@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
-PROJECT_ROOT = Path("/Users/kiki/astcok/factor_research")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 os.chdir(PROJECT_ROOT)
 sys.path.append(str(PROJECT_ROOT))
 

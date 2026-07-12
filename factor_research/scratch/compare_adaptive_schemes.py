@@ -167,7 +167,7 @@ def main():
 
 ## 1. 方案说明
 * **基线方案 (Static 30% Cap)**：静态固定的资产配置，始终保持 70% 权益类资产（`small-cap-size` 与 `illiquidity` 等权）与 30% 跨资产防御腿（国债 ETF 与 黄金 ETF 等权）。
-* **方案一 (PolicyEngine Dynamic)**：利用 [PolicyEngine](file:///Users/kiki/astcok/factor_research/portfolio/regime.py#L178) 评估全市场的状态与置信度。在熊市/恐慌且置信度高时，将权益暴露上限从 1.25x 压缩至最少 0.3x，牛市恢复 1.25x。
+* **方案一 (PolicyEngine Dynamic)**：利用 [PolicyEngine](../factor_research/portfolio/regime.py#L178) 评估全市场的状态与置信度。在熊市/恐慌且置信度高时，将权益暴露上限从 1.25x 压缩至最少 0.3x，牛市恢复 1.25x。
 * **方案二 (Regime-Adaptive Weights)**：根据市场状态动态调整权益资产与防御性资产的权重分配：
   * `bull` / `upside_crisis` -> 95% 权益 + 5% 防御腿（全力加速，剔除稀释）
   * `bear` / `panic` -> 30% 权益 + 70% 防御腿（全力防守，超配生息）
@@ -222,7 +222,11 @@ def main():
    - 方案二适合作为底层的**分配引擎（Composer Engine）**，替代目前的固定 30% 比例，提升组合的综合夏普。
 
 """
-    doc_path = Path("/Users/kiki/astcok/docs/regime_adaptive_backtest_report.md")
+    doc_path = (
+        Path(__file__).resolve().parents[2]
+        / "docs"
+        / "regime_adaptive_backtest_report.md"
+    )
     doc_path.write_text(report_content, encoding="utf-8")
     print(f"\nWritten detailed report to: {doc_path}")
 

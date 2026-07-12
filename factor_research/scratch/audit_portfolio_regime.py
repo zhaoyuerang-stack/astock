@@ -292,7 +292,11 @@ def main():
 2. **跨资产防御腿定位**：
    * 黄金与国债 ETF 组合的平均相关性在 **-0.05** 左右，表现出稳健的非对称正交防御作用。它是多头策略降配时的黄金缓冲池，但不是中性对冲策略的避风港。
 """
-    doc_path = Path("/Users/kiki/astcok/docs/regime_adaptive_all_strategies_report.md")
+    doc_path = (
+        Path(__file__).resolve().parents[2]
+        / "docs"
+        / "regime_adaptive_all_strategies_report.md"
+    )
     doc_path.write_text(report, encoding="utf-8")
     print(f"\nWritten complete multi-strategy audit report to: {doc_path}")
 
