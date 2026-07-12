@@ -93,7 +93,14 @@ class OpenBBGlobalProvider:
             "error": "",
         }
 
-    def fetch(self, spec: DatasetSpec, *, start: str | None = None, end: str | None = None) -> pd.DataFrame:
+    def fetch(
+        self,
+        spec: DatasetSpec,
+        *,
+        start: str | None = None,
+        end: str | None = None,
+        adjustment_override: str | None = None,
+    ) -> pd.DataFrame:
         status = self.probe(spec)
         if not status.get("ok"):
             raise ProviderUnavailable(status.get("error") or status.get("status") or "provider unavailable")
@@ -107,7 +114,7 @@ class OpenBBGlobalProvider:
             )
         if spec.dataset_id not in {"market_price_daily", "etf_daily", "fx_daily", "commodity_daily"}:
             raise ProviderUnavailable(f"OpenBB fetch mapping is not configured for dataset_id={spec.dataset_id}")
-        return self._fetch_prices(spec, start=start, end=end)
+        return self._fetch_prices(spec, start=start, end=end, adjustment_override=adjustment_override)
 
     @staticmethod
     def _provider_symbol(symbol: str, *, dataset_id: str) -> str:
@@ -128,6 +135,7 @@ class OpenBBGlobalProvider:
         *,
         start: str | None,
         end: str | None,
+        adjustment_override: str | None = None,
     ) -> pd.DataFrame:
         if not start:
             raise ProviderUnavailable("initial yfinance history fetch requires an explicit start date")
@@ -136,6 +144,8 @@ class OpenBBGlobalProvider:
             raise ProviderUnavailable(f"{self.source.source_id} has no allowlist for {spec.dataset_id}")
         is_cboe = self.source.source_id == "global_cboe_us_price_v1"
         is_fmp = self.source.source_id == "global_fmp_us_price_v1"
+        if adjustment_override and not is_fmp:
+            raise ProviderUnavailable(f"adjustment_override is unsupported for {self.source.source_id}")
         provider_symbols = list(symbols) if is_cboe else [self._provider_symbol(symbol, dataset_id=spec.dataset_id) for symbol in symbols]
         obb = self._load_obb()
         # Fetch one symbol at a time. yfinance's bulk endpoint may report an
@@ -154,7 +164,7 @@ class OpenBBGlobalProvider:
             elif is_cboe:
                 response = obb.equity.price.historical(**kwargs)
             elif is_fmp:
-                response = obb.equity.price.historical(**kwargs, adjustment="unadjusted")
+                response = obb.equity.price.historical(**kwargs, adjustment=adjustment_override or "unadjusted")
             else:
                 # yfinance does not expose an unadjusted historical price mode via
                 # OpenBB. Keep the provider's split-adjusted series explicit.
@@ -218,8 +228,14 @@ class OpenBBGlobalProvider:
             "low": pd.to_numeric(frame["low"], errors="coerce"),
             "close": pd.to_numeric(frame["close"], errors="coerce"),
             "volume": pd.to_numeric(frame["volume"], errors="coerce").fillna(0.0),
-            "is_adjusted": not is_fmp,
-            "adjustment_version": "cboe_eod_research_v1" if is_cboe else "fmp_unadjusted_v1" if is_fmp else "yfinance_splits_only_v1",
+            "is_adjusted": (adjustment_override or "unadjusted") != "unadjusted" if is_fmp else not is_fmp,
+            "adjustment_version": (
+                "cboe_eod_research_v1"
+                if is_cboe
+                else f"fmp_{adjustment_override or 'unadjusted'}_v1"
+                if is_fmp
+                else "yfinance_splits_only_v1"
+            ),
             "currency": self.source.currency,
         })
         return out

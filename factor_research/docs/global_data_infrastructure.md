@@ -48,6 +48,10 @@ Current local admission:
   not canonical because source-level boundary inconsistencies were observed;
   canonical CBOE data is close/volume-only and raw snapshots retain O/H/L for
   later reconciliation.
+- `global_fmp_us_price_v1`: OpenBB/FMP daily price source, enabled only for the
+  verified US stock allowlist as a second-source review path when `FMP_API_KEY`
+  is present. ETF review is not admitted because the current entitlement returns
+  `402 premium endpoint` on the ETF path.
 - `global_yfinance_fx_v1` and `global_yfinance_commodity_v1`: OpenBB/yfinance
   daily price sources, enabled for
   the documented research allowlists. Their timestamps are date-level, so canonical

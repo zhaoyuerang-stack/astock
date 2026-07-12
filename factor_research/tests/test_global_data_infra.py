@@ -213,6 +213,55 @@ def test_openbb_yfinance_maps_prices_and_fx_to_conservative_canonical_raw_frames
     assert fx_raw.iloc[0]["currency"] == "PAIR"
 
 
+def test_openbb_fmp_adjustment_override_marks_review_frame_as_adjusted():
+    from dataclasses import replace
+
+    from lake.global_catalog import get_dataset_spec, get_source_spec
+    from lake.sources.openbb_global import OpenBBGlobalProvider
+
+    calls = []
+
+    class Result:
+        def to_df(self):
+            return pd.DataFrame(
+                {
+                    "open": [100.0], "high": [101.0], "low": [99.0], "close": [100.5],
+                    "volume": [1000.0], "symbol": ["AAPL"],
+                },
+                index=pd.DatetimeIndex(["2025-01-02"], name="date"),
+            )
+
+    class Historical:
+        def __call__(self, **kwargs):
+            calls.append(kwargs)
+            return Result()
+
+    class App:
+        class equity:
+            class price:
+                historical = Historical()
+
+    source = replace(
+        get_source_spec("global_fmp_us_price_v1"),
+        admission_status="approved", license_status="approved", license_checked_at="2026-07-12",
+        allowlist=("AAPL",),
+        dataset_allowlists=(("market_price_daily", ("AAPL",)),),
+    )
+    provider = OpenBBGlobalProvider(importer=lambda _: App(), source=source)
+    raw = provider.fetch(
+        get_dataset_spec("market_price_daily"),
+        start="2025-01-02",
+        end="2025-01-03",
+        adjustment_override="splits_only",
+    )
+
+    assert calls
+    assert all(call["provider"] == "fmp" for call in calls)
+    assert all(call["adjustment"] == "splits_only" for call in calls)
+    assert bool(raw.iloc[0]["is_adjusted"]) is True
+    assert raw.iloc[0]["adjustment_version"] == "fmp_splits_only_v1"
+
+
 def test_openbb_options_probe_is_blocked_until_historical_dates_are_verified():
     from dataclasses import replace
 
@@ -230,6 +279,16 @@ def test_openbb_options_probe_is_blocked_until_historical_dates_are_verified():
     assert status["ok"] is False
     assert status["status"] == "historical_date_unverified"
     assert "PIT ingestion is blocked" in status["error"]
+
+
+def test_fmp_source_is_admitted_only_for_verified_stock_panel():
+    from lake.global_catalog import get_source_spec
+
+    source = get_source_spec("global_fmp_us_price_v1")
+
+    assert source.datasets == ("market_price_daily",)
+    assert source.allowlist_for("market_price_daily") == ("AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META")
+    assert source.allowlist_for("etf_daily") == ()
 
 
 def test_global_writer_manifest_and_price_loader(tmp_path):
@@ -571,3 +630,78 @@ store = Path("data_lake") / "global" / "macro_daily"
 df.to_parquet(store / "latest.parquet")
 """
     assert scan_source(src, rel="workflow/global_probe.py") == ["workflow/global_probe.py"]
+
+
+def test_price_reconciliation_classifies_adjustment_and_price_mismatches():
+    from lake.global_reconciliation import prepare_price_observations, reconcile_price_observations
+
+    primary = pd.DataFrame({
+        "symbol": ["AAPL", "AAPL", "AAPL", "MSFT", "MSFT"],
+        "session_date": ["2025-01-02", "2025-01-03", "2025-01-06", "2025-01-02", "2025-01-03"],
+        "adjusted_close": [100.0, 101.0, 102.0, 50.0, 51.0],
+    })
+    secondary = pd.DataFrame({
+        "symbol": ["AAPL", "AAPL", "AAPL", "MSFT", "MSFT"],
+        "session_date": ["2025-01-02", "2025-01-03", "2025-01-06", "2025-01-02", "2025-01-03"],
+        "adjusted_close": [100.0, 101.03, 204.0, 50.0, 51.0],
+    })
+    result = reconcile_price_observations(
+        prepare_price_observations(primary, source_label="primary", price_column="adjusted_close"),
+        prepare_price_observations(secondary, source_label="secondary", price_column="adjusted_close"),
+        tolerance_bps=2.0,
+        severe_bps=5000.0,
+    )
+
+    assert result.summary["aligned_rows"] == 5
+    assert result.summary["price_mismatch_rows"] == 1
+    assert result.summary["adjustment_or_unit_mismatch_rows"] == 1
+    assert set(result.mismatches["classification"]) == {"price_mismatch", "adjustment_or_unit_mismatch"}
+
+
+def test_reconcile_global_prices_uses_adjusted_close_review_path(monkeypatch):
+    from scripts.data import reconcile_global_prices
+
+    monkeypatch.setattr(
+        reconcile_global_prices,
+        "_select_primary",
+        lambda *args, **kwargs: pd.DataFrame({
+            "symbol": ["AAPL"],
+            "session_date": ["2025-01-02"],
+            "adjusted_close": [100.0],
+            "source_id": ["global_cboe_us_price_v1"],
+        }),
+    )
+    monkeypatch.setattr(
+        reconcile_global_prices,
+        "_fetch_secondary",
+        lambda *args, **kwargs: pd.DataFrame({
+            "symbol": ["AAPL"],
+            "session_date": ["2025-01-02"],
+            "adjusted_close": [100.0],
+            "source_id": ["global_fmp_us_price_v1"],
+        }),
+    )
+
+    report = reconcile_global_prices.run_reconciliation(start="2025-01-02")
+
+    assert report["summary"]["ok"] is True
+    assert report["summary"]["primary_source"] == "global_cboe_us_price_v1"
+    assert report["summary"]["secondary_source"] == "global_fmp_us_price_v1"
+
+
+def test_reconcile_global_prices_cli_returns_structured_failure(monkeypatch, capsys):
+    from scripts.data import reconcile_global_prices
+
+    monkeypatch.setattr(
+        reconcile_global_prices,
+        "run_reconciliation",
+        lambda **kwargs: (_ for _ in ()).throw(ValueError("not admitted")),
+    )
+
+    code = reconcile_global_prices.main(["--start", "2025-01-02", "--dataset", "etf_daily"])
+    out = json.loads(capsys.readouterr().out)
+
+    assert code == 1
+    assert out["summary"]["ok"] is False
+    assert out["summary"]["status"] == "reconciliation_failed"
+    assert "not admitted" in out["summary"]["error"]
