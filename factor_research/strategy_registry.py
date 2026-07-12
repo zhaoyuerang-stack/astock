@@ -17,6 +17,8 @@
 """
 import argparse
 import json
+import os
+import re
 from pathlib import Path
 from datetime import date
 
@@ -43,14 +45,28 @@ def _load():
     if not REGISTRY.exists():
         return {"families": []}
     data = json.loads(REGISTRY.read_text())
-    if isinstance(data, list):        # 旧扁平格式 → 视为空，由 __main__ 重建
-        return {"families": []}
+    if isinstance(data, list):
+        # 旧扁平格式禁止静默视为空:返回空 dict 后任何 attach_*/register 触发 _save
+        # 会把整本台账清空覆盖(退役纪律 R-7.4:不得删历史)。必须人工迁移。
+        raise ValueError(
+            f"{REGISTRY} 是旧扁平 list 格式,拒绝加载(防 _save 静默清空台账);"
+            f"请先人工迁移为 {{'families': [...]}} 结构。")
     return data
+
+
+def _version_key(version: str):
+    """版本自然序:'v1.10' > 'v1.2'(字符串序会排反)。数字段转 int 比较,非数字兜底字符串。"""
+    parts = re.split(r"(\d+)", str(version))
+    return tuple(int(p) if p.isdigit() else p for p in parts)
 
 
 def _save(data):
     data["families"].sort(key=lambda f: f["id"])
-    REGISTRY.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+    # 原子写:临时文件 + os.replace,进程中途挂掉不会留下半截 JSON 损坏台账
+    payload = json.dumps(data, ensure_ascii=False, indent=2)
+    tmp = REGISTRY.with_suffix(f".json.tmp.{os.getpid()}")
+    tmp.write_text(payload)
+    os.replace(tmp, REGISTRY)
 
 
 def register_family(id, name, hypothesis="", regime="", decay_signal="", status="active",
@@ -167,7 +183,7 @@ def register(family, version, desc, config, data_scope, metrics, status="候选"
         "nine_gate": nine_gate or {},
         **({"executable_spec": spec_record} if spec_record else {}),
     })
-    fam["versions"].sort(key=lambda v: v["version"])
+    fam["versions"].sort(key=lambda v: _version_key(v["version"]))
     _save(data)
     return f"{family}/{version}"
 
@@ -524,8 +540,9 @@ def seed_registry():
                      "cost": {"buy": 0.00225, "sell": 0.00275, "financing_rate": 0.065}},
              data_scope={"source": "data_lake", "period": "2018-2026", "survivorship_bias": False},
              metrics={"annual": 0.2593, "maxdd": -0.1943, "sharpe": 1.69, "calmar": 1.33},
-             status="在册",
-             notes="✅干净口径(修复amount复权污染)+预热(从2010切2018)。达满意线未达卓越；剔极端年(15/21/25)常态仅15%/夏普0.9，满意线靠小盘疯牛年；容量~2千万小资金可实盘。(旧污染口径曾报21.2%/夏普1.22)")
+             status="参考",
+             notes="seed 基线记录;正式在册状态以现行台账为准(standalone 在册须 DSR 证据,seed 无 nine_gate 不得直入在册)。"
+                   "✅干净口径(修复amount复权污染)+预热(从2010切2018)。达满意线未达卓越；剔极端年(15/21/25)常态仅15%/夏普0.9，满意线靠小盘疯牛年；容量~2千万小资金可实盘。(旧污染口径曾报21.2%/夏普1.22)")
 
     register("small-cap-size", "v2.1", "v2.0全历史压力测试（真实成本，含2015股灾/2017小盘崩盘）",
              config={"factor": "size60", "timing": "小盘指数MA16",
