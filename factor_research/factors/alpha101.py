@@ -45,6 +45,8 @@ def alpha_003(close: pd.DataFrame, volume: pd.DataFrame | None = None) -> pd.Dat
     return -C(R(close), R(volume), 10)
 
 def alpha_005(close: pd.DataFrame, volume: pd.DataFrame | None = None) -> pd.DataFrame:
+    # DEGENERATE (transplant residue): close-close≡0 → constant rank multiplier;
+    # collapses to price_to_ma-like info. Kept for audit; **not** in ALLOWED_FACTORS/DSL.
     return R(close - M(close, 10)) * (-Abs(R(close - close)))
 
 def alpha_006(close: pd.DataFrame, volume: pd.DataFrame | None = None) -> pd.DataFrame:
@@ -108,6 +110,7 @@ def alpha_023(close: pd.DataFrame, volume: pd.DataFrame | None = None) -> pd.Dat
     return m5.where(m5 >= M(close, 20), -1.0)
 
 def alpha_024(close: pd.DataFrame, volume: pd.DataFrame | None = None) -> pd.DataFrame:
+    # Near-duplicate of alpha_009 short-return cluster (|rank-corr|≈1); not searchable.
     return -Delta(close, 1)
 
 def alpha_025(close: pd.DataFrame, volume: pd.DataFrame | None = None) -> pd.DataFrame:
@@ -156,6 +159,7 @@ def alpha_044(close: pd.DataFrame, volume: pd.DataFrame | None = None) -> pd.Dat
     return -C(close, R(volume), 5)
 
 def alpha_049(close: pd.DataFrame, volume: pd.DataFrame | None = None) -> pd.DataFrame:
+    # Exact twin of alpha_024; not searchable (n_trials honesty).
     return -Delta(close, 1)
 
 def alpha_050(close: pd.DataFrame, volume: pd.DataFrame | None = None) -> pd.DataFrame:

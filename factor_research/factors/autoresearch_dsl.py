@@ -6,6 +6,7 @@ the existing L0/L1/L2/L3 validation lines.
 """
 from __future__ import annotations
 
+import hashlib as _hashlib
 import importlib
 import json
 from typing import Any
@@ -35,10 +36,11 @@ _FACTOR_CALLS = {
     "northbound_accumulation": ("factors.northbound", "northbound_accumulation", {"window": "window"}),
     "northbound_hold_level": ("factors.northbound", "northbound_hold_level", {}),
     "northbound_flow_strength": ("factors.northbound", "northbound_flow_strength", {"window": "window"}),
+    # 与 factory.autoresearch.registry.ALLOWED_FACTORS 同步;退化/近重复项不进 DSL
+    # (alpha_005/020/022/024/033/049 已移出,实现仍保留在 alpha101.py 供对照)。
     "alpha_001": ("factors.alpha101", "alpha_001", {}),
     "alpha_002": ("factors.alpha101", "alpha_002", {}),
     "alpha_003": ("factors.alpha101", "alpha_003", {}),
-    "alpha_005": ("factors.alpha101", "alpha_005", {}),
     "alpha_006": ("factors.alpha101", "alpha_006", {}),
     "alpha_008": ("factors.alpha101", "alpha_008", {}),
     "alpha_009": ("factors.alpha101", "alpha_009", {}),
@@ -49,22 +51,17 @@ _FACTOR_CALLS = {
     "alpha_017": ("factors.alpha101", "alpha_017", {}),
     "alpha_018": ("factors.alpha101", "alpha_018", {}),
     "alpha_019": ("factors.alpha101", "alpha_019", {}),
-    "alpha_020": ("factors.alpha101", "alpha_020", {}),
     "alpha_021": ("factors.alpha101", "alpha_021", {}),
-    "alpha_022": ("factors.alpha101", "alpha_022", {}),
     "alpha_023": ("factors.alpha101", "alpha_023", {}),
-    "alpha_024": ("factors.alpha101", "alpha_024", {}),
     "alpha_025": ("factors.alpha101", "alpha_025", {}),
     "alpha_028": ("factors.alpha101", "alpha_028", {}),
     "alpha_030": ("factors.alpha101", "alpha_030", {}),
     "alpha_032": ("factors.alpha101", "alpha_032", {}),
-    "alpha_033": ("factors.alpha101", "alpha_033", {}),
     "alpha_034": ("factors.alpha101", "alpha_034", {}),
     "alpha_037": ("factors.alpha101", "alpha_037", {}),
     "alpha_038": ("factors.alpha101", "alpha_038", {}),
     "alpha_040": ("factors.alpha101", "alpha_040", {}),
     "alpha_044": ("factors.alpha101", "alpha_044", {}),
-    "alpha_049": ("factors.alpha101", "alpha_049", {}),
     "alpha_050": ("factors.alpha101", "alpha_050", {}),
     "alpha_055": ("factors.alpha101", "alpha_055", {}),
 }
@@ -125,16 +122,46 @@ def _source_data_mtime() -> int:
     return 0
 
 
-def _get_cache_path(name: str, params: dict, data_signature: tuple | None = None) -> Path:
+def _factor_source_hash(name: str) -> str:
+    """摘要因子实现源码;改公式后缓存 key 失效,防静默复用旧面板。
+
+    解析失败返回 ``nosrc``(仍带上 name,不阻断计算)。
+    """
+    try:
+        import inspect
+
+        if name not in _FACTOR_CALLS:
+            return "unknown"
+        module_name, fn_name, _ = _FACTOR_CALLS[name]
+        fn = getattr(importlib.import_module(module_name), fn_name)
+        src = inspect.getsource(fn)
+        return _hashlib.sha256(src.encode("utf-8")).hexdigest()[:12]
+    except Exception:
+        return "nosrc"
+
+
+def _get_cache_path(
+    name: str,
+    params: dict,
+    data_signature: tuple | None = None,
+    *,
+    source_hash: str | None = None,
+) -> Path:
+    """磁盘缓存路径。panels/ 是 **cache 区**(非资产区):key = name+params+data+mtime+源码摘要。
+
+    资产区在 data_lake/factor_store/manifests|scores;本目录可 GC,不得当证据引用。
+    """
     mtime = _source_data_mtime()
+    src = source_hash if source_hash is not None else _factor_source_hash(name)
     sig_suffix = ""
     if data_signature is not None:
         sig_suffix = f"_sig{_hashlib.sha256(repr(data_signature).encode('utf-8')).hexdigest()[:16]}"
+    src_suffix = f"_src{src}"
     if not params:
-        filename = f"{name}{sig_suffix}_mt{mtime}.parquet"
+        filename = f"{name}{sig_suffix}{src_suffix}_mt{mtime}.parquet"
     else:
         param_str = "_".join(f"{k}_{v}" for k, v in sorted(params.items()))
-        filename = f"{name}_{param_str}{sig_suffix}_mt{mtime}.parquet"
+        filename = f"{name}_{param_str}{sig_suffix}{src_suffix}_mt{mtime}.parquet"
     base_dir = _ROOT / "data_lake" / "factor_store" / "panels"
     return base_dir / filename
 
@@ -142,17 +169,18 @@ def _get_cache_path(name: str, params: dict, data_signature: tuple | None = None
 def _call_factor(name: str, close: pd.DataFrame, volume: pd.DataFrame | None, params: dict, cache_mode: str = "disk") -> pd.DataFrame:
     mtime = _source_data_mtime()
     data_sig = _data_signature(close, volume)
+    src_hash = _factor_source_hash(name)
 
     # 1. Check in-memory cache first
     param_key = json.dumps(params, sort_keys=True)
-    mem_key = (name, param_key, data_sig, mtime)
+    mem_key = (name, param_key, data_sig, mtime, src_hash)
     if mem_key in _BASE_FACTOR_MEM_CACHE:
         return _BASE_FACTOR_MEM_CACHE[mem_key]
 
     # 2. Check local parquet cache unless caller requested pure in-memory mode.
     # If cache_mode is 'memory', bypass disk reading completely (Task 1652 test requirement)
     if cache_mode != "memory":
-        cache_path = _get_cache_path(name, params, data_signature=data_sig)
+        cache_path = _get_cache_path(name, params, data_signature=data_sig, source_hash=src_hash)
         if cache_path.exists():
             try:
                 cached = pd.read_parquet(cache_path)
@@ -183,16 +211,18 @@ def _call_factor(name: str, close: pd.DataFrame, volume: pd.DataFrame | None, pa
             mapped["long"] = max(int(mapped.get("short", 5)) * 4, int(mapped.get("short", 5)) + 1)
         out = fn(volume, **mapped)
     elif name == "illiquidity":
+        # Canonical Amihud uses amount; DSL surface proxies amount≈volume×close
+        # inside factors.momentum.illiquidity (aligned with AmihudIlliq).
         if volume is None:
-            raise ValueError("illiquidity requires volume")
+            raise ValueError("illiquidity requires volume (amount proxy = volume×close)")
         out = fn(close, volume, **mapped)
     else:
         out = fn(close, **mapped)
 
-    # 4. Save to parquet cache
+    # 4. Save to parquet cache (cache 区;改源码后 source_hash 变,旧文件可 GC)
     if cache_mode != "memory":
         try:
-            cache_path = _get_cache_path(name, params, data_signature=data_sig)
+            cache_path = _get_cache_path(name, params, data_signature=data_sig, source_hash=src_hash)
             cache_path.parent.mkdir(parents=True, exist_ok=True)
             out.to_parquet(cache_path)
         except Exception:
@@ -276,8 +306,6 @@ def _apply_transform(values: pd.DataFrame, op: str, close: pd.DataFrame | None =
 # 候选各算一次全市场面板(5207×2000),memo 让二者共享一次计算(~2× 加速)。
 # key 含**带符号** ast 哈希(F 与 -F 面板相反,绝不可共享)+ id(close)
 # (防数据湖同日重写的陈旧命中:重载 = 新对象 = 新 id)。搜索起点 clear。
-import hashlib as _hashlib
-
 _PANEL_CACHE: dict = {}
 _PANEL_ORDER: list = []
 _PANEL_CACHE_MAX = 6
