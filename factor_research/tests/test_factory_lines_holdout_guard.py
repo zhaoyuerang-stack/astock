@@ -172,12 +172,13 @@ def test_evaluate_candidate_rejects_vault():
 
 
 def test_compliance_lists_factory_lines():
-    from scripts.ci.check_holdout_compliance import REQUIRED, HOLDOUT_CALLS, has_holdout_call
+    from scripts.ci import check_holdout_compliance as G
 
-    assert "factory/lines/line2_validation/l0_ic_scan.py" in REQUIRED
-    assert "assert_factory_panels_clean" in HOLDOUT_CALLS
+    assert "factory/lines/line2_validation/l0_ic_scan.py" in G.REQUIRED
+    assert "factory/lines/line3_marginal/marginal_eval.py" in G.REQUIRED
     src = (ROOT / "factory/lines/line2_validation/l0_ic_scan.py").read_text(encoding="utf-8")
-    assert has_holdout_call(src)
+    assert G.BOUND.search(src), "l0_ic_scan must reference holdout self-check"
+    assert "assert_factory_panels_clean" in src
 
 
 if __name__ == "__main__":
