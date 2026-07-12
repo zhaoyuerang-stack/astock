@@ -140,6 +140,9 @@ def _normalize_price(
         # only the independently usable close/volume contract.
         out[["open", "high", "low"]] = pd.NA
         out["ohlc_quality"] = "close_only_unverified_ohlc"
+    if source.source_id == "alpha_vantage_commodity_spot_v1":
+        out[["open", "high", "low"]] = pd.NA
+        out["ohlc_quality"] = "close_only_spot_series"
     out = _append_common_columns(
         out,
         source=source,

@@ -65,6 +65,12 @@ def _provider(
         from lake.sources.alfred_macro import AlfredMacroProvider
 
         return AlfredMacroProvider(source=source)
+    if provider_mode == "alphavantage":
+        if source is None:
+            raise ValueError("alphavantage provider requires a source admission record")
+        from lake.sources.alpha_vantage_commodity import AlphaVantageCommodityProvider
+
+        return AlphaVantageCommodityProvider(source=source)
     raise ValueError(f"unsupported global data provider_mode: {provider_mode}")
 
 

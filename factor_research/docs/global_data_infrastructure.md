@@ -63,6 +63,11 @@ Current local admission:
   is conservatively delayed to the end of the source day. Equity and ETF prices are
   split-adjusted only; they are valid for returns research, not valuation calculations
   that require unadjusted prices.
+- `alpha_vantage_commodity_spot_v1`: native Alpha Vantage commodity spot source,
+  kept as a planned candidate. It can cover daily spot series for WTI, Brent,
+  natural gas, gold, and silver with an API key, but it is not enabled yet
+  because the contract is close-only spot data rather than a futures chain and
+  still needs explicit entitlement verification in this repo.
 - `global_etf_price_v1`: global ETF proxy allowlist, `research_only`. OpenBB remains
   an optional probe/provider route, but no ETF source is admitted until it supplies
   exchange, session-close, currency and corporate-action semantics required by the

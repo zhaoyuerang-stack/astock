@@ -347,6 +347,55 @@ def test_fmp_fx_source_is_admitted_for_verified_pair_panel():
     assert source.allowlist_for("fx_daily") == ("EURUSD", "USDJPY", "USDCNY", "GBPUSD", "AUDUSD", "USDCHF")
 
 
+def test_alpha_vantage_commodity_source_is_registered_as_planned_candidate():
+    from lake.global_catalog import get_source_spec
+
+    source = get_source_spec("alpha_vantage_commodity_spot_v1")
+
+    assert source.provider == "alphavantage"
+    assert source.datasets == ("commodity_daily",)
+    assert source.allowlist_for("commodity_daily") == ("CL=F", "BZ=F", "NG=F", "GC=F", "SI=F")
+
+
+def test_alpha_vantage_commodity_provider_maps_close_only_spot_series():
+    from dataclasses import replace
+
+    from lake.global_catalog import get_dataset_spec, get_source_spec
+    from lake.global_normalizers import normalize_global_frame
+    from lake.global_validator import validate_global_frame
+    from lake.sources.alpha_vantage_commodity import AlphaVantageCommodityProvider
+
+    def fake_request(params):
+        payloads = {
+            "WTI": {"data": [{"date": "2025-01-02", "value": "73.13"}]},
+            "BRENT": {"data": [{"date": "2025-01-02", "value": "75.11"}]},
+            "NATURAL_GAS": {"data": [{"date": "2025-01-02", "value": "3.24"}]},
+            "GOLD_SILVER_HISTORY:GOLD": {"data": [{"date": "2025-01-02", "value": "2645.2"}]},
+            "GOLD_SILVER_HISTORY:SILVER": {"data": [{"date": "2025-01-02", "value": "29.8"}]},
+        }
+        key = params["function"] if params["function"] != "GOLD_SILVER_HISTORY" else f"{params['function']}:{params['symbol']}"
+        return payloads[key]
+
+    source = replace(
+        get_source_spec("alpha_vantage_commodity_spot_v1"),
+        admission_status="approved", license_status="approved", license_checked_at="2026-07-12",
+    )
+    provider = AlphaVantageCommodityProvider(
+        source=source,
+        environ={"ALPHAVANTAGE_API_KEY": "test"},
+        request_json=fake_request,
+    )
+    raw = provider.fetch(get_dataset_spec("commodity_daily"), start="2025-01-01", end="2025-01-03")
+
+    assert set(raw["symbol"]) == {"CL=F", "BZ=F", "NG=F", "GC=F", "SI=F"}
+    canonical = normalize_global_frame(raw, source=source, spec=get_dataset_spec("commodity_daily"), ingest_id="commodity-unit")
+    result = validate_global_frame(canonical, source=source, spec=get_dataset_spec("commodity_daily"))
+    assert result.rejected is False
+    assert result.quarantine.empty
+    assert result.clean[["open", "high", "low"]].isna().all().all()
+    assert result.clean.iloc[0]["ohlc_quality"] == "close_only_spot_series"
+
+
 def test_global_writer_manifest_and_price_loader(tmp_path):
     from lake.global_catalog import get_dataset_spec, get_source_spec
     from lake.global_data import load_global_price_panel
