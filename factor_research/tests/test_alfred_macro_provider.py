@@ -71,4 +71,48 @@ def test_alfred_provider_maps_metadata_and_vintage_to_raw_contract():
     assert calls[1][0].endswith("/series/observations")
     assert all(call[1]["api_key"] == "test-key" for call in calls)
     assert calls[1][1]["observation_start"] == "2026-07-01"
-    assert calls[1][1]["realtime_start"] == "1776-07-04"
+    assert calls[1][1]["realtime_start"] == "2026-07-01"
+
+
+def test_alfred_provider_splits_long_vintage_ranges_before_fetching():
+    from lake.sources.alfred_macro import AlfredMacroProvider
+
+    assert AlfredMacroProvider._realtime_windows("2016-01-01")[:2] == [
+        ("2016-01-01", "2019-12-30"),
+        ("2019-12-31", "2023-12-29"),
+    ]
+
+
+def test_alfred_normalizer_discards_non_observation_markers():
+    import pandas as pd
+
+    from lake.global_catalog import get_dataset_spec, get_source_spec
+    from lake.global_normalizers import normalize_global_frame
+    from lake.global_validator import validate_global_frame
+
+    source = get_source_spec("alfred_macro_v1")
+    spec = get_dataset_spec("rates_daily")
+    raw = pd.DataFrame({
+        "series_id": ["DGS2", "DGS2"],
+        "observation_date": ["2025-01-01", "2025-01-02"],
+        "value": [".", "4.25"],
+        "unit": ["Percent", "Percent"],
+        "frequency": ["daily", "daily"],
+        "vintage_start": ["2025-01-01", "2025-01-02"],
+        "vintage_end": ["9999-12-31", "9999-12-31"],
+        "available_at": ["2025-01-02T06:00:00Z", "2025-01-03T06:00:00Z"],
+    })
+
+    canonical = normalize_global_frame(
+        raw,
+        source=source,
+        spec=spec,
+        retrieved_at="2025-01-03T12:00:00Z",
+        ingest_id="unit-ingest",
+    )
+    result = validate_global_frame(canonical, source=source, spec=spec)
+
+    assert len(canonical) == 1
+    assert canonical.iloc[0]["value"] == 4.25
+    assert result.rejected is False
+    assert len(result.quarantine) == 0

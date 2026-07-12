@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any, Callable, Mapping
 from urllib.parse import urlencode
 from urllib.request import urlopen
@@ -18,6 +18,10 @@ from lake.sources.openbb_global import ProviderUnavailable
 FRED_BASE_URL = "https://api.stlouisfed.org/fred"
 _FRED_EARLIEST_REALTIME = "1776-07-04"
 _FRED_LATEST_REALTIME = "9999-12-31"
+# FRED observations reject requests spanning more than 2,000 vintage dates.
+# Four calendar years stay well below that ceiling while retaining every
+# available vintage rather than silently falling back to latest-only values.
+_MAX_REALTIME_WINDOW_DAYS = 365 * 4
 
 
 def _frequency(value: str) -> str:
@@ -104,19 +108,44 @@ class AlfredMacroProvider:
             raise ProviderUnavailable(f"FRED metadata missing for series_id={series_id}")
         return dict(series[0])
 
-    def _observations(self, series_id: str, *, start: str | None, end: str | None) -> list[dict[str, Any]]:
+    @staticmethod
+    def _realtime_windows(start: str) -> list[tuple[str, str]]:
+        """Split the real-time vintage range into FRED-safe windows."""
+        try:
+            cursor = date.fromisoformat(start)
+        except ValueError as exc:
+            raise ProviderUnavailable(f"invalid observation start date: {start}") from exc
+        latest = date.today()
+        if cursor > latest:
+            return []
+
+        windows = []
+        while cursor <= latest:
+            window_end = min(cursor + timedelta(days=_MAX_REALTIME_WINDOW_DAYS - 1), latest)
+            windows.append((cursor.isoformat(), window_end.isoformat()))
+            cursor = window_end + timedelta(days=1)
+        return windows
+
+    def _observations(
+        self,
+        series_id: str,
+        *,
+        start: str,
+        end: str | None,
+        realtime_start: str,
+        realtime_end: str,
+    ) -> list[dict[str, Any]]:
         params = {
             "series_id": series_id,
             "api_key": self._api_key,
             "file_type": "json",
-            "realtime_start": _FRED_EARLIEST_REALTIME,
-            "realtime_end": _FRED_LATEST_REALTIME,
+            "realtime_start": realtime_start,
+            "realtime_end": realtime_end,
             "units": "lin",
             "sort_order": "asc",
             "limit": "100000",
         }
-        if start:
-            params["observation_start"] = start
+        params["observation_start"] = start
         if end:
             params["observation_end"] = end
         payload = self._request("/series/observations", params)
@@ -134,19 +163,28 @@ class AlfredMacroProvider:
         status = self.probe(spec)
         if not status.get("ok"):
             raise ProviderUnavailable(status.get("error") or status.get("status") or "provider unavailable")
+        if not start:
+            raise ProviderUnavailable("initial FRED/ALFRED history fetch requires an explicit start date")
         rows: list[dict[str, Any]] = []
         for series_id in self.source.allowlist_for(spec.dataset_id):
             metadata = self._series_metadata(series_id)
-            for observation in self._observations(series_id, start=start, end=end):
-                vintage_start = str(observation.get("realtime_start") or "")
-                rows.append({
-                    "series_id": series_id,
-                    "observation_date": observation.get("date"),
-                    "value": observation.get("value"),
-                    "unit": metadata.get("units"),
-                    "frequency": _frequency(str(metadata.get("frequency_short") or metadata.get("frequency") or "")),
-                    "vintage_start": vintage_start,
-                    "vintage_end": observation.get("realtime_end"),
-                    "available_at": self._available_at(vintage_start),
-                })
+            for realtime_start, realtime_end in self._realtime_windows(start):
+                for observation in self._observations(
+                    series_id,
+                    start=start,
+                    end=end,
+                    realtime_start=realtime_start,
+                    realtime_end=realtime_end,
+                ):
+                    vintage_start = str(observation.get("realtime_start") or "")
+                    rows.append({
+                        "series_id": series_id,
+                        "observation_date": observation.get("date"),
+                        "value": observation.get("value"),
+                        "unit": metadata.get("units"),
+                        "frequency": _frequency(str(metadata.get("frequency_short") or metadata.get("frequency") or "")),
+                        "vintage_start": vintage_start,
+                        "vintage_end": observation.get("realtime_end"),
+                        "available_at": self._available_at(vintage_start),
+                    })
         return pd.DataFrame(rows)

@@ -46,7 +46,9 @@ def _append_common_columns(
     out["source_id"] = source.source_id
     out["provider"] = source.provider
     out["dataset_id"] = spec.dataset_id
-    out["retrieved_at"] = _timestamp(pd.Series([retrieved_at or _utc_now()] * len(out)))
+    # Assign a scalar timestamp so filtered source frames cannot misalign the
+    # value by retaining a non-zero original index.
+    out["retrieved_at"] = _timestamp(pd.Series([retrieved_at or _utc_now()])).iloc[0]
     out["ingest_id"] = ingest_id
     out["schema_version"] = source.canonical_schema_version
     out["source_timezone"] = source.timezone
@@ -76,6 +78,12 @@ def _normalize_macro(
     out["observation_date"] = _timestamp(out["observation_date"])
     out["observed_at"] = out["observation_date"]
     out["value"] = pd.to_numeric(out["value"], errors="coerce")
+    if source.provider == "alfred":
+        # FRED/ALFRED emits "." for a non-observation (for example, a market
+        # holiday). It is not a malformed zero or a value to forward-fill;
+        # retain it in the immutable raw snapshot but omit it from canonical
+        # observations so normal market closures do not consume quarantine.
+        out = out.loc[out["value"].notna()].copy()
     # ALFRED uses a far-future vintage_end sentinel which exceeds pandas'
     # Timestamp bounds.  Retain ISO date strings for version comparisons.
     out["vintage_start"] = out["vintage_start"].astype(str)
