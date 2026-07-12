@@ -137,10 +137,11 @@ class Phase2Runner:
         self.top_n = self.config.get("top_n", DEFAULT_TOP_N)
         self.rebalance = self.config.get("rebalance_days", DEFAULT_REBALANCE)
         self.leverage = self.config.get("leverage", DEFAULT_LEVERAGE)
+        _default = CostModel()  # 费率唯一权威(R-COST-001),兜底值不写字面量
         self.base_cost = CostModel(
-            buy_cost=self.config.get("buy_cost", 0.00225),
-            sell_cost=self.config.get("sell_cost", 0.00275),
-            financing_rate=self.config.get("financing_rate", 0.065),
+            buy_cost=self.config.get("buy_cost", _default.buy_cost),
+            sell_cost=self.config.get("sell_cost", _default.sell_cost),
+            financing_rate=self.config.get("financing_rate", _default.financing_rate),
         )
 
     # ── main ──
@@ -168,6 +169,9 @@ class Phase2Runner:
         oos_end = min(pd.Timestamp("2026-12-31"), b - pd.Timedelta(days=1))
         oos_seg = (f"OOS 2023-{oos_end.year}", "2023-01-01", str(oos_end.date()))
         segment_defs = [IS_SEG, oos_seg, STRESS_SEG]
+        # 段角色映射:显示标签随 boundary 变(如 "OOS 2023-2024"),跨模块传递
+        # 必须用稳定 role 键,不得让 phase4 精确匹配完整标签字符串(2026-07-11 review)
+        seg_roles = {IS_SEG[0]: "is", oos_seg[0]: "oos", STRESS_SEG[0]: "stress"}
 
         # Build factor + timing on (已截) full range
         factor = self.factor_builder(close, volume, amount, trade_dates)
@@ -178,6 +182,7 @@ class Phase2Runner:
 
         # ── Three segments ──
         segments = {}
+        segments_by_role = {}
         for label, start, end in segment_defs:
             mask = (trade_dates >= pd.Timestamp(start)) & (trade_dates <= pd.Timestamp(end))
             if mask.sum() < 50:
@@ -192,6 +197,7 @@ class Phase2Runner:
 
             res = run_segment(c, v, a, w_seg, t, self.leverage, self.base_cost)
             segments[label] = res
+            segments_by_role[seg_roles[label]] = res
             print(f"  {label}: annual={res['annual']:+.1%} maxdd={res['maxdd']:+.1%} "
                   f"sharpe={res['sharpe']:.2f} turn={res['turnover']:.1f}x", flush=True)
 
@@ -237,6 +243,7 @@ class Phase2Runner:
             "family": self.family,
             "config": self.config,
             "segments": segments,
+            "segments_by_role": segments_by_role,
             "cost_sensitivity": cost_check,
             "correlation": corr_check,
             "oos_is_decay": decay_check,
