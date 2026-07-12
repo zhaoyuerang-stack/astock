@@ -117,6 +117,27 @@
       "created": "2026-07-12",
       "expires": "2027-01-08",
       "prompt_note": "业绩指引相对估值要求的预期差(guidance_gap)残差流 OOS 不塌(留存 68%)但量级太弱(ICIR 0.14),且近半是大盘暴露的伪装(size 相关 0.44);不作主腿候选。若提基本面事件族,先走纯 SUE 口径再谈估值条件化。"
+    },
+    {
+      "id": "balancesheet-operational-quality-weak",
+      "direction": "资产负债表运营质量族:净占款议价权/应收强度改善/存货强度改善(存量结构全市场直接截面)",
+      "status": "weak",
+      "action": "DEPRIORITIZE",
+      "scope_factors": [
+        "bargaining_power",
+        "receivable_intensity_chg",
+        "inventory_intensity_chg"
+      ],
+      "evidence": [
+        "reports/research/probe_fundamental_quality_20260712.md(全市场 probe:bargaining_power 正交保留率 17%=size/流动性伪装+残差 IC≈0;两 Δ 强度因子 IS 符号与设计假设相反且 OOS 塌缩/翻号,留存 9%/−49%)",
+        "reports/research/probe_fundamental_quality_bargaining_power.json",
+        "reports/research/probe_fundamental_quality_receivable_intensity_chg.json",
+        "reports/research/probe_fundamental_quality_inventory_intensity_chg.json"
+      ],
+      "revival_condition": "行业分类落湖(产业基本面 Phase 2:index_classify → data_lake/meta/industry.parquet)后,以行业内中性化/行业内 z-score 重新 probe——资负表占款/存货结构强行业性,全市场直接截面主要在比行业构成",
+      "created": "2026-07-12",
+      "expires": "2027-01-08",
+      "prompt_note": "资负表科目存量结构(议价权/应收/存货强度)全市场直接截面已 probe 阴性:议价权大半是 size/流动性伪装(正交保留率 17%,残差≈0);强度改善类 IS 符号与设计假设相反且 OOS 翻号。不要再提『资负表科目/总资产直接截面』类候选;有行业中性化再重开。"
     }
   ]
 }

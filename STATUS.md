@@ -1,8 +1,14 @@
 # STATUS — 当前进度
 
-> 更新:2026-07-03。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
+> 更新:2026-07-12。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
+
+**2026-07-12(两族 probe 闭环全阴性:隐含预期差 + 资负表运营质量;登记簿三条 DEPRIORITIZE)**:
+  · **隐含预期差因子族(新建+probe 全闭环,阴性)**:`factors/expectation_gap.py`(implied_growth_gap / guidance_gap / peg_inverse;机制锚 P/E=(1+g)/(r−g) 反解隐含增速,**信号设计在"已兑现/指引增速 − 价格隐含要求"的差上**,g_implied 单独≡价值因子;pe_ttm by_date 不复权口径 + fina/forecast/express anndate PIT;亏损股诚实 NaN)。对抗测试 9/9(退化成纯价值/纯成长的实现必挂、快报优先于预告、缺字段真拒)。全市场 probe(2018→cutoff 2022→2024,holdout 未触,3 trials 诚实申报):implied_growth_gap / peg_inverse 正交保留率 211-231%(真正交、非小盘代理)但 **OOS 塌缩翻负**(残差留存 −0%/7%)——已兑现 yoy 是市场消化过的陈旧信息;guidance_gap 唯一残差 OOS 不塌(留存 68%)但 ICIR 0.14 落入已关闭的「真正交但太弱」量级带且 size 相关 0.44。**三成员均不接工厂**。登记簿 2 条 DEPRIORITIZE(180d;复活=湖内添真前瞻一致预期数据源)+ backlog forecast-express 补交叉证据(纯 SUE 口径保持开放)。报告:`reports/research/probe_expectation_gap_20260712.md`。
+  · **资负表运营质量族 probe(销 TASKS 账,阴性)**:bargaining_power 正交保留率 17%=size/流动性伪装(残差≈0);两 Δ 强度因子 IS 符号与设计相反且 OOS 翻号。登记簿 DEPRIORITIZE(复活=行业分类落湖后行业内中性化,依赖产业基本面 Phase 2)。报告:`reports/research/probe_fundamental_quality_20260712.md`。
+  · **worktree 数据链**:data_lake 六目录+fundamental_batch symlink 主仓(gitignored 只读),此前环境性失败的 test_engine/test_data_layer/test_e2e/test_services_phase0/test_style_neutralization 全部转绿;test_autoresearch_engine 单例(`test_island_fitness_penalizes_correlation_to_book`)失败经 `git stash -u` 基线复现为**预存**(同 06-30/07-02 记录),非本次引入。
+  · **CI 缺口发现**:test_all.sh 手工枚举测试文件,check_test_discovery 只验"可收集"不验"被执行"——pytest-only 新测试(test_fundamental_quality/test_expectation_gap)从不被 CI 跑;已立后台任务(补兜底 pytest 块)。
 
 **2026-07-03(孤岛回收四项:拥挤归因 + 保质期复核环 + 基本面质量因子族 + 被丢信号销账)**:
   · **拥挤 → 衰减归因**:`capacity.strategy_pool_crowding`(零调用方孤岛回收)接进 `decay_monitor` 周度——池级(等权"策略组合"复用 calculate_crowding_score)+ 逐腿 `max_pair_corr` 点名"和谁拥挤"(阈值单源 = governance.marginal.REDUNDANT_CORR)。对抗测试抓到真设计缺陷:逐腿对池均值相关会被正交腿稀释漏检双胞胎(corr 0.99 的孪生对池仅 0.64),已改两两口径。<2 腿/样本不足诚实拒判不给 0 分假绿。测试 5/5。
