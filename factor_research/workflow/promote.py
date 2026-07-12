@@ -15,9 +15,9 @@ phase4_register 内部只调 strategy_registry.register_family/register;
 
 用法:
   cd /Users/kiki/astcok/factor_research
-  python3 workflow/promote.py --pool                       # 升所有 L3_PASSED
+  python3 workflow/promote.py --pool                       # 升所有 L3_PASSED(+默认 9-Gate)
   python3 workflow/promote.py --pool --marginal
-  python3 workflow/promote.py --pool --nine-gate           # 入册后自动回填 9-Gate
+  python3 workflow/promote.py --pool --no-nine-gate        # 显式跳过 9-Gate(仅调试;自动入口禁用)
 """
 from __future__ import annotations
 
@@ -38,12 +38,17 @@ NINE_GATE_STRATEGY_TO_FAMILY = {
 
 def promote_spec(spec, version="v1.0", warmup_start="2010-01-01",
                  force=False, run_marginal=False, regime="", decay_signal="", hyp=None,
-                 run_nine_gate=False, nine_gate_strategy=None, nine_gate_runner=None,
+                 run_nine_gate=True, nine_gate_strategy=None, nine_gate_runner=None,
                  nine_gate_trials=15, nine_gate_start=None, target_status="", holdout_id="",
                  seed_provenance=None):
     """把一个 workflow FactorSpec 走完整 phase1~4,返回 RegistrationReport。
 
     spec 可来自 from_factory.hypothesis_to_spec(hyp) 或 explore.make_candidates()。
+
+    默认 ``run_nine_gate=True``:登记成功后必跑 9-Gate 回填 DSR/PSR/PBO,避免
+    人工/factory 默认堆出无多重检验证据的「候选」台账(审计项#8;bulk_promote 早已强制开)。
+    仅调试可显式 ``run_nine_gate=False``;自动/CLI 晋级入口由
+    ``scripts/ci/check_no_force_promote.py`` 禁止字面 False。
     """
     from workflow.phase1_synthetic import Phase1Checker
     from workflow.phase2_backtest import Phase2Runner
@@ -105,7 +110,7 @@ def promote_spec(spec, version="v1.0", warmup_start="2010-01-01",
         report.phase_summary = _phase_summary(p1, p2, p3, report)
     print(report, flush=True)
 
-    # ── [可选] Nine-Gate 完整审计 → 回填台账 DSR/PSR/PBO 摘要 ──
+    # ── Nine-Gate 完整审计 → 回填台账 DSR/PSR/PBO 摘要(默认开启) ──
     if run_nine_gate:
         if report and report.registered:
             print("[nine-gate] 完整审计并回填台账...", flush=True)
@@ -119,6 +124,8 @@ def promote_spec(spec, version="v1.0", warmup_start="2010-01-01",
             print(f"  → {ng_result.get('status')}: {ng_result.get('strategy', '')}", flush=True)
         else:
             print("[nine-gate] 跳过: phase4 未登记成功", flush=True)
+    else:
+        print("[nine-gate] 显式跳过(run_nine_gate=False) — 台账将无 DSR 回填", flush=True)
 
     # ── [可选] 边际评级 → ACTIVE/SHADOW ──
     if run_marginal and report.registered:
@@ -366,7 +373,19 @@ if __name__ == "__main__":
         action="store_true",
         help="仅覆盖 phase1/2/3 与知识图谱跳过;不得绕过 holdout 金库(须 holdout_id+通过记录)",
     )
-    ap.add_argument("--nine-gate", action="store_true", help="登记成功后运行 9-Gate 并回填台账")
+    ap.add_argument(
+        "--nine-gate",
+        dest="nine_gate",
+        action="store_true",
+        default=True,
+        help="登记成功后运行 9-Gate 并回填台账(默认开启)",
+    )
+    ap.add_argument(
+        "--no-nine-gate",
+        dest="nine_gate",
+        action="store_false",
+        help="显式跳过 9-Gate(仅调试;自动/CLI 入口禁止字面 run_nine_gate=False)",
+    )
     ap.add_argument("--nine-gate-strategy", default=None, help="覆盖 9-Gate CLI 策略名")
     ap.add_argument("--nine-gate-trials", type=int, default=15, help="9-Gate 多重检验 trial 数")
     ap.add_argument("--nine-gate-start", default=None, help="覆盖 9-Gate 回测起始日期")

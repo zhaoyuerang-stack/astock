@@ -702,10 +702,18 @@ def cmd_knowledge(args):
 
 
 def cmd_promote(args):
-    """L3_PASSED 候选 → workflow phase1~4 验证+登记(唯一登记闸门)。"""
+    """L3_PASSED 候选 → workflow phase1~4 验证+登记(唯一登记闸门)。
+
+    默认 run_nine_gate=True(与 promote_spec 默认一致):登记后回填 9-Gate/DSR,
+    避免工厂 CLI 堆无多重检验证据的候选台账。
+    """
     from workflow.promote import promote_pool_l3
-    reports = promote_pool_l3(version=args.version, run_marginal=args.marginal,
-                              force=args.force)
+    reports = promote_pool_l3(
+        version=args.version,
+        run_marginal=args.marginal,
+        force=args.force,
+        run_nine_gate=True,  # 硬默认;禁止字面 False(check_no_force_promote)
+    )
     n_reg = sum(1 for r in reports if r and r.registered)
     print(f"\npromote done: {n_reg}/{len(reports)} 登记入册")
     return 0
