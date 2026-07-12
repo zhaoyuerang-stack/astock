@@ -697,6 +697,9 @@ class TradePlanView(BaseModel):
     generated_at: str = ""
     stale: bool = False
     stale_reason: str = ""
+    # 与 portfolio.paper_engine.FILL_PRICE_MODE 同步(默认 close=收盘价)
+    fill_mode: str = "close"
+    fill_mode_label: str = "收盘价"
     regime: str = ""
     regime_dist: float = 0.0
     in_market: bool = False

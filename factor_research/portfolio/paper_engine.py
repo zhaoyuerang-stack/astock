@@ -32,8 +32,45 @@ ETF_SELL_COST = _cost_cfg.etf_sell_cost
 LOT = 100
 
 # ── 执行成交价模式 (2026-06-07 Task 1.2 audit 实证) ──
-# close 模式 = T+1 14:55 收盘价成交 (盘中冲击消化后), 避开高开摩擦
+# close 模式 = T+1 收盘价成交 (盘中冲击消化后), 避开高开摩擦
+# 覆盖:环境变量 PAPER_FILL_MODE=open|close|ohlc_mid|vwap_4
 FILL_PRICE_MODE = os.environ.get("PAPER_FILL_MODE", "close")
+
+# 展示层唯一文案源(paper_trade Obsidian / web 操作卡必须跟此走,禁硬编码「开盘」)
+_FILL_MODE_LABELS = {
+    "open": "开盘价",
+    "close": "收盘价",
+    "ohlc_mid": "OHLC中价",
+    "vwap_4": "VWAP(OHLC/4)",
+}
+
+
+def resolve_fill_mode(mode: str | None = None) -> str:
+    m = (mode or FILL_PRICE_MODE or "close").strip().lower()
+    if m not in _FILL_MODE_LABELS:
+        raise ValueError(f"unknown FILL_PRICE_MODE: {m}")
+    return m
+
+
+def fill_mode_label(mode: str | None = None) -> str:
+    """短标签:开盘价 / 收盘价 / …"""
+    return _FILL_MODE_LABELS[resolve_fill_mode(mode)]
+
+
+def fill_mode_zh(mode: str | None = None) -> str:
+    """叙事用:T+1 收盘价成交"""
+    return f"T+1 {fill_mode_label(mode)}成交"
+
+
+def fill_mode_disclaimer(mode: str | None = None) -> str:
+    """完整口径一句:信号日盘后出单 → 次日按 mode 成交;涨跌停约束仍看开盘。"""
+    m = resolve_fill_mode(mode)
+    label = fill_mode_label(m)
+    return (
+        f"T 日盘后出信号 → 记 pending → **次日({fill_mode_zh(m)})**"
+        f"(不复权 {label});停牌不可成交;一字涨跌停约束仍按**次日开盘价**判定"
+    )
+
 
 SIGNALS = ROOT / "signals"
 PAPER = ROOT / "paper"
@@ -79,7 +116,10 @@ def get_close(code, date):
 
 
 def get_open(code, date):
-    """date 当天不复权开盘——T+1 成交价;停牌(当天无数据/无 open)返回 None。"""
+    """date 当天不复权开盘——涨跌停约束用;停牌(当天无数据/无 open)返回 None。
+
+    注意:默认成交价是 close(见 FILL_PRICE_MODE),不是 open。
+    """
     df = _raw(code)
     if df is None or "raw_open" not in df.columns:
         return None
@@ -369,7 +409,10 @@ def valuation(acc, date):
 
 
 def estimate_basket(date, codes, equity, top_n, names):
-    """按参考价(date 收盘)估算等权建仓清单——给"明日计划"/预览展示,实际按 T+1 开盘成交。"""
+    """按参考价(date 收盘)估算等权建仓清单——给「明日计划」/预览展示。
+
+    参考价 ≠ 成交价:实际成交走 get_fill_price / FILL_PRICE_MODE(默认 close)。
+    """
     budget_each = equity * LEVERAGE / top_n
     rows = []
     for code in codes:

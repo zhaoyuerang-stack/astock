@@ -3,7 +3,8 @@
 数据源(只读,不触发执行):
   paper/account.json + trades.csv + nav.csv(唯一写者 = scripts/ops/paper_trade,launchd 日更)
   + signals/最新信号(轮动指令)。模拟盘全自动按真实盘 T+1 口径执行,无人工环节。
-操作卡的「明日计划」与 Obsidian 卡片同口径:参考价 = 信号日收盘,实际按 T+1 成交价模式。
+操作卡的「明日计划」与 Obsidian 卡片同口径:参考价 = 信号日收盘,
+实际成交价 = portfolio.paper_engine.FILL_PRICE_MODE(默认 close 收盘价)。
 """
 from __future__ import annotations
 
@@ -27,6 +28,7 @@ from contracts.views import (
 )
 from runtime.artifacts import ArtifactPaths
 from portfolio.paper_engine import (
+    FILL_PRICE_MODE,
     NAV_FP,
     SIGNALS,
     TRADES_FP,
@@ -34,6 +36,9 @@ from portfolio.paper_engine import (
     defensive_bond_authorized,
     estimate_basket,
     estimate_bond_order,
+    fill_mode_disclaimer,
+    fill_mode_label,
+    fill_mode_zh,
     get_etf_close,
     load_account,
     load_names,
@@ -43,8 +48,11 @@ from portfolio.paper_engine import (
 ROOT = Path(__file__).resolve().parents[2]
 CHINA_TZ = ZoneInfo("Asia/Shanghai")
 
-DISCLAIMER = ("本操作卡为策略信号的机械呈现,模拟盘全自动按真实盘 T+1 口径执行;"
-              "仅供研究参考,不构成投资建议;回测与模拟盘业绩不代表未来收益。")
+DISCLAIMER = (
+    "本操作卡为策略信号的机械呈现,模拟盘全自动按真实盘口径执行"
+    f"({fill_mode_zh()}, mode=`{FILL_PRICE_MODE}`);"
+    "仅供研究参考,不构成投资建议;回测与模拟盘业绩不代表未来收益。"
+)
 
 
 def _artifacts() -> ArtifactPaths:
@@ -150,7 +158,8 @@ def trade_plan() -> TradePlanView:
             est_shares=est[0] if est else 0,
             est_notional=round(est[2], 2) if est else 0.0,
             shares_held=int(held.get("shares") or 0),
-            note="BEAR:次日将全部闲置资金买入国债ETF;切回 BULL 时卖出换回股票")
+            note=f"BEAR:次日将全部闲置资金按 {fill_mode_label()} 买入国债ETF;"
+                 f"切回 BULL 时卖出换回股票")
     elif pend_bond.get("requested") and not bond_authorized:
         reason = pend_bond.get("blocked_reason") or bond_authorization_block(pend_bond)[3]
         ref = get_etf_close(bond_code, date) or held.get("avg_cost", 0.0)
@@ -167,7 +176,7 @@ def trade_plan() -> TradePlanView:
             ref_price=round(ref, 3), est_shares=int(held["shares"]),
             est_notional=round(held["shares"] * ref, 2),
             shares_held=int(held["shares"]),
-            note="BULL:次日开盘卖出全部国债ETF,资金买回股票")
+            note=f"BULL:次日按 {fill_mode_label()} 卖出全部国债ETF,资金买回股票")
     elif held.get("shares"):
         reason = bond_authorization_block(pend_bond or held)[3]
         ref = get_etf_close(bond_code, date) or held.get("avg_cost", 0.0)
@@ -194,6 +203,8 @@ def trade_plan() -> TradePlanView:
         generated_at=datetime.now(CHINA_TZ).isoformat(timespec="seconds"),
         stale=stale,
         stale_reason=f"信号日 {date} 早于最近交易日 {latest_td},等待数据更新" if stale else "",
+        fill_mode=FILL_PRICE_MODE,
+        fill_mode_label=fill_mode_label(),
         regime=str(sig.get("regime", "")),
         regime_dist=float(sig.get("regime_dist") or 0.0),
         in_market=bool(sig.get("in_market")),
