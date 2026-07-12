@@ -77,9 +77,13 @@ data(lake) → factors → core.engine → {strategies(生产), factory/workflow
 - **调度** ✅/⏳:`scripts/ops/scheduled_daily_update.py` 每日盘后执行价量/财务/ETF 增量 + stale gate + 信号生成 + 自动模拟盘;`scripts/ops/scheduled_weekly_maintenance.py` 做周/月线、不复权价、完整质量校验;FastAPI :8011 和 Web :3000 由 launchd KeepAlive 常驻。完整事件驱动仍归入中央调度层。
 
 ## 母策略台账 schema(两层,`strategy_registry.py`)
-- **母策略 family**:`id / name / hypothesis / regime / decay_signal / status`(active·paused·retired)
-- **版本 version**:`version / desc / config / data_scope(源·区间·幸存者偏差) / metrics / status / notes`(版本 status:候选·在册·退役·参考)
+
+> 完整必填字段清单唯一权威(2026-07-11 从 `CLAUDE.md` §7.1/7.2 下沉到本节；语义未变)：
+
+- **母策略 family** 必填:`id / name / hypothesis / regime / decay_signal / status`(active·paused·retired)，展开为叙事字段即:family id、策略名称、核心经济学假设、alpha 来源、适用市场状态、不适用市场状态、预期失效信号、主要风险、与现有母策略关系、研究负责人/生成来源、创建时间。
+- **版本 version** 必填:`version / desc / config / data_scope(源·区间·幸存者偏差) / metrics / status / notes`(版本 status:候选·在册·退役·参考)，展开为叙事字段即:version id、所属 family、因子定义、参数配置、股票池、调仓频率、持仓数量、成本模型、样本内绩效、样本外绩效、压力测试绩效、换手、容量评估、相关性评估、9-Gate 结果、入册结论、退役条件。
 - 数据口径是**版本属性**,不占版本号语义。API:`register_family()` 声明母策略 → `register()` 挂版本。
+- 入册门槛数值与退役纪律行为规则见根 [`CLAUDE.md`](CLAUDE.md) §7。
 
 ## Policy 层 VetoFilter(观察态)
 - 通用实现入口:`factor_research/research_toolkit/` 是策略研究与控制规则验证工具箱,承载 HostSpec、ControlArtifact、candidate-pool policy、marginal delta report 和 discard-pile triage 等宿主无关能力。
