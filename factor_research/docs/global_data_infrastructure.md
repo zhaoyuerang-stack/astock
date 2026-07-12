@@ -34,9 +34,10 @@ allowed use, allowlist, unit/calendar/timezone contract, canonical key policy, r
 policy and PIT confidence. A planned or unlicensed source produces
 `source_not_admitted`, not a fallback provider request.
 
-The initial records are deliberately not enabled:
+Current local admission:
 
-- `alfred_macro_v1`: FRED/ALFRED macro and rates, `research_only`. It requires
+- `alfred_macro_v1`: FRED/ALFRED macro and rates, `research_only`, enabled for
+  `macro_daily`, `macro_monthly`, and `rates_daily`. It requires
   `FRED_API_KEY`. The API returns a real-time vintage date rather than a verified
   intraday publication timestamp, so the adapter converts that date to the end of the
   source day in `America/Chicago`. This is conservative and can delay a signal; it is
@@ -51,9 +52,9 @@ are reviewed. Data health exposes `admission_status`, `license_status`, allowed 
 availability confidence, last-good ingest and quarantine count; none of these states
 mean that the data is tradable.
 
-Approval is a local configuration decision, not an implicit package install. For example,
-after documenting the review, an operator may add the following to their untracked
-configuration override:
+Approval is a local configuration decision, not an implicit package install. The
+repository configuration enables ALFRED for local research; another environment must
+make the same explicit admission decision and provide its own environment variable:
 
 ```yaml
 global_data:
@@ -68,7 +69,10 @@ global_data:
 ```
 
 The API key remains in the `FRED_API_KEY` environment variable, never in YAML. An
-invalid approval field is rejected rather than silently changing a source record.
+invalid approval field is rejected rather than silently changing a source record. A
+daily-update worker must provide that environment variable; otherwise the source health
+is `missing_credentials`. Because ALFRED is auxiliary (`required=false`), that state
+does not block the A-share production signal.
 
 ## Cleaning And PIT
 
@@ -96,8 +100,9 @@ invalid approval field is rejected rather than silently changing a source record
 
 ## Production Semantics
 
-`settings.global_data.enabled` defaults to false and `required` defaults to
-false.  Scheduled daily update treats global data as auxiliary unless
+`GlobalDataConfig` defaults to false/false, but the repository's checked-in settings
+enable the admitted ALFRED datasets with `required=false`. Scheduled daily update
+treats global data as auxiliary unless
 `required=true`; auxiliary failures can produce `partial_ok` but cannot block the
 existing A-share signal path.
 
@@ -111,8 +116,11 @@ the scheduler ran.
 # Check an admitted source/provider without fetching.
 python3 scripts/data/update_global_data.py --dataset macro_daily --source alfred_macro_v1 --probe
 
-# Fetch, snapshot, normalize, validate and merge only after source admission.
-python3 scripts/data/update_global_data.py --dataset macro_daily --source alfred_macro_v1 --provider-mode alfred --from-watermark
+# Initial ALFRED history backfill. An explicit start prevents an unbounded vintage request.
+python3 scripts/data/update_global_data.py --all-enabled --provider-mode alfred --start 2016-01-01
+
+# Daily revision-window update after the initial backfill.
+python3 scripts/data/update_global_data.py --all-enabled --provider-mode alfred --from-watermark
 
 # Re-run normalizer/validator from an immutable raw snapshot.
 python3 scripts/data/update_global_data.py --dataset etf_daily --source global_etf_price_v1 --replay-ingest <ingest_id>

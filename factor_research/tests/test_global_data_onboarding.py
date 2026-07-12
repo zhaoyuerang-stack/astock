@@ -163,10 +163,13 @@ def test_conflicting_primary_keys_reject_the_full_batch():
     assert "primary key conflict" in validated.issues
 
 
-def test_global_source_read_view_exposes_unapproved_admission_state(tmp_path):
-    from services.read.global_data import global_data_sources
+def test_global_source_read_view_exposes_unapproved_admission_state(tmp_path, monkeypatch):
+    from app_config.settings import Settings
+    from services.read import global_data
 
-    view = global_data_sources(root=tmp_path)
+    monkeypatch.setattr(global_data, "get_settings", lambda: Settings._from_dict({}))
+
+    view = global_data.global_data_sources(root=tmp_path)
     macro = next(source for source in view.sources if source.dataset_id == "macro_daily")
 
     assert macro.source_id == "alfred_macro_v1"
@@ -175,10 +178,17 @@ def test_global_source_read_view_exposes_unapproved_admission_state(tmp_path):
     assert macro.availability_confidence == "date_only_conservative_end_of_source_day"
 
 
-def test_unapproved_source_records_status_without_writing_canonical_data(tmp_path):
-    from scripts.data.update_global_data import run_global_update
+def test_unapproved_source_records_status_without_writing_canonical_data(tmp_path, monkeypatch):
+    from app_config.settings import GlobalDataConfig
+    from scripts.data import update_global_data
 
-    result = run_global_update(
+    monkeypatch.setattr(
+        update_global_data,
+        "_settings",
+        lambda: GlobalDataConfig(enabled=True, datasets=("macro_daily",)),
+    )
+
+    result = update_global_data.run_global_update(
         root=tmp_path,
         dataset_ids=["macro_daily"],
         source_id="alfred_macro_v1",
@@ -191,10 +201,13 @@ def test_unapproved_source_records_status_without_writing_canonical_data(tmp_pat
     assert (tmp_path / "data_lake/global_manifest.json").exists()
 
 
-def test_all_enabled_respects_disabled_global_data_configuration(tmp_path):
-    from scripts.data.update_global_data import run_global_update
+def test_all_enabled_respects_disabled_global_data_configuration(tmp_path, monkeypatch):
+    from app_config.settings import GlobalDataConfig
+    from scripts.data import update_global_data
 
-    result = run_global_update(root=tmp_path, all_enabled=True)
+    monkeypatch.setattr(update_global_data, "_settings", lambda: GlobalDataConfig())
+
+    result = update_global_data.run_global_update(root=tmp_path, all_enabled=True)
 
     assert result["ok"] is True
     assert result["skipped"] is True

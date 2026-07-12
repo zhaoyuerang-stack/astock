@@ -48,6 +48,23 @@ def test_global_data_settings_defaults_disabled_non_required():
     assert configured.global_data.max_daily_failures == 2
 
 
+def test_repository_settings_admit_alfred_as_auxiliary_research_data():
+    from app_config.settings import Settings
+
+    settings = Settings.from_yaml(str(ROOT / "app_config" / "settings.yaml"))
+    global_data = settings.global_data
+
+    assert global_data.enabled is True
+    assert global_data.required is False
+    assert global_data.provider_mode == "alfred"
+    assert global_data.datasets == ("macro_daily", "macro_monthly", "rates_daily")
+    assert global_data.api_key_envs == {"alfred": "FRED_API_KEY"}
+    admission = global_data.source_admissions["alfred_macro_v1"]
+    assert admission["admission_status"] == "approved"
+    assert admission["license_status"] == "approved"
+    assert admission["allowed_use"] == "research_only"
+
+
 def test_global_dataset_registry_declares_required_pit_metadata():
     from lake.global_catalog import DATASET_REGISTRY, get_dataset_spec, validate_dataset_registry
 
