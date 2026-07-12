@@ -49,3 +49,6 @@ factor_research/scratch/*
 # 私有/本机配置与凭证(永不入库)
 project.private.config.json
 desktop/stock-diagnosis-client/auth.json
+
+# 策略台账跨进程互斥锁（运行时文件；内容不承载台账状态）
+factor_research/.strategy_versions.json.lock

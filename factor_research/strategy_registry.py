@@ -16,9 +16,17 @@
   register("momentum", "v1.0", desc, config, data_scope, metrics, status="候选", notes=...)
 """
 import argparse
+import fcntl
 import json
-from pathlib import Path
+import math
+import os
+import stat
+import tempfile
+import threading
+from contextlib import contextmanager
 from datetime import date
+from functools import wraps
+from pathlib import Path
 
 from engine.metrics import compute_hit
 
@@ -39,20 +47,180 @@ DSR_ALPHA = 0.05
 DIVERSIFIER_FAMILIES = {"large-cap-growth-hedged", "hq-momentum-hedged"}
 
 
-def _load():
-    if not REGISTRY.exists():
-        return {"families": []}
-    data = json.loads(REGISTRY.read_text())
-    if isinstance(data, list):        # 旧扁平格式 → 视为空，由 __main__ 重建
-        return {"families": []}
+class RegistryValidationError(ValueError):
+    """Raised when the strategy registry is not valid strict JSON/basic schema."""
+
+
+_PROCESS_WRITE_LOCK = threading.RLock()
+_WRITE_STATE = threading.local()
+
+
+def _validate_registry(data):
+    """Validate the stable structural invariants shared by old and new ledgers.
+
+    The registry has accumulated optional fields over time, so this deliberately
+    validates only the identity/container shape needed to update it safely. It
+    rejects ambiguous duplicate identities and malformed containers without
+    pretending that every historical optional field is mandatory.
+    """
+    if not isinstance(data, dict):
+        raise RegistryValidationError("strategy registry root must be an object")
+    families = data.get("families")
+    if not isinstance(families, list):
+        raise RegistryValidationError("strategy registry 'families' must be a list")
+
+    family_ids = set()
+    for family_index, family in enumerate(families):
+        where = f"families[{family_index}]"
+        if not isinstance(family, dict):
+            raise RegistryValidationError(f"{where} must be an object")
+        family_id = family.get("id")
+        if not isinstance(family_id, str) or not family_id.strip():
+            raise RegistryValidationError(f"{where}.id must be a non-empty string")
+        if family_id in family_ids:
+            raise RegistryValidationError(f"duplicate family id: {family_id!r}")
+        family_ids.add(family_id)
+
+        versions = family.get("versions")
+        if not isinstance(versions, list):
+            raise RegistryValidationError(f"{where}.versions must be a list")
+        version_ids = set()
+        for version_index, version in enumerate(versions):
+            version_where = f"{where}.versions[{version_index}]"
+            if not isinstance(version, dict):
+                raise RegistryValidationError(f"{version_where} must be an object")
+            version_id = version.get("version")
+            if not isinstance(version_id, str) or not version_id.strip():
+                raise RegistryValidationError(
+                    f"{version_where}.version must be a non-empty string")
+            if version_id in version_ids:
+                raise RegistryValidationError(
+                    f"duplicate version id in family {family_id!r}: {version_id!r}")
+            version_ids.add(version_id)
     return data
 
 
-def _save(data):
+def _reject_non_finite_json(value):
+    raise RegistryValidationError(f"non-finite JSON number: {value}")
+
+
+def _read_registry_file(path, *, allow_legacy_list=False):
+    try:
+        data = json.loads(
+            path.read_text(encoding="utf-8"),
+            parse_constant=_reject_non_finite_json,
+        )
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise RegistryValidationError(f"cannot read valid JSON registry {path}: {exc}") from exc
+    if allow_legacy_list and isinstance(data, list):
+        data = {"families": []}
+    return _validate_registry(data)
+
+
+def _lock_path():
+    return REGISTRY.with_name(f".{REGISTRY.name}.lock")
+
+
+@contextmanager
+def _write_transaction():
+    """Serialize the complete read-modify-replace cycle across threads/processes."""
+    with _PROCESS_WRITE_LOCK:
+        depth = getattr(_WRITE_STATE, "depth", 0)
+        if depth:
+            _WRITE_STATE.depth = depth + 1
+            try:
+                yield
+            finally:
+                _WRITE_STATE.depth = depth
+            return
+
+        REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+        with _lock_path().open("a+b") as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            _WRITE_STATE.depth = 1
+            try:
+                yield
+            finally:
+                _WRITE_STATE.depth = 0
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
+def _registry_write(func):
+    """Keep each public registry mutation as one locked transaction."""
+    @wraps(func)
+    def wrapped(*args, **kwargs):
+        with _write_transaction():
+            return func(*args, **kwargs)
+    return wrapped
+
+
+def _load():
+    if not REGISTRY.exists():
+        return {"families": []}
+    return _read_registry_file(REGISTRY, allow_legacy_list=True)
+
+
+def _serialize_registry(data):
+    _validate_registry(data)
     data["families"].sort(key=lambda f: f["id"])
-    REGISTRY.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+    try:
+        payload = json.dumps(
+            data, ensure_ascii=False, indent=2, allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        raise RegistryValidationError(f"strategy registry is not strict JSON: {exc}") from exc
+    _validate_registry(json.loads(payload))
+    return payload
 
 
+def _fsync_parent(path):
+    directory_fd = os.open(path.parent, os.O_RDONLY)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def _save_unlocked(data):
+    payload = _serialize_registry(data)
+    target_mode = (
+        stat.S_IMODE(REGISTRY.stat().st_mode) if REGISTRY.exists() else 0o644
+    )
+    file_descriptor, temp_name = tempfile.mkstemp(
+        dir=REGISTRY.parent,
+        prefix=f".{REGISTRY.name}.",
+        suffix=".tmp",
+    )
+    temp_path = Path(temp_name)
+    try:
+        os.fchmod(file_descriptor, target_mode)
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as temp_file:
+            file_descriptor = -1
+            temp_file.write(payload)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+
+        # Validate the exact bytes that will be installed, then validate again
+        # after replacement. The latter turns unexpected storage corruption into
+        # an explicit failure instead of silently accepting a broken ledger.
+        _read_registry_file(temp_path)
+        os.replace(temp_path, REGISTRY)
+        _fsync_parent(REGISTRY)
+        _read_registry_file(REGISTRY)
+    finally:
+        if file_descriptor >= 0:
+            os.close(file_descriptor)
+        temp_path.unlink(missing_ok=True)
+
+
+def _save(data):
+    if getattr(_WRITE_STATE, "depth", 0):
+        _save_unlocked(data)
+        return
+    with _write_transaction():
+        _save_unlocked(data)
+
+
+@_registry_write
 def register_family(id, name, hypothesis="", regime="", decay_signal="", status="active",
                     style_betas=None, capacity_m=0.0, failure_boundaries=None):
     """登记/更新一个母策略（同 id 覆盖元信息，保留其下版本）"""
@@ -77,6 +245,7 @@ def register_family(id, name, hypothesis="", regime="", decay_signal="", status=
     return id
 
 
+@_registry_write
 def register(family, version, desc, config, data_scope, metrics, status="候选", notes="",
              evidence=None, admission=None, nine_gate=None, date_str=None,
              spec=None, spec_hash=None):
@@ -172,6 +341,7 @@ def register(family, version, desc, config, data_scope, metrics, status="候选"
     return f"{family}/{version}"
 
 
+@_registry_write
 def migrate_two_track_admission(apply: bool = True):
     """一次性迁移：用 compute_hit 重算全台账 hit，并按双轨准入规则裁定「在册」去留。
 
@@ -232,6 +402,7 @@ def migrate_two_track_admission(apply: bool = True):
     return transitions
 
 
+@_registry_write
 def demote_dsr_insignificant_standalone(threshold: float = DSR_ALPHA, apply: bool = True):
     """一次性治理迁移（ADR-020 / R-OBJECTIVE-001）：把 DSR 多重测试惩罚下不显著的
     「在册 standalone」降为「参考」，保留历史绩效/配置/nine_gate，仅移出有效 alpha 池。
@@ -272,6 +443,7 @@ def demote_dsr_insignificant_standalone(threshold: float = DSR_ALPHA, apply: boo
     return transitions
 
 
+@_registry_write
 def attach_nine_gate(family, version, summary, evidence=None):
     """把一次 Nine-Gate 审计摘要（NineGatesReport.summarize()）写入指定版本的 nine_gate 字段。
 
@@ -294,6 +466,207 @@ def attach_nine_gate(family, version, summary, evidence=None):
     return f"{family}/{version}"
 
 
+@_registry_write
+def merge_nine_gate(family, version, patch):
+    """Atomically merge partial Gate evidence without a read/save race."""
+    data = _load()
+    fam = next((f for f in data["families"] if f["id"] == family), None)
+    if fam is None:
+        raise ValueError(f"母策略 '{family}' 未登记")
+    item = next((v for v in fam["versions"] if v["version"] == version), None)
+    if item is None:
+        raise ValueError(f"版本 '{family}/{version}' 不存在")
+    summary = dict(item.get("nine_gate") or {})
+    summary.update(dict(patch or {}))
+    item["nine_gate"] = summary
+    _save(data)
+    return f"{family}/{version}"
+
+
+@_registry_write
+def restate_execution_costs(
+    family,
+    version,
+    *,
+    metrics,
+    cost_model,
+    audit,
+    notes,
+):
+    """Restate one historical version after a disclosed execution-cost error.
+
+    This is deliberately narrower than :func:`register`: it cannot change a
+    version's lifecycle status, Nine-Gate evidence, identity, data scope, or
+    admission track.  It only installs metrics reproduced by the canonical
+    strategy runner, records the canonical long-leg cost assumptions, and
+    invalidates any old diversifier rationale that depended on the erroneous
+    cost result.
+
+    ``audit`` is mandatory immutable evidence.  Reapplying the same
+    ``audit_id`` is idempotent; trying to reuse an id for different evidence is
+    rejected.  The whole mutation uses the registry's locked atomic writer.
+    """
+    from core.engine import CostModel
+
+    supplied_cost = dict(cost_model or {})
+    if family not in DIVERSIFIER_FAMILIES:
+        raise ValueError(
+            f"execution-cost restatement is restricted to the disclosed hedged families: {family!r}"
+        )
+    canonical = CostModel()
+    required_cost = {
+        "buy_cost": float(canonical.buy_cost),
+        "sell_cost": float(canonical.sell_cost),
+        "financing_rate": float(canonical.financing_rate),
+    }
+    if supplied_cost != required_cost:
+        raise ValueError(
+            "historical cost restatement must use the canonical CostModel: "
+            f"expected={required_cost}, got={supplied_cost}"
+        )
+
+    metric_values = dict(metrics or {})
+    required_metrics = {"annual", "maxdd", "sharpe", "calmar", "n"}
+    missing_metrics = sorted(required_metrics - metric_values.keys())
+    if missing_metrics:
+        raise ValueError(f"cost restatement metrics missing: {missing_metrics}")
+    for key, value in metric_values.items():
+        if isinstance(value, bool):
+            raise ValueError(f"cost restatement metric {key!r} must be numeric, not bool")
+        if not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+            raise ValueError(f"cost restatement metric {key!r} must be finite, got {value!r}")
+        metric_values[key] = int(value) if key == "n" else float(value)
+    metric_values["hit"] = compute_hit(
+        metric_values["annual"], metric_values["maxdd"]
+    )
+
+    audit_record = dict(audit or {})
+    required_audit = {
+        "audit_id",
+        "rule",
+        "run_at",
+        "runner",
+        "sample_start",
+        "sample_end",
+        "return_digest",
+        "source_hashes",
+    }
+    missing_audit = sorted(
+        key for key in required_audit if not audit_record.get(key)
+    )
+    if missing_audit:
+        raise ValueError(f"cost restatement audit missing: {missing_audit}")
+    if audit_record["rule"] != "R-COST-001 / ADR-032":
+        raise ValueError("cost restatement audit must cite R-COST-001 / ADR-032")
+    if not isinstance(audit_record["source_hashes"], dict):
+        raise ValueError("cost restatement audit source_hashes must be an object")
+    hex_chars = set("0123456789abcdef")
+    return_digest = str(audit_record["return_digest"])
+    if len(return_digest) != 64 or set(return_digest) - hex_chars:
+        raise ValueError("cost restatement return_digest must be a lowercase SHA-256")
+    source_hashes = audit_record["source_hashes"]
+    if not source_hashes or any(
+        len(str(value)) != 64 or set(str(value)) - hex_chars
+        for value in source_hashes.values()
+    ):
+        raise ValueError("cost restatement source_hashes must contain lowercase SHA-256 values")
+    if not str(notes or "").strip():
+        raise ValueError("cost restatement requires truthful replacement notes")
+
+    data = _load()
+    fam = next((f for f in data["families"] if f["id"] == family), None)
+    if fam is None:
+        raise ValueError(f"母策略 '{family}' 未登记")
+    item = next((v for v in fam["versions"] if v["version"] == version), None)
+    if item is None:
+        raise ValueError(f"版本 '{family}/{version}' 不存在")
+
+    evidence = dict(item.get("evidence") or {})
+    restatements = list(evidence.get("execution_cost_restatements") or [])
+    invalidated_rationale = (
+        "历史 diversifier 准入依据受 long 腿零交易成本口径污染，已作废；"
+        "不得用于重新准入，须按修正成本重跑组合边际。"
+    )
+    invalidated_note = "历史迁移记录保留；原组合边际证据已由 R-COST-001 作废。"
+    same_id = [
+        row for row in restatements
+        if row.get("audit_id") == audit_record["audit_id"]
+    ]
+    if same_id:
+        existing = same_id[0] if len(same_id) == 1 else {}
+        same_evidence = all(
+            existing.get(key) == value for key, value in audit_record.items()
+        )
+        current_cost = dict((item.get("config") or {}).get("cost") or {})
+        canonical_cost_still_installed = all(
+            current_cost.get(key) == value for key, value in required_cost.items()
+        )
+        if (
+            not same_evidence
+            or existing.get("corrected_metrics") != metric_values
+            or dict(item.get("metrics") or {}) != metric_values
+            or not canonical_cost_still_installed
+        ):
+            raise ValueError(
+                f"audit_id {audit_record['audit_id']!r} already exists with different evidence"
+            )
+        admission = dict(item.get("admission") or {})
+        if admission:
+            expected_admission = {
+                "rationale": invalidated_rationale,
+                "evidence_status": "INVALIDATED_BY_COST_RESTATEMENT",
+                "invalidated_by": audit_record["audit_id"],
+            }
+            if any(admission.get(key) != value for key, value in expected_admission.items()):
+                raise ValueError(
+                    f"audit_id {audit_record['audit_id']!r} exists but admission invalidation drifted"
+                )
+            if admission.get("note") != invalidated_note:
+                admission["note"] = invalidated_note
+                item["admission"] = admission
+                _save(data)
+        return f"{family}/{version}"
+
+    # Preserve exactly what the historical record claimed before correction.
+    audit_record["prior_record"] = {
+        "metrics": dict(item.get("metrics") or {}),
+        "config_cost": dict((item.get("config") or {}).get("cost") or {}),
+        "notes": item.get("notes", ""),
+        "admission": dict(item.get("admission") or {}),
+    }
+    audit_record["corrected_metrics"] = dict(metric_values)
+    audit_record["canonical_long_leg_cost"] = dict(required_cost)
+    restatements.append(audit_record)
+    evidence["execution_cost_restatements"] = restatements
+    item["evidence"] = evidence
+
+    config = dict(item.get("config") or {})
+    previous_cost = dict(config.get("cost") or {})
+    config["cost"] = {
+        **required_cost,
+        **{
+            key: value
+            for key, value in previous_cost.items()
+            if key not in required_cost
+        },
+    }
+    item["config"] = config
+    item["metrics"] = metric_values
+    item["notes"] = str(notes).strip()
+
+    admission = dict(item.get("admission") or {})
+    if admission:
+        admission["rationale"] = invalidated_rationale
+        admission["note"] = invalidated_note
+        admission["evidence_status"] = "INVALIDATED_BY_COST_RESTATEMENT"
+        admission["invalidated_by"] = audit_record["audit_id"]
+        item["admission"] = admission
+
+    _save(data)
+    return f"{family}/{version}"
+
+
+@_registry_write
 def attach_data_incident(family, version, incident):
     """Append a data incident to version evidence without changing lifecycle status."""
     data = _load()
@@ -319,6 +692,7 @@ def attach_data_incident(family, version, incident):
     return f"{family}/{version}"
 
 
+@_registry_write
 def attach_decay_check(family, version, result, *, checked_at=None):
     """把一次 governance/decay.py::decay_check() 的结果写入指定版本的 decay_check 字段。
 
@@ -343,6 +717,7 @@ def attach_decay_check(family, version, result, *, checked_at=None):
     return f"{family}/{version}"
 
 
+@_registry_write
 def attach_catalog_status(family, version, status, *, marginal=None, changed_at=None):
     """把一次边际贡献定级(governance/marginal.py::marginal_alpha 的残差法判决)写入
     指定版本的 catalog_status 字段。
@@ -374,6 +749,7 @@ def attach_catalog_status(family, version, status, *, marginal=None, changed_at=
     return f"{family}/{version}"
 
 
+@_registry_write
 def attach_executable_spec(
     family,
     version,
@@ -411,6 +787,7 @@ def attach_executable_spec(
     return f"{family}/{version}"
 
 
+@_registry_write
 def retire_version(family, version, *, reason, evidence_refs=(), actor="workflow",
                    control_event_path=None):
     """唯一的版本退役通道(ADR-017 处置 + Task 15 状态机接线)。
