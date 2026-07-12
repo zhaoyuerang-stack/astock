@@ -40,6 +40,9 @@ echo ""
 echo "=== check_amount_units.py (成交额单位 share×raw，禁 volume×100×price) ==="
 python3 scripts/ci/check_amount_units.py
 
+echo ""
+echo "=== check_cost_model_usage.py (正式路径禁低于 canonical 成本地板) ==="
+python3 scripts/ci/check_cost_model_usage.py
 
 echo ""
 echo "=== test_loop_foundations.py (防自欺地基:trial账本 + holdout金库) ==="

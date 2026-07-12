@@ -33,12 +33,55 @@ from engine.metrics import compute_hit, institutional_metrics, TARGET_ANNUAL, TA
 # Config & Data Containers
 # ---------------------------------------------------------------------------
 
+# Canonical A-share prudent floors (R-COST-001 / docs/cost_model.md).
+# Formal evidence paths must not undercut these; stress may raise above them.
+CANONICAL_BUY_COST = 0.00225
+CANONICAL_SELL_COST = 0.00275
+CANONICAL_FINANCING_RATE = 0.065
+
+
 @dataclass(frozen=True)
 class CostModel:
-    """Execution cost assumptions (matches ``core/backtest.CostModel``)."""
-    buy_cost: float = 0.00225
-    sell_cost: float = 0.00275
-    financing_rate: float = 0.065
+    """Execution cost assumptions (matches ``core/backtest.CostModel``).
+
+    Defaults are the canonical A-share prudent floors. Prefer
+    :func:`formal_cost_model` on workflow / registry / promote paths so config
+    cannot silently inject rates below the floor (audit #8).
+    """
+    buy_cost: float = CANONICAL_BUY_COST
+    sell_cost: float = CANONICAL_SELL_COST
+    financing_rate: float = CANONICAL_FINANCING_RATE
+
+
+def formal_cost_model(
+    buy_cost: float | None = None,
+    sell_cost: float | None = None,
+    financing_rate: float | None = None,
+) -> CostModel:
+    """CostModel for formal backtest / promote / phase2-3 evidence.
+
+    - Omitted fields → canonical floors.
+    - Rates **above** the floor are allowed (stress / +50% sensitivity).
+    - Rates **below** the floor raise ``ValueError`` (R-COST-001; no silent undercut).
+    - ``financing_rate`` may be 0.0 for unlevered books; negative is rejected.
+
+    Unit tests that need free fills may still construct ``CostModel(...)``
+    directly; formal workflow code must use this helper.
+    """
+    buy = CANONICAL_BUY_COST if buy_cost is None else float(buy_cost)
+    sell = CANONICAL_SELL_COST if sell_cost is None else float(sell_cost)
+    fin = CANONICAL_FINANCING_RATE if financing_rate is None else float(financing_rate)
+    if buy < CANONICAL_BUY_COST or sell < CANONICAL_SELL_COST:
+        raise ValueError(
+            "R-COST-001: formal path cannot undercut canonical costs "
+            f"(buy>={CANONICAL_BUY_COST}, sell>={CANONICAL_SELL_COST}); "
+            f"got buy_cost={buy}, sell_cost={sell}"
+        )
+    if buy < 0.0 or sell < 0.0 or fin < 0.0:
+        raise ValueError(
+            f"R-COST-001: costs must be non-negative; got buy={buy}, sell={sell}, fin={fin}"
+        )
+    return CostModel(buy_cost=buy, sell_cost=sell, financing_rate=fin)
 
 
 @dataclass(frozen=True)

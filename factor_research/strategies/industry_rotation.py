@@ -21,8 +21,11 @@ class StrategyConfig:
     top_k_industries: int = 10
     top_n_stocks: int = 2
     w_cpv: float = 0.5  # CPV penalty weight (0.0 for v1.0/v1.1, 0.5 for v1.2/v1.4)
-    cost_mode: str = "stock"  # "stock" (0.47% friction), "etf" (0.05% friction)
-    
+    # cost_mode retained for config dict compat only; formal path always uses
+    # canonical CostModel floors (R-COST-001). Live ETF commissions may be lower,
+    # but evidence / 在册 comparison must not undercut (audit #8).
+    cost_mode: str = "stock"
+
     def to_dict(self):
         return asdict(self)
 
@@ -362,12 +365,11 @@ def run_industry_rotation_strategy(config=StrategyConfig()):
             weight_val = 1.0 / len(selected_stocks)
             scheduled_weights[effective_date] = pd.Series(weight_val, index=selected_stocks)
             
-    # 5. Cost Model
-    if config.cost_mode == "etf":
-        cost_model = CostModel(buy_cost=0.0005, sell_cost=0.0005, financing_rate=0.0)
-    else:
-        cost_model = CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.0)
-        
+    # 5. Cost Model — always canonical floors (R-COST-001 / audit #8).
+    # Previously cost_mode=="etf" used 5bp/side and could paint optimistic formal
+    # evidence; live ETF fee studies belong in scripts/research, not strategy code.
+    cost_model = CostModel()
+
     # 6. Run Engine
     engine_config = BacktestConfig(
         start=config.start,

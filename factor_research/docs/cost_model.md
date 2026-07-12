@@ -38,6 +38,21 @@
 4. **禁止为达标临时下调**滑点/佣金/冲击。
 5. 所有报告必须说明成本口径。
 
+
+### 3.0 地板强制(audit #8, 2026-07-12)
+
+- **数值地板** = `CostModel` 默认: `buy_cost ≥ 0.00225`, `sell_cost ≥ 0.00275`。
+- **运行时**:正式路径用 `core.engine.formal_cost_model(...)`。`phase2` / `phase3` 从
+  config 读费率时,低于地板 **raise**(不可静默夹紧后继续达标)。
+  允许 **抬高**(成本敏感性 / Gate 6 stress)。
+- **静态守卫**:`scripts/ci/check_cost_model_usage.py` 扫
+  `strategies/ portfolio/ workflow/ factory/ services/actions/ core/analysis/`,
+  字面量 `buy_cost`/`sell_cost` **低于地板即失败**(含 0 与 5bp etf 乐观值)。
+- **策略代码**:`industry_rotation` 不再提供 `cost_mode=etf` 正式折扣;实盘 ETF
+  佣金研究放 `scripts/research/`,不作入册证据口径。
+- 单元测试隔离成交时序仍可直接 `CostModel(buy_cost=0, ...)`(不在守卫根下)。
+
+
 ## 4. 变更费率时必须同步(四处,缺一即口径漂移)
 
 1. `factor_research/core/engine.py::CostModel`(数值权威);

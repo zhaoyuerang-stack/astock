@@ -27,7 +27,14 @@ from typing import Callable, Optional
 import numpy as np
 import pandas as pd
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
+from core.engine import (
+    BacktestEngine,
+    BacktestConfig,
+    Signal,
+    PricePanel,
+    CostModel,
+    formal_cost_model,
+)
 from strategies.small_cap import load_price_panels as load_data
 from governance.holdout import boundary, assert_search_clean
 
@@ -137,10 +144,11 @@ class Phase2Runner:
         self.top_n = self.config.get("top_n", DEFAULT_TOP_N)
         self.rebalance = self.config.get("rebalance_days", DEFAULT_REBALANCE)
         self.leverage = self.config.get("leverage", DEFAULT_LEVERAGE)
-        self.base_cost = CostModel(
-            buy_cost=self.config.get("buy_cost", 0.00225),
-            sell_cost=self.config.get("sell_cost", 0.00275),
-            financing_rate=self.config.get("financing_rate", 0.065),
+        # R-COST-001 / audit #8: config may raise stress above floor, never undercut.
+        self.base_cost = formal_cost_model(
+            buy_cost=self.config.get("buy_cost"),
+            sell_cost=self.config.get("sell_cost"),
+            financing_rate=self.config.get("financing_rate"),
         )
 
     # ── main ──
@@ -267,8 +275,8 @@ class Phase2Runner:
         # Base cost
         base = run_segment(c, v, a, w_seg, t, self.leverage, self.base_cost)
 
-        # +50% cost
-        stressed_cost = CostModel(
+        # +50% cost (above floor — formal_cost_model allows upward stress)
+        stressed_cost = formal_cost_model(
             buy_cost=self.base_cost.buy_cost * 1.5,
             sell_cost=self.base_cost.sell_cost * 1.5,
             financing_rate=self.base_cost.financing_rate * 1.5,

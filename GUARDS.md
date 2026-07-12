@@ -19,7 +19,7 @@
 | 测试发现完整 | P1 | `check_test_discovery.py` | 全量收集 `test_*.py`，杜绝漏跑的手工清单 |
 | R-DATA-001 禁用旧口径 | P0 | `check_no_legacy_data.py` | AST 禁代码 import data_full / 从 data_full 目录读盘(放过注释/口径标签/迁移目录) |
 | amount 单位口径 | P0 | `check_amount_units.py` | 正式路径重建 amount 禁 `volume×100×price`；canonical = `lake.units.implied_amount`(share×raw) |
-| R-COST-001 正式成本 | P0 | `check_cost_model_usage.py` | 正式策略/workflow 禁非正 stock 腿成本 |
+| R-COST-001 正式成本 | P0 | `check_cost_model_usage.py` | 正式策略/workflow 禁 stock 腿费率低于 canonical 地板(买 0.225%/卖 0.275%;含 0 与乐观低正值) |
 | R-ARCH-002 生产层隔离 | P1 | `check_layer_deps.py`(覆盖) | production 禁 import research 在依赖图内强制 |
 | Git 禁止一锅端 | P1 | 人工 diff | 多 agent 共享工作树必守，无脚本可代替 |
 

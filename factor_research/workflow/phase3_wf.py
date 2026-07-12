@@ -29,7 +29,14 @@ from typing import Callable, Optional
 import numpy as np
 import pandas as pd
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
+from core.engine import (
+    BacktestEngine,
+    BacktestConfig,
+    Signal,
+    PricePanel,
+    CostModel,
+    formal_cost_model,
+)
 from strategies.small_cap import load_price_panels as load_data
 from governance.holdout import boundary, assert_search_clean
 
@@ -95,10 +102,11 @@ class WF3Runner:
         self.top_n = self.config.get("top_n", 25)
         self.rebalance = self.config.get("rebalance_days", 20)
         self.leverage = self.config.get("leverage", 1.25)
-        self.cost = CostModel(
-            buy_cost=self.config.get("buy_cost", 0.00225),
-            sell_cost=self.config.get("sell_cost", 0.00275),
-            financing_rate=self.config.get("financing_rate", 0.065),
+        # R-COST-001 / audit #8: config cannot undercut canonical floors.
+        self.cost = formal_cost_model(
+            buy_cost=self.config.get("buy_cost"),
+            sell_cost=self.config.get("sell_cost"),
+            financing_rate=self.config.get("financing_rate"),
         )
 
     def run(self, warmup_start: str = "2010-01-01") -> dict:
