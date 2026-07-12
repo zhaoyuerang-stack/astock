@@ -314,7 +314,7 @@ def execute_to_target(acc, date, target, top_n, names, trades, blocked, leverage
         if bond_requested or has_legacy_holding:
             blocked.append(bond_authorization_block(bond))
     target = set(target)
-    # 1. 卖出:持仓中不在 target 的(掉出名单),用 date 开盘价
+    # 1. 卖出:持仓中不在 target 的(掉出名单),成交价=FILL_PRICE_MODE(默认 close)
     for code in list(acc["positions"]):
         if code in target:
             continue
@@ -341,7 +341,7 @@ def execute_to_target(acc, date, target, top_n, names, trades, blocked, leverage
             trades.append([date, held["code"], held.get("name", held["code"]), "SELL", held["shares"],
                            round(price, 3), round(notional, 2), round(cost, 2), round(acc["cash"], 2)])
             acc["bond"] = None
-    # 3. 买入:target 中未持有的(新进名单),等权 total_equity/top_n,用 date 开盘价
+    # 3. 买入:target 中未持有的(新进名单),等权 total_equity/top_n;成交价=FILL_PRICE_MODE
     pos_value = sum(p["shares"] * (get_close(c, date) or p["avg_cost"]) for c, p in acc["positions"].items())
     budget_each = (acc["cash"] + pos_value) * leverage / top_n
     for code in target:
