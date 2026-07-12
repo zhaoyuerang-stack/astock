@@ -541,6 +541,17 @@ class Phase4Register:
         if (p2 or {}).get("cost_sensitivity", {}).get("verdict") == "FAIL":
             return "Phase 2 cost sensitivity FAIL"
 
+        # Phase 2: OOS/IS decay FAIL? (过拟合塌陷——此前只写 lesson 仍可登记「候选」)
+        if (p2 or {}).get("oos_is_decay", {}).get("verdict") == "FAIL":
+            dc = (p2 or {}).get("oos_is_decay", {})
+            ratio = dc.get("ratio")
+            detail = dc.get("detail")
+            if ratio is not None:
+                return f"Phase 2 oos_is_decay FAIL (OOS/IS ratio={float(ratio):.2f})"
+            if detail:
+                return f"Phase 2 oos_is_decay FAIL ({detail})"
+            return "Phase 2 oos_is_decay FAIL"
+
         # Phase 2: correlation FAIL?
         if (p2 or {}).get("correlation", {}).get("verdict") == "FAIL":
             return "Phase 2 correlation FAIL"
