@@ -78,9 +78,16 @@ def run_l2(
     rebalance_freq: str = "20D",
     factor: pd.DataFrame | None = None,
 ) -> Experiment:
-    """L2 multi-regime: 跑同 L1 的 backtest，按 regime 切片报告。"""
+    """L2 multi-regime: 跑同 L1 的 backtest，按 regime 切片报告。
+
+    Holdout: 入口强制 assert_search_clean——不得依赖调用方截断。
+    """
     check_f1_economic_thesis(hyp)
     check_f2_cheap_first(hyp.status, ExperimentProtocol.L2_MULTI_REGIME)
+
+    from .holdout_guard import assert_factory_panels_clean
+
+    assert_factory_panels_clean(close, volume, amount, label="factory L2")
 
     t0 = time.time()
 

@@ -57,7 +57,13 @@ def _dispatch_args(deps: tuple[str, ...], close, volume, amount) -> list[pd.Data
 
 
 def precompute_forward_returns(close: pd.DataFrame, horizon: int = 20) -> pd.DataFrame:
-    """T 日因子 vs T+1..T+horizon 收益率（shift -horizon 对齐）。"""
+    """T 日因子 vs T+1..T+horizon 收益率（shift -horizon 对齐）。
+
+    入口自带 holdout 闸:禁止用含金库期的 close 预计算 forward 偷看样本外。
+    """
+    from .holdout_guard import assert_factory_panels_clean
+
+    assert_factory_panels_clean(close, label="factory precompute_forward_returns")
     return close.pct_change(horizon).shift(-horizon)
 
 
@@ -75,9 +81,18 @@ def run_l0(
     """运行单 Hypothesis 的 L0 IC scan。
 
     sample_dates: 若给定，从 forward_ret 等距抽样 N 个日期跑（更快但精度下降）。
+
+    Holdout: 入口强制 assert_search_clean(close/forward_ret)——不得依赖调用方截断。
+    HoldoutBreach 在 try 外抛出,不得被吞成 DISCARD 后继续用脏数据算 IC。
     """
     check_f1_economic_thesis(hyp)
     check_f2_cheap_first(hyp.status, ExperimentProtocol.L0_IC_SCAN)
+
+    from .holdout_guard import assert_factory_panels_clean
+
+    assert_factory_panels_clean(
+        close, volume, amount, forward_ret, label="factory L0",
+    )
 
     t0 = time.time()
 

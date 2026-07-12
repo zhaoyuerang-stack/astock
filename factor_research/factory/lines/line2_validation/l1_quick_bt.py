@@ -62,9 +62,15 @@ def run_l1(
 
     direction: +1 → long top, -1 → long bottom (来自 L0 ICIR 符号)。
     start: 短窗口（默认 2020 至今），求快不求全。
+
+    Holdout: 入口强制 assert_search_clean(close 等)——不得依赖调用方截断。
     """
     check_f1_economic_thesis(hyp)
     check_f2_cheap_first(hyp.status, ExperimentProtocol.L1_QUICK_BT)
+
+    from .holdout_guard import assert_factory_panels_clean
+
+    assert_factory_panels_clean(close, volume, amount, label="factory L1")
 
     t0 = time.time()
 

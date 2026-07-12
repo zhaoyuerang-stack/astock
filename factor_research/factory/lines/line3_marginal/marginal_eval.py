@@ -124,7 +124,13 @@ def run_candidate_returns(
     start: str = "2018-01-01",
     config: StrategyConfig = StrategyConfig(),
 ) -> pd.Series:
-    """跑候选 hypothesis 的 daily returns，按 config 决定 top_n/timing/rebal。"""
+    """跑候选 hypothesis 的 daily returns，按 config 决定 top_n/timing/rebal。
+
+    Holdout: 入口强制 assert_search_clean——边际评分不得用金库期数据。
+    """
+    from factory.lines.line2_validation.holdout_guard import assert_factory_panels_clean
+
+    assert_factory_panels_clean(close, volume, amount, label="factory marginal returns")
     fn = _resolve_factor_fn(hyp.factor_fn_name)
     args = _dispatch_args(hyp.data_dependencies, close, volume, amount)
     factor = fn(*args, **hyp.factor_params)
@@ -210,7 +216,17 @@ def evaluate_candidate(
       1. 按 GRADE_PRIORITY 升序（P 最优，SHELVE 最差）
       2. 同 grade 按 regime_weighted_score 降序
     这样 LIVE_D 配置也能浮出来（即使有别的 cfg 跑出 SHELVE）。
+
+    Holdout: 入口强制 assert_search_clean(close 等 + live_returns 索引)。
     """
+    from factory.lines.line2_validation.holdout_guard import assert_factory_panels_clean
+    from governance.holdout import assert_search_clean
+
+    assert_factory_panels_clean(close, volume, amount, label="factory evaluate_candidate")
+    for name, series in (live_returns or {}).items():
+        if series is not None and len(series):
+            assert_search_clean(series.index, label=f"factory evaluate_candidate live:{name}")
+
     t0 = time.time()
     grid = config_grid or DEFAULT_CONFIG_GRID
 

@@ -83,9 +83,15 @@ def run_l3(
     """L3 walk-forward = 按年切片稳定性测试。
 
     跑全期回测一次，按 calendar year 切 → 每年独立算 metrics。
+
+    Holdout: 入口强制 assert_search_clean——不得依赖调用方截断。
     """
     check_f1_economic_thesis(hyp)
     check_f2_cheap_first(hyp.status, ExperimentProtocol.L3_WALK_FORWARD)
+
+    from .holdout_guard import assert_factory_panels_clean
+
+    assert_factory_panels_clean(close, volume, amount, label="factory L3")
 
     t0 = time.time()
 
