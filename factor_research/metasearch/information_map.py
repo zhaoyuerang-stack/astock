@@ -176,7 +176,9 @@ def main():
     px = load_prices(start="2018-01-01", fields=("close", "volume"))
     raw = load_raw_close(start="2018-01-01")
     close, volume = px["close"], px["volume"]
-    amount = volume * 100 * raw.reindex(index=volume.index, columns=volume.columns)
+    from lake.units import implied_amount
+
+    amount = implied_amount(volume, raw)
     print(f"  {close.shape}, {time.time()-t0:.1f}s")
 
     # ── Candidate ICs ──

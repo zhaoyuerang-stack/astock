@@ -77,8 +77,8 @@ def make_synthetic_clean():
     volume = pd.DataFrame(vol_data, index=dates)
     volume.iloc[EV_START - 10:, volume.columns.get_loc("000003")] = 0
 
-    # Amount = volume × 100 × raw_close (correct)
-    amount = volume * 100 * raw_close
+    # Amount = volume(share) × raw_close (canonical lake units)
+    amount = volume * raw_close
 
     # ---- Event: +10% limit-up at ev_start+5 ----
     gap_idx = EV_START + 5
@@ -89,7 +89,7 @@ def make_synthetic_clean():
         ri = raw_close.columns.get_loc(s)
         prev_r = raw_close[s].iloc[gap_idx - 1]
         raw_close.iloc[gap_idx, ri] = prev_r * 1.10
-    amount = volume * 100 * raw_close
+    amount = volume * raw_close
 
     # ---- Fundamental: avail_date at ev_start ----
     # Use a MASSIVE value (10.0 = 1000% growth) so the fundamental signal
@@ -125,7 +125,7 @@ def make_synthetic_leaky():
 
     result = dict(clean)
     result["timing_clean"] = timing_leaky
-    result["amount"] = volume * 100 * close  # ← adjusted close!
+    result["amount"] = volume * close  # ← adjusted close (wrong price base)!
     return result
 
 
@@ -337,7 +337,7 @@ class Phase1Checker:
     # ── Check 3: amount 公式 ──
 
     def _check_amount_formula(self, syn: dict) -> CheckResult:
-        """Amount = volume × 100 × raw_close, NOT adjusted close.
+        """Amount = volume(share) × raw_close, NOT adjusted close.
 
         Tests the INPUT data provided to factor_builder. Since all
         factors in this codebase accept amount as a pre-computed parameter
@@ -348,8 +348,8 @@ class Phase1Checker:
         raw_close = syn["raw_close"]
         amount = syn["amount"]
 
-        expected = volume * 100 * raw_close
-        wrong = volume * 100 * close
+        expected = volume * raw_close
+        wrong = volume * close
 
         diff_raw = float((amount - expected).abs().max().max())
         diff_adj = float((amount - wrong).abs().max().max())
@@ -361,16 +361,16 @@ class Phase1Checker:
         matches_adj = diff_adj < tol
 
         if matches_adj and not matches_raw:
-            return CheckResult("amount_formula", "amount = vol×100×raw_close", "FAIL",
+            return CheckResult("amount_formula", "amount = vol×raw_close", "FAIL",
                                f"Amount uses ADJUSTED close (diff vs raw={diff_raw:.1f}, "
                                f"vs adj={diff_adj:.4f}). Cross-sectional ranking is contaminated.",
                                {"diff_vs_raw": diff_raw, "diff_vs_adj": diff_adj})
         elif matches_raw:
-            return CheckResult("amount_formula", "amount = vol×100×raw_close", "PASS",
+            return CheckResult("amount_formula", "amount = vol×raw_close", "PASS",
                                f"Amount uses raw_close correctly (diff={diff_raw:.4f}).",
                                {"diff_vs_raw": diff_raw})
         else:
-            return CheckResult("amount_formula", "amount = vol×100×raw_close", "WARN",
+            return CheckResult("amount_formula", "amount = vol×raw_close", "WARN",
                                f"Amount formula unclear (raw_diff={diff_raw:.1f}, adj_diff={diff_adj:.1f}).",
                                {"diff_vs_raw": diff_raw, "diff_vs_adj": diff_adj})
 
@@ -536,7 +536,7 @@ class Phase1Checker:
 def _suggest_fix(check_id: str) -> str:
     return {
         "timing_peek": "Add .shift(1) to timing: timing = (condition).shift(1).",
-        "amount_formula": "Use amount = volume * 100 * raw_close, not adjusted close.",
+        "amount_formula": "Use amount = volume * raw_close (shares × CNY/share), not adjusted close.",
         "fund_alignment": "Use load_fundamental_panel() which aligns via avail_date→ffill.",
         "warmup": "Load data from ≥2yr before backtest start for rolling window warmup.",
         "delisted": "Ensure data pipeline includes delisted stocks from meta/delisted_codes.",

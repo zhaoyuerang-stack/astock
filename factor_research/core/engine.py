@@ -68,8 +68,8 @@ class PricePanel:
     used to be passed around between modules.
     """
     close: pd.DataFrame          # adjusted close (for return calculation)
-    volume: pd.DataFrame         # in 手 (×100 for shares)
-    amount: pd.DataFrame         # turnover in CNY  (volume*100*raw_close)
+    volume: pd.DataFrame         # shares (canonical data-lake unit; not 手)
+    amount: pd.DataFrame         # turnover in CNY  (volume × raw_close; see lake.units.implied_amount)
     raw_close: Optional[pd.DataFrame] = None  # unadjusted close (for valuation / order sizing)
     # 注:曾有 raw_open 字段(暗示开盘成交)但引擎从不读取 → 已删,避免误导。执行契约 = T+1 收盘
     # (见下方 Signal.execution_timing);若要 T+1 开盘/VWAP 成交须新增 T_PLUS_1_OPEN 分支 + 立 ADR。

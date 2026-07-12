@@ -29,10 +29,12 @@ from factors.utils import safe_zscore, mad_clip
 
 
 print("Loading...", flush=True)
+from lake.units import implied_amount
+
 px = load_prices(start="2010-01-01", fields=("close", "volume"))
 raw = load_raw_close(start="2010-01-01")
 close, volume = px["close"], px["volume"]
-amount = volume * 100 * raw.reindex(index=volume.index, columns=volume.columns)
+amount = implied_amount(volume, raw)
 prices = PricePanel(close=close, volume=volume, amount=amount)
 ret_a = close.pct_change(fill_method=None).abs()
 illiq = (ret_a / (amount.replace(0, np.nan) + 1)).rolling(20).mean()

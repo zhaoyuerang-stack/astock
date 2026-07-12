@@ -40,6 +40,11 @@ echo "=== check_no_legacy_data.py (R-DATA-001 禁代码 import/加载 data_full 
 python3 scripts/ci/check_no_legacy_data.py
 
 echo ""
+echo ""
+echo "=== check_amount_units.py (成交额单位 share×raw，禁 volume×100×price) ==="
+python3 scripts/ci/check_amount_units.py
+
+echo ""
 echo "=== test_loop_foundations.py (防自欺地基:trial账本 + holdout金库) ==="
 python3 tests/test_loop_foundations.py
 

@@ -24,7 +24,7 @@ def _synthetic_data(T=150, N=30, seed=42):
     
     close = pd.DataFrame(10.0 * np.exp(np.cumsum(rng.normal(0, 0.01, (T, N)), axis=0)), index=dates, columns=codes)
     volume = pd.DataFrame(rng.integers(1000, 5000, (T, N)), index=dates, columns=codes)
-    amount = volume * 100 * close
+    amount = volume * close
     
     # Generate a dummy factor
     factor = pd.DataFrame(rng.normal(0, 1, (T, N)), index=dates, columns=codes)

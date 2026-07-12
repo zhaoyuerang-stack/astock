@@ -48,10 +48,12 @@ class StrategyConfig:
 
 def load_price_panels(start="2010-01-01"):
     """Load close/volume/amount panels.  Amount uses unadjusted price."""
+    from lake.units import implied_amount
+
     px = load_prices(start=start, fields=("close", "volume"))
     raw = load_raw_close(start=start)
     raw = raw.reindex(index=px["volume"].index, columns=px["volume"].columns)
-    amount = px["volume"] * 100 * raw
+    amount = implied_amount(px["volume"], raw)
     close, volume = px["close"], px["volume"]
     # Truncate tail where raw prices lag (causing NaN amount on latest days)
     valid = amount.notna().sum(axis=1)

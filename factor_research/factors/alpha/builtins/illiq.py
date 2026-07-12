@@ -6,7 +6,7 @@ AmihudIlliq  Illiq = mean(|ret| / amount) over window.  Classic definition.
 SizeProxy     -ln(avg_amount + 1).  Simplified version used in the report.
               Correlated ~0.9 with market cap.  Positive = smaller stocks.
 
-Both use amount = volume(手) × 100 × raw_close(元) from FactorData.
+Both use amount in CNY from FactorData (canonical: volume shares × raw_close).
 """
 import numpy as np
 import pandas as pd

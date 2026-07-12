@@ -176,18 +176,18 @@ def main():
     import argparse
 
     from lake.load_lake import load_prices, load_raw_close
-
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", action="store_true",
                     help="落机器可读冗余簇到 metasearch/redundancy_clusters.json")
     ap.add_argument("--json-path", default=None, help="自定义 JSON 输出路径")
     args = ap.parse_args()
+    from lake.units import implied_amount
 
     print("Loading data lake...")
     px = load_prices(start="2018-01-01", fields=("close", "volume"))
     raw = load_raw_close(start="2018-01-01")
     close, volume = px["close"], px["volume"]
-    amount = volume * 100 * raw.reindex(index=volume.index, columns=volume.columns)
+    amount = implied_amount(volume, raw)
     print(f"  {close.shape}")
 
     ics = audit_hypothesis_pool(close, volume, amount, max_hyps=30)

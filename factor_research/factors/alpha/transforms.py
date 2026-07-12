@@ -116,13 +116,14 @@ def make_factor_data(start: str = "2010-01-01") -> "FactorData":
     from lake.load_lake import load_prices, load_raw_close, load_industry, load_market_cap
     from factors.alpha.base import FactorData
 
+    from lake.units import implied_amount
+
     px = load_prices(start=start, fields=("close", "volume"))
     raw = load_raw_close(start=start)
     close, volume = px["close"], px["volume"]
 
-    # Amount = volume(手) × 100 × raw_close(元)
-    raw_aligned = raw.reindex(index=close.index, columns=close.columns)
-    amount = volume * 100.0 * raw_aligned
+    # canonical: volume=share, amount=CNY = volume × raw_close (no ×100 hands conversion)
+    amount = implied_amount(volume, raw)
 
     # Industry / market cap
     ind = load_industry()
