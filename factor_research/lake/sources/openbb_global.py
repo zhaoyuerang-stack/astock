@@ -116,9 +116,10 @@ class OpenBBGlobalProvider:
             raise ProviderUnavailable(f"OpenBB fetch mapping is not configured for dataset_id={spec.dataset_id}")
         return self._fetch_prices(spec, start=start, end=end, adjustment_override=adjustment_override)
 
-    @staticmethod
-    def _provider_symbol(symbol: str, *, dataset_id: str) -> str:
+    def _provider_symbol(self, symbol: str, *, dataset_id: str) -> str:
         if dataset_id == "fx_daily":
+            if self.source and self.source.source_id == "global_fmp_fx_v1":
+                return symbol
             return symbol if symbol.endswith("=X") else f"{symbol}=X"
         return symbol
 
@@ -143,7 +144,7 @@ class OpenBBGlobalProvider:
         if not symbols:
             raise ProviderUnavailable(f"{self.source.source_id} has no allowlist for {spec.dataset_id}")
         is_cboe = self.source.source_id == "global_cboe_us_price_v1"
-        is_fmp = self.source.source_id == "global_fmp_us_price_v1"
+        is_fmp = self.source.source_id.startswith("global_fmp_")
         if adjustment_override and not is_fmp:
             raise ProviderUnavailable(f"adjustment_override is unsupported for {self.source.source_id}")
         provider_symbols = list(symbols) if is_cboe else [self._provider_symbol(symbol, dataset_id=spec.dataset_id) for symbol in symbols]
@@ -217,7 +218,15 @@ class OpenBBGlobalProvider:
         }[spec.dataset_id]
         out = pd.DataFrame({
             "symbol": frame["symbol"].astype(str),
-            "exchange": "CBOE_US" if is_cboe else "FMP_US" if is_fmp else exchange,
+            "exchange": (
+                "CBOE_US"
+                if is_cboe
+                else "FMP_FX"
+                if is_fmp and spec.dataset_id == "fx_daily"
+                else "FMP_US"
+                if is_fmp
+                else exchange
+            ),
             "session_date": session_dates,
             # The source has only a date-level timestamp; this is deliberately
             # later than the unknown source close, never an asserted close time.

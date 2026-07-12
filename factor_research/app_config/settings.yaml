@@ -21,7 +21,7 @@ data:
   warmup_start: "2010-01-01"
   default_start: "2018-01-01"
 
-# 全球多资产数据层:ALFRED 与 yfinance 价格源已准入为本地研究用途，仍非生产阻塞。
+# 全球多资产数据层:ALFRED、CBOE、FMP 股票/外汇已准入为本地研究用途，仍非生产阻塞。
 # 凭证只从运行环境 FRED_API_KEY 读取，数据不得再分发。
 global_data:
   enabled: true
@@ -46,15 +46,20 @@ global_data:
       license_status: approved
       license_checked_at: "2026-07-12"
       allowed_use: research_only
-    global_yfinance_fx_v1:
+    global_fmp_fx_v1:
       admission_status: approved
       license_status: approved
       license_checked_at: "2026-07-12"
       allowed_use: research_only
+    global_yfinance_fx_v1:
+      admission_status: planned
+      license_status: pending
+      license_checked_at: "pending"
+      allowed_use: research_only
     global_yfinance_commodity_v1:
-      admission_status: approved
-      license_status: approved
-      license_checked_at: "2026-07-12"
+      admission_status: planned
+      license_status: pending
+      license_checked_at: "pending"
       allowed_use: research_only
   max_daily_failures: 0
 

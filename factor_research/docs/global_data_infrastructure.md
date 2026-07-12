@@ -52,12 +52,17 @@ Current local admission:
   verified US stock allowlist as a second-source review path when `FMP_API_KEY`
   is present. ETF review is not admitted because the current entitlement returns
   `402 premium endpoint` on the ETF path.
+- `global_fmp_fx_v1`: OpenBB/FMP daily FX source, enabled for the verified
+  `EURUSD/USDJPY/USDCNY/GBPUSD/AUDUSD/USDCHF` allowlist. Real probes succeeded
+  with naked pair symbols such as `EURUSD`; the adapter must not append
+  yfinance-style `=X`.
 - `global_yfinance_fx_v1` and `global_yfinance_commodity_v1`: OpenBB/yfinance
-  daily price sources, enabled for
-  the documented research allowlists. Their timestamps are date-level, so canonical
-  availability is conservatively delayed to the end of the source day. Equity and ETF
-  prices are split-adjusted only; they are valid for returns research, not valuation
-  calculations that require unadjusted prices.
+  daily price sources kept as planned fallbacks only. yfinance FX was rate-limited
+  in local probes, and commodity historical coverage is still unverified under the
+  current OpenBB surface. Their timestamps are date-level, so canonical availability
+  is conservatively delayed to the end of the source day. Equity and ETF prices are
+  split-adjusted only; they are valid for returns research, not valuation calculations
+  that require unadjusted prices.
 - `global_etf_price_v1`: global ETF proxy allowlist, `research_only`. OpenBB remains
   an optional probe/provider route, but no ETF source is admitted until it supplies
   exchange, session-close, currency and corporate-action semantics required by the

@@ -147,6 +147,8 @@ def _normalize_price(
         retrieved_at=retrieved_at,
         ingest_id=ingest_id,
     )
+    if spec.dataset_id == "fx_daily":
+        out["pair"] = out["symbol"].astype(str)
     # Pandas may materialize scalar bools as numpy.bool_.  Treat only actual
     # boolean values as adjustment flags; string truthy values stay invalid
     # for the validator rather than becoming silently adjusted prices.

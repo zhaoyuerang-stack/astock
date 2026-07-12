@@ -67,8 +67,9 @@ def test_repository_settings_admit_alfred_as_auxiliary_research_data():
     assert admission["license_status"] == "approved"
     assert admission["allowed_use"] == "research_only"
     assert global_data.source_admissions["global_cboe_us_price_v1"]["admission_status"] == "approved"
-    assert global_data.source_admissions["global_yfinance_fx_v1"]["admission_status"] == "approved"
-    assert global_data.source_admissions["global_yfinance_commodity_v1"]["admission_status"] == "approved"
+    assert global_data.source_admissions["global_fmp_fx_v1"]["admission_status"] == "approved"
+    assert global_data.source_admissions["global_yfinance_fx_v1"]["admission_status"] == "planned"
+    assert global_data.source_admissions["global_yfinance_commodity_v1"]["admission_status"] == "planned"
 
 
 def test_global_dataset_registry_declares_required_pit_metadata():
@@ -213,6 +214,52 @@ def test_openbb_yfinance_maps_prices_and_fx_to_conservative_canonical_raw_frames
     assert fx_raw.iloc[0]["currency"] == "PAIR"
 
 
+def test_openbb_fmp_fx_preserves_native_pair_symbols():
+    from dataclasses import replace
+
+    from lake.global_catalog import get_dataset_spec, get_source_spec
+    from lake.sources.openbb_global import OpenBBGlobalProvider
+
+    calls = []
+
+    class Result:
+        def __init__(self, symbol):
+            self.symbol = symbol
+
+        def to_df(self):
+            return pd.DataFrame(
+                {
+                    "open": [1.03], "high": [1.04], "low": [1.02], "close": [1.025],
+                    "volume": [1000.0], "symbol": [self.symbol],
+                },
+                index=pd.DatetimeIndex(["2025-01-02"], name="date"),
+            )
+
+    class Historical:
+        def __call__(self, **kwargs):
+            calls.append(kwargs)
+            return Result(kwargs["symbol"])
+
+    class App:
+        class currency:
+            class price:
+                historical = Historical()
+
+    source = replace(
+        get_source_spec("global_fmp_fx_v1"),
+        admission_status="approved", license_status="approved", license_checked_at="2026-07-12",
+    )
+    provider = OpenBBGlobalProvider(importer=lambda _: App(), source=source)
+    raw = provider.fetch(get_dataset_spec("fx_daily"), start="2025-01-01", end="2025-01-03")
+
+    assert [call["symbol"] for call in calls] == ["EURUSD", "USDJPY", "USDCNY", "GBPUSD", "AUDUSD", "USDCHF"]
+    assert all(call["provider"] == "fmp" for call in calls)
+    assert raw.iloc[0]["symbol"] == "EURUSD"
+    assert raw.iloc[0]["exchange"] == "FMP_FX"
+    assert bool(raw.iloc[0]["is_adjusted"]) is False
+    assert raw.iloc[0]["adjustment_version"] == "fmp_unadjusted_v1"
+
+
 def test_openbb_fmp_adjustment_override_marks_review_frame_as_adjusted():
     from dataclasses import replace
 
@@ -291,6 +338,15 @@ def test_fmp_source_is_admitted_only_for_verified_stock_panel():
     assert source.allowlist_for("etf_daily") == ()
 
 
+def test_fmp_fx_source_is_admitted_for_verified_pair_panel():
+    from lake.global_catalog import get_source_spec
+
+    source = get_source_spec("global_fmp_fx_v1")
+
+    assert source.datasets == ("fx_daily",)
+    assert source.allowlist_for("fx_daily") == ("EURUSD", "USDJPY", "USDCNY", "GBPUSD", "AUDUSD", "USDCHF")
+
+
 def test_global_writer_manifest_and_price_loader(tmp_path):
     from lake.global_catalog import get_dataset_spec, get_source_spec
     from lake.global_data import load_global_price_panel
@@ -348,6 +404,50 @@ def test_global_writer_manifest_and_price_loader(tmp_path):
     )
     assert list(close.columns) == ["QQQ", "SPY"]
     assert close.loc[pd.Timestamp("2026-07-07"), "SPY"] == 621.5
+
+
+def test_fx_writer_manifest_and_price_loader_uses_pair_symbol_column(tmp_path):
+    from dataclasses import replace
+
+    from lake.global_catalog import get_dataset_spec, get_source_spec
+    from lake.global_data import load_global_price_panel
+    from lake.global_normalizers import normalize_global_frame
+    from lake.global_validator import validate_global_frame
+    from lake.global_writer import read_global_manifest, write_validated_global_dataset
+
+    spec = get_dataset_spec("fx_daily")
+    source = replace(
+        get_source_spec("global_fmp_fx_v1"),
+        admission_status="approved", license_status="approved", license_checked_at="2026-07-12",
+    )
+    raw = pd.DataFrame({
+        "session_date": ["2026-07-07", "2026-07-08"],
+        "symbol": ["EURUSD", "EURUSD"],
+        "exchange": ["FMP_FX", "FMP_FX"],
+        "session_close_at": ["2026-07-07T23:59:59Z", "2026-07-08T23:59:59Z"],
+        "available_at": ["2026-07-07T23:59:59Z", "2026-07-08T23:59:59Z"],
+        "open": [1.07, 1.08],
+        "high": [1.08, 1.09],
+        "low": [1.06, 1.07],
+        "close": [1.075, 1.085],
+        "volume": [1000, 1100],
+        "is_adjusted": [False, False],
+        "adjustment_version": ["fmp_unadjusted_v1", "fmp_unadjusted_v1"],
+        "currency": ["PAIR", "PAIR"],
+    })
+    canonical = normalize_global_frame(raw, source=source, spec=spec, ingest_id="fx-unit")
+    validation = validate_global_frame(canonical, source=source, spec=spec)
+    assert validation.rejected is False
+    write_validated_global_dataset(validation, source=source, spec=spec, ingest_id="fx-unit", root=tmp_path)
+
+    manifest = read_global_manifest(root=tmp_path)
+    assert manifest["datasets"]["fx_daily"]["coverage"]["received"] == 1
+    assert manifest["datasets"]["fx_daily"]["coverage"]["missing"] == [
+        "AUDUSD", "GBPUSD", "USDCHF", "USDCNY", "USDJPY"
+    ]
+    panel = load_global_price_panel("fx_daily", root=tmp_path, adjustment_basis="raw")
+    assert list(panel.columns) == ["EURUSD"]
+    assert panel.loc[pd.Timestamp("2026-07-08"), "EURUSD"] == 1.085
 
 
 def test_adjusted_only_price_source_rejects_raw_price_loader(tmp_path):
@@ -534,6 +634,41 @@ def test_update_global_data_selects_configured_yfinance_source_over_planned_sour
 
     assert result["ok"] is True
     assert result["detail"]["etf_daily"]["source_id"] == "global_yfinance_us_price_v1"
+
+
+def test_update_global_data_prefers_admitted_fmp_fx_source(tmp_path):
+    from scripts.data.update_global_data import run_global_update
+
+    class FakeProvider:
+        def probe(self, spec):
+            return {"ok": True, "provider": "fake", "dataset_id": spec.dataset_id, "status": "available"}
+
+        def fetch(self, spec, *, start=None, end=None, adjustment_override=None):
+            return pd.DataFrame({
+                "date": ["2026-07-07"],
+                "symbol": ["EURUSD"],
+                "exchange": ["FMP_FX"],
+                "session_close_at": ["2026-07-07T23:59:59Z"],
+                "available_at": ["2026-07-07T23:59:59Z"],
+                "open": [1.07],
+                "high": [1.08],
+                "low": [1.06],
+                "close": [1.075],
+                "volume": [1000],
+                "is_adjusted": [False],
+                "adjustment_version": ["fmp_unadjusted_v1"],
+                "currency": ["PAIR"],
+            })
+
+    result = run_global_update(
+        root=tmp_path,
+        dataset_ids=["fx_daily"],
+        provider=FakeProvider(),
+        start="2026-07-07",
+    )
+
+    assert result["ok"] is True
+    assert result["detail"]["fx_daily"]["source_id"] == "global_fmp_fx_v1"
 
 
 def test_update_global_data_dry_run_does_not_write_manifest(tmp_path):
