@@ -240,6 +240,16 @@ def sample_quality_check():
 
 
 def compute_update_health(report: dict) -> dict:
+    """Split this-run update outcomes into core vs auxiliary.
+
+    Core (affects ``core_update_ok`` / ``update_failed_but_data_fresh``):
+      · price (价量)
+      · fundamental
+      · global only when ``required=true``
+
+    Auxiliary (never blocks price-lake freshness; can only yield ``partial_ok``):
+      · ETF, raw OHLC, tushare incremental dims, non-required global
+    """
     price_ok = report.get("price_update", {}).get("ok", True)
     fundamental_ok = report.get("fundamental_update", {}).get("ok", True)
     etf_ok = report.get("etf_update", {}).get("ok", True)
@@ -248,6 +258,7 @@ def compute_update_health(report: dict) -> dict:
     global_update = report.get("global_data_update", {}) or {}
     global_update_ok = global_update.get("ok", True)
     global_update_required = bool(global_update.get("required", False))
+    # Global is core only when explicitly required; otherwise auxiliary-only.
     core_update_ok = price_ok and fundamental_ok and (global_update_ok or not global_update_required)
     aux_update_ok = etf_ok and raw_ok and tushare_inc_ok and global_update_ok
     required_update_ok = global_update_ok or not global_update_required
@@ -265,19 +276,63 @@ def compute_update_health(report: dict) -> dict:
     }
 
 
+def is_price_data_fresh(after_latest, expected) -> bool:
+    """Price-lake freshness only — never gated on ETF / tushare / global update flags."""
+    return expected is not None and after_latest is not None and after_latest >= expected
+
+
+def should_emit_signal(*, fresh: bool, force: bool = False) -> bool:
+    """Signal emission depends on lake freshness (or force), not this-run update success."""
+    return bool(fresh or force)
+
+
+def is_update_failed_but_data_fresh(*, fresh: bool, core_update_ok: bool) -> bool:
+    """Core update failed this run, but existing lake data still meets expected trade day."""
+    return bool(fresh and not core_update_ok)
+
+
 def compute_final_status(
     *,
     fresh: bool,
     signal_ok: bool,
     aux_update_ok: bool,
     required_update_ok: bool = True,
+    core_update_ok: bool = True,
     force: bool = False,
 ) -> str:
+    """Map update/freshness/signal outcomes to day-report status.
+
+    Contract:
+      · required global failure → ``failed`` (hard)
+      · not fresh and not force → ``failed`` (no signal)
+      · fresh (or force) + signal_ok + all updates ok → ``ok``
+      · fresh (or force) + signal_ok + core and/or aux update fail → ``partial_ok``
+        (includes ``update_failed_but_data_fresh``: price update blew up but lake still fresh)
+      · fresh but signal not generated → ``failed``
+    """
     if not required_update_ok:
         return "failed"
-    if (fresh or force) and signal_ok:
-        return "ok" if aux_update_ok else "partial_ok"
-    return "failed"
+    if not (fresh or force):
+        return "failed"
+    if not signal_ok:
+        return "failed"
+    if core_update_ok and aux_update_ok:
+        return "ok"
+    return "partial_ok"
+
+
+def exit_code_for_status(status: str) -> int:
+    """launchd treats non-zero as job failure/alarm.
+
+    ``ok`` and ``partial_ok`` both exit 0 so aux/core-degraded-but-signaled days
+    do not page as hard failures. ``skipped_*`` time/dedupe gates also exit 0;
+    lock contention exits 2.
+    """
+    if status in ("ok", "partial_ok", "skipped_already_ok", "skipped_before_china_time"):
+        return 0
+    if status == "skipped_locked":
+        return 2
+    return 1
 
 
 def attach_production_readiness(report):
@@ -637,8 +692,8 @@ def run_daily_update(args):
                 report["expected_trade_date_source"] = expected_source
                 after_latest = actual_latest_price_date()
                 report["latest_after_update"] = str(after_latest.date()) if after_latest is not None else None
-                # freshness 仅基于核心价量数据(price/daily)，ETF/raw 是辅助数据，失败不阻断信号
-                fresh = expected is not None and after_latest is not None and after_latest >= expected
+                # freshness 仅基于核心价量数据(price/daily)，ETF/raw/tushare/global 失败不阻断
+                fresh = is_price_data_fresh(after_latest, expected)
                 report["data_fresh"] = bool(fresh)
 
                 # 区分核心更新失败 vs 辅助更新失败。全球数据默认辅助,仅 required=true 时进入核心。
@@ -653,7 +708,9 @@ def run_daily_update(args):
                 aux_update_ok = update_health["aux_update_ok"]
                 required_update_ok = update_health["required_update_ok"]
 
-                report["update_failed_but_data_fresh"] = bool(fresh and not core_update_ok)
+                report["update_failed_but_data_fresh"] = is_update_failed_but_data_fresh(
+                    fresh=bool(fresh), core_update_ok=bool(core_update_ok),
+                )
                 report["aux_update_partial"] = bool(not aux_update_ok)
                 if not etf_ok:
                     etf_detail = report.get("etf_update", {}).get("detail", {})
@@ -668,6 +725,9 @@ def run_daily_update(args):
                     failed_dims = [d for d, v in gd_detail.items() if not (v or {}).get("ok")]
                     required = report.get("global_data_update", {}).get("required", False)
                     print(f"[freshness] global 数据部分失败({failed_dims}),required={required}")
+                if report["update_failed_but_data_fresh"]:
+                    print("[freshness] core update failed but lake still fresh "
+                          "→ will still attempt signal (update_failed_but_data_fresh)")
                 print(f"[freshness] after={report['latest_after_update']} fresh={fresh} "
                       f"price_ok={price_ok} etf_ok={etf_ok} raw_ok={raw_ok} "
                       f"tushare_inc_ok={tushare_inc_ok} global_ok={global_update_ok}")
@@ -681,7 +741,7 @@ def run_daily_update(args):
                 print(f"[readiness] allowed={readiness.allowed} "
                       f"blocking={readiness.blocking_reasons} warnings={readiness.warnings}")
 
-                if fresh or args.force:
+                if should_emit_signal(fresh=bool(fresh), force=bool(args.force)):
                     run_report_nlp(report, dry_run=args.dry_run)
                     run_signal(report, dry_run=args.dry_run)
                     run_factor_health(report, dry_run=args.dry_run)
@@ -696,16 +756,17 @@ def run_daily_update(args):
                     print("[signal] skip because data is stale")
 
                 signal_ok = bool(report.get("signal", {}).get("generated") or args.dry_run)
-                # ok = 核心数据新鲜 + 信号生成；partial_ok = 信号生成但辅助更新有失败
+                # ok = 全量更新成功 + 新鲜 + 信号; partial_ok = 信号已出但本轮 core/aux 有失败
                 report["status"] = compute_final_status(
                     fresh=bool(fresh),
                     signal_ok=signal_ok,
                     aux_update_ok=bool(aux_update_ok),
                     required_update_ok=bool(required_update_ok),
+                    core_update_ok=bool(core_update_ok),
                     force=bool(args.force),
                 )
-                # partial_ok 仍返回 0(不触发 launchd 报警),failed 返回 1
-                return 0 if report["status"] in ("ok", "partial_ok") else 1
+                # partial_ok → exit 0 (launchd 不报警); failed → 1
+                return exit_code_for_status(report["status"])
             except Exception as exc:
                 report["status"] = "failed"
                 report["error"] = str(exc)

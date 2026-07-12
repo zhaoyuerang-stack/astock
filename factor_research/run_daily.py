@@ -145,6 +145,21 @@ def build_rotation_payload(regime: str, defensive_auth: dict | None) -> dict:
     return payload
 
 
+def try_update_prices_best_effort() -> dict:
+    """Best-effort price update for standalone ``run_daily`` invocations.
+
+    Never raises: update failure is a soft warning. Callers continue with
+    existing lake data; production signal gating remains readiness/freshness
+    (not "update failed → abort").
+    """
+    try:
+        from scripts.data import update_lake
+        update_lake.update_prices()
+        return {"ok": True}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc), "error_type": type(exc).__name__}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-update", action="store_true")
@@ -167,14 +182,13 @@ def main():
     )
     print("=" * 60)
 
-    # ① 增量更新数据
+    # ① 增量更新数据（失败只 warn，继续用湖内现有数据出信号；
+    #    是否允许出正式信号由 readiness/data_stale 兜底，不是更新失败即停）
     if not args.no_update:
         print("\n[1/6] 增量更新价量数据...")
-        try:
-            from scripts.data import update_lake
-            update_lake.update_prices()
-        except Exception as e:
-            print(f"  ⚠️ 更新失败({str(e)[:50]})，用现有数据继续")
+        update_result = try_update_prices_best_effort()
+        if not update_result.get("ok"):
+            print(f"  ⚠️ 更新失败({str(update_result.get('error', ''))[:50]})，用现有数据继续")
     else:
         print("\n[1/6] 跳过数据更新(--no-update)")
 

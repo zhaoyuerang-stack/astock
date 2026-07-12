@@ -410,13 +410,15 @@ def test_e2e_compute_final_status_respects_fresh_from_canonical(tmp_path: Path, 
     expected = pd.Timestamp("2026-07-10")
     fresh = bool(after is not None and after >= expected)
     assert SDU.compute_final_status(
-        fresh=fresh, signal_ok=True, aux_update_ok=True, required_update_ok=True,
+        fresh=fresh, signal_ok=True, aux_update_ok=True,
+        required_update_ok=True, core_update_ok=True,
     ) == "failed"
 
     expected_ok = pd.Timestamp("2026-07-01")
     fresh_ok = bool(after is not None and after >= expected_ok)
     assert SDU.compute_final_status(
-        fresh=fresh_ok, signal_ok=True, aux_update_ok=True, required_update_ok=True,
+        fresh=fresh_ok, signal_ok=True, aux_update_ok=True,
+        required_update_ok=True, core_update_ok=True,
     ) == "ok"
 
 
