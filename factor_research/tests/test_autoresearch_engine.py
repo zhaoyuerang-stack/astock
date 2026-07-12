@@ -278,6 +278,7 @@ def test_lite_engine_logs_discard_shelve_and_promote_without_registry_write():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         repo = CandidateRepository(root / "candidates.jsonl")
+        log = ExperimentLog(root / "experiment_log.jsonl")
         review = ReviewQueue(root / "review_queue.jsonl")
 
         good = validate_candidate_ast(_candidate())
@@ -304,6 +305,7 @@ def test_lite_engine_logs_discard_shelve_and_promote_without_registry_write():
                 "exposure_similarity": 0.2,
             },
             repository=repo,
+            experiment_log=log,
             review_queue=review,
         )
         assert result.decision == CandidateDecision.PROMOTE
@@ -335,6 +337,7 @@ def test_lite_engine_logs_discard_shelve_and_promote_without_registry_write():
                 "exposure_similarity": 0.8,
             },
             repository=repo,
+            experiment_log=log,
             review_queue=review,
         )
         assert shelved.decision == CandidateDecision.SHELVE
@@ -353,6 +356,7 @@ def test_lite_engine_logs_discard_shelve_and_promote_without_registry_write():
             l1_metrics={},
             redundancy_inputs={},
             repository=repo,
+            experiment_log=log,
             review_queue=review,
         )
         assert discarded.decision == CandidateDecision.DISCARD
@@ -617,12 +621,16 @@ def test_human_review_approve_reject_without_registry_write():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         repo = CandidateRepository(root / "candidates.jsonl")
+        log = ExperimentLog(root / "experiment_log.jsonl")
         review = ReviewQueue(root / "review_queue.jsonl")
 
         approved_cand = validate_candidate_ast(_candidate())
         rejected_cand = validate_candidate_ast(_candidate(weight=0.6))
         for cand in (approved_cand, rejected_cand):
-            result = evaluate_lite(cand, repository=repo, review_queue=review, **promote_kwargs)
+            result = evaluate_lite(
+                cand, repository=repo, experiment_log=log,
+                review_queue=review, **promote_kwargs,
+            )
             assert result.decision == CandidateDecision.PROMOTE
         assert len(review.pending()) == 2
 
@@ -685,9 +693,13 @@ def test_promote_approved_candidate_gates_and_calls_workflow_promote():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         repo = CandidateRepository(root / "candidates.jsonl")
+        log = ExperimentLog(root / "experiment_log.jsonl")
         review = ReviewQueue(root / "review_queue.jsonl")
         cand = validate_candidate_ast(_candidate())
-        evaluate_lite(cand, repository=repo, review_queue=review, **promote_kwargs)
+        evaluate_lite(
+            cand, repository=repo, experiment_log=log,
+            review_queue=review, **promote_kwargs,
+        )
 
         # 未 approve 不允许入册
         try:
@@ -728,9 +740,13 @@ def test_review_approve_auto_promote_submits_shadow_job():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         repo = CandidateRepository(root / "candidates.jsonl")
+        log = ExperimentLog(root / "experiment_log.jsonl")
         review = ReviewQueue(root / "review_queue.jsonl")
         cand = validate_candidate_ast(_candidate())
-        evaluate_lite(cand, repository=repo, review_queue=review, **promote_kwargs)
+        evaluate_lite(
+            cand, repository=repo, experiment_log=log,
+            review_queue=review, **promote_kwargs,
+        )
 
         item = review_autoresearch_candidate(
             fingerprint=cand.fingerprint,
@@ -774,9 +790,13 @@ def test_auto_promote_shadow_updates_review_queue_and_never_active():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         repo = CandidateRepository(root / "candidates.jsonl")
+        log = ExperimentLog(root / "experiment_log.jsonl")
         review = ReviewQueue(root / "review_queue.jsonl")
         cand = validate_candidate_ast(_candidate())
-        evaluate_lite(cand, repository=repo, review_queue=review, **promote_kwargs)
+        evaluate_lite(
+            cand, repository=repo, experiment_log=log,
+            review_queue=review, **promote_kwargs,
+        )
         review_autoresearch_candidate(fingerprint=cand.fingerprint, action="approve", repository=repo, review_queue=review)
 
         resp = promote_approved_candidate(
@@ -830,9 +850,13 @@ def test_auto_promote_failure_marks_retryable_promote_failed():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         repo = CandidateRepository(root / "candidates.jsonl")
+        log = ExperimentLog(root / "experiment_log.jsonl")
         review = ReviewQueue(root / "review_queue.jsonl")
         cand = validate_candidate_ast(_candidate())
-        evaluate_lite(cand, repository=repo, review_queue=review, **promote_kwargs)
+        evaluate_lite(
+            cand, repository=repo, experiment_log=log,
+            review_queue=review, **promote_kwargs,
+        )
         review_autoresearch_candidate(fingerprint=cand.fingerprint, action="approve", repository=repo, review_queue=review)
 
         try:
@@ -929,6 +953,8 @@ def test_island_search_mutation_stays_in_whitelist_and_search_is_deterministic()
             close, volume, amount, forward_ret,
             vintage_id="synthetic",
             n_islands=2, generations=2, population=4, top_k=3, rng_seed=7,
+            # 隔离:只验 |ICIR|+novelty 排序(默认 corr/orth/turnover 已开)
+            corr_weight=0.0, orth_weight=0.0, turnover_weight=0.0,
             repository=CandidateRepository(root / "candidates.jsonl"),
             experiment_log=ExperimentLog(root / "experiment_log.jsonl"),
             review_queue=ReviewQueue(root / "review_queue.jsonl"),
@@ -1012,6 +1038,8 @@ def test_island_fitness_blends_novelty_with_icir():
             close, volume, amount, forward_ret,
             vintage_id="synthetic",
             n_islands=2, generations=1, population=4, top_k=4, rng_seed=7,
+            # 隔离新颖性:关掉默认 corr/orth/turnover(审计#11 默认已开)
+            corr_weight=0.0, orth_weight=0.0, turnover_weight=0.0,
             runners={"l0": fake_l0},
             repository=CandidateRepository(root / "candidates.jsonl"),
             experiment_log=ExperimentLog(root / "experiment_log.jsonl"),
@@ -1092,7 +1120,7 @@ def test_island_fitness_penalizes_turnover():
             close, volume, amount, forward_ret,
             vintage_id="synthetic",
             n_islands=2, generations=1, population=4, top_k=4, rng_seed=7,
-            novelty_weight=0.0, corr_weight=0.0, turnover_weight=1.0,
+            novelty_weight=0.0, corr_weight=0.0, orth_weight=0.0, turnover_weight=1.0,
             runners={"l0": fake_l0},
             repository=CandidateRepository(root / "candidates.jsonl"),
             experiment_log=ExperimentLog(root / "experiment_log.jsonl"),
@@ -1140,8 +1168,9 @@ def test_island_fitness_penalizes_correlation_to_book():
         result = run_island_search(
             close, volume, amount, forward_ret,
             vintage_id="synthetic",
-            n_islands=2, generations=1, population=4, top_k=4, rng_seed=7,
-            novelty_weight=0.0, corr_weight=1.0, rediscovery_corr=0.0,  # 隔离软罚,关硬闸
+            n_islands=2, generations=1, population=4, top_k=100, rng_seed=7,
+            novelty_weight=0.0, corr_weight=1.0, orth_weight=0.0, turnover_weight=0.0,
+            rediscovery_corr=0.0,  # 隔离软罚,关硬闸
             reference_panels=[book_panel],
             runners={"l0": fake_l0},
             repository=CandidateRepository(root / "candidates.jsonl"),
@@ -1222,8 +1251,8 @@ def test_rediscovery_gate_zeros_edge_above_corr_threshold():
         result = run_island_search(
             close, volume, amount, forward_ret,
             vintage_id="synthetic",
-            n_islands=2, generations=1, population=4, top_k=4, rng_seed=7,
-            novelty_weight=0.0, corr_weight=1.0, turnover_weight=0.0,
+            n_islands=2, generations=1, population=4, top_k=100, rng_seed=7,
+            novelty_weight=0.0, corr_weight=1.0, orth_weight=0.0, turnover_weight=0.0,
             rediscovery_corr=0.5, reference_panels=[book_panel],
             runners={"l0": fake_l0},
             repository=CandidateRepository(root / "candidates.jsonl"),
@@ -1326,6 +1355,7 @@ def test_read_views_expose_candidates_and_review_queue():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         repo = CandidateRepository(root / "candidates.jsonl")
+        log = ExperimentLog(root / "experiment_log.jsonl")
         review = ReviewQueue(root / "review_queue.jsonl")
         candidate = validate_candidate_ast(_candidate())
         evaluate_lite(
@@ -1351,6 +1381,7 @@ def test_read_views_expose_candidates_and_review_queue():
                 "exposure_similarity": 0.2,
             },
             repository=repo,
+            experiment_log=log,
             review_queue=review,
         )
 
@@ -1491,6 +1522,7 @@ def test_island_fitness_penalizes_complexity():
             n_islands=2, generations=1, population=4, top_k=4, rng_seed=7,
             runners={"l0": fake_l0},
             complexity_weight=0.1,
+            corr_weight=0.0, orth_weight=0.0, turnover_weight=0.0,
             repository=CandidateRepository(root / "candidates.jsonl"),
             experiment_log=ExperimentLog(root / "experiment_log.jsonl"),
             review_queue=ReviewQueue(root / "review_queue.jsonl"),

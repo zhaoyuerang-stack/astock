@@ -1,15 +1,15 @@
 """多岛屿进化搜索:在受控 DSL 空间内变异/交叉/迁移。
 
 每个岛屿独立进化(各自 rng),周期性把最优个体迁移到邻岛——岛屿模型
-保多样性、防全局早熟。适应度四项(同一套 canonical 验证线,绝无第二套口径):
-  |ICIR|                          真实 run_l0 的独立 edge
+保多样性、防全局早熟。适应度(同一套 canonical 验证线,绝无第二套口径):
+  |ICIR_nw|                       真实 run_l0 的独立 edge(NW 诚实量级)
   + novelty_weight × 行为新颖性    vs 已评估候选+参考池的最近邻行为距离(因子形态)
-  − corr_weight × 对在册组合相关    候选 top-N 收益与在册腿同涨同跌→罚,反相关(防御腿)→奖
-  − turnover_weight × 换手代理      top-N 成员相邻期流失率→罚,把 L1 的成本压力前置
+  − corr_weight × 对在册残差相关  候选 top-N 与在册腿**扣市场后**偏相关(默认 0.3)
+  − orth_weight × 风格暴露        size/流动性截面相关(默认 0.2,防 book 风格回流)
+  − turnover_weight × 换手代理    top-N 成员流失率(默认 0.15)
   [硬闸] 对在册相关 ≥ rediscovery_corr → |ICIR| 归零(边际为零,不让高 IC 重发现霸榜)
-只奖绩效必然同质坍缩;新颖性填未占领的行为生态位;边际项填组合相关空洞
-(伪多样性审计:在册 5 股票腿 0.76 相关);换手项防"高 IC 高换手在 L1 被成本杀"
-(成本约 12pp/年),并抵消去去相关项对反转(高换手)的偏好。冠军可再走更深的 L1~L3。
+默认开启 corr/orth/turnover——corr_weight=0 曾只追 IC、易重复发现 book 风格(审计#11)。
+显式传 0 可关单项(测试隔离)。冠军可再走更深的 L1~L3。
 
 全程确定性:同 rng_seed + 同数据 → 同搜索轨迹(实验可复现)。
 """
@@ -605,10 +605,12 @@ def run_island_search(
     rng_seed: int = 7,
     sample_dates: int | None = 120,
     novelty_weight: float = 0.25,
-    corr_weight: float = 0.0,
-    turnover_weight: float = 0.0,
+    # 默认开启去相关/正交(与 services.actions.autoresearch_search 生产口径对齐)。
+    # corr_weight=0 曾导致搜索只追 IC,重复发现 book 风格(审计#11)。
+    corr_weight: float = 0.3,
+    turnover_weight: float = 0.15,
     complexity_weight: float = 0.0,
-    orth_weight: float = 0.0,
+    orth_weight: float = 0.2,
     stability_weight: float = 0.0,
     use_algebraic_proxies: bool = False,
     multi_fidelity: bool = False,
@@ -642,8 +644,38 @@ def run_island_search(
       - 新颖性(行为距离):候选因子形态与之雷同 → 压分;
       - 边际贡献(corr_weight>0):候选 top-N 收益与在册腿同涨同跌 → 罚,反相关(防御腿)→ 奖。
     传入面板必须与 close 同口径(walk-forward 下即已截断的训练面板)。
-    novelty_weight=0 退回纯绩效;corr_weight=0 不计边际(向后兼容)。
+    默认 corr_weight/orth_weight/turnover_weight>0;显式传 0 才关闭对应项(测试隔离用)。
+    reference_panels/style_panels 缺省且权重>0 时尝试自动加载在册/风格面板;
+    加载失败则该项惩罚静默为 0 并打印警告(合成测试可无湖数据)。
     """
+    from governance.holdout import assert_search_clean
+    assert_search_clean(close.index, label="AutoResearch island search")
+    assert_search_clean(forward_ret.index, label="AutoResearch island forward returns")
+
+    # 默认正交:权重>0 但调用方未给参考面板 → 尝试加载生产口径(失败不阻断搜索)
+    if corr_weight > 0 and not reference_panels:
+        try:
+            from services.actions.autoresearch_search import active_book_panels
+            reference_panels = active_book_panels(close, volume, amount)
+        except Exception as exc:
+            print(
+                f"[fitness] corr_weight={corr_weight} 但在册参考面板不可用"
+                f"({type(exc).__name__}: {str(exc)[:80]});相关惩罚本轮=0",
+                flush=True,
+            )
+            reference_panels = []
+    if orth_weight > 0 and not style_panels:
+        try:
+            from services.actions.autoresearch_search import _style_panels
+            style_panels = _style_panels(close)
+        except Exception as exc:
+            print(
+                f"[fitness] orth_weight={orth_weight} 但风格面板不可用"
+                f"({type(exc).__name__}: {str(exc)[:80]});风格正交惩罚本轮=0",
+                flush=True,
+            )
+            style_panels = []
+
     # 因子面板 memo 搜索内有效:清空以隔离上一次 run / 不同数据口径(防陈旧命中)
     from factors.autoresearch_dsl import clear_factor_cache
     clear_factor_cache()

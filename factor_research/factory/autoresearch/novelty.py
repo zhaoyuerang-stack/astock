@@ -186,16 +186,21 @@ def _partial_corr(cxy: float, cxm: float, cym: float) -> float | None:
 def partial_correlation_to_book(
     cand_ret: pd.Series, ref_returns: list[pd.Series], market_ret: pd.Series,
 ) -> float:
-    """根因#2:扣市场偏相关 —— 候选与在册腿"控制市场共同暴露后"的有符号最大相关。
+    """根因#2 / 审计#11:扣市场**残差相关**(偏相关),非 raw 收益相关。
 
     raw 相关把"两腿都只是在跟大盘"误判成冗余,也会让"靠抵消市场暴露藏共同赌注"的一对
     漏判(各自对市场 beta 相反,raw corr 被漂白成低值,但策略层赌的是同一个东西)。
-    先算 corr(候选,市场)、corr(在册腿,市场),再用偏相关公式扣掉市场共同分量。
+    先算 corr(候选,市场)、corr(在册腿,市场),再用偏相关公式扣掉市场共同分量
+    ——等价于各自对市场回归后残差序列的相关。
 
-    market_ret 方差退化(如未传市场代理)→ 退回 raw 相关(向后兼容,不返回 None)。
+    市场代理方差可用时优先偏相关(残差相关)。偏相关分母退化(至少一方被市场
+    完全解释)时:若 raw |corr|≈1 视为**同赌纯 beta 的冗余**(c=raw),否则跳过该腿
+    ——不得把"残差无定义"静默成 0 洗白重发现。
+    仅当 market 全程方差退化才整体退回 max_return_correlation(raw)。
     取 max(同 max_return_correlation,对应 novelty 最近邻语义);无可比参考 → 0.0。
     """
     best = None
+    market_usable = False
     for rr in ref_returns:
         df = pd.concat(
             {"x": cand_ret, "y": rr, "m": market_ret}, axis=1, join="inner",
@@ -208,12 +213,24 @@ def partial_correlation_to_book(
         cxy = float(x.corr(y))
         if cxy != cxy:
             continue
-        c = cxy
         if m.std() > 0:
+            market_usable = True
             cxm, cym = float(x.corr(m)), float(y.corr(m))
-            if cxm == cxm and cym == cym:
-                partial = _partial_corr(cxy, cxm, cym)
-                if partial is not None:
-                    c = partial
+            if cxm != cxm or cym != cym:
+                continue
+            partial = _partial_corr(cxy, cxm, cym)
+            if partial is not None:
+                c = partial
+            elif abs(cxy) >= 0.99:
+                # 残差空间退化 + 收益几乎共线 → 同质 beta 赌注,计为冗余
+                c = cxy
+            else:
+                continue
+        else:
+            c = cxy
         best = c if best is None else max(best, c)
-    return best if best is not None else 0.0
+    if best is not None:
+        return best
+    if not market_usable:
+        return max_return_correlation(cand_ret, ref_returns)
+    return 0.0

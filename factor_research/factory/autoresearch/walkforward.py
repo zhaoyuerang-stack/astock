@@ -80,6 +80,8 @@ def run_walk_forward_search(
 
     cutoff_ts = pd.Timestamp(cutoff)
     end_ts = pd.Timestamp(oos_end) if oos_end else close.index[-1]
+    from governance.holdout import assert_search_clean
+    assert_search_clean(end_ts, label="AutoResearch walk-forward OOS")
     if not (close.index[0] < cutoff_ts < end_ts):
         raise ValueError(f"cutoff must fall inside data range: {close.index[0].date()} < {cutoff} < {end_ts.date()}")
     oos_dates = close.index[(close.index > cutoff_ts) & (close.index <= end_ts)]
@@ -96,7 +98,8 @@ def run_walk_forward_search(
     train_forward = precompute_forward_returns(train_close)
     train_vintage = f"{vintage_id}|train<={cutoff_ts.date()}"
     # 在册参考面板只在截断后的训练面板上构造(防未来:不让 cutoff 后收益进选择)
-    if reference_builder is not None and island_kw.get("corr_weight", 0) > 0:
+    # 与 run_island_search 默认 corr_weight=0.3 对齐;显式 0 才跳过参考面板构建
+    if reference_builder is not None and float(island_kw.get("corr_weight", 0.3) or 0) > 0:
         island_kw = {**island_kw,
                      "reference_panels": reference_builder(train_close, train_volume, train_amount)}
     search = run_island_search(
