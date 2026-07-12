@@ -311,6 +311,43 @@
 
 ---
 
+### ADR-032 对冲家族 long 腿零成本事故重述（R-COST-001，2026-07-10）
+- **上下文**：`large-cap-growth-hedged` 与 `hq-momentum-hedged` 的历史策略实现只收了对冲年费/择时切换摩擦，却把 long 股票腿的 `buy_cost/sell_cost/financing_rate` 显式设为 0。受影响的不是口述中的 5 个，而是台账内完整的 **6 个版本**：large-cap 的 v1.0/v1.0-full/v1.1/v1.1-full，以及 hq-momentum 的 v1.0/v1.0-full。旧 notes/admission 中的正收益和组合边际叙述因此不能继续作准入证据。
+- **决策**：
+  1. 两个正式策略 runner 的 long 腿统一使用 `core.engine.CostModel()`（买 0.225%、卖 0.275%、融资 6.5%）；对冲年费与切换摩擦仍在策略层另收，不能互相替代。
+  2. 新增 `scripts/repair/restate_hedged_execution_costs.py`：默认 dry-run，只有显式 `--apply` 才写台账；以真实 runner 重算，选择证据严格截在 holdout boundary 之前，不使用旧 notes 或旧缓存生成指标。
+  3. 台账只能经 `strategy_registry.restate_execution_costs()` 重述。该窄 API 强制 canonical cost、有限数指标、完整 audit id/收益摘要/source hash，并保留版本 status、Nine-Gate 与 data scope；旧 diversifier rationale 标记为 `INVALIDATED_BY_COST_RESTATEMENT`，不得用于重新准入。
+  4. 本次不把成本重述冒充 Nine-Gate 复审或组合边际复审；所有版本保留原「退役/参考」生命周期状态。若未来要重新在册，必须用修正成本从组合边际开始重跑完整证据链。
+  5. Nine-Gate 与策略 runner 必须共同调用 `core.hedged_portfolio.HedgedReturnPolicy`；Gate 4/5/6/7/7A 和持久化 `version_returns` 都复现 benchmark short、hedge carry、neutral-NAV timing 与 switch friction。发现的 6 份 long-only 旧缓存已由最终策略收益原子替换。
+- **真实重算结果**（样本均止于 2024-12-31，全部 `hit=False`）：
+
+  | 版本 | 样本起点 | 年化 | 最大回撤 | Sharpe |
+  | --- | --- | ---: | ---: | ---: |
+  | hq-momentum-hedged/v1.0 | 2023-01-03 | -5.52% | -20.01% | -0.40 |
+  | hq-momentum-hedged/v1.0-full | 2012-01-04 | -10.67% | -79.13% | -0.77 |
+  | large-cap-growth-hedged/v1.0 | 2023-01-03 | -3.73% | -9.08% | -1.27 |
+  | large-cap-growth-hedged/v1.0-full | 2010-01-05 | -1.52% | -25.00% | -0.37 |
+  | large-cap-growth-hedged/v1.1 | 2023-01-03 | -2.06% | -10.80% | -0.56 |
+  | large-cap-growth-hedged/v1.1-full | 2012-01-04 | -1.06% | -29.07% | -0.19 |
+
+- **理由**：成本口径错误不能只补文档；必须让历史记分牌、准入叙述和可复现证据同步失效。保留旧记录在每个版本的 `evidence.execution_cost_restatements[].prior_record` 中，既不抹历史，也不允许错误数字继续充当有效事实。
+- **验证**：先执行不写台账的 dry-run，确认 4 次唯一策略执行覆盖 6 个版本；再以 `--apply` 真实重跑并由 canonical API 写入。共享 hedged policy 在真实湖上与两个策略 runner 各核对 850 日，最大绝对误差均为 0；最终缓存 digest、台账 metrics 与重算收益逐项一致。每条审计记录包含 return digest、long-leg cost digest/总额、数据湖 manifest fingerprint 和最终源码 bundle SHA-256。相关单元测试覆盖全量枚举、dry-run 不写、生命周期/Nine-Gate 不变、幂等重放、非 canonical 成本拒绝、零 long-leg 成本拒绝与 hedged replay 漂移 fail-closed。
+
+---
+
+
+### ADR-033 成本分层 + 融资利率统一 + ADV 研究冲击（R-COST-001，2026-07-12）
+- **上下文**：正式 `CostModel` 地板（买 0.225%/卖 0.275%）作为防自欺研究成本是正确的，但 (1) 文档融资写 5%、代码 6.5% 漂移；(2) 小盘/大盘/ETF 共用一套正式费率，易用 ETF 低费率达标；(3) Gate 6 的 ADV 平方根冲击只活在 `nine_gates` 内联代码，未沉淀为研究层可复用模块，也未写清「不可反推降低正式地板」。
+- **决策**：
+  1. **融资利率统一为 6.5%/年**（`CANONICAL_FINANCING_RATE=0.065`）；`cost_model.md` 删除 5% 表述，以代码为准。
+  2. **宇宙分层**（`core/cost_tiers.py`）：`small_cap` 正式地板；`large_cap` 正式**仍须**地板（不可因大盘流动性下调）；`etf` 仅 `research_cost_for_universe` 敏感性（如 5bp），`formal_cost_for_universe("etf")` 直接 raise。
+  3. **ADV 冲击研究层**（`core/cost_impact.py`）：在已扣正式 CostModel 的净收益上叠加 `Y·vol·√participation` 与 1–5 日拆单；Gate 6 改为调用该模块。ADV 结果**不得**用于证明正式 buy/sell 可低于地板。
+  4. 正式入册/phase2/3/promote 路径不改费率数值本身，只封死分层误用与文档漂移。
+- **理由**：研究成本模型的正确目标是防假 alpha，不是复刻最优券商账单；分层让大盘/ETF 对照成为可能，同时禁止用对照档偷换入册证据。
+- **验证**：`pytest tests/test_cost_tiers_and_impact.py tests/test_cost_model_guard.py -q`；`scripts/ci/check_cost_model_usage.py`。
+
+---
+
 ## ③ 投资/交易决策记录
 
 > 实盘/模拟盘的逐日决策**已自动落盘**:`factor_research/signals/<date>.json`(信号)+ Obsidian `30.output/A股v2.0模拟盘/`(操作卡)。本节只记**需人工复盘的关键决策**(regime 切换、风控动作、异常),不重复日常信号。
@@ -327,4 +364,3 @@
 | 2026-07-05 | — | 修复 Composite 双重平移与 NaN 漏洞，重构引入 small-cap-size v2.0，策略被 7B 时滞衰减一票否决 | 还原真实 T-1 绩效（年化跃升至18.76%/夏普1.28/回撤-11.46%），7B时滞衰减超标（0.58 > 0.40） | REJECTED 登记入册，严格打标，禁止带病上线 |
 
 > 复盘要点(填):切换是否过频(regime 无滞回)、成本损耗是否超预期、事后是否印证。损耗超预期 → 立新假设走研究流程,不私改口径。
-

@@ -639,84 +639,25 @@ class NineGatesEvaluator:
             reasons.append(f"High transaction cost sensitivity: 3x costs degrade returns by {decay_rate:.1%}")
             verdict = "FAIL"
 
-        # 2. Capacity Curve Modeling
-        # We model market impact cost as a linear-quadratic participation function of ADV:
-        # Extra Slippage = 0.05 * (Trade Size / ADV)
-        # Scales: 5M, 50M, 500M, 2B
-        aum_scales = [5_000_000, 50_000_000, 500_000_000, 2_000_000_000]
-        capacity_results = {}
-        
-        # Precompute 20-day rolling Average Daily Volume (ADV) in CNY
-        adv = self.prices.amount.rolling(20).mean()
-        
-        # Precompute 20-day rolling daily volatility of each stock
-        daily_ret = self.prices.close.pct_change(fill_method=None)
-        vol_20d = daily_ret.rolling(20).std().fillna(0.02) # default to 2% daily vol if NaN
-        
-        for scale in aum_scales:
-            # Re-run standard backtest but manually apply AUM-dependent market impact cost
-            # Extract weight differences to estimate trade size
-            weights = self._get_weights(signal)
-            w_diff = weights.diff().abs().fillna(0.0)
-            
-            # Estimate daily trading size in CNY
-            trade_cny = w_diff * scale
-            
-            # Align with ADV
-            adv_aligned = adv.reindex_like(trade_cny)
-            
-            # Participation rate
-            participation = trade_cny / (adv_aligned + 1.0)
-            participation = participation.clip(lower=0.0, upper=0.5)
-            
-            # 1. Square-Root Market Impact Law:
-            # Impact = Y * Vol * sqrt(Participation)  where Y = 1.0 (standard buy-side multiplier)
-            single_day_slippage = 1.0 * vol_20d.reindex_like(participation) * np.sqrt(participation)
-            
-            # 2. Multi-Day Order Splitting Optimization:
-            # Cost(N) = single_day_slippage / sqrt(N) + (N - 1) * alpha_decay
-            # We assume a daily alpha decay of 0.001 (10 bps/day) for delayed execution
-            alpha_decay = 0.001
-            costs = []
-            for n in range(1, 6):
-                c = single_day_slippage / np.sqrt(n) + (n - 1) * alpha_decay
-                costs.append(c)
-            stacked = np.stack([c.values for c in costs], axis=0)
-            min_cost = np.min(stacked, axis=0)
-            impact_slippage = pd.DataFrame(min_cost, index=single_day_slippage.index, columns=single_day_slippage.columns)
-            
-            # Aggregated daily portfolio impact cost
-            # Sum(stock_slippage * stock_weight)
-            daily_impact = (impact_slippage * weights).sum(axis=1)
-            
-            # Adjust original returns
-            net_rets = res_1x.returns - daily_impact.reindex(res_1x.returns.index).fillna(0.0)
-            
-            ann = net_rets.mean() * 252
-            vol = net_rets.std() * np.sqrt(252)
-            sr = ann / vol if vol > 0 else 0.0
-            dd = ((1 + net_rets).cumprod() / (1 + net_rets).cumprod().cummax() - 1).min()
-            
-            capacity_results[str(scale)] = {
-                "annual": float(ann),
-                "sharpe": float(sr),
-                "maxdd": float(dd)
-            }
-            
+        # 2. Capacity Curve Modeling (research-layer ADV impact overlay).
+        # Formal CostModel floors already paid in res_1x; ADV impact is additive
+        # and must never justify undercutting those floors (R-COST-001 / cost_impact).
+        from core.cost_impact import capacity_curve, summarize_capacity_limit
+
+        weights = self._get_weights(signal)
+        capacity_results = capacity_curve(
+            base_returns=res_1x.returns,
+            amount=self.prices.amount,
+            close=self.prices.close,
+            weights=weights,
+        )
         metrics["capacity_curve"] = capacity_results
-        
-        # Decision: AUM capacity threshold (AUM where Sharpe falls below 0.5)
-        capacity_limit_reached = False
-        for scale in sorted(aum_scales):
-            perf = capacity_results[str(scale)]
-            if perf["sharpe"] < 0.5 or perf["annual"] < 0.05:
-                capacity_limit_reached = True
-                metrics["capacity_limit_aum"] = scale
-                reasons.append(f"Capacity limit reached at {scale/1e6:.1f}M: Net Sharpe={perf['sharpe']:.2f}, Return={perf['annual']:.1%}")
-                break
-                
-        if not capacity_limit_reached:
-            metrics["capacity_limit_aum"] = aum_scales[-1]
+
+        limit_aum, cap_reasons = summarize_capacity_limit(capacity_results)
+        reasons.extend(cap_reasons)
+        metrics["capacity_limit_aum"] = (
+            float(limit_aum) if limit_aum is not None else 0.0
+        )
 
         passed = (verdict != "FAIL")
         details = (
