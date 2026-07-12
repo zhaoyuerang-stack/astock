@@ -34,17 +34,95 @@ REGISTRY = Path(__file__).parent / "strategy_versions.json"
 
 # 双轨准入：唯一允许长期占用「在册」的两条轨。
 #   standalone  —— 单体达标（hit=True：年化>15% 且 回撤<20%）+ DSR 多重测试惩罚下显著（dsr_p<DSR_ALPHA）
-#   diversifier —— 单体不达标但作为组合分流器（负相关 / 对组合夏普有正增量），须 rationale 佐证
-# DSR 仅卡 standalone：diversifier 凭组合边际而非单体统计显著性入册，不受此门约束。
+#   diversifier —— 单体不达标但作为组合分流器：须 rationale + 机械边际证据
+#                  (corr_to_book / residual_sharpe，见 _validate_diversifier_admission)
+# DSR 仅卡 standalone：diversifier 凭组合边际而非单体统计显著性入册，不受 DSR 门约束，
+# 但仍须通过残差夏普与相关硬闸（禁止「任意非空字符串」橡皮图章）。
 ADMISSION_TRACKS = ("standalone", "diversifier")
 
 # standalone 准入的 DSR（Deflated Sharpe Ratio）多重测试惩罚显著性阈值。
 # 来源 R-OBJECTIVE-001 / 9-Gate G8：单体达标(hit)不等于经得起搜索惩罚，dsr_p>=此值即多重测试下不显著。
 DSR_ALPHA = 0.05
 
+# diversifier 机械门槛 —— 与 governance.marginal 同口径（避免 import 环，数值在此钉死并测对齐）。
+# |corr| ≥ 此 → 与在册 book 同质，不得以 diversifier 入册。
+DIVERSIFIER_MAX_ABS_CORR = 0.7
+# 残差夏普（去 book beta 后年化夏普）须 ≥ 此 → 确有边际 alpha。
+DIVERSIFIER_MIN_RESIDUAL_SHARPE = 0.5
+
 # 设计上即为「对冲分流器」的母策略：单体低收益 + 与主力负相关，靠组合层增量入册（diversifier 轨）。
 # 仅这两族的对冲假设里显式写了「等额做空…对冲 Beta」并实测负相关，故迁移时自动归类为 diversifier。
 DIVERSIFIER_FAMILIES = {"large-cap-growth-hedged", "hq-momentum-hedged"}
+
+
+def _is_finite_number(value) -> bool:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    return value == value and value not in (float("inf"), float("-inf"))
+
+
+def _validate_diversifier_admission(family: str, version: str, adm: dict) -> None:
+    """diversifier「在册」硬闸：禁止仅靠非空 rationale / 手填 corr 入册。
+
+    必填：
+      · rationale（人类可读）
+      · corr_to_book / residual_sharpe 数值门槛
+      · admission.marginal_receipt：把机械字段与 family/version + research-ledger
+        run_id/entry_hash 绑定的结构化收据（改数须重开收据）
+
+    evidence_status=INVALIDATED_* 禁止再占「在册」。
+    """
+    from research_ledger.receipts import (
+        MARGINAL_RECEIPT_KEY,
+        verify_marginal_receipt_self_consistent,
+    )
+
+    tag = f"{family}/{version}"
+    rationale = (adm.get("rationale") or "").strip()
+    if not rationale:
+        raise ValueError(
+            f"{tag} diversifier 准入要求 rationale（负相关 / 组合夏普增量的文字依据）。")
+
+    evidence_status = str(adm.get("evidence_status") or "")
+    if evidence_status.startswith("INVALIDATED"):
+        raise ValueError(
+            f"{tag} diversifier 证据已作废(evidence_status={evidence_status!r})，"
+            f"不得再登记为「在册」。请重算边际后写新 admission 或降 status。")
+
+    corr = adm.get("corr_to_book")
+    residual_sharpe = adm.get("residual_sharpe")
+    if not _is_finite_number(corr):
+        raise ValueError(
+            f"{tag} diversifier 准入须提供数值 admission.corr_to_book"
+            f"（对在册组合日收益相关，来自 governance.marginal.marginal_alpha 或等价）。"
+            f"禁止仅用 rationale 字符串入册。")
+    if not _is_finite_number(residual_sharpe):
+        raise ValueError(
+            f"{tag} diversifier 准入须提供数值 admission.residual_sharpe"
+            f"（去 book beta 后残差夏普，来自 marginal_alpha 或等价）。"
+            f"禁止仅用 rationale 字符串入册。")
+
+    corr_f = float(corr)
+    rs_f = float(residual_sharpe)
+    if abs(corr_f) >= DIVERSIFIER_MAX_ABS_CORR:
+        raise ValueError(
+            f"{tag} diversifier 准入要求 |corr_to_book|<{DIVERSIFIER_MAX_ABS_CORR}，"
+            f"当前 corr_to_book={corr_f:.3f}——与在册组合高度同质，不是有效分流器。")
+    if rs_f < DIVERSIFIER_MIN_RESIDUAL_SHARPE:
+        raise ValueError(
+            f"{tag} diversifier 准入要求 residual_sharpe≥{DIVERSIFIER_MIN_RESIDUAL_SHARPE}，"
+            f"当前 residual_sharpe={rs_f:.3f}——去 book 暴露后边际 alpha 不足。")
+
+    # Normalize floats so receipt hash is stable if callers passed ints.
+    adm["corr_to_book"] = corr_f
+    adm["residual_sharpe"] = rs_f
+
+    receipt = adm.get(MARGINAL_RECEIPT_KEY)
+    receipt_errors = verify_marginal_receipt_self_consistent(
+        family, version, adm, receipt if isinstance(receipt, dict) else None,
+    )
+    if receipt_errors:
+        raise ValueError(f"{tag} diversifier 收据校验失败: " + "; ".join(receipt_errors))
 
 
 class RegistryValidationError(ValueError):
@@ -253,8 +331,11 @@ def register(family, version, desc, config, data_scope, metrics, status="候选"
 
     hit：一律由 ``engine.metrics.compute_hit`` 按 metrics 里的 annual/maxdd 重算并覆盖，
          禁止调用方手填——这是「修代码不修记分牌」铁律的机械执行点。
-    admission：双轨准入声明 {"track": "standalone"|"diversifier", "rationale": str, ...}。
-         status="在册" 必须通过准入：standalone 轨要求 hit=True；diversifier 轨要求 rationale。
+    admission：双轨准入声明。
+         status="在册" 必须通过准入：
+           · standalone：hit=True + nine_gate.dsr_p < DSR_ALPHA
+           · diversifier：rationale + corr_to_book + residual_sharpe 机械门槛
+             （见 _validate_diversifier_admission；禁止仅非空字符串）
          单体达标(hit=True)且未显式声明 → 自动补 standalone 轨（向后兼容）。
     nine_gate：Nine-Gate R2P 审计摘要 {dsr_p, psr, n_trials, pbo, wf_sharpe, cv_sharpe, ...}。
     evidence：证据链锚点 {"hypothesis_id": str, "experiment_ids": [str,...]}（默认空 dict）。
@@ -297,13 +378,13 @@ def register(family, version, desc, config, data_scope, metrics, status="候选"
             raise ValueError(
                 f"{family}/{version} 不能登记为「在册」：单体不达标"
                 f"（hit=False，年化={a}，回撤={dd}），且未声明 diversifier 准入。"
-                f"请传 admission={{'track':'diversifier','rationale':...}} 或降级 status。")
+                f"请传 admission={{'track':'diversifier','rationale':...,"
+                f"'corr_to_book':float,'residual_sharpe':float}} 或降级 status。")
         elif track == "standalone" and not hit:
             raise ValueError(
                 f"{family}/{version} standalone 准入要求 hit=True，但单体不达标（年化={a}，回撤={dd}）。")
-        elif track == "diversifier" and not (adm.get("rationale") or "").strip():
-            raise ValueError(
-                f"{family}/{version} diversifier 准入要求 rationale（负相关 / 组合夏普增量依据）。")
+        elif track == "diversifier":
+            _validate_diversifier_admission(family, version, adm)
         elif track not in ADMISSION_TRACKS:
             raise ValueError(
                 f"{family}/{version} 未知 admission.track={track!r}（应为 {ADMISSION_TRACKS}）。")
@@ -316,13 +397,14 @@ def register(family, version, desc, config, data_scope, metrics, status="候选"
                 raise ValueError(
                     f"{family}/{version} standalone 准入必须有 nine_gate.dsr_p——"
                     f"请先跑 9-Gate 审计（workflow/promote.py 或 run_nine_gates_all.py）。"
-                    f"若靠组合边际入册，请改 admission={{'track':'diversifier','rationale':...}}；"
+                    f"若靠组合边际入册，请改 admission={{'track':'diversifier',"
+                    f"'rationale':...,'corr_to_book':float,'residual_sharpe':float}}；"
                     f"否则降 status='候选'。")
             if dsr_p >= DSR_ALPHA:
                 raise ValueError(
                     f"{family}/{version} standalone 准入要求 DSR p<{DSR_ALPHA}，"
                     f"当前 dsr_p={dsr_p:.4f}——多重测试惩罚下不显著（hit 达标≠搜索后显著）。"
-                    f"可改 diversifier 轨（需 rationale）或降 status='候选'/'参考'。")
+                    f"可改 diversifier 轨（须机械边际证据）或降 status='候选'/'参考'。")
 
     existing = next((v for v in fam["versions"] if v["version"] == version), None)
     reg_date = date_str or (existing.get("date") if existing else None) or str(date.today())
@@ -926,9 +1008,11 @@ def seed_registry():
                      "cost": {"hedge_cost_annual": 0.015, "switch_friction": 0.0025}},
              data_scope={"source": "data_lake", "period": "2023-2026", "survivorship_bias": False},
              metrics={"annual": 0.0297, "maxdd": -0.1131, "sharpe": 0.33, "calmar": 0.26},
-             status="在册",
+             # seed 历史叙述；成本重算后 diversifier 在册已作废——不得无机械边际再标「在册」
+             status="参考",
              admission={"track": "diversifier",
-                        "rationale": "与小盘策略相关性 -0.096 负相关，作 Beta 对冲分流腿，单体低收益但对组合有增量"},
+                        "rationale": "与小盘策略相关性 -0.096 负相关，作 Beta 对冲分流腿，单体低收益但对组合有增量",
+                        "note": "seed 仅保留叙事；重新在册须 corr_to_book+residual_sharpe 机械证据"},
              notes="✅样本外测试（2023-2026）表现良好：超额为正，最大回撤 11.3% 控制在 15% 以内，年化调仓降至 3.6 次，与小盘策略相关性 -0.096 负相关，符合第二母策略分流要求。")
 
     register("large-cap-growth-hedged", "v1.0-full", "全历史压力测试版：大盘成长对冲 + MA120 + 2% 滞后缓冲",
@@ -946,9 +1030,10 @@ def seed_registry():
                      "cost": {"hedge_cost_annual": 0.015, "switch_friction": 0.0025}},
              data_scope={"source": "data_lake", "period": "2023-2026", "survivorship_bias": False},
              metrics={"annual": 0.0566, "maxdd": -0.1053, "sharpe": 0.58, "calmar": 0.54},
-             status="在册",
+             status="参考",
              admission={"track": "diversifier",
-                        "rationale": "大盘成长对冲腿，与小盘主力负相关，单体低收益但对组合夏普有正增量"},
+                        "rationale": "大盘成长对冲腿，与小盘主力负相关，单体低收益但对组合夏普有正增量",
+                        "note": "seed 仅保留叙事；重新在册须 corr_to_book+residual_sharpe 机械证据"},
              notes="✅自适应 CPV 惩罚版：样本外（2023-2026）年化提升至 5.66%（超越 Baseline 3.97%），最大回撤控制在 10.53%，成功避开了 2023-2026 年高股息红利央国企的拥挤抱团误伤。")
 
     register("large-cap-growth-hedged", "v1.1-full", "全历史压力测试自适应 CPV 惩罚版：大盘成长对冲 + MA120 自适应 CPV 惩罚 ($w_{max}=0.5$)",
@@ -957,9 +1042,10 @@ def seed_registry():
                      "cost": {"hedge_cost_annual": 0.015, "switch_friction": 0.0025}},
              data_scope={"source": "data_lake", "period": "2012-2026", "survivorship_bias": False},
              metrics={"annual": 0.0138, "maxdd": -0.2698, "sharpe": 0.19, "calmar": 0.05},
-             status="在册",
+             status="参考",
              admission={"track": "diversifier",
-                        "rationale": "全历史对冲腿，与小盘负相关；单体不达标，价值在组合层 Beta 对冲与回撤压缩"},
+                        "rationale": "全历史对冲腿，与小盘负相关；单体不达标，价值在组合层 Beta 对冲与回撤压缩",
+                        "note": "seed 仅保留叙事；重新在册须 corr_to_book+residual_sharpe 机械证据"},
              notes="全历史压力测试：将全历史收益从 -3.03% 扭转为 +1.38%（夏普 0.19），且最大回撤由 -48.69% 压缩至 -26.98%，相比 baseline 有巨大的绝对与相对优化。")
 
     register_family(
@@ -1007,9 +1093,10 @@ def seed_registry():
                      "cost": {"hedge_cost_annual": 0.015}},
              data_scope={"source": "data_lake", "period": "2023-2026", "survivorship_bias": False},
              metrics={"annual": 0.1086, "maxdd": -0.1906, "sharpe": 0.70, "calmar": 0.57},
-             status="在册",
+             status="参考",
              admission={"track": "diversifier",
-                        "rationale": "等额做空 Top800 等权对冲 Beta，与大盘对冲腿/小盘负相关；单体年化 10.86%<15% 不达标，价值在组合层去 Beta 增量"},
+                        "rationale": "等额做空 Top800 等权对冲 Beta，与大盘对冲腿/小盘负相关；单体年化 10.86%<15% 不达标，价值在组合层去 Beta 增量",
+                        "note": "seed 仅保留叙事；重新在册须 corr_to_book+residual_sharpe 机械证据"},
              notes="✅高质量动量对冲样本外（2023-2026）表现良好：超额为正，年化回报 10.86%，夏普比率达到 0.70，展现出在震荡下行市中极强的抗风险与选股阿尔法能力。")
 
     register("hq-momentum-hedged", "v1.0-full", "高质量动量对冲策略全历史压力测试版：60日动量 + 60日 Kaufman ER + 40% 财务质量过滤",
@@ -1017,9 +1104,10 @@ def seed_registry():
                      "cost": {"hedge_cost_annual": 0.015}},
              data_scope={"source": "data_lake", "period": "2012-2026", "survivorship_bias": False},
              metrics={"annual": 0.0533, "maxdd": -0.4795, "sharpe": 0.39, "calmar": 0.11},
-             status="在册",
+             status="参考",
              admission={"track": "diversifier",
-                        "rationale": "全历史对冲腿，质量+路径平滑过滤抗动量崩塌；单体不达标，价值在组合层对冲与抗崩塌"},
+                        "rationale": "全历史对冲腿，质量+路径平滑过滤抗动量崩塌；单体不达标，价值在组合层对冲与抗崩塌",
+                        "note": "seed 仅保留叙事；重新在册须 corr_to_book+residual_sharpe 机械证据"},
              notes="全历史压力测试（2012-2026）：经历多次动量崩塌（Momentum Crash），由于质量和路径平滑度过滤，全历史年化保持为正（+5.33%，夏普 0.39），显著优于原始动量（-13.90%，夏普 -0.67）。")
 
 

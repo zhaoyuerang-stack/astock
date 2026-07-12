@@ -53,11 +53,22 @@ def test_auto_standalone_path_also_gated(tmp_path, monkeypatch):
 
 
 def test_diversifier_not_gated_by_dsr(tmp_path, monkeypatch):
-    # diversifier 凭组合边际入册,不受 DSR 约束(dsr_p=0.9 仍可登记)
+    # diversifier 凭组合边际入册,不受 DSR 约束(dsr_p=0.9 仍可登记);
+    # 但仍须 corr_to_book + residual_sharpe + marginal_receipt。
+    from research_ledger.receipts import diversifier_admission_with_receipt
     _setup(tmp_path, monkeypatch)
-    tag = sr.register("fam", "v1.0", "d", {}, "scope", dict(HIT), status="在册",
-                      admission={"track": "diversifier", "rationale": "负相关对冲"},
-                      nine_gate={"dsr_p": 0.9})
+    tag = sr.register(
+        "fam", "v1.0", "d", {}, "scope", dict(HIT), status="在册",
+        admission=diversifier_admission_with_receipt(
+            "fam", "v1.0",
+            rationale="负相关对冲",
+            corr_to_book=-0.15,
+            residual_sharpe=0.75,
+            run_id="a" * 16,
+            entry_hash="b" * 64,
+        ),
+        nine_gate={"dsr_p": 0.9},
+    )
     assert tag == "fam/v1.0"
 
 

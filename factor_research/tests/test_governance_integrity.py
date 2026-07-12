@@ -22,14 +22,20 @@ try:
 
     @pytest.fixture(autouse=True)
     def _restore_registry_path():
-        """hermetic:每个测试结束后恢复 R.REGISTRY,避免临时台账污染后续测试文件
-        (全量 pytest 发现下,本文件多处把 R.REGISTRY 指向 tmp;不恢复会污染 risk_phase3 等)。"""
+        """Restore every mutable registry module setting after each test.
+
+        Several migration tests deliberately replace both the registry path and
+        the historical diversifier allow-list.  Leaving either replacement in
+        the imported module makes later tests order-dependent.
+        """
         import strategy_registry as R
-        saved = R.REGISTRY
+        saved_registry = R.REGISTRY
+        saved_diversifier_families = R.DIVERSIFIER_FAMILIES
         try:
             yield
         finally:
-            R.REGISTRY = saved
+            R.REGISTRY = saved_registry
+            R.DIVERSIFIER_FAMILIES = saved_diversifier_families
 except ImportError:
     pass  # 作为 __main__ 脚本直跑时无 pytest;独立进程不会污染他人
 
@@ -120,20 +126,93 @@ def test_register_admission_gate():
         raised = True
     assert raised, "不达标却能裸入在册（闸门失效）"
 
-    # 3) 不达标 + diversifier(有 rationale) + 在册 → 通过
+    from research_ledger.receipts import diversifier_admission_with_receipt
+
+    def _div_adm(family, version, **kw):
+        base = dict(
+            rationale="与主力负相关，组合层增量",
+            corr_to_book=-0.1,
+            residual_sharpe=0.8,
+            run_id="a" * 16,
+            entry_hash="b" * 64,
+        )
+        base.update(kw)
+        return diversifier_admission_with_receipt(family, version, **base)
+
+    # 3) 不达标 + diversifier(机械边际+收据) + 在册 → 通过
     R.register("famy", "v-div", "d", {}, {}, {"annual": 0.05, "maxdd": -0.10}, status="在册",
-               admission={"track": "diversifier", "rationale": "与主力负相关，组合层增量"})
+               admission=_div_adm("famy", "v-div"))
     v = next(x for x in R._load()["families"][0]["versions"] if x["version"] == "v-div")
     assert v["admission"]["track"] == "diversifier"
+    assert v["admission"]["corr_to_book"] == -0.1
+    assert v["admission"]["residual_sharpe"] == 0.8
+    assert "marginal_receipt" in v["admission"]
 
     # 4) diversifier 但 rationale 空 → 抛错
     raised = False
     try:
         R.register("famy", "v-div2", "d", {}, {}, {"annual": 0.05, "maxdd": -0.10}, status="在册",
-                   admission={"track": "diversifier", "rationale": "  "})
+                   admission=_div_adm("famy", "v-div2", rationale="  "))
     except ValueError:
         raised = True
     assert raised, "空 rationale 的 diversifier 不应通过"
+
+    # 5) diversifier 仅有 rationale、无机械边际 → 抛错（堵橡皮图章）
+    raised = False
+    try:
+        R.register("famy", "v-div-str-only", "d", {}, {}, {"annual": 0.05, "maxdd": -0.10},
+                   status="在册",
+                   admission={"track": "diversifier", "rationale": "随便写一句负相关"})
+    except ValueError as exc:
+        raised = True
+        assert "corr_to_book" in str(exc) or "residual_sharpe" in str(exc)
+    assert raised, "仅非空 rationale 的 diversifier 不应通过"
+
+    # 5b) 有数字无收据 → 抛错
+    raised = False
+    try:
+        R.register("famy", "v-div-noreceipt", "d", {}, {}, {"annual": 0.05, "maxdd": -0.10},
+                   status="在册",
+                   admission={"track": "diversifier", "rationale": "手填",
+                              "corr_to_book": -0.1, "residual_sharpe": 0.8})
+    except ValueError as exc:
+        raised = True
+        assert "收据" in str(exc) or "marginal_receipt" in str(exc)
+    assert raised, "无 marginal_receipt 不应通过"
+
+    # 6) diversifier 相关过高 → 抛错
+    raised = False
+    try:
+        R.register("famy", "v-div-corr", "d", {}, {}, {"annual": 0.05, "maxdd": -0.10},
+                   status="在册",
+                   admission=_div_adm("famy", "v-div-corr", corr_to_book=0.85, residual_sharpe=0.9))
+    except ValueError as exc:
+        raised = True
+        assert "corr_to_book" in str(exc)
+    assert raised, "高相关 diversifier 不应通过"
+
+    # 7) diversifier 残差夏普不足 → 抛错
+    raised = False
+    try:
+        R.register("famy", "v-div-rs", "d", {}, {}, {"annual": 0.05, "maxdd": -0.10},
+                   status="在册",
+                   admission=_div_adm("famy", "v-div-rs", residual_sharpe=0.2))
+    except ValueError as exc:
+        raised = True
+        assert "residual_sharpe" in str(exc)
+    assert raised, "弱残差夏普 diversifier 不应通过"
+
+    # 8) evidence_status INVALIDATED → 抛错
+    raised = False
+    try:
+        adm = _div_adm("famy", "v-div-inv")
+        adm["evidence_status"] = "INVALIDATED_BY_COST_RESTATEMENT"
+        R.register("famy", "v-div-inv", "d", {}, {}, {"annual": 0.05, "maxdd": -0.10},
+                   status="在册", admission=adm)
+    except ValueError as exc:
+        raised = True
+        assert "INVALIDATED" in str(exc) or "作废" in str(exc)
+    assert raised, "作废 diversifier 证据不应再入在册"
     print("✅ test_register_admission_gate")
 
 
@@ -304,19 +383,28 @@ def test_strategy_gate_status_consumes_dsr():
         # 本测试验的是 get_strategy_gate_status 读取器(track 无关:registered 只看 status=在册,
         # dsr 来自 nine_gate)。用 diversifier 轨入册以绕开 standalone DSR 门(ADR-020),
         # 不影响读取器三态(DSR失败/未审计/DSR通过)的验证。
-        DIV = {"track": "diversifier", "rationale": "组合层增量"}
+        from research_ledger.receipts import diversifier_admission_with_receipt
+        def _div(ver):
+            return diversifier_admission_with_receipt(
+                "gfam", ver, rationale="组合层增量",
+                corr_to_book=-0.2, residual_sharpe=0.7,
+                run_id="a" * 16, entry_hash="b" * 64,
+            )
         # 在册,带 DSR 失败的 nine_gate
-        R.register("gfam", "v1", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册", admission=DIV)
+        R.register("gfam", "v1", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册",
+                   admission=_div("v1"))
         # Task 9: 审批只认 passed_all。完整门未过 → 闸门识别为未通过(不再靠 DSR-only/gate4 推断)
         R.attach_nine_gate("gfam", "v1", {"passed_all": False, "dsr_p": 0.40, "dsr_significant": False})
         g = get_strategy_gate_status("gfam", "v1")
         assert g["registered"] and g["dsr_audited"] and g["dsr_passed"] is False, "完整门失败未被闸门识别"
         # 未审计版本:dsr_audited=False、dsr_passed=None(不应误判失败)
-        R.register("gfam", "v2", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册", admission=DIV)
+        R.register("gfam", "v2", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册",
+                   admission=_div("v2"))
         g2 = get_strategy_gate_status("gfam", "v2")
         assert g2["registered"] and g2["dsr_audited"] is False and g2["dsr_passed"] is None
         # DSR 通过
-        R.register("gfam", "v3", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册", admission=DIV)
+        R.register("gfam", "v3", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册",
+                   admission=_div("v3"))
         R.attach_nine_gate("gfam", "v3", {"passed_all": True, "dsr_p": 0.01, "dsr_significant": True})
         assert get_strategy_gate_status("gfam", "v3")["dsr_passed"] is True
     finally:
@@ -343,8 +431,15 @@ def test_trade_readiness_requires_nine_gate_pass():
         R.register_family("readyfam", "准备度测试族")
         # diversifier 轨入册以绕开 standalone DSR 门(ADR-020);本测试验 trade-readiness 对
         # DSR 待审/失败/通过三态的处置,与准入轨无关(读取器只看 nine_gate 状态)。
-        R.register("readyfam", "v1", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册",
-                   admission={"track": "diversifier", "rationale": "组合层增量"})
+        from research_ledger.receipts import diversifier_admission_with_receipt
+        R.register(
+            "readyfam", "v1", "d", {}, {}, {"annual": 0.30, "maxdd": -0.10}, status="在册",
+            admission=diversifier_admission_with_receipt(
+                "readyfam", "v1", rationale="组合层增量",
+                corr_to_book=-0.2, residual_sharpe=0.7,
+                run_id="a" * 16, entry_hash="b" * 64,
+            ),
+        )
 
         C._SETTINGS = Settings(strategy=StrategyConfig(family="readyfam", version="v1"))
         TR.data_quality = lambda with_duckdb=False: SimpleNamespace(verdict="可用")

@@ -51,13 +51,25 @@ def main():
         "cost_decay_rate": (p2.get("cost_sensitivity", {}) or {}).get("decay_pct"),
         "note": "phase1-3 验证(防未来/成本/WF PASS);diversifier 轨,DSR 未跑(只卡 standalone)",
     }
-    admission = {
-        "track": "diversifier",
-        "rationale": (f"组合边际已证:对 small-cap 核心 Sharpe IS 0.77→1.09 / OOS 0.48→0.60;"
-                      f"zero_ret_days size 正交(截面 corr 0.057)→ 真分散非 size 代理。"
-                      f"phase1-3 验证通过(防未来/成本敏感/WF 9-11 正窗)。"),
-        "note": "L1 证据(phase1-3+组合边际 probe);未跑 9-Gate/DSR;λ=0.5 与流动性族筛选计入 n_trials=12",
-    }
+    # 机械门槛 + marginal_receipt(register 硬闸)。重跑时须:
+    # 1) governance.marginal.marginal_alpha 复算 corr/residual_sharpe
+    # 2) 写入 research_ledger 得 run_id/entry_hash
+    # 3) diversifier_admission_with_receipt(...) 打包
+    from research_ledger.receipts import diversifier_admission_with_receipt
+    admission = diversifier_admission_with_receipt(
+        FAMILY, VERSION,
+        rationale=(
+            f"组合边际已证:对 small-cap 核心 Sharpe IS 0.77→1.09 / OOS 0.48→0.60;"
+            f"zero_ret_days size 正交(截面 corr 0.057)→ 真分散非 size 代理。"
+            f"phase1-3 验证通过(防未来/成本敏感/WF 9-11 正窗)。"
+        ),
+        corr_to_book=0.057,
+        residual_sharpe=0.60,
+        # TODO: 实跑后替换为 research_ledger 真实 run_id/entry_hash
+        run_id="0" * 16,
+        entry_hash="0" * 64,
+        note="L1 证据;未跑 9-Gate/DSR;须绑定真实 ledger run 后方可正式在册",
+    )
     config = {
         "factor": "zscore(small_cap_factor) + 0.5*zscore(zero_ret_days)",
         "lambda": LAMBDA, "small_cap_window": WIN, "zero_ret_window": WIN,
