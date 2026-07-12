@@ -91,16 +91,14 @@ def validate_feedback_envelope(
 
 
 def actual_latest_price_date(root: Path = ROOT) -> str:
-    dates = []
-    # 性能优化：无需扫描全部 5000+ 个 Parquet 文件（耗时 5秒+），仅扫描前 10 个即可对齐最新日期（耗时 <30ms）
-    for fp in sorted((root / "data_lake/price/daily").glob("*.parquet"))[:10]:
-        try:
-            df = pd.read_parquet(fp, columns=["date"])
-        except Exception:
-            continue
-        if len(df):
-            dates.append(pd.to_datetime(df["date"]).max())
-    return _date_str(max(dates)) if dates else ""
+    """Latest price-lake trade date as ``YYYY-MM-DD`` (canonical via lake.freshness).
+
+    Do not reimplement per-code sampling here — partial scans diverge from
+    scheduled_daily_update and can fail-open or fail-closed wrongly.
+    """
+    from lake.freshness import actual_latest_price_date_str
+
+    return actual_latest_price_date_str(root)
 
 
 def latest_expected_trade_date(root: Path = ROOT, today=None) -> tuple[str, str]:

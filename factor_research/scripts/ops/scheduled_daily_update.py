@@ -211,15 +211,14 @@ def expected_trade_date(today=None):
 
 
 def actual_latest_price_date():
-    dates = []
-    for fp in sorted((ROOT / "data_lake/price/daily").glob("*.parquet")):
-        try:
-            df = pd.read_parquet(fp, columns=["date"])
-        except Exception:
-            continue
-        if len(df):
-            dates.append(pd.to_datetime(df["date"]).max())
-    return max(dates) if dates else None
+    """Latest price-lake trade date (canonical via lake.freshness).
+
+    Returns ``pd.Timestamp | None`` for freshness comparisons in this script.
+    Must stay identical in meaning to ``runtime.production_readiness.actual_latest_price_date``.
+    """
+    from lake.freshness import actual_latest_price_date as canonical
+
+    return canonical(ROOT)
 
 
 def sample_quality_check():
