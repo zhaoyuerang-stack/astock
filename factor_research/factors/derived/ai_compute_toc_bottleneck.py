@@ -58,9 +58,11 @@ def ai_compute_toc_bottleneck_factor(close, amount=None):
 
 def _load_price_panels_internal(start):
     from lake.load_lake import load_prices, load_raw_close
+    from lake.units import implied_amount
+
     px = load_prices(start=start, fields=("close", "volume"))
     raw = load_raw_close(start=start)
-    amount = px["volume"] * 100 * raw.reindex(index=px["volume"].index, columns=px["volume"].columns)
+    amount = implied_amount(px["volume"], raw)
     close, volume = px["close"], px["volume"]
     valid = amount.notna().sum(axis=1)
     if len(valid) > 5:

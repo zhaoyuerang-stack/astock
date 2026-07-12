@@ -13,7 +13,6 @@ os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
 from strategies.small_cap import StrategyConfig, latest_signal, load_price_panels
-from lake.load_lake import load_raw_close                                   # noqa: E402
 
 sig = latest_signal(StrategyConfig(start="2010-01-01"))
 close = sig["result"]["close"]
@@ -29,9 +28,8 @@ print(f"  择时   : {'🟢 持仓' if in_market else '🔴 空仓观望'}   (�
 
 # ── 容量:当日持仓近 20 日均真实成交额 → 上限 ──
 if in_market and holdings:
-    _, volume, _ = load_price_panels("2024-01-01")
-    raw = load_raw_close(start="2024-01-01")
-    real_amt = volume * 100 * raw.reindex(index=volume.index, columns=volume.columns)
+    # load_price_panels already returns canonical amount (share × raw CNY/share)
+    _, _volume, real_amt = load_price_panels("2024-01-01")
     cols = [c for c in holdings if c in real_amt.columns]
     adv = real_amt.loc[real_amt.index <= last, cols].iloc[-20:].mean().dropna()
     cap10, cap5 = adv.median() * 0.10 * len(holdings), adv.median() * 0.05 * len(holdings)

@@ -33,7 +33,7 @@ def _synthetic(seed: int = 11):
         index=dates,
         columns=codes,
     )
-    amount = volume * 100 * close
+    amount = volume * close
     net_profit_yoy = pd.DataFrame(
         rng.normal(0.15, 0.25, close.shape),
         index=dates,

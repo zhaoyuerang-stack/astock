@@ -164,10 +164,13 @@ def cmd_queue(args):
 
 def _load_data_panel(start: str):
     from lake.load_lake import load_prices, load_raw_close
+    from lake.units import implied_amount
+
     px = load_prices(start=start, fields=("close", "volume"))
     raw = load_raw_close(start=start)
     close, volume = px["close"], px["volume"]
-    amount = volume * 100 * raw.reindex(index=volume.index, columns=volume.columns)
+    # canonical lake volume unit = share; amount CNY = shares × raw CNY/share
+    amount = implied_amount(volume, raw)
     return close, volume, amount
 
 

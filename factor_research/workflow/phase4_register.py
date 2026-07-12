@@ -158,7 +158,7 @@ def _suggest_fix(check_id: str) -> str:
         ),
         "amount_formula": (
             "Use raw_close (not adjusted close) for amount: "
-            "amount = volume * 100 * raw_close. "
+            "amount = volume * raw_close (canonical share × CNY/share). "
             "Adjusted close embeds future corporate actions in historical prices."
         ),
         "fund_alignment": (

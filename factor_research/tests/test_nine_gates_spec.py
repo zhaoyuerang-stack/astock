@@ -96,7 +96,7 @@ def test_run_evaluation_with_spec():
     rng = np.random.default_rng(42)
     close = pd.DataFrame(10.0 * np.exp(np.cumsum(rng.normal(0, 0.01, (100, 5)), axis=0)), index=dates, columns=codes)
     volume = pd.DataFrame(1000, index=dates, columns=codes)
-    amount = volume * 100 * close
+    amount = volume * close
     
     mock_prices = (close, volume, amount)
     

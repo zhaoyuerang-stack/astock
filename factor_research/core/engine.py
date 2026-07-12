@@ -68,8 +68,8 @@ class PricePanel:
     used to be passed around between modules.
     """
     close: pd.DataFrame          # adjusted close (for return calculation)
-    volume: pd.DataFrame         # in 手 (×100 for shares)
-    amount: pd.DataFrame         # turnover in CNY  (volume*100*raw_close)
+    volume: pd.DataFrame         # shares (canonical data-lake unit; not 手)
+    amount: pd.DataFrame         # turnover in CNY  (volume × raw_close; see lake.units.implied_amount)
     raw_close: Optional[pd.DataFrame] = None  # unadjusted close (for valuation / order sizing)
     # Optional extensions for live-trade simulation
     raw_open: Optional[pd.DataFrame] = None

@@ -39,9 +39,11 @@ class StrategyConfig:
 
 def load_price_panels(start="2010-01-01"):
     """Load tech-board close/volume/amount panels."""
-    px = px = load_prices(start=start, fields=("close", "volume"))
+    from lake.units import implied_amount
+
+    px = load_prices(start=start, fields=("close", "volume"))
     raw = load_raw_close(start=start)
-    amount = px["volume"] * 100 * raw.reindex(index=px["volume"].index, columns=px["volume"].columns)
+    amount = implied_amount(px["volume"], raw)
     close, volume = px["close"], px["volume"]
     
     # Filter to tech boards (ChiNext 30 and STAR 688)

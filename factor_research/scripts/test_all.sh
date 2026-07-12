@@ -37,6 +37,11 @@ python3 scripts/ci/check_naming_taxonomy.py
 
 
 echo ""
+echo "=== check_amount_units.py (成交额单位 share×raw，禁 volume×100×price) ==="
+python3 scripts/ci/check_amount_units.py
+
+
+echo ""
 echo "=== test_loop_foundations.py (防自欺地基:trial账本 + holdout金库) ==="
 python3 tests/test_loop_foundations.py
 

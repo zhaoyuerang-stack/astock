@@ -131,11 +131,13 @@ def cluster_by_redundancy(mat: pd.DataFrame, threshold=2.0) -> list[list[str]]:
 
 def main():
     from lake.load_lake import load_prices, load_raw_close
+    from lake.units import implied_amount
+
     print("Loading data lake...")
     px = load_prices(start="2018-01-01", fields=("close", "volume"))
     raw = load_raw_close(start="2018-01-01")
     close, volume = px["close"], px["volume"]
-    amount = volume * 100 * raw.reindex(index=volume.index, columns=volume.columns)
+    amount = implied_amount(volume, raw)
     print(f"  {close.shape}")
 
     ics = audit_hypothesis_pool(close, volume, amount, max_hyps=30)

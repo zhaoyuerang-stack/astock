@@ -31,11 +31,13 @@ def main() -> int:
     args = parser.parse_args()
 
     print(f"[factor-store] loading price panels from {args.start}", flush=True)
+    from lake.units import implied_amount
+
     prices = load_prices(start=args.start, fields=("close", "volume"))
     close = prices["close"]
     volume = prices["volume"]
     raw_close = load_raw_close(start=args.start).reindex(index=close.index, columns=close.columns)
-    amount = volume * 100.0 * raw_close
+    amount = implied_amount(volume, raw_close)
 
     valid = amount.notna().sum(axis=1)
     if len(valid):

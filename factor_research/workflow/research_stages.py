@@ -16,11 +16,13 @@ class InvalidResearchStageTransition(ValueError):
 def load_stage_data(start: str):
     from factory.lines.line2_validation.l0_ic_scan import precompute_forward_returns
     from lake.load_lake import load_prices, load_raw_close
+    from lake.units import implied_amount
 
     px = load_prices(start=start, fields=("close", "volume"))
     close, volume = px["close"], px["volume"]
     raw = load_raw_close(start=start).reindex(index=volume.index, columns=volume.columns)
-    amount = volume * 100 * raw
+    # canonical lake volume unit = share; amount CNY = shares × raw CNY/share
+    amount = implied_amount(volume, raw)
     forward = precompute_forward_returns(close)
     vintage = f"data_lake@{close.index[-1].strftime('%Y-%m-%d')}"
     return close, volume, amount, forward, vintage
