@@ -27,7 +27,7 @@ global_data:
   enabled: true
   required: false
   provider_mode: alfred
-  datasets: [macro_daily, macro_monthly, rates_daily, market_price_daily, etf_daily, fx_daily, commodity_daily]
+  datasets: [macro_daily, macro_monthly, rates_daily, market_price_daily, etf_daily, fx_daily]
   api_key_envs:
     alfred: FRED_API_KEY
   source_admissions:

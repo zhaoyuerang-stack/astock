@@ -84,7 +84,7 @@ make the same explicit admission decision and provide its own environment variab
 ```yaml
 global_data:
   enabled: true
-  datasets: [macro_daily, macro_monthly, rates_daily, market_price_daily, etf_daily, fx_daily, commodity_daily]
+  datasets: [macro_daily, macro_monthly, rates_daily, market_price_daily, etf_daily, fx_daily]
   api_key_envs: {alfred: FRED_API_KEY}
   source_admissions:
     alfred_macro_v1:
@@ -149,7 +149,13 @@ python3 scripts/data/update_global_data.py --all-enabled --provider-mode alfred 
 
 # yfinance/OpenBB has no API key requirement for these small research allowlists.
 # Prices are split-adjusted; do not request raw price panels from these datasets.
-python3 scripts/data/update_global_data.py --dataset market_price_daily --dataset etf_daily --dataset fx_daily --dataset commodity_daily --start 2016-01-01
+python3 scripts/data/update_global_data.py --dataset market_price_daily --dataset etf_daily --dataset fx_daily --start 2016-01-01
+
+`commodity_daily` remains catalog-only for now. The current local OpenBB surface
+offers only `obb.derivatives.futures.historical(provider=yfinance)`, and live
+probes returned `YFRateLimitError` / empty results for the documented futures
+symbols. It stays out of the enabled dataset set until a verified historical
+commodity provider is admitted.
 
 # Re-run normalizer/validator from an immutable raw snapshot.
 python3 scripts/data/update_global_data.py --dataset etf_daily --source global_etf_price_v1 --replay-ingest <ingest_id>

@@ -59,7 +59,7 @@ def test_repository_settings_admit_alfred_as_auxiliary_research_data():
     assert global_data.provider_mode == "alfred"
     assert global_data.datasets == (
         "macro_daily", "macro_monthly", "rates_daily",
-        "market_price_daily", "etf_daily", "fx_daily", "commodity_daily",
+        "market_price_daily", "etf_daily", "fx_daily",
     )
     assert global_data.api_key_envs == {"alfred": "FRED_API_KEY"}
     admission = global_data.source_admissions["alfred_macro_v1"]
