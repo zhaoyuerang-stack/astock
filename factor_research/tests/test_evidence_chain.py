@@ -8,6 +8,7 @@ Run:  cd /Users/kiki/astcok/factor_research && python3 tests/test_evidence_chain
 
 全程用临时台账文件,绝不写脏真实 strategy_versions.json。
 """
+import json
 import os
 import sys
 import tempfile
@@ -18,6 +19,7 @@ sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
 import strategy_registry as reg
+import workflow.phase4_register as phase4_mod
 from workflow.phase4_register import Phase4Register
 
 
@@ -29,6 +31,28 @@ def _with_tmp_registry(fn):
         fn()
     finally:
         reg.REGISTRY = orig
+
+
+def _with_passing_holdout(holdout_id: str = "test-holdout-ok"):
+    """Redirect holdout ledger to a temp file with one passing validation."""
+    tmp = Path(tempfile.mktemp(suffix=".jsonl"))
+    rec = {
+        "candidate_id": holdout_id,
+        "holdout_metrics": {"sharpe": 1.2, "n": 40, "annual": 0.2, "maxdd": -0.1},
+        "holdout_dsr_sig": True,
+        "holdout_trials": 1,
+        "peek_count": 1,
+        "boundary": "2025-01-01",
+    }
+    tmp.write_text(json.dumps(rec) + "\n", encoding="utf-8")
+    orig = phase4_mod._HOLDOUT_VALIDATIONS
+    phase4_mod._HOLDOUT_VALIDATIONS = tmp
+    return holdout_id, orig, tmp
+
+
+def _restore_holdout(orig, tmp: Path):
+    phase4_mod._HOLDOUT_VALIDATIONS = orig
+    tmp.unlink(missing_ok=True)
 
 
 def _versions(family_id):
@@ -61,6 +85,8 @@ def test_register_evidence_defaults_empty():
 
 def test_phase4_threads_evidence_into_registry():
     """Phase4Register.register() 把 hypothesis_id + 实验 ID 透传进台账。"""
+    holdout_id, orig_ho, tmp_ho = _with_passing_holdout("hyp9999aaaa-ho")
+
     def body():
         p1 = []  # 无 phase1 check → 不 blocked
         p2 = {
@@ -78,12 +104,16 @@ def test_phase4_threads_evidence_into_registry():
             hypothesis="测试假设",
             hypothesis_id="hyp9999aaaa",
             evidence_experiment_ids=["exp_l0", "exp_l1", "exp_l3"],
+            holdout_id=holdout_id,
         )
         assert report.registered, f"应登记成功: {report.detail}"
         v = _versions("fam-c")[0]
         assert v["evidence"]["hypothesis_id"] == "hyp9999aaaa"
         assert v["evidence"]["experiment_ids"] == ["exp_l0", "exp_l1", "exp_l3"]
-    _with_tmp_registry(body)
+    try:
+        _with_tmp_registry(body)
+    finally:
+        _restore_holdout(orig_ho, tmp_ho)
     print("✅ test_phase4_threads_evidence_into_registry passed")
 
 
@@ -149,6 +179,8 @@ def test_phase4_blocks_rebalance_slower_than_factor_half_life():
 
 def test_phase4_persists_executable_spec_from_ast_execution():
     """Phase4 应把 AST execution 编成 ExecutableStrategySpec 并写入台账。"""
+    holdout_id, orig_ho, tmp_ho = _with_passing_holdout("fam-spec-ho")
+
     def body():
         p2 = _passing_phase2({
             "top_n": 99,
@@ -161,7 +193,9 @@ def test_phase4_persists_executable_spec_from_ast_execution():
                 "execution": {"portfolio_size": 35, "rebalance_freq": "30D", "smoothing_window": 10},
             },
         })
-        report = Phase4Register("fam-spec", "v1.0").register([], p2, _passing_phase3(), hypothesis="test")
+        report = Phase4Register("fam-spec", "v1.0").register(
+            [], p2, _passing_phase3(), hypothesis="test", holdout_id=holdout_id,
+        )
         assert report.registered, f"应登记成功: {report.detail}"
         v = _versions("fam-spec")[0]
         executable = v["executable_spec"]
@@ -171,7 +205,10 @@ def test_phase4_persists_executable_spec_from_ast_execution():
         assert spec["selection"]["rebalance_days"] == 30
         assert spec["execution"]["smoothing_window"] == 10
         assert spec["data"]["dependencies"] == ["holder/holdernumber", "price/close"]
-    _with_tmp_registry(body)
+    try:
+        _with_tmp_registry(body)
+    finally:
+        _restore_holdout(orig_ho, tmp_ho)
     print("✅ test_phase4_persists_executable_spec_from_ast_execution passed")
 
 

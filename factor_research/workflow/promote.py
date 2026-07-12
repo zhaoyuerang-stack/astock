@@ -282,11 +282,12 @@ def _run_marginal(spec, report):
 
         print("[marginal] 对 ACTIVE 组合算边际贡献...", flush=True)
         # §5.2 缝③:边际 ACTIVE/SHADOW 定级是选择,只用 <boundary,金库不参与定级。
-        from governance.holdout import boundary
+        from governance.holdout import assert_search_clean, boundary
         _hb = boundary()
         live = {k: v[v.index < _hb] for k, v in run_active(start="2018-01-01").items()}
         close, volume, amount = load_price_panels("2018-01-01")
         close, volume, amount = close[close.index < _hb], volume[volume.index < _hb], amount[amount.index < _hb]
+        assert_search_clean(close.index, label="promotion marginal classification")
         # 用 spec 反推一个最小 Hypothesis(marginal 需要 factor_fn_name);
         # 若 spec 来自 from_factory,其 config 不含 fn_name,这里 best-effort 跳过。
         fn_name = spec.config.get("factor_fn_name")
@@ -360,7 +361,11 @@ if __name__ == "__main__":
     ap.add_argument("--pool", action="store_true", help="升 pool 中所有 L3_PASSED")
     ap.add_argument("--version", default="v1.0")
     ap.add_argument("--marginal", action="store_true", help="登记后算边际贡献")
-    ap.add_argument("--force", action="store_true", help="phase1/2 不过也强制登记(标候选)")
+    ap.add_argument(
+        "--force",
+        action="store_true",
+        help="仅覆盖 phase1/2/3 与知识图谱跳过;不得绕过 holdout 金库(须 holdout_id+通过记录)",
+    )
     ap.add_argument("--nine-gate", action="store_true", help="登记成功后运行 9-Gate 并回填台账")
     ap.add_argument("--nine-gate-strategy", default=None, help="覆盖 9-Gate CLI 策略名")
     ap.add_argument("--nine-gate-trials", type=int, default=15, help="9-Gate 多重检验 trial 数")

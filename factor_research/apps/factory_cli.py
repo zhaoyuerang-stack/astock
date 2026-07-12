@@ -798,7 +798,11 @@ def main():
                        help="L3_PASSED → workflow phase1~4 验证+登记(唯一登记闸门)")
     p.add_argument("--version", default="v1.0")
     p.add_argument("--marginal", action="store_true", help="登记后算边际贡献")
-    p.add_argument("--force", action="store_true", help="phase1/2 不过也强制登记(标候选)")
+    p.add_argument(
+        "--force",
+        action="store_true",
+        help="仅覆盖 phase1/2/3 与知识图谱跳过;不得绕过 holdout(须 holdout_id+通过记录)",
+    )
     p.set_defaults(func=cmd_promote)
 
     args = parser.parse_args()

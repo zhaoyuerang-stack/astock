@@ -51,19 +51,32 @@ def _extract_nine_gate_summary(phase2_data, phase3_data) -> dict:
     return {k: v for k, v in out.items() if v is not None}
 
 
-def _holdout_gate(holdout_id: str, *, min_sharpe: float = 0.6) -> tuple[Optional[str], dict]:
-    """§5.2 登记前金库闸:holdout_id 提供时,要求存在一条**通过**的 holdout 校验记录。
+def _holdout_gate(
+    holdout_id: str,
+    *,
+    min_sharpe: float = 0.6,
+    path: Path | None = None,
+) -> tuple[Optional[str], dict]:
+    """§5.2 登记前金库闸(硬):必须有 holdout_id,且存在一条**通过**的校验记录。
 
-    读 data_lake/governance/holdout_validations.jsonl(由 governance.holdout.validate_on_holdout
-    写入),按 candidate_id 取最新一条。返回 (block_reason 或 None, holdout_summary)。
-    无记录 / 夏普 < min_sharpe → 返回 block_reason(触碰金库或金库段崩,§5.2 拒绝登记)。
-    holdout_id 为空 → (None, {}),由调用方决定软告警(向后兼容历史/手动登记)。
+    读 holdout_validations.jsonl(由 governance.holdout.validate_on_holdout 写入),
+    按 candidate_id 取最新一条。返回 (block_reason 或 None, holdout_summary)。
+
+    fail-closed:
+      · holdout_id 为空 → 阻断(禁止「软跳过」绕开金库)
+      · 无记录 / 夏普 < min_sharpe / holdout DSR 明确不显著 → 阻断
+    force=True **不得**覆盖本闸(见 Phase4Register.register)。
     """
-    if not holdout_id:
-        return None, {}
+    if not str(holdout_id or "").strip():
+        return (
+            "无 holdout_id;§5.2 要求晋级前唯一一次金库校验"
+            "(先 validate_on_holdout,再把 candidate_id 传入 holdout_id)",
+            {},
+        )
     rec = None
-    if _HOLDOUT_VALIDATIONS.exists():
-        for line in _HOLDOUT_VALIDATIONS.read_text().splitlines():
+    ledger = path or _HOLDOUT_VALIDATIONS
+    if ledger.exists():
+        for line in ledger.read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
             try:
@@ -79,7 +92,8 @@ def _holdout_gate(holdout_id: str, *, min_sharpe: float = 0.6) -> tuple[Optional
     dsr_sig = rec.get("holdout_dsr_sig")
     summary = {"holdout_sharpe": sh, "holdout_n": m.get("n"),
                "holdout_trials": rec.get("holdout_trials"), "holdout_dsr_p": rec.get("holdout_dsr_p"),
-               "peek_count": rec.get("peek_count"), "boundary": rec.get("boundary")}
+               "peek_count": rec.get("peek_count"), "boundary": rec.get("boundary"),
+               "holdout_id": holdout_id}
     if not isinstance(sh, (int, float)) or sh < min_sharpe:
         return (f"holdout 校验未通过(夏普={sh} < {min_sharpe});§5.2 金库段崩→拒绝登记", summary)
     if dsr_sig is False:
@@ -339,29 +353,30 @@ class Phase4Register:
         # Reproducibility metadata
         repro = reproducibility_meta()
 
-        # Check if registration is allowed
+        # Check if registration is allowed (phase1/2/3).
+        # force=True 仅可覆盖本段 phase 门——**不得**覆盖下方 holdout 金库闸。
         blocked = self._check_blocked(phase1_results, phase2_data, phase3_data)
         if blocked and not force:
             print(f"  Registration BLOCKED: {blocked}", flush=True)
-            print(f"  Use force=True to override.", flush=True)
+            print(f"  Use force=True to override phase1/2/3 only (holdout 仍强制).", flush=True)
             return RegistrationReport(
                 family=self.family, version=self.version,
                 registered=False, repro_meta=repro, lessons_saved=n_lessons,
                 detail=f"Blocked: {blocked}", status="blocked",
             )
+        if blocked and force:
+            print(f"  ⚠️ force=True:覆盖 phase 阻断({blocked});holdout 金库仍强制", flush=True)
 
-        # §5.2 holdout 金库闸:holdout_id 提供时强制要求通过记录;缺省软告警(向后兼容)。
+        # §5.2 holdout 金库闸(硬):空 id / 无通过记录 / DSR 不显著 → 一律阻断;
+        # force=True 也不能绕(金库是唯一未偷看样本,允许 force 绕开会废掉 §5.2)。
         ho_block, ho_summary = _holdout_gate(holdout_id)
-        if holdout_id and ho_block and not force:
-            print(f"  Registration BLOCKED (holdout §5.2): {ho_block}", flush=True)
-            print(f"  Use force=True to override.", flush=True)
+        if ho_block:
+            print(f"  Registration BLOCKED (holdout §5.2, hard): {ho_block}", flush=True)
             return RegistrationReport(
                 family=self.family, version=self.version,
                 registered=False, repro_meta=repro, lessons_saved=n_lessons,
                 detail=f"Blocked: {ho_block}", status="blocked",
             )
-        if not holdout_id:
-            print("  ⚠️ 无 holdout_id:跳过 §5.2 金库校验(手动/历史登记路径,不阻断)", flush=True)
 
         # Build metrics from Phase 2+3
         metrics = self._build_metrics(phase2_data, phase3_data)

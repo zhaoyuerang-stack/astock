@@ -30,8 +30,15 @@ def test_force_false_not_flagged():
 
 
 def test_live_repo_clean():
-    # bulk_promote 已修硬闸 → 实库应通过
+    # bulk_promote / factory_cli / scheduled_factor_search / autoresearch 入口无字面 force=True
     assert check() == 0
+
+
+def test_scan_set_covers_factory_cli():
+    from scripts.ci.check_no_force_promote import AUTO_PROMOTE_FILES
+
+    assert "apps/factory_cli.py" in AUTO_PROMOTE_FILES
+    assert "services/actions/autoresearch.py" in AUTO_PROMOTE_FILES
 
 
 if __name__ == "__main__":

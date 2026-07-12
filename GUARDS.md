@@ -11,7 +11,7 @@
 | services 权限分层 | P1 | `check_layer_deps.py` | `services.read` 禁 import `services.actions`；`services.actions` 高风险 promote/registry 动作必须经 `jobs` 或 `action_guard` |
 | workflow / script 边界 | P1 | `check_layer_deps.py` | `workflow.*` 禁 import `scripts.research.*`；research script 只能包 CLI |
 | R-ARCH-004 数据湖写入可审计 | P1 | `check_lake_writers.py` | 写 data_lake 核心区必须走 canonical writer + 更新 manifest |
-| R-WF-001 候选入册通道 | P0 | `check_no_force_promote.py` | 禁自动晋级脚本 `force=True` 跳过 phase1/2 防未来门 |
+| R-WF-001 候选入册通道 | P0 | `check_no_force_promote.py` | 禁 bulk/scheduled/factory_cli/autoresearch 字面 `force=True`/`run_marginal=False`；holdout 硬闸在 `phase4_register`(force 亦不可绕) |
 | R-REG-001 / R-EVIDENCE-001 证据自证 | P0 | `check_registry_evidence.py` | 禁跨家族 IC 证据照抄；standalone 在册 DSR 缺算/不显著(≥0.05)亦判失败(G3) |
 | R-OBJECTIVE-001 DSR 强制门 | P0 | `strategy_registry.register()` + `check_registry_evidence.py`(G3) | standalone 准入须 dsr_p<0.05(多重测试惩罚显著)，hit 达标≠通过 |
 | G8 防自欺 / holdout | P0 | `check_holdout_compliance.py` | 自动环+promote 验证栈(phase2/3)load 全样本必须截到 <boundary；锁 holdout.start hash(ADR-021)；强制 boundary 只进不退+账本一致(ADR-023)，禁偷看金库 |
