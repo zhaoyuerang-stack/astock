@@ -10,6 +10,38 @@
 - [ ] **【2026-09-30 复核】small-cap-size/v2.0 纸面前向实验(ADR-024)** — 06-22 启动的人工 override 纸面前向(零真金,DSR=0.086 未过门,主仓继续防守)。跟踪器 `scripts/research/paper_forward_smallcap.py` 已接进日更旁路(每日自动累积快照到 `reports/experiments/smallcap_v2_paper_forward.jsonl`)。**到 ~2026-09 底(≥3 月前向)复核**:前向兑现(夏普稳、回撤受控、未破 MA16 防守)→ 证据增强(n_periods↑,DSR 可能真过)→ 再议小额真仓 + 走正式 promote;前向塌陷/破防守 → 证否、停实验。**注:复核前绝不因「纸面好看」就绕 DSR 门登记在册(R-LLM-001/§12.3)。** 谁:用户 + 走 workflow。
 - [ ] **【并行设计】冠军因子 L1~L3 审计并行化改造** — 06-28 发现演化收尾时的 Top K 冠军因子 L3 审计为串行，单线程排队 Walk-Forward 耗时 15-20 分钟成为新瓶颈。已在 `factory/autoresearch/islands.py` 完成多核并行化重构（父进程顺序写盘以防止文件锁死锁），语法编译已通过。待随下一次大规模进化寻优启动进行实跑效果与性能验证。谁:研究侧 + 走 workflow。
 
+### 漏洞审计 / 成本分层剩余债(2026-07-12 会话盘点)
+
+> 来源:2026-07 代码级漏洞审计 + 成本口径讨论 + ADR-033。  
+> **本会话已落地**(勿重复立项):金额 share×raw;holdout hard gate;diversifier 机械边际;promote 默认 9-Gate;phase4 `oos_is_decay`;日更失败语义契约;新鲜度 SSOT;质量分层抽样;paper 文案跟 `FILL_PRICE_MODE`;候选缺 DSR 打标+G6+两项 PENDING 真回填;API 重任务 token + 非 loopback 读鉴权;成本地板 audit#8;`formal_cost_model`/宇宙分层/ADV 研究层 ADR-033。  
+> 下列为**明确未做完**或**需产品拍板**项;与下文数据债有交叉时以本表优先级为准。
+
+#### 待决策(产品/研究策略,先拍板再写码)
+
+- [ ] **V-D1 日更失败是否硬停信号** — 现状:`scheduled_daily_update` 在 `update_failed_but_data_fresh` 时仍可出信号(湖 fresh 则继续);`run_daily` 更新异常亦为软警告+readiness 兜底。**选项 A** 维持现状(契约已文档化+测试);**选项 B** 核心更新失败一律 abort、禁止出正式信号。谁:用户拍板 → ops。
+- [ ] **V-D2 研究 API 是否要多用户身份** — 现状:本机 action token + 非 loopback 须 token;`GET /settings/action-token` 仅 loopback。**够用**于研究台;**不够** SaaS/小程序多租户。若上公网/多用户须 JWT/session,与 miniapp openid 分轨。谁:用户拍板 → API。
+
+#### 成本口径 follow-up(ADR-033 后)
+
+- [ ] **V-C1 策略 runner 接线 `formal_cost_for_universe`** — 分层 API 已在 `core/cost_tiers.py`,但多数 `strategies/*` 仍 `CostModel()` 或 `config.cost.buy_cost` 透传;大盘/ETF 研究档未在 runner 层强制标注「非入册」。目标:正式 runner 只走 `formal_cost_for_universe(universe)`;research 脚本才允许 `research_cost_for_universe`。谁:引擎/策略。
+- [ ] **V-C2 透传 `config.cost` 的运行时地板** — AST 守卫拦字面量;运行时若 `StrategyConfig(cost=CostModel(buy=0.001))` 再透传仍可能绕过。可选:构造路径统一 `formal_cost_model`,或 CostModel 正式构造 fail-closed(测试用 experimental 出口)。谁:引擎。
+- [ ] **V-C3 ADV 冲击接入更多研究入口** — Gate 6 已用 `core/cost_impact`;`scripts/research/*` 容量/敏感性脚本可逐步改调同一模块,避免第二套公式。不改正式地板。谁:研究侧按需。
+
+#### 生产 / 数据新鲜度(审计 P1 残留)
+
+- [ ] **V-P1 质量门仍非全市场** — 分层抽样已替「只扫 5 大票」,但日更质量门仍是样本;全湖 `validate_final` 未作为日更硬闸。评估:日更后异步全检 vs 周度全检。谁:数据/ops。
+- [ ] **V-P2 上游滞后/停更静默风险**(与下文数据债合并推进,此处立索引) — `daily_basic`/`moneyflow` 滞后价量;北向 `hk_hold` 停更;ETF 东财源;积分墙 `cyq_perf`/`report_rc`。**原则**:门禁再严,上游脏信号仍造假 alpha。详见本文件「规划中」ETF/北向/daily_basic 与「积分墙」条目。
+
+#### API / 产品面
+
+- [ ] **V-A1 小程序鉴权与本机重任务隔离审计** — miniapp 有 openid;需确认:① 租户隔离;② token 扣费与失败退款;③ **是否能触发本机 promote / 9-Gate / 写台账**(应不能)。谁:产品+API,只读审计先。
+- [ ] **V-A2 `factory_cli promote --force` 扫描范围** — holdout 已 hard-gate;`check_no_force_promote` 主扫 bulk/scheduled;确认 factory_cli / 其它 CLI 的 force 语义与守卫覆盖无漏。谁:workflow 守卫。
+
+#### 工程 hygiene(非 alpha,但易复发)
+
+- [ ] **V-E1 共享工作树脏树收尾纪律** — 本会话多次遇他人半成品(nine_gates hedged、test_all 重写、DECISIONS ADR-032 等);提交靠人工显式 stage。可选:pre-commit 禁 `git add -A` 的 shell 包装或 agent 提交 checklist 机械检查。谁:协作/工具。
+- [ ] **V-E2 全量 `test_all.sh` 绿线确认** — 分项验证已过;脏树收敛后跑一次完整 `bash factor_research/scripts/test_all.sh` 作会话级收口证据。谁:任意 agent 收尾。
+
 ### 系统架构解耦总任务(2026-06-30 盘点)
 
 > 来源: 2026-06-30 只读架构盘点。`python3 factor_research/scripts/ci/check_layer_deps.py` 当前通过,所以这是下一轮架构债治理,不是已触发的硬违规修复。原则:先用守卫固化边界,再小步迁移实现;不得改 alpha 判定、成本、holdout、DSR、台账状态、生产部署清单。
