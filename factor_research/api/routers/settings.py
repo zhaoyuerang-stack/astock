@@ -5,14 +5,14 @@ import json
 from datetime import date
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from contracts.views import (ActionTokenView, AuditView, LLMConfigSet, LLMConfigView,
                              LLMTestResult, SystemConfigView)
-from services.actions.action_guard import (ACTION_HEADER, audit_action,
+from services.actions.action_guard import (audit_action,
                                            current_action_token,
                                            is_loopback_request,
-                                           verify_action_token)
+                                           require_action_token)
 from services.read.audit import recent_audit
 from services.read.settings import system_config
 
@@ -29,10 +29,6 @@ def config() -> SystemConfigView:
 @router.get("/audit", response_model=AuditView)
 def audit(limit: int = 40) -> AuditView:
     return recent_audit(limit=limit)
-
-
-def require_action_token(x_action_token: str | None = Header(default=None, alias=ACTION_HEADER)) -> None:
-    verify_action_token(x_action_token)
 
 
 @router.get("/action-token", response_model=ActionTokenView)

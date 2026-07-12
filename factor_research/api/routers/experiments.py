@@ -1,7 +1,7 @@
 """研究实验端点:假设池漏斗 / 假设列表 / 已登记实验。"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from contracts.views import (
     ActionJobView,
@@ -28,7 +28,7 @@ from contracts.views import (
     ResearchWorkItemListView,
     ResearchRunIndexView,
 )
-from services.actions.action_guard import ACTION_HEADER, audit_action, verify_action_token
+from services.actions.action_guard import audit_action, require_action_token
 from services.actions.autoresearch import (
     promote_approved_candidate,
     run_autoresearch_seeds,
@@ -85,10 +85,6 @@ def get_logical_chains() -> list[dict]:
 @router.get("/industry-knowledge-graph")
 def get_industry_knowledge_graph() -> dict:
     return industry_knowledge_graph()
-
-
-def require_action_token(x_action_token: str | None = Header(default=None, alias=ACTION_HEADER)) -> None:
-    verify_action_token(x_action_token)
 
 
 @router.get("/promotion-readiness", response_model=PromotionReadinessView)

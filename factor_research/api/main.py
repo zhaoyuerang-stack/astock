@@ -9,11 +9,17 @@
 """
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from api.routers import (agent, backtest, data, experiments, factors, miniapp, paper, portfolio,
                          risk, settings, state, strategies, system, trade_readiness, governance)
+from services.actions.action_guard import (
+    ACTION_HEADER,
+    is_public_path,
+    require_local_or_action_token,
+)
 
 app = FastAPI(title="Quant Research Platform API", version="0.0-phase0")
 
@@ -30,6 +36,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def research_api_local_or_token(request: Request, call_next):
+    """Research desk reads: loopback OK; non-loopback needs X-Action-Token.
+
+    Heavy/write endpoints still enforce token via Depends(require_action_token)
+    even on loopback. Miniapp / health / OpenAPI stay public (own auth or none).
+    """
+    path = request.url.path
+    if is_public_path(path):
+        return await call_next(request)
+    # Action-token bootstrap itself is loopback-gated inside the route.
+    if path == "/settings/action-token":
+        return await call_next(request)
+    try:
+        require_local_or_action_token(request)
+    except Exception as exc:
+        # HTTPException from verify_action_token
+        status = getattr(exc, "status_code", 403)
+        detail = getattr(exc, "detail", f"missing or invalid {ACTION_HEADER}")
+        return JSONResponse(status_code=status, content={"detail": detail})
+    return await call_next(request)
+
 
 app.include_router(strategies.router)
 app.include_router(factors.router)

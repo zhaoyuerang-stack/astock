@@ -61,8 +61,11 @@ interface WaitJobOptions {
 
 let actionTokenPromise: Promise<ActionTokenView> | null = null;
 
-async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { cache: "no-store" });
+async function get<T>(path: string, extraHeaders: Record<string, string> = {}): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    cache: "no-store",
+    headers: { ...extraHeaders },
+  });
   if (!res.ok) throw new Error(`API ${path} → ${res.status} ${res.statusText}`);
   return res.json() as Promise<T>;
 }
@@ -97,6 +100,11 @@ async function actionToken(): Promise<ActionTokenView> {
     });
   }
   return actionTokenPromise;
+}
+
+async function protectedGet<T>(path: string): Promise<T> {
+  const token = await actionToken();
+  return get<T>(path, { [token.header || "X-Action-Token"]: token.token });
 }
 
 async function protectedPost<T>(path: string, body: unknown): Promise<T> {
@@ -240,16 +248,20 @@ export const api = {
   experimentJob: (jobId: string) => get<ActionJobView>(`/experiments/jobs/${encodeURIComponent(jobId)}`),
   waitForExperimentJob,
   agentAsk: (request: string, context: Record<string, unknown> = {}, messages: AgentMessage[] = []) =>
-    post<AgentAskResponse>("/agent/ask", { request, context, messages }),
+    protectedPost<AgentAskResponse>("/agent/ask", { request, context, messages }),
   createAgentSession: (body: { page_context?: string; title?: string; user_id?: string } = {}) =>
-    post<AgentSession>("/agent/sessions", {
+    protectedPost<AgentSession>("/agent/sessions", {
       page_context: body.page_context ?? "",
       title: body.title ?? "AI 会话",
       user_id: body.user_id ?? "local",
     }),
-  getAgentSession: (sessionId: string) => get<AgentSession>(`/agent/sessions/${encodeURIComponent(sessionId)}`),
+  getAgentSession: (sessionId: string) =>
+    protectedGet<AgentSession>(`/agent/sessions/${encodeURIComponent(sessionId)}`),
   agentSessionAsk: (sessionId: string, request: string, context: Record<string, unknown> = {}) =>
-    post<AgentSessionAskResponse>(`/agent/sessions/${encodeURIComponent(sessionId)}/ask`, { request, context }),
+    protectedPost<AgentSessionAskResponse>(`/agent/sessions/${encodeURIComponent(sessionId)}/ask`, {
+      request,
+      context,
+    }),
   systemConfig: () => get<SystemConfigView>("/settings/config"),
   audit: (limit = 40) => get<AuditView>(`/settings/audit?limit=${limit}`),
   actionToken,
@@ -269,7 +281,8 @@ export const api = {
     for (const [key, value] of entries) {
       if (value !== undefined && value !== "") q.set(key, String(value));
     }
-    return get<BacktestResult>(`/backtest/run?${q.toString()}`);
+    // Heavy: always send action token (server requires it even on loopback).
+    return protectedGet<BacktestResult>(`/backtest/run?${q.toString()}`);
   },
   tradeReadiness: () => get<TradeReadinessView>("/trade-readiness"),
   governance: () => get<GovernanceView>("/governance"),

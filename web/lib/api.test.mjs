@@ -171,14 +171,18 @@ test("protected settings posts use the action token header without exposing it i
   assert.deepEqual(calls.map((c) => c.path), ["/settings/action-token", "/settings/llm"]);
 });
 
-test("production backtest client does not send fixed leverage", async () => {
+test("production backtest client does not send fixed leverage and includes action token", async () => {
   const calls = [];
   const { api } = await importFreshApi();
 
   globalThis.fetch = async (url, init = {}) => {
     const path = String(url).replace("http://api.test", "");
     calls.push({ path, init });
+    if (path === "/settings/action-token") {
+      return jsonResponse({ header: "X-Action-Token", token: "bt-token", source: "file" });
+    }
     assert.equal(path.includes("leverage="), false);
+    assert.equal(init.headers["X-Action-Token"], "bt-token");
     return jsonResponse({
       annual: 0,
       vol: 0,
@@ -208,13 +212,13 @@ test("production backtest client does not send fixed leverage", async () => {
     leverage: 9,
   });
 
-  assert.equal(
-    calls[0].path,
+  assert.deepEqual(calls.map((c) => c.path), [
+    "/settings/action-token",
     "/backtest/run?start=2018-01-01&top_n=25&rebalance_days=20&factor_window=20&timing_ma=16",
-  );
+  ]);
 });
 
-test("agentAsk sends prior messages for multi-turn context", async () => {
+test("agentAsk sends prior messages and action token for multi-turn context", async () => {
   const calls = [];
   const { api } = await importFreshApi();
 
@@ -222,8 +226,13 @@ test("agentAsk sends prior messages for multi-turn context", async () => {
     const path = String(url).replace("http://api.test", "");
     calls.push({ path, init });
 
+    if (path === "/settings/action-token") {
+      return jsonResponse({ header: "X-Action-Token", token: "agent-token", source: "file" });
+    }
+
     if (path === "/agent/ask") {
       assert.equal(init.method, "POST");
+      assert.equal(init.headers["X-Action-Token"], "agent-token");
       const body = JSON.parse(init.body);
       assert.equal(body.request, "继续解释第二点");
       assert.deepEqual(body.context, { current_page: "overview" });
@@ -231,6 +240,7 @@ test("agentAsk sends prior messages for multi-turn context", async () => {
         { role: "user", content: "这个系统怎么用" },
         { role: "assistant", content: "先看总览，再看风控。" },
       ]);
+      assert.equal(String(init.body).includes("agent-token"), false);
       return jsonResponse({
         output: {
           summary: "继续说明",
@@ -263,10 +273,10 @@ test("agentAsk sends prior messages for multi-turn context", async () => {
     ],
   );
 
-  assert.equal(calls.length, 1);
+  assert.deepEqual(calls.map((c) => c.path), ["/settings/action-token", "/agent/ask"]);
 });
 
-test("agent session API creates a session and asks inside it", async () => {
+test("agent session API creates a session and asks inside it with action token", async () => {
   const calls = [];
   const { api } = await importFreshApi();
 
@@ -274,8 +284,13 @@ test("agent session API creates a session and asks inside it", async () => {
     const path = String(url).replace("http://api.test", "");
     calls.push({ path, init });
 
+    if (path === "/settings/action-token") {
+      return jsonResponse({ header: "X-Action-Token", token: "session-token", source: "file" });
+    }
+
     if (path === "/agent/sessions") {
       assert.equal(init.method, "POST");
+      assert.equal(init.headers["X-Action-Token"], "session-token");
       assert.deepEqual(JSON.parse(init.body), {
         page_context: "overview",
         title: "AI 会话",
@@ -295,6 +310,7 @@ test("agent session API creates a session and asks inside it", async () => {
 
     if (path === "/agent/sessions/s-123/ask") {
       assert.equal(init.method, "POST");
+      assert.equal(init.headers["X-Action-Token"], "session-token");
       assert.deepEqual(JSON.parse(init.body), {
         request: "继续解释",
         context: { current_page: "overview" },
@@ -339,5 +355,9 @@ test("agent session API creates a session and asks inside it", async () => {
   assert.equal(session.session_id, "s-123");
   const reply = await api.agentSessionAsk("s-123", "继续解释", { current_page: "overview" });
   assert.equal(reply.session.messages.length, 2);
-  assert.deepEqual(calls.map((c) => c.path), ["/agent/sessions", "/agent/sessions/s-123/ask"]);
+  assert.deepEqual(calls.map((c) => c.path), [
+    "/settings/action-token",
+    "/agent/sessions",
+    "/agent/sessions/s-123/ask",
+  ]);
 });

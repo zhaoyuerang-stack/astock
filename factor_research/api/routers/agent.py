@@ -1,11 +1,15 @@
-"""POST /agent/ask —— 研究副驾驶(规则式 planner;LLM 可插拔)。"""
+"""POST /agent/ask —— 研究副驾驶(规则式 planner;LLM 可插拔)。
+
+重任务(LLM / 会话写):始终要求 X-Action-Token,即使 loopback。
+"""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from contracts.views import (AgentAskRequest, AgentAskResponse, AgentKnowledgeSourceView,
                              AgentSessionAskRequest, AgentSessionAskResponse,
                              AgentSessionCreateRequest, AgentSessionView)
+from services.actions.action_guard import require_action_token
 from services.agent.knowledge import PROJECT_ROOT, list_knowledge_sources
 from services.agent.planner import ask
 from services.agent.sessions import append_message, create_session, get_session, history_for_llm, list_sessions
@@ -14,14 +18,20 @@ router = APIRouter(prefix="/agent", tags=["agent"])
 
 
 @router.post("/ask", response_model=AgentAskResponse)
-def agent_ask(body: AgentAskRequest) -> AgentAskResponse:
+def agent_ask(
+    body: AgentAskRequest,
+    _confirmed: None = Depends(require_action_token),
+) -> AgentAskResponse:
     context = dict(body.context)
     context["messages"] = body.messages[-8:]
     return AgentAskResponse(**ask(body.request, context))
 
 
 @router.post("/sessions", response_model=AgentSessionView)
-def agent_create_session(body: AgentSessionCreateRequest) -> AgentSessionView:
+def agent_create_session(
+    body: AgentSessionCreateRequest,
+    _confirmed: None = Depends(require_action_token),
+) -> AgentSessionView:
     return AgentSessionView(**create_session(
         page_context=body.page_context,
         title=body.title,
@@ -30,12 +40,19 @@ def agent_create_session(body: AgentSessionCreateRequest) -> AgentSessionView:
 
 
 @router.get("/sessions", response_model=list[AgentSessionView])
-def agent_list_sessions(user_id: str = "local", limit: int = 20) -> list[AgentSessionView]:
+def agent_list_sessions(
+    user_id: str = "local",
+    limit: int = 20,
+    _confirmed: None = Depends(require_action_token),
+) -> list[AgentSessionView]:
     return [AgentSessionView(**s) for s in list_sessions(user_id=user_id, limit=limit)]
 
 
 @router.get("/sessions/{session_id}", response_model=AgentSessionView)
-def agent_get_session(session_id: str) -> AgentSessionView:
+def agent_get_session(
+    session_id: str,
+    _confirmed: None = Depends(require_action_token),
+) -> AgentSessionView:
     try:
         return AgentSessionView(**get_session(session_id))
     except FileNotFoundError as e:
@@ -45,7 +62,11 @@ def agent_get_session(session_id: str) -> AgentSessionView:
 
 
 @router.post("/sessions/{session_id}/ask", response_model=AgentSessionAskResponse)
-def agent_session_ask(session_id: str, body: AgentSessionAskRequest) -> AgentSessionAskResponse:
+def agent_session_ask(
+    session_id: str,
+    body: AgentSessionAskRequest,
+    _confirmed: None = Depends(require_action_token),
+) -> AgentSessionAskResponse:
     try:
         session = get_session(session_id)
     except FileNotFoundError as e:
@@ -72,7 +93,7 @@ def agent_session_ask(session_id: str, body: AgentSessionAskRequest) -> AgentSes
 
 
 @router.get("/sources", response_model=list[AgentKnowledgeSourceView])
-def agent_sources() -> list[AgentKnowledgeSourceView]:
+def agent_sources(_confirmed: None = Depends(require_action_token)) -> list[AgentKnowledgeSourceView]:
     out: list[AgentKnowledgeSourceView] = []
     for src in list_knowledge_sources():
         out.append(
@@ -93,4 +114,3 @@ def agent_sources() -> list[AgentKnowledgeSourceView]:
         )
     )
     return out
-
