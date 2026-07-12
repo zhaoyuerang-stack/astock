@@ -35,7 +35,16 @@ def volatility(close: pd.DataFrame, n: int = 20) -> pd.DataFrame:
 
 
 def illiquidity(close: pd.DataFrame, volume: pd.DataFrame, n: int = 20) -> pd.DataFrame:
-    """Amihud非流动性因子 = mean(|ret|/volume)"""
-    ret = close.pct_change().abs()
-    daily = ret / (volume + 1)
+    """Amihud 非流动性 = mean(|ret| / amount)，与 `factors.alpha.builtins.illiq.AmihudIlliq` 对齐。
+
+    正式 Amihud(2002) 分母是成交额 amount，不是成交量 volume。
+    AutoResearch DSL 表面只有 close/volume 时，用 amount ≈ volume × close 代理
+    （在 amount = volume×price 时与 OO 版同构；截面排序下常数单位差可消）。
+
+    历史错误口径曾写 mean(|ret|/volume)，等价于 Amihud×价格水平，会把价格因子
+    混进「illiquidity」搜索语义——已纠正，勿回退。
+    """
+    ret = close.pct_change(fill_method=None).abs()
+    amount = volume.astype(float) * close.astype(float)
+    daily = ret / (amount.replace(0, np.nan) + 1.0)
     return daily.rolling(n).mean()

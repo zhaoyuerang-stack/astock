@@ -56,11 +56,11 @@ FACTOR_MUTATION_SPECS: dict[str, dict] = {
         "data_dependencies": ("price/close",),
     },
 
-    # Amihud illiquidity（已 LIVE 但参数可调）
+    # Amihud illiquidity（参数可调；分母=amount，与 OO AmihudIlliq 对齐）
     "factors.momentum.illiquidity": {
         "thesis": EconomicThesis(
-            mechanism="Amihud 2002 非流动性 = mean(|ret|/volume)。已 LIVE v1.0 +32%",
-            citation="Amihud 2002 + 用户实证",
+            mechanism="Amihud 2002 非流动性 = mean(|ret|/amount)；DSL 用 volume×close 代理 amount",
+            citation="Amihud 2002 + factors.alpha.builtins.illiq.AmihudIlliq",
             falsifiability="市场成交额持续放大；因子 IC 连续 4 季 < 0",
         ),
         "param_grid": {
@@ -68,7 +68,7 @@ FACTOR_MUTATION_SPECS: dict[str, dict] = {
             # (近同一信息源),保 n40(生产相邻口径)(metasearch_findings_20260623)。
             "n": [5, 10, 20, 40],
         },
-        "data_dependencies": ("price/close", "price/volume"),
+        "data_dependencies": ("price/close", "price/volume", "price/amount"),
     },
 
     # 价格偏离均线
