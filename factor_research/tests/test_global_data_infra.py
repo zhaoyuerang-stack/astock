@@ -254,7 +254,7 @@ def test_global_writer_manifest_and_price_loader(tmp_path):
         "adjustment_version": ["raw-v1", "raw-v1", "raw-v1", "raw-v1"],
         "currency": ["USD", "USD", "USD", "USD"],
     })
-    source = get_source_spec("global_cboe_us_price_v1")
+    source = get_source_spec("global_etf_price_v1")
     canonical = normalize_global_frame(
         frame,
         source=source,
@@ -275,8 +275,8 @@ def test_global_writer_manifest_and_price_loader(tmp_path):
     manifest = read_global_manifest(root=tmp_path)
     assert manifest["datasets"]["market_price_daily"]["row_count"] == 4
     assert manifest["datasets"]["market_price_daily"]["latest_date"] == "2026-07-07"
-    assert manifest["datasets"]["market_price_daily"]["calendar"] == "US_EQUITIES"
-    assert manifest["datasets"]["market_price_daily"]["timezone"] == "America/New_York"
+    assert manifest["datasets"]["market_price_daily"]["calendar"] == "SOURCE_EXCHANGE"
+    assert manifest["datasets"]["market_price_daily"]["timezone"] == "SOURCE_EXCHANGE"
     assert manifest["datasets"]["market_price_daily"]["currency"] == "USD"
 
     with pytest.raises(ValueError, match="adjustment_basis"):
@@ -322,7 +322,7 @@ def test_adjusted_only_price_source_rejects_raw_price_loader(tmp_path):
     assert adjusted.iloc[0, 0] == 621.5
 
 
-def test_cboe_rounding_tolerance_does_not_quarantine_valid_ohlc_boundary():
+def test_cboe_source_is_canonicalized_as_close_only_when_ohlc_is_unverified():
     from dataclasses import replace
 
     from lake.global_catalog import get_dataset_spec, get_source_spec
@@ -334,6 +334,8 @@ def test_cboe_rounding_tolerance_does_not_quarantine_valid_ohlc_boundary():
     result = validate_global_frame(normalize_global_frame(raw, source=source, spec=get_dataset_spec("market_price_daily"), ingest_id="cboe-rounding"), source=source, spec=get_dataset_spec("market_price_daily"))
     assert result.rejected is False
     assert result.quarantine.empty
+    assert result.clean[["open", "high", "low"]].isna().all().all()
+    assert result.clean.iloc[0]["ohlc_quality"] == "close_only_unverified_ohlc"
 
 
 def test_global_macro_loader_uses_available_at_as_of_alignment(tmp_path):

@@ -44,7 +44,10 @@ Current local admission:
   not an assertion of the exact release time.
 - `global_cboe_us_price_v1`: OpenBB/CBOE daily price source, enabled for the
   overseas-equity and ETF allowlists. Its adjustment semantics are not sufficient
-  for valuation, so it is research-return-only.
+  for valuation, so it is research-return-only. Its historical O/H/L fields are
+  not canonical because source-level boundary inconsistencies were observed;
+  canonical CBOE data is close/volume-only and raw snapshots retain O/H/L for
+  later reconciliation.
 - `global_yfinance_fx_v1` and `global_yfinance_commodity_v1`: OpenBB/yfinance
   daily price sources, enabled for
   the documented research allowlists. Their timestamps are date-level, so canonical

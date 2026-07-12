@@ -133,6 +133,13 @@ def _normalize_price(
     out["observed_at"] = out["session_close_at"]
     for column in ("open", "high", "low", "close", "volume"):
         out[column] = pd.to_numeric(out[column], errors="coerce")
+    if source.source_id == "global_cboe_us_price_v1":
+        # CBOE historical O/H/L has source-level boundary inconsistencies on
+        # a small but material subset of dates. Raw snapshots retain every
+        # field for later reconciliation; canonical research data exposes
+        # only the independently usable close/volume contract.
+        out[["open", "high", "low"]] = pd.NA
+        out["ohlc_quality"] = "close_only_unverified_ohlc"
     out = _append_common_columns(
         out,
         source=source,

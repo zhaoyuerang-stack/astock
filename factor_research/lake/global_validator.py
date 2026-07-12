@@ -93,7 +93,10 @@ def validate_global_frame(
     spec: DatasetSpec,
 ) -> GlobalValidationResult:
     """Validate canonical data and isolate row-level errors before lake writes."""
-    required = COMMON_COLUMNS + _dataset_columns(spec)
+    dataset_columns = _dataset_columns(spec)
+    if source.source_id == "global_cboe_us_price_v1":
+        dataset_columns = tuple(column for column in dataset_columns if column not in {"open", "high", "low"})
+    required = COMMON_COLUMNS + dataset_columns
     missing = [column for column in required if column not in frame.columns]
     if missing:
         return _reject(frame, f"missing canonical columns: {','.join(missing)}")
@@ -135,17 +138,15 @@ def validate_global_frame(
         _append_reason(reasons, out["vintage_start"].astype(str) > out["vintage_end"].astype(str), "invalid_vintage_range")
 
     if spec.dataset_id in {"market_price_daily", "etf_daily", "fx_daily", "commodity_daily"}:
-        for column in ("open", "high", "low", "close", "volume"):
+        price_columns = ("close", "volume") if source.source_id == "global_cboe_us_price_v1" else ("open", "high", "low", "close", "volume")
+        for column in price_columns:
             _append_reason(reasons, out[column].isna(), f"invalid_{column}")
-        _append_reason(reasons, (out[["open", "high", "low", "close"]] <= 0).any(axis=1), "non_positive_price")
+        _append_reason(reasons, out["close"] <= 0, "non_positive_price")
         _append_reason(reasons, out["volume"] < 0, "negative_volume")
-        # CBOE historical OHLC values are rounded independently to cents, so
-        # a valid bar can cross an OHLC boundary by a few cents. Keep this
-        # source-specific price precision allowance small and explicit.
-        price_tolerance = 0.05 if source.source_id == "global_cboe_us_price_v1" else 0.0
-        lower = out["low"] > (out[["open", "close"]].min(axis=1) + price_tolerance)
-        upper = out["high"] < (out[["open", "close"]].max(axis=1) - price_tolerance)
-        _append_reason(reasons, lower | upper, "ohlc_inconsistent")
+        if source.source_id != "global_cboe_us_price_v1":
+            lower = out["low"] > out[["open", "close"]].min(axis=1)
+            upper = out["high"] < out[["open", "close"]].max(axis=1)
+            _append_reason(reasons, lower | upper, "ohlc_inconsistent")
         _append_reason(reasons, ~out["is_adjusted"].map(is_bool), "invalid_is_adjusted")
         if "raw_close" not in out.columns or "adjusted_close" not in out.columns:
             return _reject(frame, "price adjustment fields are not separated")
