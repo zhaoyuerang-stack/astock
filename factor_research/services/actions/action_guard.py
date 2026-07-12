@@ -4,11 +4,12 @@ from __future__ import annotations
 import json
 import os
 import secrets
-import stat
 from datetime import date
 from pathlib import Path
 
 from fastapi import HTTPException, Request
+
+from lake.artifact_writer import append_jsonl, atomic_write_text
 
 ROOT = Path(__file__).resolve().parents[2]
 ACTION_TOKEN_ENV = "ASTCOK_ACTION_TOKEN"
@@ -29,12 +30,7 @@ def current_action_token() -> tuple[str, str]:
             return token, "file"
 
     token = secrets.token_urlsafe(32)
-    ACTION_TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
-    ACTION_TOKEN_FILE.write_text(token + "\n", encoding="utf-8")
-    try:
-        ACTION_TOKEN_FILE.chmod(stat.S_IRUSR | stat.S_IWUSR)
-    except OSError:
-        pass
+    atomic_write_text(ACTION_TOKEN_FILE, token + "\n", mode=0o600)
     return token, "file"
 
 
@@ -53,7 +49,6 @@ def is_loopback_request(request: Request) -> bool:
 def audit_action(summary: str, detail: str = "", *, status: str = "accepted", actor: str = "human") -> None:
     """Append action audit without recording secrets or payload contents."""
     try:
-        ACTION_AUDIT_FILE.parent.mkdir(parents=True, exist_ok=True)
         row = {
             "date": str(date.today()),
             "summary": summary,
@@ -61,7 +56,6 @@ def audit_action(summary: str, detail: str = "", *, status: str = "accepted", ac
             "status": status,
             "actor": actor,
         }
-        with ACTION_AUDIT_FILE.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
-    except OSError:
-        pass
+        append_jsonl(ACTION_AUDIT_FILE, row)
+    except OSError as exc:
+        raise RuntimeError("failed to persist the action audit record") from exc

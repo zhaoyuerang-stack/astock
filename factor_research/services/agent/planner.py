@@ -18,6 +18,7 @@ from pathlib import Path
 from contracts.models import AgentTask
 from services.agent.llm_adapter import get_adapter
 from services.agent.skills import route_skill
+from lake.artifact_writer import append_jsonl
 
 ROOT = Path(__file__).resolve().parents[2]
 _TASK_LOG = ROOT / "data_lake" / "agent" / "agent_tasks.jsonl"
@@ -79,11 +80,9 @@ def _task_id(request: str, context: dict) -> str:
 
 def _log_task(task: AgentTask) -> None:
     try:
-        _TASK_LOG.parent.mkdir(parents=True, exist_ok=True)
-        with _TASK_LOG.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(task.model_dump(), ensure_ascii=False, default=str) + "\n")
-    except OSError:
-        pass
+        append_jsonl(_TASK_LOG, task.model_dump())
+    except OSError as exc:
+        raise RuntimeError("failed to persist agent task audit") from exc
 
 
 # ── 各工具结果 → 结构化解读 ────────────────────────────────────────────────────

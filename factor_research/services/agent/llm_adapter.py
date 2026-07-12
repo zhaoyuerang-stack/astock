@@ -15,6 +15,8 @@ import os
 import urllib.request
 from pathlib import Path
 
+from lake.artifact_writer import atomic_write_json
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -235,7 +237,6 @@ def load_runtime_config() -> dict:
 
 def save_runtime_config(provider: str, model: str, base_url: str, api_key: str | None) -> dict:
     """保存到 gitignored 文件(权限 600)。api_key 传 None 表示保留原 key。"""
-    _RUNTIME.parent.mkdir(parents=True, exist_ok=True)
     cur = load_runtime_config()
     cfg = {
         "provider": (provider or "none"),
@@ -243,11 +244,7 @@ def save_runtime_config(provider: str, model: str, base_url: str, api_key: str |
         "base_url": (base_url or ""),
         "api_key": (api_key if api_key is not None else cur.get("api_key", "")),
     }
-    _RUNTIME.write_text(json.dumps(cfg, ensure_ascii=False), encoding="utf-8")
-    try:
-        os.chmod(_RUNTIME, 0o600)
-    except OSError:
-        pass
+    atomic_write_json(_RUNTIME, cfg, mode=0o600)
     return cfg
 
 
