@@ -697,10 +697,17 @@
             "wf_sharpe": 0.3372
           },
           "status": "候选",
-          "notes": "Workflow Phase 1-3 validated. WF: +8.0% ann / -64.0% dd.",
+          "notes": "Workflow Phase 1-3 validated. WF: +8.0% ann / -64.0% dd. [nine_gate_audit=PENDING/STUB_NO_DSR]",
           "evidence": {
             "hypothesis_id": "d17adfabb99eab96",
-            "experiment_ids": []
+            "experiment_ids": [],
+            "nine_gate_audit": {
+              "status": "PENDING",
+              "classification": "STUB_NO_DSR",
+              "reason": "nine_gate 仅有 WF/局部摘要、无 dsr_p(易被误读为已审计)",
+              "flagged_at": "2026-07-12",
+              "rule": "历史候选无 dsr_p 须显式标记 PENDING/EXEMPT;禁止无 9-Gate 却像审过。升「在册」仍须 dsr_p+DSR 门。"
+            }
           },
           "admission": {},
           "nine_gate": {
@@ -3386,8 +3393,16 @@
             "hit": false
           },
           "status": "候选",
-          "notes": "华西个股选股版：在v1.3的基础上，对于选中的行业，在行业内部挑选绩优且非拥挤个股（ROE+NPY-0.5*CPV）。由于个股摩擦成本和因子分散度大，相比纯行业ETF版（v1.3）表现有一定磨损，全历史年化 +12.89%，夏普 0.76，回撤 -26.75%，登记为候选。",
-          "evidence": {},
+          "notes": "华西个股选股版：在v1.3的基础上，对于选中的行业，在行业内部挑选绩优且非拥挤个股（ROE+NPY-0.5*CPV）。由于个股摩擦成本和因子分散度大，相比纯行业ETF版（v1.3）表现有一定磨损，全历史年化 +12.89%，夏普 0.76，回撤 -26.75%，登记为候选。 [nine_gate_audit=PENDING/EMPTY]",
+          "evidence": {
+            "nine_gate_audit": {
+              "status": "PENDING",
+              "classification": "EMPTY",
+              "reason": "nine_gate 为空,无 DSR/9-Gate 实算",
+              "flagged_at": "2026-07-12",
+              "rule": "历史候选无 dsr_p 须显式标记 PENDING/EXEMPT;禁止无 9-Gate 却像审过。升「在册」仍须 dsr_p+DSR 门。"
+            }
+          },
           "nine_gate": {},
           "admission": {}
         }
@@ -3925,13 +3940,20 @@
           },
           "metrics": {},
           "status": "候选",
-          "notes": "观察版本：不得参与生产组合；未编造收益、回撤、夏普或 Gate 结果。",
+          "notes": "观察版本：不得参与生产组合；未编造收益、回撤、夏普或 Gate 结果。 [nine_gate_audit=EXEMPT_SHADOW/EMPTY]",
           "evidence": {
             "artifact_paths": [
               "data_lake/agent/shadow_incubation_log.json",
               "data_lake/research_signals/ontology_predictions.json",
               "reports/islands/shadow_ontology_performance.json"
-            ]
+            ],
+            "nine_gate_audit": {
+              "status": "EXEMPT_SHADOW",
+              "classification": "EMPTY",
+              "reason": "nine_gate 为空,无 DSR/9-Gate 实算",
+              "flagged_at": "2026-07-12",
+              "rule": "历史候选无 dsr_p 须显式标记 PENDING/EXEMPT;禁止无 9-Gate 却像审过。升「在册」仍须 dsr_p+DSR 门。"
+            }
           },
           "admission": {},
           "nine_gate": {}

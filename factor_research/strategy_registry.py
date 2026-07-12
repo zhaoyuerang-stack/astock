@@ -525,12 +525,114 @@ def demote_dsr_insignificant_standalone(threshold: float = DSR_ALPHA, apply: boo
     return transitions
 
 
+# 候选无 DSR 的审计标签(evidence.nine_gate_audit)——历史台账 fail-closed 标记,禁止「看起来审过」。
+NINE_GATE_AUDIT_KEY = "nine_gate_audit"
+NINE_GATE_AUDIT_PENDING = "PENDING"
+NINE_GATE_AUDIT_EXEMPT_SHADOW = "EXEMPT_SHADOW"
+NINE_GATE_AUDIT_COMPLETE = "COMPLETE"
+NINE_GATE_AUDIT_OK_STATUSES = (
+    NINE_GATE_AUDIT_PENDING,
+    NINE_GATE_AUDIT_EXEMPT_SHADOW,
+    "EXEMPT",
+    NINE_GATE_AUDIT_COMPLETE,
+)
+
+
+def classify_nine_gate_payload(nine_gate: dict | None) -> str:
+    """分类 nine_gate 字段: COMPLETE | EMPTY | STUB_NO_DSR。
+
+    STUB_NO_DSR = 仅有 phase3 WF 摘要等、无 dsr_p,易被误读为「已 9-Gate」。
+    """
+    ng = dict(nine_gate or {})
+    if ng.get("dsr_p") is not None:
+        return "COMPLETE"
+    if not ng:
+        return "EMPTY"
+    return "STUB_NO_DSR"
+
+
+def candidate_missing_dsr(version_row: dict) -> bool:
+    """候选且 nine_gate.dsr_p 缺失。"""
+    if (version_row or {}).get("status") != "候选":
+        return False
+    return (version_row.get("nine_gate") or {}).get("dsr_p") is None
+
+
+def candidate_has_audit_flag(version_row: dict) -> bool:
+    audit = ((version_row.get("evidence") or {}).get(NINE_GATE_AUDIT_KEY) or {})
+    return str(audit.get("status") or "") in NINE_GATE_AUDIT_OK_STATUSES
+
+
+def _default_audit_status_for_candidate(family_id: str, version: str, notes: str) -> str:
+    """shadow/观察 类候选豁免实算,其余 PENDING 待 9-Gate。"""
+    blob = f"{family_id} {version} {notes or ''}".lower()
+    if "shadow" in blob or "观察" in notes or "不得参与生产" in (notes or ""):
+        return NINE_GATE_AUDIT_EXEMPT_SHADOW
+    return NINE_GATE_AUDIT_PENDING
+
+
+@_registry_write
+def flag_candidates_missing_dsr(*, apply: bool = True, date_str: str | None = None) -> list[dict]:
+    """治理迁移:给历史「候选」且无 nine_gate.dsr_p 的版本打 evidence.nine_gate_audit。
+
+    不伪造 DSR、不改 status/metrics/nine_gate 绩效字段。
+    幂等:已有 PENDING/EXEMPT_*/COMPLETE 标签则跳过。
+    返回 transition 列表。
+    """
+    data = _load()
+    today = date_str or str(date.today())
+    transitions: list[dict] = []
+    for fam in data["families"]:
+        fid = fam["id"]
+        for v in fam["versions"]:
+            if not candidate_missing_dsr(v):
+                continue
+            if candidate_has_audit_flag(v):
+                continue
+            classification = classify_nine_gate_payload(v.get("nine_gate"))
+            status = _default_audit_status_for_candidate(
+                fid, str(v.get("version") or ""), str(v.get("notes") or ""),
+            )
+            reason = {
+                "EMPTY": "nine_gate 为空,无 DSR/9-Gate 实算",
+                "STUB_NO_DSR": "nine_gate 仅有 WF/局部摘要、无 dsr_p(易被误读为已审计)",
+                "COMPLETE": "ok",
+            }.get(classification, classification)
+            ev = dict(v.get("evidence") or {})
+            ev[NINE_GATE_AUDIT_KEY] = {
+                "status": status,
+                "classification": classification,
+                "reason": reason,
+                "flagged_at": today,
+                "rule": (
+                    "历史候选无 dsr_p 须显式标记 PENDING/EXEMPT;"
+                    "禁止无 9-Gate 却像审过。升「在册」仍须 dsr_p+DSR 门。"
+                ),
+            }
+            v["evidence"] = ev
+            # 备注追加一行,人工浏览也不误判
+            note_tag = f"[nine_gate_audit={status}/{classification}]"
+            notes = str(v.get("notes") or "")
+            if note_tag not in notes:
+                v["notes"] = (notes + " " + note_tag).strip() if notes else note_tag
+            transitions.append({
+                "id": f"{fid}/{v.get('version')}",
+                "status": status,
+                "classification": classification,
+                "reason": reason,
+            })
+    if apply and transitions:
+        _save(data)
+    return transitions
+
+
 @_registry_write
 def attach_nine_gate(family, version, summary, evidence=None):
     """把一次 Nine-Gate 审计摘要（NineGatesReport.summarize()）写入指定版本的 nine_gate 字段。
 
     可选 evidence 同步绑定证据链 {"hypothesis_id":..., "experiment_ids":[...]}。
     经 _save 走台账唯一写入口；不改 status/metrics。
+    若 summary 含 dsr_p,自动把 evidence.nine_gate_audit 标为 COMPLETE(清 PENDING)。
     """
     data = _load()
     fam = next((f for f in data["families"] if f["id"] == family), None)
@@ -539,10 +641,22 @@ def attach_nine_gate(family, version, summary, evidence=None):
     v = next((x for x in fam["versions"] if x["version"] == version), None)
     if v is None:
         raise ValueError(f"版本 '{family}/{version}' 不存在")
-    v["nine_gate"] = dict(summary or {})
+    summary = dict(summary or {})
+    v["nine_gate"] = summary
+    ev = dict(v.get("evidence") or {})
     if evidence:
-        ev = dict(v.get("evidence") or {})
         ev.update(evidence)
+    # 实算 DSR 后关闭历史 PENDING 标签
+    if summary.get("dsr_p") is not None:
+        audit = dict(ev.get(NINE_GATE_AUDIT_KEY) or {})
+        audit.update({
+            "status": NINE_GATE_AUDIT_COMPLETE,
+            "classification": "COMPLETE",
+            "cleared_at": str(date.today()),
+            "reason": "nine_gate.dsr_p 已回填",
+        })
+        ev[NINE_GATE_AUDIT_KEY] = audit
+    if ev:
         v["evidence"] = ev
     _save(data)
     return f"{family}/{version}"

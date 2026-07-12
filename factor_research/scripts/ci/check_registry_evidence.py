@@ -472,6 +472,40 @@ def find_standalone_evidence_gaps(rows: list[dict]) -> list[tuple[str, str]]:
     return out
 
 
+def find_candidate_missing_dsr_unflagged(rows: list[dict]) -> list[tuple[str, str]]:
+    """G6:「候选」无 dsr_p 必须显式 evidence.nine_gate_audit 标签。
+
+    历史默认 promote 不跑 9-Gate 留下无 DSR 候选台账;打标后才允许继续挂「候选」,
+    防止 WF 摘要/空 nine_gate 被误读为已审计。升在册仍走 register() DSR 硬门。
+    """
+    from strategy_registry import (
+        NINE_GATE_AUDIT_KEY,
+        NINE_GATE_AUDIT_OK_STATUSES,
+        classify_nine_gate_payload,
+    )
+
+    out = []
+    for r in rows:
+        if r.get("status") != "候选":
+            continue
+        ng = r.get("nine_gate") or {}
+        if ng.get("dsr_p") is not None:
+            continue
+        tag = f"{r['family']}/{r['version']}"
+        audit = (r.get("evidence") or {}).get(NINE_GATE_AUDIT_KEY) or {}
+        st = str(audit.get("status") or "")
+        if st in NINE_GATE_AUDIT_OK_STATUSES:
+            continue
+        cls = classify_nine_gate_payload(ng)
+        out.append((
+            f"G6-cand-no-dsr:{tag}",
+            f"[G6 候选无DSR未标记] {tag} status=候选 但 nine_gate.dsr_p 缺失"
+            f"(classification={cls}) 且 evidence.{NINE_GATE_AUDIT_KEY} 未标记 "
+            f"PENDING/EXEMPT/COMPLETE — 请跑 strategy_registry.flag_candidates_missing_dsr()",
+        ))
+    return out
+
+
 def check(ledger: dict | None = None, research_records: list[dict] | None = None) -> int:
     if ledger is None:
         ledger = json.loads(LEDGER.read_text())
@@ -487,6 +521,7 @@ def check(ledger: dict | None = None, research_records: list[dict] | None = None
         + find_standalone_evidence_gaps(rows)
         + find_nine_gate_receipt_gaps(rows, research_records=research_records)
         + find_diversifier_receipt_gaps(rows, research_records=research_records)
+        + find_candidate_missing_dsr_unflagged(rows)
     )
     keys = {k for k, _ in all_v}
 
