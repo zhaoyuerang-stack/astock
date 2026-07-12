@@ -1,0 +1,43 @@
+{
+  "generated_at": "2026-07-12 11:25:20",
+  "threshold": 2.0,
+  "n_hypotheses": 21,
+  "source": "bootstrap from reports/research/metasearch_findings_20260623.md; refresh via python3 -m metasearch.factor_mi_audit --json",
+  "clusters": [
+    [
+      "small_cap_factor_w20",
+      "small_cap_factor_w30",
+      "small_cap_factor_w45",
+      "small_cap_factor_w60",
+      "small_cap_factor_w120",
+      "small_cap_factor_w252"
+    ],
+    [
+      "high_low_breakout__n20",
+      "price_position__n20"
+    ],
+    [
+      "amplitude_mean__n60",
+      "volatility__n60"
+    ],
+    [
+      "illiquidity__n40",
+      "illiquidity__n60"
+    ]
+  ],
+  "factor_clusters": [
+    [
+      "illiquidity",
+      "small_cap_factor"
+    ],
+    [
+      "amplitude_mean",
+      "volatility"
+    ],
+    [
+      "high_low_breakout",
+      "price_position"
+    ]
+  ],
+  "consumer": "knowledge.directions.redundancy_clusters(生成端 steering,fail-open)"
+}

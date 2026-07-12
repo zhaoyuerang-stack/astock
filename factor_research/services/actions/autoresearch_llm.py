@@ -93,9 +93,20 @@ def generate_llm_candidates(
 
         ledger_block = ledger_to_prompt(build_failure_ledger(experiment_log, repository))
 
+    # 方向级教训回流(knowledge/direction_registry.json,证据门控):已证伪/太弱方向勿再提,
+    # 空白区优先。fail-open:方向层故障不阻断生成(生成端 steering,非验真)。
+    direction_block = ""
+    try:
+        from knowledge.directions import prompt_block
+
+        direction_block = prompt_block()
+    except Exception as e:
+        print(f"[llm_gen] 方向登记簿读取失败(fail-open): {e}", flush=True)
+
     user = (
         f"请提出 {n} 个候选因子。"
         + (f"研究主题:{theme}。" if theme else "")
+        + (f"\n{direction_block}" if direction_block else "")
         + (f"\n{ledger_block}\n上述教训优先级最高,与之冲突的方向直接放弃。" if ledger_block else "")
         + f"\n已尝试候选与结局(避开重复,绕开已被证伪的方向):\n{_feedback_lines(repository)}"
     )

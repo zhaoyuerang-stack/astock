@@ -129,15 +129,65 @@ def cluster_by_redundancy(mat: pd.DataFrame, threshold=2.0) -> list[list[str]]:
     return sorted(clusters, key=lambda c: -len(c))
 
 
+def _pool_factor_base_map() -> dict:
+    """hypothesis 名 → 基础因子名(factor_fn_name 末段),供 DSL 白名单粒度消费。"""
+    pool = HypothesisPool()
+    out = {}
+    for h in pool.all():
+        fn = getattr(h, "factor_fn_name", "") or ""
+        if fn:
+            out[h.name] = fn.rsplit(".", 1)[-1]
+    return out
+
+
+def factor_clusters_from(clusters: list[list[str]], name_to_base: dict) -> list[list[str]]:
+    """hypothesis 簇 → 基础因子名簇(去重;映射不到/单成员簇丢弃)。
+
+    产物供 knowledge.directions.redundancy_clusters 在生成端做"同簇两腿=同一信息
+    算两遍 → 排尾"(L-1 教训机械回流);不参与任何有效性判断。
+    """
+    out = []
+    for c in clusters:
+        mapped = sorted({name_to_base.get(n, "") for n in c} - {""})
+        if len(mapped) > 1:
+            out.append(mapped)
+    return out
+
+
+def write_clusters_json(clusters: list[list[str]], *, threshold: float,
+                        n_hypotheses: int, out_path=None) -> Path:
+    """落机器可读冗余簇(metasearch/redundancy_clusters.json,月度刷新)。"""
+    from datetime import datetime
+
+    out = Path(out_path or Path(__file__).resolve().parent / "redundancy_clusters.json")
+    payload = {
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "threshold": threshold,
+        "n_hypotheses": n_hypotheses,
+        "clusters": clusters,
+        "factor_clusters": factor_clusters_from(clusters, _pool_factor_base_map()),
+        "consumer": "knowledge.directions.redundancy_clusters(生成端 steering,fail-open)",
+    }
+    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return out
+
+
 def main():
+    import argparse
+
     from lake.load_lake import load_prices, load_raw_close
-    from lake.units import implied_amount
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--json", action="store_true",
+                    help="落机器可读冗余簇到 metasearch/redundancy_clusters.json")
+    ap.add_argument("--json-path", default=None, help="自定义 JSON 输出路径")
+    args = ap.parse_args()
 
     print("Loading data lake...")
     px = load_prices(start="2018-01-01", fields=("close", "volume"))
     raw = load_raw_close(start="2018-01-01")
     close, volume = px["close"], px["volume"]
-    amount = implied_amount(volume, raw)
+    amount = volume * 100 * raw.reindex(index=volume.index, columns=volume.columns)
     print(f"  {close.shape}")
 
     ics = audit_hypothesis_pool(close, volume, amount, max_hyps=30)
@@ -184,6 +234,11 @@ def main():
     print(f"  原 hypothesis: {n_total}")
     print(f"  独立簇: {n_keep}")
     print(f"  算力节省: {saving:.0%} (每簇保留 1 个,其他可跳过 L1)")
+
+    if args.json or args.json_path:
+        out = write_clusters_json(clusters, threshold=2.0, n_hypotheses=n_total,
+                                  out_path=args.json_path)
+        print(f"\n✓ 机器可读冗余簇已落盘: {out}")
 
 
 if __name__ == "__main__":

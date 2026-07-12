@@ -295,6 +295,9 @@ class ChampionRecord:
     complexity: float = 0.0
     regime_icirs: dict[str, float] = field(default_factory=dict)
     ast: dict = field(default_factory=dict)
+    # knowledge gate 的 fitness 乘子(1.0 正常 / 0.3 方向降权;R-EVIDENCE 精神:
+    # fitness 必须能从记录字段机械复原,pa≠1 时缺它冠军 fitness 无法自证)
+    priority_adjustment: float = 1.0
 
 
 @dataclass
@@ -1129,6 +1132,9 @@ def run_island_search(
         result = final_results.get(fp, l0_result)
         from factory.autoresearch.complexity import compute_complexity
         comp_report = compute_complexity(candidate)
+        pa = float(
+            (result.metrics.get("knowledge_gate", {}) or {}).get("priority_adjustment", 1.0)
+        )
         champions.append(ChampionRecord(
             fingerprint=fp, island=island, generation=gen, icir=icir,
             expr=ast_expr(candidate.ast),
@@ -1138,6 +1144,7 @@ def run_island_search(
             complexity=float(comp_report.score),
             regime_icirs=regime_meta.get(fp, {}),
             ast=candidate.ast,
+            priority_adjustment=pa,
         ))
     return IslandSearchResult(evaluated=evaluated + prefilter_trials[0], champions=champions)
 

@@ -1,0 +1,104 @@
+{
+  "_readme": [
+    "方向级研究教训登记簿(死路/弱方向/空白区)——人/强模型策展,git 跟踪,机器消费。",
+    "与 findings.json 分工:findings.json 由验证结果机器自长(单候选粒度);本文件承接",
+    "LESSONS/DECISIONS/research_ledger 的**方向级**结论(因子族/数据源粒度),此前只存在于",
+    "自然语言,生成器不消费,算力反复烧回死路。",
+    "证据门控:evidence 为空的条目会被 knowledge/directions.py 忽略并警告——禁止无证据编方向。",
+    "action 语义:SKIP=种子不生成+候选降权跳过 / DEPRIORITIZE=种子排尾+候选降权 /",
+    "BOOST=种子排头(算力倾斜) / NOTE=仅注入 LLM 播种 prompt,不产机械 gate。",
+    "expires 到期 → 条目自动失效 = 复活重测(参照 revival_condition);修改本文件请附证据指针。"
+  ],
+  "version": 1,
+  "entries": [
+    {
+      "id": "northbound-holder-flow-weak-longonly",
+      "direction": "北向/股东户数/资金流正交族做 top25 long-only 主腿",
+      "status": "weak",
+      "action": "DEPRIORITIZE",
+      "scope_factors": [
+        "northbound_accumulation",
+        "northbound_flow_strength",
+        "northbound_hold_level",
+        "holder_count_chg",
+        "holdertrade_net",
+        "large_order_net_ratio"
+      ],
+      "evidence": [
+        "research_ledger:run_id=e6e655401623899d(全市场 top25 非 real_alpha,与 illiquidity/size 簇相关 0.66-0.83)",
+        "auto-memory:project_orthogonal_too_weak(残差 IC 真正交但 ICIR~0.2,long-only 做不成 standalone 也加不动核心)"
+      ],
+      "revival_condition": "搜索基因组支持 top50-100 宽持仓或多空结构后重测(u300/u800 下独立 IC 反而走强 0.02→0.04,信息分散在横截面,top25 集中持仓吃不到)",
+      "created": "2026-07-02",
+      "expires": "2026-12-29",
+      "prompt_note": "北向/股东户数/大单资金流残差已证真正交但量级太弱(ICIR~0.2),top25 long-only 下做不成主腿;除非明确设计宽持仓/多空结构,否则不要再提纯此族因子当主信号(可作次要腿,权重<0.4)。"
+    },
+    {
+      "id": "momentum-fullmarket-standalone-null",
+      "direction": "等权全市场横截面动量单因子提纯",
+      "status": "falsified",
+      "action": "NOTE",
+      "scope_factors": [],
+      "evidence": [
+        "auto-memory:project_momentum_universe_dependent(等权全市场动量≈null,微盘反转洗掉;横截面动量分支可投侧均不显著,已关闭)"
+      ],
+      "revival_condition": "剔微盘的大中盘宇宙(~9%/t~1.5)进入可搜索宇宙后可重开",
+      "created": "2026-07-02",
+      "expires": "",
+      "prompt_note": "等权全市场横截面动量≈null(微盘反转洗掉),动量单因子提纯(一阶/残差/波动调整)在全市场宇宙已系统性证伪关闭;动量只作为组合构件与其他信息源搭配,不要再提『纯动量+参数微调』类候选。"
+    },
+    {
+      "id": "size-illiquidity-same-information",
+      "direction": "size 与 illiquidity/小盘代理互相组合(同信息算两遍)",
+      "status": "falsified",
+      "action": "NOTE",
+      "scope_factors": [],
+      "evidence": [
+        "reports/research/metasearch_findings_20260623.md(size-earnings 与 small-cap-size MI 距离 1.34 / illiquidity 1.56,同一微盘信息源不同投影)",
+        "DECISIONS.md:ADR-020(纯 Amihud 三代 DSR 全过,掺 size 反削弱:v1.3 混合 p=0.086 / size-earnings p=0.152 不过)"
+      ],
+      "revival_condition": "",
+      "created": "2026-07-02",
+      "expires": "",
+      "prompt_note": "size 与 illiquidity 是同一微盘信息源的不同投影(MI 高冗余);把 size 代理与流动性/小盘因子互相组合 = 同一信息算两遍、白涨 n_trials、DSR 多重检验会把混合版打下去。不要提这类组合。"
+    },
+    {
+      "id": "frontier-fundamental-family",
+      "direction": "信息地图空白区:基本面族(距价格族最远邻)",
+      "status": "frontier",
+      "action": "BOOST",
+      "scope_factors": [
+        "net_profit_yoy",
+        "roe",
+        "bp_proxy",
+        "revenue_yoy",
+        "ep_proxy"
+      ],
+      "evidence": [
+        "reports/research/metasearch_findings_20260623.md(information_map:基本面族 net_profit_yoy/roe/bp_proxy 距价格族 MI 距离 2.8-2.9,为现有池最独立空白区之一)"
+      ],
+      "revival_condition": "",
+      "created": "2026-07-02",
+      "expires": "2026-12-29",
+      "prompt_note": "信息地图显示基本面族(净利增速/ROE/账面市值比)距现有价格类因子池 MI 距离 2.8-2.9,是最独立的空白区;优先提基本面 × 价格量能的跨信息源组合,而非价格族内部换皮。"
+    },
+    {
+      "id": "illiquidity-amount-not-volume",
+      "direction": "DSL/搜索白名单 illiquidity 口径澄清:分母=amount(成交额),非 volume",
+      "status": "frontier",
+      "action": "NOTE",
+      "scope_factors": [
+        "illiquidity"
+      ],
+      "evidence": [
+        "factors/momentum.py::illiquidity 已改为 amount≈volume×close,对齐 factors.alpha.builtins.illiq.AmihudIlliq",
+        "tests/test_illiquidity_amount_alignment.py",
+        "历史错误:|ret|/volume ≡ Amihud×价格水平,污染搜索语义与 MI 审计"
+      ],
+      "revival_condition": "",
+      "created": "2026-07-12",
+      "expires": "",
+      "prompt_note": "illiquidity 正式口径是 Amihud |ret|/amount(成交额)。勿再实现或搜索 |ret|/volume 版本;那是混入价格水平的另一因子。台账 illiquidity 家族与 DSL 白名单现已对齐 amount 口径。"
+    }
+  ]
+}

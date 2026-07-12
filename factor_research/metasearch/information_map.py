@@ -13,6 +13,7 @@
   python3 -m metasearch.information_map [--with-live] [--output map.png]
 """
 import argparse
+import json
 import sys
 import time
 from pathlib import Path
@@ -111,12 +112,63 @@ def _print_legend():
         print(f"    {icon} {label}")
 
 
+def frontier_from_distances(dist: pd.DataFrame, status_map: dict,
+                            name_to_base: dict, k: int = 8):
+    """空白区 = 距全部 LIVE 锚最远的候选(信息互补度最高);无 LIVE 锚退回平均两两距离。
+
+    返回 (ranked[{name,distance}], 基础因子名列表)。产物供
+    knowledge.directions.frontier_factors 在生成端做算力倾斜(BOOST 排头),
+    不参与任何有效性判断(候选仍走完整 L0-L3/9-Gate/holdout)。
+    """
+    live = [n for n in dist.index if "live" in str(status_map.get(n, ""))]
+    rows = []
+    for name in dist.index:
+        if name in live:
+            continue
+        if live:
+            d = float(dist.loc[name, live].min())
+        else:
+            others = dist.loc[name].drop(name)
+            if others.empty:
+                continue
+            d = float(others.mean())
+        rows.append({"name": str(name), "distance": round(d, 3)})
+    rows.sort(key=lambda r: -r["distance"])
+    top = rows[:k]
+    factors = sorted({name_to_base.get(r["name"], "") for r in top} - {""})
+    return top, factors
+
+
+def write_frontier_json(dist: pd.DataFrame, status_map: dict, *, k: int = 8,
+                        out_path=None) -> Path:
+    """落机器可读空白区(metasearch/frontier.json,月度刷新)。"""
+    from datetime import datetime
+
+    from metasearch.factor_mi_audit import _pool_factor_base_map
+
+    top, factors = frontier_from_distances(dist, status_map, _pool_factor_base_map(), k=k)
+    out = Path(out_path or Path(__file__).resolve().parent / "frontier.json")
+    payload = {
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "method": "min MI-distance to LIVE anchors (无锚退回平均两两距离), top-k",
+        "k": k,
+        "signals": top,
+        "factors": factors,
+        "consumer": "knowledge.directions.frontier_factors(生成端算力倾斜,fail-open)",
+    }
+    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--with-live", action="store_true", default=True,
                     help="包含 LIVE 策略 (默认 True)")
     ap.add_argument("--max-hyps", type=int, default=50)
     ap.add_argument("--output", help="HTML/PNG 输出路径 (可选)")
+    ap.add_argument("--json", action="store_true",
+                    help="落机器可读空白区到 metasearch/frontier.json")
+    ap.add_argument("--json-path", default=None, help="自定义 JSON 输出路径")
     args = ap.parse_args()
 
     print("Loading data lake...")
@@ -124,9 +176,7 @@ def main():
     px = load_prices(start="2018-01-01", fields=("close", "volume"))
     raw = load_raw_close(start="2018-01-01")
     close, volume = px["close"], px["volume"]
-    from lake.units import implied_amount
-
-    amount = implied_amount(volume, raw)
+    amount = volume * 100 * raw.reindex(index=volume.index, columns=volume.columns)
     print(f"  {close.shape}, {time.time()-t0:.1f}s")
 
     # ── Candidate ICs ──
@@ -168,6 +218,10 @@ def main():
     # ── Print summary ──
     _print_coverage_summary(coords, status_map)
     _print_legend()
+
+    if args.json or args.json_path:
+        out = write_frontier_json(dist, status_map, out_path=args.json_path)
+        print(f"\n✓ 机器可读空白区已落盘: {out}")
 
     # ── 邻居分析: 重点对每个 LIVE 看最相似/最独立的候选 ──
     print(f"\n{'='*70}")

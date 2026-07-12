@@ -1,0 +1,31 @@
+{
+  "generated_at": "2026-07-12 11:25:20",
+  "method": "bootstrap from metasearch_findings_20260623 information_map blank zones; refresh via python3 -m metasearch.information_map --json",
+  "k": 8,
+  "signals": [
+    {
+      "name": "vol_breakout__short5_long10",
+      "distance": 2.97
+    },
+    {
+      "name": "net_profit_yoy",
+      "distance": 2.9
+    },
+    {
+      "name": "roe",
+      "distance": 2.88
+    },
+    {
+      "name": "bp_proxy",
+      "distance": 2.85
+    }
+  ],
+  "factors": [
+    "bp_proxy",
+    "ep_proxy",
+    "net_profit_yoy",
+    "revenue_yoy",
+    "roe"
+  ],
+  "consumer": "knowledge.directions.frontier_factors(生成端算力倾斜,fail-open)"
+}
