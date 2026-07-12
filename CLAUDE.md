@@ -14,7 +14,7 @@
 1. 阅读本文件的 `P0 / P1` 规则。
 2. 阅读 `STATUS.md`，确认当前进度、最近失败项、未完成任务。
 3. 运行或要求查看 `git status --short`，确认工作树是否已有他人改动（多 agent 共享工作树）。
-4. 判断任务类型：`data / factor / engine / strategy / workflow / registry / production / web / docs`。
+4. 判断任务类型：`data / factor / engine / strategy / workflow / registry / production / web / docs`；涉及 `factor_research/<module>/` 时先读该目录下的 `MODULE_STATUS.md`（角色/保留理由/边界自证，36 个模块各一份）。
 5. 只修改本任务相关文件；不得顺手重构无关模块。
 6. 修改前说明计划；修改后运行对应检查(§13)。
 7. 提交前只显式 stage 本次文件，必须检查 `git diff --cached --stat` 和 `git diff --cached`。
@@ -67,6 +67,10 @@
 | 决策      | `DECISIONS.md`                                | ADR 决策记录，append-only                          |
 | 经验      | `LESSONS.md`                                  | 踩坑、故障、修复经验、接口血泪铁律细节                           |
 | 归档      | `docs/archive/`                               | 已完成或废弃方案，只作历史参考，不作实现依据                        |
+| 分类      | `FACTOR_TAXONOMY.md` / `factor_research/docs/naming_taxonomy.md` / `factor_research/docs/ontology_glossary.md` | 因子业务分类 / 代码命名目标 taxonomy / 当前命名冲突盘点——三者边界不同，不是同一份文档的多个版本 |
+| 数据(扩展) | `factor_research/docs/data_dimensions.md` + `factor_research/docs/global_data_infrastructure.md` | 已入库维度清单(与 `data_infrastructure.md` 是总-分关系) / 全球多资产扩展层(不替代 A 股主湖) |
+| 模块自证    | `factor_research/<module>/MODULE_STATUS.md`   | 36 个研究模块各一份，进入该模块前必读：角色 / 保留理由 / 边界              |
+| 守卫索引    | `GUARDS.md`                                   | P0/P1 规则 ↔ `scripts/ci/` 守卫脚本的机械对照表(原 §16 下沉)          |
 
 消歧规则：
 
@@ -75,7 +79,9 @@
 * 产品侧 PRD / Web 侧 SPEC 不得覆盖本仓引擎规格。
 * 冲突时优先级：`CLAUDE.md` > `SPEC.md` > `STATUS.md` > 其他文档 > archive。
 
-**source-of-truth 约定**(防止重复规则改一处忘多处)：本文 §4/§8/§10 等"摘要"以专章/子文档为唯一真相 —— 成本数值唯一权威 = `core/engine.py::CostModel`(文档面 `cost_model.md`)；9-Gate 细节唯一真相 = `LOOP_ENGINEERING.md`；守卫现状唯一真相 = `scripts/ci/` 实际脚本(§16 表是其索引)。
+**source-of-truth 约定**(防止重复规则改一处忘多处)：本文 §4/§8/§10 等"摘要"以专章/子文档为唯一真相 —— 成本数值唯一权威 = `core/engine.py::CostModel`(文档面 `cost_model.md`)；9-Gate 门禁清单与判据唯一真相 = 代码 `core/analysis/nine_gates.py`(文档面 `WORKFLOW.md` §1.1；`LOOP_ENGINEERING.md` 讲的是演化机制，不是门禁清单来源，2026-07-11 核实两者曾对不上后已改正此处指向)；守卫现状唯一真相 = `scripts/ci/` 实际脚本(索引见 `GUARDS.md`)。
+
+> 已知但尚未处置的地图外文档：根目录 SaaS/小程序商业计划(`BUSINESS_MODEL.md` 等)与 `docs/` 下题材型分析报告，处置方案见 2026-07-11 文档审计（用户已拍板方向，等 git 工作树空闲后执行迁移，执行后本表补行）；`LOOP_CLOSURE_TASK.md` 核实为未落地的过期规划稿(`factor_research/loops/` 目录未创建)，暂不收录进本表，处置留 `TASKS.md`。
 
 ---
 
@@ -182,19 +188,9 @@ data_lake → factors → core.engine → strategies / factory / workflow → re
 
 ## 6. 9-Gate R2P 门禁摘要
 
-所有候选策略入册前必须通过 9-Gate R2P 流水线。**唯一真相 = [`LOOP_ENGINEERING.md`](LOOP_ENGINEERING.md)**，本表只作速查：
+候选策略入册前必须通过 Gate 0–Gate 8 共 9 关。**唯一真相 = 代码 [`core/analysis/nine_gates.py`](factor_research/core/analysis/nine_gates.py) 的 docstring**；文档面对照见 [`WORKFLOW.md`](WORKFLOW.md) §1.1。下面只列门名不复述判据，避免代码/文档各改一半又对不上（2026-07-11 审计时发现旧版本表和代码不一致，已按代码改正）：
 
-| Gate | 名称           | 核心问题                     |
-| ---- | ------------ | ------------------------ |
-| G1   | 数据可用性        | 数据是否覆盖完整、字段可信、无口径缺陷      |
-| G2   | 防未来函数        | 信号是否只用当时可知信息             |
-| G3   | 成本扣除         | 是否扣真实交易与冲击成本             |
-| G4   | 样本外检验        | 样本外是否仍稳定                 |
-| G5   | 压力期检验        | 极端/熊市/风格逆风期是否可承受         |
-| G6   | 换手与容量        | 换手、冲击、成交容量是否现实           |
-| G7   | 中性化与相关性      | 是否只是暴露于已知风格或现有策略         |
-| G8   | DSR / 多重测试惩罚 | 是否经得起大规模搜索后的统计惩罚         |
-| G9   | 入册材料完整性      | thesis/配置/绩效/风险/失效信号是否齐全 |
+Gate 0 数据审计 → Gate 1 经济假设 → Gate 2 单因子验证 → Gate 3 中性化验证 → Gate 4 多重检验惩罚(DSR) → Gate 5 组合回测 → Gate 6 成本容量建模 → Gate 7 样本外与压力测试(含 7A 净化嵌入交叉验证) → Gate 8 实盘监控。
 
 代码入口：可复用库入口为 `workflow/nine_gate_runner.py`；`scripts/research/run_nine_gates_all.py` 只作 CLI 包装,不得被 workflow 反向依赖。
 
@@ -202,13 +198,7 @@ data_lake → factors → core.engine → strategies / factory / workflow → re
 
 ## 7. 策略生命周期
 
-### 7.1 母策略 family 必填字段
-
-family id、策略名称、核心经济学假设、alpha 来源、适用市场状态、不适用市场状态、预期失效信号、主要风险、与现有母策略关系、研究负责人/生成来源、创建时间。
-
-### 7.2 策略 version 必填字段
-
-version id、所属 family、因子定义、参数配置、股票池、调仓频率、持仓数量、成本模型、样本内绩效、样本外绩效、压力测试绩效、换手、容量评估、相关性评估、9-Gate 结果、入册结论、退役条件。
+母策略(family)与版本(version)的完整必填字段清单唯一权威 = [`SPEC.md`](SPEC.md)「母策略台账 schema」一节(2026-07-11 从本节下沉，语义未变)。本节只留入册门槛数值与退役纪律这两条行为规则，编号沿用旧 §7.3/§7.4，避免破坏已有外部引用(如 `reports/discovery/*.md` 里的 `§7.3` 引用)。
 
 ### 7.3 入册门槛
 
@@ -279,35 +269,19 @@ version id、所属 family、因子定义、参数配置、股票池、调仓频
 
 ## 13. 常用检查入口
 
-具体命令见 [`RUNBOOK.md`](RUNBOOK.md)，本文只保留检查类别。每次任务至少选相关检查：
-
-| 任务类型       | 必查                               |
-| ---------- | -------------------------------- |
-| 数据         | 数据质量校验、schema 校验、样本覆盖、异常报告       |
-| 因子         | 单元测试、防未来检查、截面 sanity check       |
-| 回测引擎       | engine tests、成本测试、边界条件测试         |
-| 策略         | 样本内、样本外、压力测试、成本敏感性               |
-| workflow   | phase1-4 流程测试、入册测试、失败路径测试        |
-| registry   | schema 测试、唯一写入口测试、历史兼容测试         |
-| production | 生产信号 smoke test、禁止研究层 import     |
-| web        | 类型检查、lint、组件测试；开发期不得用 build 代替检查 |
-| docs       | 链接、规则编号、状态同步                     |
-
-一键入口：`bash scripts/test_all.sh`（含分层守卫 + 数据湖写入守卫 + 全量测试发现），具体以 `RUNBOOK.md` 为准。
+按任务类型选检查的完整对照表已下沉到 [`RUNBOOK.md`](RUNBOOK.md) §⑦(2026-07-11)。一键入口：`bash scripts/test_all.sh`（含分层守卫 + 数据湖写入守卫 + 全量测试发现）。
 
 ---
 
 ## 14. Web 作用域规则
 
-Web 不是本文件主要作用域。涉及 Web 必须先读 [`web/CLAUDE.md`](web/CLAUDE.md) + [`WEB_DESIGN.md`](WEB_DESIGN.md) + [`Implement.md`](Implement.md)。
-
-根规则：① 非 Web 任务不得顺手改 `web/`；② Web 开发期优先类型检查/lint/组件测试；③ 开发服务运行时不得随意跑生产 build；④ Web 缓存损坏/端口占用/`.next` 问题按 `web/CLAUDE.md` 处理；⑤ Web 展示层不得改变研究/回测/成本口径或入册规则。
+Web 不是本文件主要作用域。涉及 Web 必须先读 [`web/CLAUDE.md`](web/CLAUDE.md) + [`WEB_DESIGN.md`](WEB_DESIGN.md) + [`Implement.md`](Implement.md)——该文件 §2/§3 已完整覆盖"非 Web 任务不得改 web/"「展示层不得改研究口径」「build/缓存/端口纪律」，2026-07-11 核实与本节逐条重复后，本节不再复述，只留这条跨边界提醒：**任何 agent 改 `web/` 前，先确认自己不是在借前端改口径**——回测/成本/入册规则永远由引擎层决定。
 
 ---
 
 ## 15. 并行与机器纪律
 
-机器：本机 = **Apple M5(10 核:4 性能 + 6 能效)/ 24GB**。运行环境细节见 [`RUNBOOK.md`](RUNBOOK.md) + [`data_infrastructure.md`](factor_research/docs/data_infrastructure.md)。原则：
+机器规格见 [`RUNBOOK.md`](RUNBOOK.md) §⑧(2026-07-11 下沉，纯硬件事实不属于规则)。原则：
 
 ① 可并行的独立计算应并行（多因子回测/多策略复测/跨接口抓取/多 agent 审计），用 `&`+`wait` 或后台任务；② API 限速/封禁风险优先于并行速度；③ 东财等易封接口不得加多线程硬冲（见 §9）；④ akshare 等易 hang 必须用 daemon+join 超时模式；⑤ 内存是高并发硬约束（并发前看 `memory_pressure`，吃紧降并发）；⑥ 并行只能加速计算，不能改样本/公式/成本/shift/T+1/真实口径；⑦ 后台任务必须可追踪、可停止、可报告，不得变孤儿进程。
 
@@ -315,33 +289,14 @@ Web 不是本文件主要作用域。涉及 Web 必须先读 [`web/CLAUDE.md`](w
 
 ## 16. 规则守卫表
 
-下表是 `scripts/ci/` 实际守卫的索引（**唯一真相 = 脚本本身**，均由 `scripts/test_all.sh` 调用）：
-
-| 规则 / 关注点              | 等级 | 守卫脚本(`scripts/ci/`)        | 说明                                   |
-| --------------------- | -- | ------------------------- | ------------------------------------ |
-| R-ARCH-001 单向依赖       | P1 | `check_layer_deps.py`     | AST 静态分析 FORBIDDEN_EDGES，禁下层/生产层反向 import |
-| API 薄层 / artifact 边界  | P1 | `check_layer_deps.py`     | API 禁直接读取 `data_lake/reports/signals/paper`;直接写运行审计产物必须显式经 `services.actions.action_guard` |
-| services 权限分层          | P1 | `check_layer_deps.py`     | `services.read` 禁 import `services.actions`;`services.actions` 高风险 promote/registry 动作必须经 `jobs` 或 `action_guard` |
-| workflow / script 边界     | P1 | `check_layer_deps.py`     | `workflow.*` 禁 import `scripts.research.*`;research script 只能包 CLI |
-| R-ARCH-004 数据湖写入可审计  | P1 | `check_lake_writers.py`   | 写 data_lake 核心区必须走 canonical writer + 更新 manifest |
-| R-WF-001 候选入册通道       | P0 | `check_no_force_promote.py`| 禁自动晋级脚本 `force=True` 跳过 phase1/2 防未来门 |
-| R-REG-001 / R-EVIDENCE-001 证据自证 | P0 | `check_registry_evidence.py`| 禁跨家族 IC 证据照抄；standalone 在册 DSR 缺算/不显著(≥0.05)亦判失败(G3) |
-| R-OBJECTIVE-001 DSR 强制门 | P0 | `strategy_registry.register()` + `check_registry_evidence.py`(G3) | standalone 准入须 dsr_p<0.05(多重测试惩罚显著)，hit 达标≠通过 |
-| G8 防自欺 / holdout      | P0 | `check_holdout_compliance.py`| 自动环+promote 验证栈(phase2/3)load 全样本必须截到 <boundary；锁 holdout.start hash(ADR-021)；强制 boundary 只进不退+账本一致(ADR-023)，禁偷看金库 |
-| 防自欺 / 控制路径可观测         | P0 | `check_control_exceptions.py`| 准入/裁决/信号/执行路径禁 `except: pass` 静默吞异常 |
-| 测试发现完整                | P1 | `check_test_discovery.py` | 全量收集 `test_*.py`，杜绝漏跑的手工清单           |
-| R-DATA-001 禁用旧口径      | P0 | `check_no_legacy_data.py`  | AST 禁代码 import data_full / 从 data_full 目录读盘(放过注释/口径标签/迁移目录) |
-| R-ARCH-002 生产层隔离      | P1 | `check_layer_deps.py`(覆盖) | production 禁 import research 在依赖图内强制 |
-| Git 禁止一锅端             | P1 | 人工 diff                   | 多 agent 共享工作树必守，无脚本可代替               |
-
-凡“缺/待建”的守卫，应在 `TASKS.md` 立项。
+P0/P1 规则 ↔ `scripts/ci/` 守卫脚本的完整对照表已下沉到 [`GUARDS.md`](GUARDS.md)(2026-07-11)。**唯一真相仍是脚本本身**；缺/待建的守卫在 `TASKS.md` 立项。
 
 ---
 
 ## 17. 修改文档的规则
 
 修改本文件属架构级变更。允许情形：发现 P0/P1 规则缺失、文档冲突、新增已验证架构边界、成本/数据/入册/回测权威正式决策变化、多 agent 协作协议变化。
-修改时必须：① 同步 `STATUS.md`；② 必要时同步 `SPEC.md`；③ 涉及决策追加 `DECISIONS.md`；④ 涉及踩坑追加 `LESSONS.md`；⑤ 不得把临时命令/临时环境/一次性排障细节塞回本文。
+修改时必须：① 同步 `STATUS.md`；② 必要时同步 `SPEC.md`；③ 涉及决策追加 `DECISIONS.md`；④ 涉及踩坑追加 `LESSONS.md`；⑤ 不得把临时命令/临时环境/一次性排障细节塞回本文——本文只留 P0/P1 规则、接手协议、文档路由、架构边界；速查表/索引表一律下沉到对应子文档(`GUARDS.md`/`SPEC.md`/`RUNBOOK.md`/`web/CLAUDE.md`)，本文只留一句话指针，防止 2026-06 到 2026-07 那种从 48 行涨到 358 行的再次发生。
 
 ---
 
