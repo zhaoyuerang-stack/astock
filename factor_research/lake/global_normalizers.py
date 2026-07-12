@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import pandas as pd
+from pandas.api.types import is_bool
 
 from lake.global_catalog import DatasetSpec, SourceSpec
 
@@ -139,7 +140,10 @@ def _normalize_price(
         retrieved_at=retrieved_at,
         ingest_id=ingest_id,
     )
-    adjusted = out["is_adjusted"].map(lambda value: value is True)
+    # Pandas may materialize scalar bools as numpy.bool_.  Treat only actual
+    # boolean values as adjustment flags; string truthy values stay invalid
+    # for the validator rather than becoming silently adjusted prices.
+    adjusted = out["is_adjusted"].map(lambda value: is_bool(value) and bool(value))
     if "raw_close" not in out.columns:
         out["raw_close"] = out["close"].where(~adjusted)
     if "adjusted_close" not in out.columns:
@@ -171,7 +175,7 @@ def normalize_global_frame(
             retrieved_at=retrieved_at,
             ingest_id=ingest_id,
         )
-    if spec.dataset_id in {"market_price_daily", "etf_daily"}:
+    if spec.dataset_id in {"market_price_daily", "etf_daily", "fx_daily", "commodity_daily"}:
         return _normalize_price(
             raw,
             source=source,

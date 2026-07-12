@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pandas as pd
+from pandas.api.types import is_bool
 
 from lake.global_catalog import DatasetSpec, SourceSpec
 
@@ -41,7 +42,7 @@ class GlobalValidationResult:
 def _dataset_columns(spec: DatasetSpec) -> tuple[str, ...]:
     if spec.dataset_id in {"macro_daily", "macro_monthly", "rates_daily"}:
         return ("series_id", "observation_date", "value", "unit", "frequency", "vintage_start", "vintage_end")
-    if spec.dataset_id in {"market_price_daily", "etf_daily"}:
+    if spec.dataset_id in {"market_price_daily", "etf_daily", "fx_daily", "commodity_daily"}:
         return (
             "symbol",
             "exchange",
@@ -61,7 +62,7 @@ def _dataset_columns(spec: DatasetSpec) -> tuple[str, ...]:
 def primary_key_for_dataset(spec: DatasetSpec) -> tuple[str, ...]:
     if spec.dataset_id in {"macro_daily", "macro_monthly", "rates_daily"}:
         return ("series_id", "observation_date", "vintage_start")
-    if spec.dataset_id in {"market_price_daily", "etf_daily"}:
+    if spec.dataset_id in {"market_price_daily", "etf_daily", "fx_daily", "commodity_daily"}:
         return ("symbol", "exchange", "session_date", "adjustment_version")
     raise ValueError(f"no primary-key policy is configured for {spec.dataset_id}")
 
@@ -133,7 +134,7 @@ def validate_global_frame(
         _append_reason(reasons, out["value"].isna(), "invalid_value")
         _append_reason(reasons, out["vintage_start"].astype(str) > out["vintage_end"].astype(str), "invalid_vintage_range")
 
-    if spec.dataset_id in {"market_price_daily", "etf_daily"}:
+    if spec.dataset_id in {"market_price_daily", "etf_daily", "fx_daily", "commodity_daily"}:
         for column in ("open", "high", "low", "close", "volume"):
             _append_reason(reasons, out[column].isna(), f"invalid_{column}")
         _append_reason(reasons, (out[["open", "high", "low", "close"]] <= 0).any(axis=1), "non_positive_price")
@@ -141,7 +142,7 @@ def validate_global_frame(
         lower = out["low"] > out[["open", "close"]].min(axis=1)
         upper = out["high"] < out[["open", "close"]].max(axis=1)
         _append_reason(reasons, lower | upper, "ohlc_inconsistent")
-        _append_reason(reasons, ~out["is_adjusted"].map(lambda value: isinstance(value, bool)), "invalid_is_adjusted")
+        _append_reason(reasons, ~out["is_adjusted"].map(is_bool), "invalid_is_adjusted")
         if "raw_close" not in out.columns or "adjusted_close" not in out.columns:
             return _reject(frame, "price adjustment fields are not separated")
         _append_reason(reasons, (~out["is_adjusted"]) & out["raw_close"].isna(), "missing_raw_close")

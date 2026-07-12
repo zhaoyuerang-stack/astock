@@ -42,10 +42,20 @@ Current local admission:
   intraday publication timestamp, so the adapter converts that date to the end of the
   source day in `America/Chicago`. This is conservative and can delay a signal; it is
   not an assertion of the exact release time.
+- `global_yfinance_us_price_v1`, `global_yfinance_fx_v1`, and
+  `global_yfinance_commodity_v1`: OpenBB/yfinance daily price sources, enabled for
+  the documented research allowlists. Their timestamps are date-level, so canonical
+  availability is conservatively delayed to the end of the source day. Equity and ETF
+  prices are split-adjusted only; they are valid for returns research, not valuation
+  calculations that require unadjusted prices.
 - `global_etf_price_v1`: global ETF proxy allowlist, `research_only`. OpenBB remains
   an optional probe/provider route, but no ETF source is admitted until it supplies
   exchange, session-close, currency and corporate-action semantics required by the
   canonical schema.
+- `cboe_options_chain_v1`: remains planned. The provider probe returned the same
+  chain for distinct requested EOD dates, so historical-date semantics are not proven.
+  It must not enter canonical derivatives data or factors until a provider returns
+  auditable historical EOD chains with contract lifecycle coverage.
 
 An approved source may be enabled only after its license/entitlement and PIT metadata
 are reviewed. Data health exposes `admission_status`, `license_status`, allowed use,
@@ -59,7 +69,7 @@ make the same explicit admission decision and provide its own environment variab
 ```yaml
 global_data:
   enabled: true
-  datasets: [macro_daily, macro_monthly, rates_daily]
+  datasets: [macro_daily, macro_monthly, rates_daily, market_price_daily, etf_daily, fx_daily, commodity_daily]
   api_key_envs: {alfred: FRED_API_KEY}
   source_admissions:
     alfred_macro_v1:
@@ -121,6 +131,10 @@ python3 scripts/data/update_global_data.py --all-enabled --provider-mode alfred 
 
 # Daily revision-window update after the initial backfill.
 python3 scripts/data/update_global_data.py --all-enabled --provider-mode alfred --from-watermark
+
+# yfinance/OpenBB has no API key requirement for these small research allowlists.
+# Prices are split-adjusted; do not request raw price panels from these datasets.
+python3 scripts/data/update_global_data.py --dataset market_price_daily --dataset etf_daily --dataset fx_daily --dataset commodity_daily --start 2016-01-01
 
 # Re-run normalizer/validator from an immutable raw snapshot.
 python3 scripts/data/update_global_data.py --dataset etf_daily --source global_etf_price_v1 --replay-ingest <ingest_id>

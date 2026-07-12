@@ -19,6 +19,7 @@ from app_config.settings import GlobalDataConfig, get_settings  # noqa: E402
 from lake.global_catalog import (  # noqa: E402
     SourceSpec,
     apply_source_admission,
+    get_sources_for_dataset,
     get_dataset_spec,
     get_source_for_dataset,
 )
@@ -53,7 +54,11 @@ def _provider(
     if provider is not None:
         return provider
     if provider_mode == "openbb":
-        return OpenBBGlobalProvider(api_key_envs=api_key_envs or {})
+        # Settings contains credentials for several providers (for example
+        # ALFRED/FRED). OpenBB must check only the selected source's own
+        # entitlement, otherwise an unrelated missing key blocks yfinance.
+        source_keys = {"source": source.api_key_env} if source and source.api_key_env else {}
+        return OpenBBGlobalProvider(api_key_envs=source_keys, source=source)
     if provider_mode == "alfred":
         if source is None:
             raise ValueError("alfred provider requires a source admission record")
@@ -136,15 +141,23 @@ def run_global_update(
         spec = get_dataset_spec(dataset_id)
         request_start = _incremental_start(root, dataset_id, start) if from_watermark else start
         try:
-            dataset_source = source or get_source_for_dataset(dataset_id, source_id=source_id)
-            if source is None:
+            if source is not None:
+                dataset_source = source
+            elif source_id:
+                dataset_source = get_source_for_dataset(dataset_id, source_id=source_id)
                 dataset_source = apply_source_admission(
                     dataset_source,
                     settings.source_admissions.get(dataset_source.source_id),
                 )
-                configured_key_env = settings.api_key_envs.get(dataset_source.provider, "")
-                if configured_key_env:
-                    dataset_source = replace(dataset_source, api_key_env=configured_key_env)
+            else:
+                candidates = [
+                    apply_source_admission(item, settings.source_admissions.get(item.source_id))
+                    for item in get_sources_for_dataset(dataset_id)
+                ]
+                dataset_source = next((item for item in candidates if item.enabled), candidates[0])
+            configured_key_env = settings.api_key_envs.get(dataset_source.provider, "")
+            if configured_key_env:
+                dataset_source = replace(dataset_source, api_key_env=configured_key_env)
         except (KeyError, ValueError) as exc:
             failures += 1
             result["detail"][dataset_id] = {
@@ -289,13 +302,15 @@ def run_global_update(
             )
             validation = validate_global_frame(canonical, source=dataset_source, spec=spec)
             if validation.rejected:
-                quarantine = write_global_quarantine(
-                    validation.quarantine,
-                    source=dataset_source,
-                    spec=spec,
-                    ingest_id=raw_snapshot["ingest_id"],
-                    root=root,
-                )
+                quarantine = {"count": int(len(validation.quarantine))}
+                if not validate_only:
+                    quarantine = write_global_quarantine(
+                        validation.quarantine,
+                        source=dataset_source,
+                        spec=spec,
+                        ingest_id=raw_snapshot["ingest_id"],
+                        root=root,
+                    )
                 message = "; ".join(validation.issues)
                 result["detail"][dataset_id] = {
                     "ok": False,

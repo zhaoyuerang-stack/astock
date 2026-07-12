@@ -57,6 +57,8 @@ def load_global_price_panel(
     for col in (spec.date_column, spec.symbol_column, price_field):
         if col not in frame.columns:
             raise KeyError(f"{col} not found in {dataset_id}")
+    if frame[price_field].notna().sum() == 0:
+        raise ValueError(f"{dataset_id} does not provide {adjustment_basis} prices")
     pivot = frame.pivot_table(
         index=_canonical_date_index(frame[spec.date_column]),
         columns=spec.symbol_column,

@@ -57,12 +57,18 @@ def test_repository_settings_admit_alfred_as_auxiliary_research_data():
     assert global_data.enabled is True
     assert global_data.required is False
     assert global_data.provider_mode == "alfred"
-    assert global_data.datasets == ("macro_daily", "macro_monthly", "rates_daily")
+    assert global_data.datasets == (
+        "macro_daily", "macro_monthly", "rates_daily",
+        "market_price_daily", "etf_daily", "fx_daily", "commodity_daily",
+    )
     assert global_data.api_key_envs == {"alfred": "FRED_API_KEY"}
     admission = global_data.source_admissions["alfred_macro_v1"]
     assert admission["admission_status"] == "approved"
     assert admission["license_status"] == "approved"
     assert admission["allowed_use"] == "research_only"
+    assert global_data.source_admissions["global_yfinance_us_price_v1"]["admission_status"] == "approved"
+    assert global_data.source_admissions["global_yfinance_fx_v1"]["admission_status"] == "approved"
+    assert global_data.source_admissions["global_yfinance_commodity_v1"]["admission_status"] == "approved"
 
 
 def test_global_dataset_registry_declares_required_pit_metadata():
@@ -110,6 +116,120 @@ def test_openbb_provider_missing_package_returns_structured_unavailable():
     assert status["status"] == "provider_unavailable"
     assert status["provider"] == "openbb"
     assert "openbb" in status["error"].lower()
+
+
+def test_openbb_source_without_key_is_not_given_unrelated_provider_key(monkeypatch):
+    from dataclasses import replace
+
+    from lake.global_catalog import get_source_spec
+    from scripts.data import update_global_data
+
+    captured = {}
+
+    class FakeOpenBBProvider:
+        def __init__(self, *, api_key_envs, source):
+            captured["api_key_envs"] = api_key_envs
+            captured["source"] = source
+
+    monkeypatch.setattr(update_global_data, "OpenBBGlobalProvider", FakeOpenBBProvider)
+
+    source = replace(
+        get_source_spec("global_yfinance_fx_v1"),
+        admission_status="approved", license_status="approved", license_checked_at="2026-07-12",
+    )
+    update_global_data._provider(provider_mode="openbb", api_key_envs={"alfred": "FRED_API_KEY"}, source=source)
+
+    assert captured["api_key_envs"] == {}
+    assert captured["source"] == source
+
+
+def test_openbb_yfinance_maps_prices_and_fx_to_conservative_canonical_raw_frames():
+    from dataclasses import replace
+
+    from lake.global_catalog import get_dataset_spec, get_source_spec
+    from lake.sources.openbb_global import OpenBBGlobalProvider
+
+    calls = []
+
+    class Result:
+        def __init__(self, symbol):
+            self.symbol = symbol
+
+        def to_df(self):
+            return pd.DataFrame(
+                {
+                    "open": [100.0], "high": [101.0], "low": [99.0], "close": [100.5],
+                    "volume": [1000.0], "symbol": [self.symbol],
+                },
+                index=pd.DatetimeIndex(["2025-01-02"], name="date"),
+            )
+
+    class Historical:
+        def __init__(self, kind):
+            self.kind = kind
+
+        def __call__(self, **kwargs):
+            calls.append((self.kind, kwargs))
+            return Result(kwargs["symbol"])
+
+    class App:
+        class equity:
+            class price:
+                historical = Historical("equity")
+
+        class currency:
+            class price:
+                historical = Historical("currency")
+
+    us_source = replace(
+        get_source_spec("global_yfinance_us_price_v1"),
+        admission_status="approved", license_status="approved", license_checked_at="2026-07-12",
+    )
+    us_provider = OpenBBGlobalProvider(importer=lambda _: App(), source=us_source)
+    us_raw = us_provider.fetch(get_dataset_spec("etf_daily"), start="2025-01-01", end="2025-01-03")
+
+    assert len(calls) == 11
+    assert all(call[0] == "equity" for call in calls)
+    assert all(call[1]["provider"] == "yfinance" for call in calls)
+    assert all(call[1]["adjustment"] == "splits_only" for call in calls)
+    assert us_raw.iloc[0]["symbol"] == "SPY"
+    assert us_raw.iloc[0]["exchange"] == "YFINANCE_US"
+    assert bool(us_raw.iloc[0]["is_adjusted"]) is True
+    assert us_raw.iloc[0]["adjustment_version"] == "yfinance_splits_only_v1"
+    assert str(us_raw.iloc[0]["available_at"]).endswith("+00:00")
+
+    fx_source = replace(
+        get_source_spec("global_yfinance_fx_v1"),
+        admission_status="approved", license_status="approved", license_checked_at="2026-07-12",
+    )
+    fx_provider = OpenBBGlobalProvider(importer=lambda _: App(), source=fx_source)
+    fx_raw = fx_provider.fetch(get_dataset_spec("fx_daily"), start="2025-01-01", end="2025-01-03")
+
+    assert len(calls) == 17
+    assert all(call[0] == "currency" for call in calls[11:])
+    assert [call[1]["symbol"] for call in calls[11:]] == ["EURUSD=X", "USDJPY=X", "USDCNY=X", "GBPUSD=X", "AUDUSD=X", "USDCHF=X"]
+    assert fx_raw.iloc[0]["symbol"] == "EURUSD"
+    assert fx_raw.iloc[0]["exchange"] == "YFINANCE_FX"
+    assert fx_raw.iloc[0]["currency"] == "PAIR"
+
+
+def test_openbb_options_probe_is_blocked_until_historical_dates_are_verified():
+    from dataclasses import replace
+
+    from lake.global_catalog import get_dataset_spec, get_source_spec
+    from lake.sources.openbb_global import OpenBBGlobalProvider
+
+    source = replace(
+        get_source_spec("cboe_options_chain_v1"),
+        admission_status="approved", license_status="approved", license_checked_at="2026-07-12",
+    )
+    status = OpenBBGlobalProvider(importer=lambda _: object(), source=source).probe(
+        get_dataset_spec("derivatives_daily")
+    )
+
+    assert status["ok"] is False
+    assert status["status"] == "historical_date_unverified"
+    assert "PIT ingestion is blocked" in status["error"]
 
 
 def test_global_writer_manifest_and_price_loader(tmp_path):
@@ -166,6 +286,37 @@ def test_global_writer_manifest_and_price_loader(tmp_path):
     )
     assert list(close.columns) == ["QQQ", "SPY"]
     assert close.loc[pd.Timestamp("2026-07-07"), "SPY"] == 621.5
+
+
+def test_adjusted_only_price_source_rejects_raw_price_loader(tmp_path):
+    from dataclasses import replace
+
+    from lake.global_catalog import get_dataset_spec, get_source_spec
+    from lake.global_data import load_global_price_panel
+    from lake.global_normalizers import normalize_global_frame
+    from lake.global_validator import validate_global_frame
+    from lake.global_writer import write_validated_global_dataset
+
+    spec = get_dataset_spec("etf_daily")
+    source = replace(
+        get_source_spec("global_yfinance_us_price_v1"),
+        admission_status="approved", license_status="approved", license_checked_at="2026-07-12",
+    )
+    raw = pd.DataFrame({
+        "session_date": ["2026-07-07"], "symbol": ["SPY"], "exchange": ["YFINANCE_US"],
+        "session_close_at": ["2026-07-08T03:59:59Z"], "available_at": ["2026-07-08T03:59:59Z"],
+        "open": [620.0], "high": [622.0], "low": [619.0], "close": [621.5], "volume": [1000],
+        "is_adjusted": [True], "adjustment_version": ["yfinance_splits_only_v1"], "currency": ["USD"],
+    })
+    canonical = normalize_global_frame(raw, source=source, spec=spec, ingest_id="adjusted-only")
+    validation = validate_global_frame(canonical, source=source, spec=spec)
+    assert validation.rejected is False
+    write_validated_global_dataset(validation, source=source, spec=spec, ingest_id="adjusted-only", root=tmp_path)
+
+    with pytest.raises(ValueError, match="does not provide raw prices"):
+        load_global_price_panel("etf_daily", root=tmp_path, adjustment_basis="raw")
+    adjusted = load_global_price_panel("etf_daily", root=tmp_path, adjustment_basis="adjusted")
+    assert adjusted.iloc[0, 0] == 621.5
 
 
 def test_global_macro_loader_uses_available_at_as_of_alignment(tmp_path):
@@ -270,6 +421,41 @@ def test_update_global_data_uses_fake_provider_and_writes_manifest(tmp_path):
     assert result["detail"]["market_price_daily"]["ok"] is True
     manifest = json.loads((tmp_path / "data_lake/global_manifest.json").read_text(encoding="utf-8"))
     assert manifest["datasets"]["market_price_daily"]["row_count"] == 1
+
+
+def test_update_global_data_selects_configured_yfinance_source_over_planned_source(tmp_path, monkeypatch):
+    from app_config.settings import GlobalDataConfig
+    from scripts.data import update_global_data
+
+    class FakeProvider:
+        def probe(self, spec):
+            return {"ok": True, "provider": "fake", "dataset_id": spec.dataset_id, "status": "available"}
+
+        def fetch(self, spec, *, start=None, end=None):
+            return pd.DataFrame({
+                "date": ["2026-07-07"], "symbol": ["SPY"], "exchange": ["YFINANCE_US"],
+                "session_close_at": ["2026-07-08T03:59:59Z"], "open": [620.0], "high": [622.0],
+                "low": [619.0], "close": [621.5], "volume": [1000], "is_adjusted": [True],
+                "adjustment_version": ["yfinance_splits_only_v1"], "currency": ["USD"],
+            })
+
+    monkeypatch.setattr(update_global_data, "_settings", lambda: GlobalDataConfig(
+        enabled=True,
+        source_admissions={
+            "global_yfinance_us_price_v1": {
+                "admission_status": "approved", "license_status": "approved", "license_checked_at": "2026-07-12",
+            }
+        },
+    ))
+    result = update_global_data.run_global_update(
+        root=tmp_path,
+        dataset_ids=["etf_daily"],
+        provider=FakeProvider(),
+        start="2026-07-07",
+    )
+
+    assert result["ok"] is True
+    assert result["detail"]["etf_daily"]["source_id"] == "global_yfinance_us_price_v1"
 
 
 def test_update_global_data_dry_run_does_not_write_manifest(tmp_path):
