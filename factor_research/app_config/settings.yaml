@@ -36,7 +36,7 @@ global_data:
       license_status: approved
       license_checked_at: "2026-07-12"
       allowed_use: research_only
-    global_yfinance_us_price_v1:
+    global_cboe_us_price_v1:
       admission_status: approved
       license_status: approved
       license_checked_at: "2026-07-12"

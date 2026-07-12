@@ -107,7 +107,7 @@ class OpenBBGlobalProvider:
             )
         if spec.dataset_id not in {"market_price_daily", "etf_daily", "fx_daily", "commodity_daily"}:
             raise ProviderUnavailable(f"OpenBB fetch mapping is not configured for dataset_id={spec.dataset_id}")
-        return self._fetch_yfinance_prices(spec, start=start, end=end)
+        return self._fetch_prices(spec, start=start, end=end)
 
     @staticmethod
     def _provider_symbol(symbol: str, *, dataset_id: str) -> str:
@@ -122,7 +122,7 @@ class OpenBBGlobalProvider:
                 return column
         raise ProviderUnavailable("OpenBB historical response is missing a date index")
 
-    def _fetch_yfinance_prices(
+    def _fetch_prices(
         self,
         spec: DatasetSpec,
         *,
@@ -134,7 +134,8 @@ class OpenBBGlobalProvider:
         symbols = self.source.allowlist_for(spec.dataset_id)
         if not symbols:
             raise ProviderUnavailable(f"{self.source.source_id} has no allowlist for {spec.dataset_id}")
-        provider_symbols = [self._provider_symbol(symbol, dataset_id=spec.dataset_id) for symbol in symbols]
+        is_cboe = self.source.source_id == "global_cboe_us_price_v1"
+        provider_symbols = list(symbols) if is_cboe else [self._provider_symbol(symbol, dataset_id=spec.dataset_id) for symbol in symbols]
         obb = self._load_obb()
         # Fetch one symbol at a time. yfinance's bulk endpoint may report an
         # empty aggregate response while obscuring which symbol failed; a
@@ -143,12 +144,14 @@ class OpenBBGlobalProvider:
         for provider_symbol in provider_symbols:
             kwargs = {
                 "symbol": provider_symbol,
-                "provider": "yfinance",
+                "provider": "cboe" if is_cboe else "yfinance",
                 "start_date": start,
                 "end_date": end,
             }
             if spec.dataset_id == "fx_daily":
                 response = obb.currency.price.historical(**kwargs)
+            elif is_cboe:
+                response = obb.equity.price.historical(**kwargs)
             else:
                 # yfinance does not expose an unadjusted historical price mode via
                 # OpenBB. Keep the provider's split-adjusted series explicit.
@@ -201,7 +204,7 @@ class OpenBBGlobalProvider:
         }[spec.dataset_id]
         out = pd.DataFrame({
             "symbol": frame["symbol"].astype(str),
-            "exchange": exchange,
+            "exchange": "CBOE_US" if is_cboe else exchange,
             "session_date": session_dates,
             # The source has only a date-level timestamp; this is deliberately
             # later than the unknown source close, never an asserted close time.
@@ -213,7 +216,7 @@ class OpenBBGlobalProvider:
             "close": pd.to_numeric(frame["close"], errors="coerce"),
             "volume": pd.to_numeric(frame["volume"], errors="coerce").fillna(0.0),
             "is_adjusted": True,
-            "adjustment_version": "yfinance_splits_only_v1",
+            "adjustment_version": "cboe_eod_research_v1" if is_cboe else "yfinance_splits_only_v1",
             "currency": self.source.currency,
         })
         return out

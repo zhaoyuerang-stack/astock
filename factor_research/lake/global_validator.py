@@ -139,8 +139,12 @@ def validate_global_frame(
             _append_reason(reasons, out[column].isna(), f"invalid_{column}")
         _append_reason(reasons, (out[["open", "high", "low", "close"]] <= 0).any(axis=1), "non_positive_price")
         _append_reason(reasons, out["volume"] < 0, "negative_volume")
-        lower = out["low"] > out[["open", "close"]].min(axis=1)
-        upper = out["high"] < out[["open", "close"]].max(axis=1)
+        # CBOE historical OHLC values are rounded independently to cents, so
+        # a valid bar can cross an OHLC boundary by a few cents. Keep this
+        # source-specific price precision allowance small and explicit.
+        price_tolerance = 0.05 if source.source_id == "global_cboe_us_price_v1" else 0.0
+        lower = out["low"] > (out[["open", "close"]].min(axis=1) + price_tolerance)
+        upper = out["high"] < (out[["open", "close"]].max(axis=1) - price_tolerance)
         _append_reason(reasons, lower | upper, "ohlc_inconsistent")
         _append_reason(reasons, ~out["is_adjusted"].map(is_bool), "invalid_is_adjusted")
         if "raw_close" not in out.columns or "adjusted_close" not in out.columns:

@@ -66,7 +66,7 @@ def test_repository_settings_admit_alfred_as_auxiliary_research_data():
     assert admission["admission_status"] == "approved"
     assert admission["license_status"] == "approved"
     assert admission["allowed_use"] == "research_only"
-    assert global_data.source_admissions["global_yfinance_us_price_v1"]["admission_status"] == "approved"
+    assert global_data.source_admissions["global_cboe_us_price_v1"]["admission_status"] == "approved"
     assert global_data.source_admissions["global_yfinance_fx_v1"]["admission_status"] == "approved"
     assert global_data.source_admissions["global_yfinance_commodity_v1"]["admission_status"] == "approved"
 
@@ -317,6 +317,20 @@ def test_adjusted_only_price_source_rejects_raw_price_loader(tmp_path):
         load_global_price_panel("etf_daily", root=tmp_path, adjustment_basis="raw")
     adjusted = load_global_price_panel("etf_daily", root=tmp_path, adjustment_basis="adjusted")
     assert adjusted.iloc[0, 0] == 621.5
+
+
+def test_cboe_rounding_tolerance_does_not_quarantine_valid_ohlc_boundary():
+    from dataclasses import replace
+
+    from lake.global_catalog import get_dataset_spec, get_source_spec
+    from lake.global_normalizers import normalize_global_frame
+    from lake.global_validator import validate_global_frame
+
+    source = replace(get_source_spec("global_cboe_us_price_v1"), admission_status="approved", license_status="approved", license_checked_at="2026-07-12")
+    raw = pd.DataFrame({"date": ["2025-01-02"], "symbol": ["AAPL"], "exchange": ["CBOE_US"], "session_close_at": ["2025-01-03T04:59:59Z"], "open": [40.02], "high": [40.00], "low": [38.66], "close": [38.83], "volume": [1], "is_adjusted": [True], "adjustment_version": ["cboe_eod_research_v1"], "currency": ["USD"]})
+    result = validate_global_frame(normalize_global_frame(raw, source=source, spec=get_dataset_spec("market_price_daily"), ingest_id="cboe-rounding"), source=source, spec=get_dataset_spec("market_price_daily"))
+    assert result.rejected is False
+    assert result.quarantine.empty
 
 
 def test_global_macro_loader_uses_available_at_as_of_alignment(tmp_path):

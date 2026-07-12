@@ -42,8 +42,11 @@ Current local admission:
   intraday publication timestamp, so the adapter converts that date to the end of the
   source day in `America/Chicago`. This is conservative and can delay a signal; it is
   not an assertion of the exact release time.
-- `global_yfinance_us_price_v1`, `global_yfinance_fx_v1`, and
-  `global_yfinance_commodity_v1`: OpenBB/yfinance daily price sources, enabled for
+- `global_cboe_us_price_v1`: OpenBB/CBOE daily price source, enabled for the
+  overseas-equity and ETF allowlists. Its adjustment semantics are not sufficient
+  for valuation, so it is research-return-only.
+- `global_yfinance_fx_v1` and `global_yfinance_commodity_v1`: OpenBB/yfinance
+  daily price sources, enabled for
   the documented research allowlists. Their timestamps are date-level, so canonical
   availability is conservatively delayed to the end of the source day. Equity and ETF
   prices are split-adjusted only; they are valid for returns research, not valuation
