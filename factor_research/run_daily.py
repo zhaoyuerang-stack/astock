@@ -26,7 +26,6 @@ from core.engine import PricePanel
 from strategies.small_cap import load_price_panels
 from strategies.executable import build_executable_strategy
 from lake.load_lake import load_raw_close
-from lake.validator import DataValidator
 from app_config.settings import get_settings
 from runtime.production_readiness import get_production_readiness
 from runtime.deployment import (
@@ -210,12 +209,19 @@ def main():
         ),
     )
     last = close.index[-1]
-    cal = pd.read_parquet("data_lake/meta/trade_calendar.parquet")["date"]
-    v = DataValidator(calendar=cal)
-    sample = ["600519", "000001", "300750", "600036", "601398"]
-    bad = [c for c in sample if c in close.columns
-           and not v.validate(c, pd.read_parquet(f"data_lake/price/daily/{c}.parquet"))["ok"]]
-    print(f"  最新交易日: {last.date()} | 抽样校验: {'✅全部通过' if not bad else f'⚠️{bad}异常'}")
+    # 分层抽样质量门(与 scheduled_daily_update 同源),不再只扫 5 只大票
+    from lake.sample_quality import run_sample_quality_check
+    from pathlib import Path as _Path
+    sq = run_sample_quality_check(
+        _Path("."),
+        seed=str(last.date()),
+    )
+    bad = [row["code"] for row in (sq.get("bad") or [])]
+    print(
+        f"  最新交易日: {last.date()} | 抽样校验"
+        f"(n={sq.get('n_checked')}, strata={sq.get('strata_checked')}): "
+        f"{'✅全部通过' if sq.get('ok') else f'⚠️{len(bad)}只异常' + (str(bad[:5]) if bad else '')}"
+    )
 
     # ③ canonical spec 驱动的 factor / timing / policy
     print(f"\n[3/6] 生成策略信号 ({spec.family}/{spec.version})...")

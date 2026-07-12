@@ -28,6 +28,7 @@ REPORT_DIR = ROOT / "reports/ops/daily_update"
 DATA_TRIAGE_PATH = ROOT / "reports/data/data_issue_triage.json"
 LOCK_PATH = LOG_DIR / ".scheduled_daily_update.lock"
 PYTHON = "/opt/homebrew/bin/python3"
+# 向后兼容:旧固定 5 只锚点;日更质量门已改为 lake.sample_quality 分层抽样
 SAMPLE_CODES = ["600519", "000001", "300750", "600036", "601398"]
 CALENDAR_ANCHORS = ["600519", "601398", "000001", "600036", "600000", "601988"]
 CHINA_TZ = ZoneInfo("Asia/Shanghai")
@@ -221,22 +222,20 @@ def actual_latest_price_date():
     return canonical(ROOT)
 
 
-def sample_quality_check():
-    from lake.validator import DataValidator
+def sample_quality_check(seed=None):
+    """分层抽样质量门(锚点 + 主板/创业板/科创板/北交所),不再只扫 5 只大票。
 
-    cal = pd.read_parquet(ROOT / "data_lake/meta/trade_calendar.parquet")["date"]
-    validator = DataValidator(calendar=cal)
-    bad = []
-    checked = []
-    for code in SAMPLE_CODES:
-        fp = ROOT / f"data_lake/price/daily/{code}.parquet"
-        if not fp.exists():
-            continue
-        result = validator.validate(code, pd.read_parquet(fp))
-        checked.append(code)
-        if not result["ok"]:
-            bad.append({"code": code, "issues": result["issues"]})
-    return {"checked": checked, "bad": bad, "ok": not bad}
+    seed 默认用 expected 交易日,保证同日可复现;详见 ``lake.sample_quality``。
+    """
+    from lake.sample_quality import run_sample_quality_check
+
+    if seed is None:
+        try:
+            exp, _ = expected_trade_date()
+            seed = str(exp.date()) if exp is not None else None
+        except Exception:
+            seed = None
+    return run_sample_quality_check(ROOT, seed=seed)
 
 
 def compute_update_health(report: dict) -> dict:
@@ -732,8 +731,16 @@ def run_daily_update(args):
                       f"price_ok={price_ok} etf_ok={etf_ok} raw_ok={raw_ok} "
                       f"tushare_inc_ok={tushare_inc_ok} global_ok={global_update_ok}")
 
-                report["sample_quality"] = sample_quality_check()
-                print(f"[quality] sample_ok={report['sample_quality']['ok']} bad={report['sample_quality']['bad']}")
+                report["sample_quality"] = sample_quality_check(
+                    seed=report.get("expected_trade_date") or report.get("run_date"),
+                )
+                sq = report["sample_quality"]
+                print(
+                    f"[quality] sample_ok={sq.get('ok')} n_checked={sq.get('n_checked')} "
+                    f"n_bad={sq.get('n_bad')} strata={sq.get('strata_checked')} "
+                    f"bad={sq.get('bad')[:5] if sq.get('bad') else []}"
+                    f"{'...' if len(sq.get('bad') or []) > 5 else ''}"
+                )
                 triage = attach_data_issue_triage(report)
                 print(f"[triage] production_blocked={triage['summary']['production_blocked']} "
                       f"categories={triage['summary']['counts_by_category']}")
