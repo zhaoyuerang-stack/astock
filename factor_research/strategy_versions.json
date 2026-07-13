@@ -3161,6 +3161,53 @@
       "failure_boundaries": {}
     },
     {
+      "id": "multi-factor-composite",
+      "versions": [
+        {
+          "version": "v1.0",
+          "date": "2026-06-30",
+          "desc": "illiq(60%)+small_cap(20%)+lc_hedge(20%) 三策略低相关组合",
+          "config": {
+            "allocation": {
+              "illiq_v3.1": 0.6,
+              "small_cap_v2.0": 0.2,
+              "lc_hedge_v1.0": 0.2
+            },
+            "rebalance": "monthly"
+          },
+          "data_scope": {
+            "source": "data_lake",
+            "period": "2018-2024",
+            "train_period": "2018-2022",
+            "oos_period": "2023-2024",
+            "survivorship_bias": false,
+            "n_trials": 126,
+            "dsr_p": 1e-06
+          },
+          "metrics": {
+            "annual": 0.1735,
+            "maxdd": -0.1725,
+            "sharpe": 0.87,
+            "calmar": 1.01,
+            "hit": false
+          },
+          "status": "参考",
+          "notes": "⚠️ 2026-06-30 严格训练/OOS分离测试(2018-22训练/2023-24验证)。最优权重 illiq_v11(60%)+illiq(10%)+small(10%)+size_earn(10%)+hq_full(10%)。OOS T-1: 年化17.35%/夏普0.87/回撤-17.25%/卡玛1.01。夏普差一口气(0.87 vs 门槛1.0)。DSR高度显著(p≈0,n_trials=126)。策略池多样性不足(illiq簇合计70%)，需引入真正正交的新因子后重组合。记为参考，待新因子入库后重跑。",
+          "evidence": {},
+          "admission": {},
+          "nine_gate": {}
+        }
+      ],
+      "name": "多因子低相关组合",
+      "hypothesis": "通过将低相关策略（illiq/小盘/大盘对冲）组合，利用MPT分散降低回撤，在多Regime下维持正超额",
+      "regime": "全天候（低相关对冲）",
+      "decay_signal": "illiq单体夏普<1.0持续3个月 | lc_hedge与illiq相关性>0.5 | 组合MaxDD突破-20%",
+      "status": "active",
+      "style_betas": {},
+      "capacity_m": 0.0,
+      "failure_boundaries": {}
+    },
+    {
       "id": "ontology_industry",
       "versions": [
         {
