@@ -167,7 +167,44 @@ INTERFACES = {
         "index_codes": ["000300.SH", "000905.SH", "000852.SH", "932000.CSI",
                         "000016.SH", "399006.SZ", "000001.SH", "399001.SZ"],
     },
+    # ── 机构/游资交易公示(by_date,一次全市场一天)── 零抓取空白区,2026-07-06 接入
+    "top_list": {  # 龙虎榜:异常波动/换手触发的强制公示名单 → 游资/关注度代理
+        "mode": "by_date", "date_param": "trade_date",
+        # 同股同日可因触发多条不同上榜理由分别列示,reason 入键防止误删非重复行
+        "keys": ["ts_code", "trade_date", "reason"],
+        "store": "institutional/top_list_all.parquet",
+        "fields": ("trade_date,ts_code,name,close,pct_change,turnover_rate,amount,"
+                   "l_sell,l_buy,l_amount,net_amount,net_rate,amount_rate,float_values,reason"),
+    },
+    "top_inst": {  # 龙虎榜机构成交明细:同股同日可有多个营业部各买/卖各一行
+        "mode": "by_date", "date_param": "trade_date",
+        "keys": ["ts_code", "trade_date", "exalter", "side"],
+        "store": "institutional/top_inst_all.parquet",
+        "fields": "trade_date,ts_code,exalter,side,buy,buy_rate,sell,sell_rate,net_buy,reason",
+    },
+    "block_trade": {  # 大宗交易:无自然行 ID,同股同日同价可有多笔不同买卖方,全字段去重
+        "mode": "by_date", "date_param": "trade_date",
+        "keys": ["ts_code", "trade_date", "price", "vol", "buyer", "seller"],
+        "store": "institutional/block_trade_all.parquet",
+        "fields": "ts_code,trade_date,price,vol,amount,buyer,seller",
+    },
+    # 回购:ann_date 事件流,非按交易日全市场快照——用 start/end 窗口(补 by_date 没有的窗口模式)。
+    # 实测:不带日期一次默认回2000条最新在前(20260706~20260423,~2.5月);带 start/end 窗口
+    # 仍固定 2000 条硬顶——必须切小窗口(月度)防止早期历史被静默截断(同 report_rc 5000 行截断教训)。
+    "repurchase": {
+        "mode": "by_window", "date_param": "ann_date", "keys": ["ts_code", "ann_date"],
+        "store": "institutional/repurchase_all.parquet",
+        "fields": "ts_code,ann_date,end_date,proc,exp_date,vol,amount,high_limit,low_limit",
+    },
+    # 质押率:实测 end_date 单独查询返回空(非全市场快照接口),ts_code 单独查询返回该股全历史多期——
+    # 走 by_stock(同 balancesheet 等 2000 积分档 vip 限制模式一致,逐股一次拿全史)。
+    "pledge_stat": {
+        "mode": "by_stock", "keys": ["ts_code", "end_date"],
+        "store": "institutional/pledge_stat_all.parquet",
+        "fields": "ts_code,end_date,pledge_count,unrest_pledge,rest_pledge,total_share,pledge_ratio",
+    },
     # 注:cyq_chips(筹码分布,数十亿行)+ report_rc(研报海量)体量过大,需专门按日窗口/降采样,暂缓。
+    # 注:cyq_perf 实测账号无该接口权限(40203),不接。
 }
 
 
@@ -180,6 +217,19 @@ def _trade_dates(start, end):
 
 def _quarter_ends(start, end):
     return [d.strftime("%Y%m%d") for d in pd.date_range(start, end, freq="QE")]
+
+
+def _month_windows(start, end):
+    """按自然月切窗口(含首尾不完整月),用于 ann_date 事件流接口——覆盖全部日历日
+    (公告可能落在非交易日),不用 _trade_dates(会漏周末/节假日公告)。"""
+    months = pd.date_range(pd.Timestamp(start).to_period("M").to_timestamp(),
+                            pd.Timestamp(end), freq="MS")
+    out = []
+    for ms in months:
+        me = min(ms + pd.offsets.MonthEnd(0), pd.Timestamp(end))
+        ws = max(ms, pd.Timestamp(start))
+        out.append((ws.strftime("%Y%m%d"), me.strftime("%Y%m%d")))
+    return out
 
 
 def _all_codes():
@@ -226,6 +276,13 @@ def backfill(name, start="20100101", end=None, flush_every=200):
         done = set(existing["ts_code"]) if len(existing) else set()
         units = [c for c in spec["index_codes"] if c not in done]
         fetch = lambda u: call(name, {"ts_code": u}, fields)
+    elif mode == "by_window":
+        # 增量:已有数据的 date_param 最大值之前的月份窗口视为已补齐(该月内不会再有新公告落进旧月份)。
+        done_max = str(existing[spec["date_param"]].astype(str).max()) if len(existing) else "00000000"
+        all_windows = _month_windows(start, end)
+        units = [(ws, we) for ws, we in all_windows if we >= done_max]
+        done = set(all_windows) - set(units)
+        fetch = lambda u: call(name, {"start_date": u[0], "end_date": u[1]}, fields)
     elif mode == "once":
         df = call(name, spec.get("params", {}), fields)
         df.to_parquet(fp, index=False)
