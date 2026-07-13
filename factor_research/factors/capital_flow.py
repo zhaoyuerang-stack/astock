@@ -32,6 +32,14 @@ def _align_to_close(panel: pd.DataFrame, close: pd.DataFrame) -> pd.DataFrame:
     return out[common].reindex(columns=close.columns)
 
 
+@register_factor(
+    "large_order_net_ratio",
+    params={"window": (3, 60)},
+    data=("moneyflow",),
+    input="close",
+    arg_map={"window": "window"},
+    searchable=True,
+)
 def large_order_net_ratio(close, window: int = 5, **_):
     """(大单+特大单净买入) / 全部单子总成交额,滚动平滑;高值=主力资金净流入。"""
     panels = _load_moneyflow_cache()

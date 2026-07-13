@@ -54,14 +54,42 @@ def test_allowed_factors_and_dsl_auto_wired():
     from factory.autoresearch.registry import ALLOWED_FACTORS
     from factors.autoresearch_dsl import _FACTOR_CALLS
 
-    # 迁移后白名单规模应稳定(含 holder/large_order 覆盖 + searchable 自动)
+    # 迁移后白名单规模应稳定(searchable 自动;无手工表)
     assert len(ALLOWED_FACTORS) >= 40
-    for name in ("momentum", "illiquidity", "roe", "northbound_hold_level", "alpha_009"):
+    for name in (
+        "momentum",
+        "illiquidity",
+        "roe",
+        "northbound_hold_level",
+        "alpha_009",
+        "holder_count_chg",
+        "holdertrade_net",
+        "large_order_net_ratio",
+    ):
         assert name in ALLOWED_FACTORS, name
         assert name in _FACTOR_CALLS, name
         mod, fn, _ = _FACTOR_CALLS[name]
         assert mod.startswith("factors."), mod
         assert fn  # non-empty
+
+
+def test_holder_and_flow_registered_searchable():
+    from factors.registry import discover
+    from factory.autoresearch.registry import ALLOWED_FACTORS
+
+    reg = discover()
+    for name, mod_suffix, window_key in (
+        ("holder_count_chg", "shareholder", "window"),
+        ("holdertrade_net", "shareholder", "window"),
+        ("large_order_net_ratio", "capital_flow", "window"),
+    ):
+        assert name in reg, name
+        rec = reg[name]
+        assert rec.searchable is True, name
+        assert rec.fn.__module__.endswith(mod_suffix), rec.fn.__module__
+        assert window_key in rec.params
+        assert name in ALLOWED_FACTORS
+        assert ALLOWED_FACTORS[name].params == rec.params
 
 
 def test_momentum_shim_reexports_from_split_modules():
@@ -132,6 +160,7 @@ if __name__ == "__main__":
     test_discover_includes_migrated_searchable_families()
     test_earnings_registered_but_not_searchable()
     test_allowed_factors_and_dsl_auto_wired()
+    test_holder_and_flow_registered_searchable()
     test_momentum_shim_reexports_from_split_modules()
     test_dsl_illiquidity_resolves_to_liquidity_module()
     test_deprecated_quality_and_gap_not_in_registry_or_search()

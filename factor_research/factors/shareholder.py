@@ -34,8 +34,14 @@ def _align_to_close(panel: pd.DataFrame, close: pd.DataFrame) -> pd.DataFrame:
     return out[common].reindex(columns=close.columns)
 
 
-@register_factor("holder_count_chg", params={"window": (20, 120)},
-                 data=("holder/holdernumber",), input="close", arg_map={"window": "window"})
+@register_factor(
+    "holder_count_chg",
+    params={"window": (40, 240)},
+    data=("holder/holdernumber",),
+    input="close",
+    arg_map={"window": "window"},
+    searchable=True,
+)
 def holder_count_chg(close, window: int = 60, **_):
     """股东户数环比变化,负号:户数减少 → 筹码集中 → 因子值升高(买入)。"""
     panel = _align_to_close(_load_holdernumber_cache(), close)
@@ -71,6 +77,14 @@ def _snap_to_next_trading_day(df: pd.DataFrame, trade_idx: pd.DatetimeIndex) -> 
     return out.groupby(level=0).sum()
 
 
+@register_factor(
+    "holdertrade_net",
+    params={"window": (40, 250)},
+    data=("holder/holdertrade",),
+    input="close",
+    arg_map={"window": "window"},
+    searchable=True,
+)
 def holdertrade_net(close, window: int = 120, **_):
     """高管/重要股东滚动净增减持比例(窗口内事件求和;净增持 → 因子值升高)。
 

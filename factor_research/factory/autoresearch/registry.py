@@ -12,21 +12,9 @@ class FactorSpec:
     data_dependencies: tuple[str, ...] = ()
 
 
-# 手工条目仅保留「尚未 @register_factor 或需覆盖 params」的因子。
-# momentum/fundamental/northbound/alpha101 等已由 factors.registry discover 自动注入
-# (searchable=True);setdefault → 装饰器优先,本表只补缺/覆盖。
-ALLOWED_FACTORS: dict[str, FactorSpec] = {
-    # 股东/资金流:register 的 window 范围与搜索宇宙刻意不同 → 手工覆盖保留
-    "holder_count_chg": FactorSpec(
-        "holder_count_chg", {"window": (40, 240)}, ("holder/holdernumber",)
-    ),
-    "holdertrade_net": FactorSpec(
-        "holdertrade_net", {"window": (40, 250)}, ("holder/holdertrade",)
-    ),
-    "large_order_net_ratio": FactorSpec(
-        "large_order_net_ratio", {"window": (3, 60)}, ("moneyflow",)
-    ),
-}
+# 搜索白名单全部由 @register_factor(searchable=True) 注入;本表不再手写因子条目。
+# setdefault:若未来需临时覆盖某因子 params,可在此预置后 discover 不会覆盖。
+ALLOWED_FACTORS: dict[str, FactorSpec] = {}
 
 # ── @register_factor 自动接线: 只有显式 searchable=True 的因子才进搜索白名单 ──
 # "工厂搜不搜某因子"是研究判断(扩搜索宇宙改变确定性搜索行为),故 opt-in 不自动。

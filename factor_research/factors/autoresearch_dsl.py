@@ -18,13 +18,8 @@ import pandas as pd
 from factors.utils import mad_clip, safe_zscore
 
 
-# 手工条目仅保留尚未 @register_factor 的接线(股东/大单)。
-# momentum/fundamental/northbound/alpha101/… 由 discover 自动注入。
-_FACTOR_CALLS: dict[str, tuple] = {
-    "holder_count_chg": ("factors.shareholder", "holder_count_chg", {"window": "window"}),
-    "holdertrade_net": ("factors.shareholder", "holdertrade_net", {"window": "window"}),
-    "large_order_net_ratio": ("factors.capital_flow", "large_order_net_ratio", {"window": "window"}),
-}
+# DSL 调用表全部由 @register_factor discover 注入;本表不再手写因子条目。
+_FACTOR_CALLS: dict[str, tuple] = {}
 
 # ── @register_factor 自动接线: factors 层登记的因子自动补进 DSL 调用表(手工优先)──
 # 同层 factors→factors;新因子 @register_factor 后这里自动出现,无需手改。
