@@ -560,20 +560,40 @@ class Phase4Register:
 
         return None
 
+    @staticmethod
+    def _segments_by_role(p2) -> dict:
+        """取结构化段字典;旧报告无 segments_by_role 时按显示标签前缀归类回退。
+
+        禁止精确匹配完整标签字符串:OOS 标签终点年随 holdout boundary 变
+        (如 "OOS 2023-2024"),硬编码 "OOS 2023-2026" 曾导致 OOS 指标静默丢失
+        (2026-07-11 review)。
+        """
+        roles = dict((p2 or {}).get("segments_by_role") or {})
+        if roles:
+            return roles
+        for label, seg in (p2 or {}).get("segments", {}).items():
+            if label.startswith("IS"):
+                roles["is"] = seg
+            elif label.startswith("OOS"):
+                roles["oos"] = seg
+            elif label.startswith("压力"):
+                roles["stress"] = seg
+        return roles
+
     def _build_metrics(self, p2, p3) -> dict:
         """Build metrics dict from Phase 2+3 data."""
         m = {}
-        segs = p2.get("segments", {})
-        for label, key in [("IS  2018-2022", "2018"), ("OOS 2023-2026", "2023"),
-                            ("压力 2010-2017", "2010")]:
-            s = segs.get(label, {})
+        roles = self._segments_by_role(p2)
+        for role, key in [("is", "2018"), ("oos", "2023"), ("stress", "2010")]:
+            s = roles.get(role, {})
             if s:
                 m[f"annual_{key}"] = s.get("annual", 0)
                 m[f"maxdd_{key}"] = s.get("maxdd", 0)
                 m[f"sharpe_{key}"] = s.get("sharpe", 0)
 
-        # Top-level (show IS 2018-2022)
-        is_seg = segs.get("IS  2018-2022", {})
+        # Top-level = IS 段(样本内口径):auto_hit 因此基于样本内绩效——保持既有行为,
+        # 改为 OOS/全样本口径是研究决策,需另立 ADR(2026-07-11 review 标记)。
+        is_seg = roles.get("is", {})
         m["annual"] = is_seg.get("annual", 0)
         m["maxdd"] = is_seg.get("maxdd", 0)
         m["sharpe"] = is_seg.get("sharpe", 0)
@@ -596,9 +616,11 @@ class Phase4Register:
     def _build_config(self, p2) -> dict:
         """Build config dict."""
         cfg = dict(p2.get("config", {}))
+        from core.engine import CostModel
+        base = CostModel()  # 费率唯一权威(R-COST-001),禁止在此写字面量
         cfg["cost"] = {
-            "buy": 0.00225,
-            "sell": 0.00275,
-            "financing_rate": 0.065,
+            "buy": base.buy_cost,
+            "sell": base.sell_cost,
+            "financing_rate": base.financing_rate,
         }
         return cfg

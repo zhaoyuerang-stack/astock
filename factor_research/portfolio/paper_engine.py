@@ -288,7 +288,9 @@ def execute_to_target(acc, date, target, top_n, names, trades, blocked, leverage
         acc["cash"] += notional - cost
         trades.append([date, code, names.get(code, code), "SELL", pos["shares"],
                        round(price, 3), round(notional, 2), round(cost, 2), round(acc["cash"], 2)])
-    # 2. 轮动关闭(BULL)且持有债券 → 先卖光 ETF,资金回笼供买股
+    # 2. 轮动关闭(BULL)且持有债券 → 先卖光 ETF,资金回笼供买股。
+    #    fail-closed(有意设计,勿"修"):未授权时连卖出也不自动执行,遗留持仓留人工处置
+    #    ——未授权指令不得被当成可执行轮动(见 test_paper_etf.py L85 与 run_daily 部署纪律)。
     held = acc.get("bond")
     if held and held.get("shares") and not bond_enabled and bond_authorized:
         price = get_etf_fill(held["code"], date)

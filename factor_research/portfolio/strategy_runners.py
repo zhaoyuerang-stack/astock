@@ -72,7 +72,7 @@ def _run_with_factor(
 
     cfg = BacktestConfig(
         start=start,
-        cost=CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065),
+        cost=CostModel(),  # 费率唯一权威 = core.engine.CostModel 默认值(R-COST-001)
         leverage=leverage,
     )
     engine = BacktestEngine(prices=prices, config=cfg)

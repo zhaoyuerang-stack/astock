@@ -95,10 +95,11 @@ class WF3Runner:
         self.top_n = self.config.get("top_n", 25)
         self.rebalance = self.config.get("rebalance_days", 20)
         self.leverage = self.config.get("leverage", 1.25)
+        _default = CostModel()  # 费率唯一权威(R-COST-001),兜底值不写字面量
         self.cost = CostModel(
-            buy_cost=self.config.get("buy_cost", 0.00225),
-            sell_cost=self.config.get("sell_cost", 0.00275),
-            financing_rate=self.config.get("financing_rate", 0.065),
+            buy_cost=self.config.get("buy_cost", _default.buy_cost),
+            sell_cost=self.config.get("sell_cost", _default.sell_cost),
+            financing_rate=self.config.get("financing_rate", _default.financing_rate),
         )
 
     def run(self, warmup_start: str = "2010-01-01") -> dict:
