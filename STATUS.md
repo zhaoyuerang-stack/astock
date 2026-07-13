@@ -22,6 +22,14 @@
   · **worktree 数据链**:data_lake 六目录+fundamental_batch symlink 主仓(gitignored 只读),此前环境性失败的 test_engine/test_data_layer/test_e2e/test_services_phase0/test_style_neutralization 全部转绿;test_autoresearch_engine 单例(`test_island_fitness_penalizes_correlation_to_book`)失败经 `git stash -u` 基线复现为**预存**(同 06-30/07-02 记录),非本次引入。
   · **CI 缺口发现**:test_all.sh 手工枚举测试文件,check_test_discovery 只验"可收集"不验"被执行"——pytest-only 新测试(test_fundamental_quality/test_expectation_gap)从不被 CI 跑;已立后台任务(补兜底 pytest 块)。
 
+**2026-07-05(daily-round-3:研究总监审视,算力再分配,不改口径不碰台账写入口)**:
+  · **在册池清零**:`decay_status.json` 机械确认 `no_registered=true`;`strategy_versions.json` 30 个 family 全落在 候选/参考/退役/已证伪/`REJECTED_BY_ADVERSARIAL_DECAY`,此前仅剩的两个 diversifier(`hq-momentum-hedged`/`large-cap-growth-hedged`)已完成 TASKS 待办的退役复核,当前**无一在册**。
+  · **并行 agent 实时活动**:另一并行 agent(`codex/xiaochengxu` 分支)当日在跑组合再构成(`composite-portfolio` v1.1/v1.2-no-mom,均被 `REJECTED_BY_ADVERSARIAL_DECAY`,DSR p=0.23~0.26)与跨资产腿搜索(`cross_asset_leg_search`,纳指 ETF 513100/MA240 shadow_recommend=true),覆盖了 metasearch 06-23 指出的空白区之一(跨资产腿)——本轮建议下轮不重复投入该方向。
+  · **基本面质量因子族解封**:TASKS.md 原「需数据湖机器」阻塞条件经核实不成立(`data_lake/financials/balancesheet_all.parquet` 本机非空),`factors/fundamental_quality.py` 代码+单测早已就绪只欠 probe 步骤 3——是 metasearch 3 个空白区里唯一仍空闲、就绪度最高的方向,建议下轮方向①/②优先执行。
+  · **研报-NLP 管线误诊纠正**:TASKS.md 原描述"缺 PDF 源"已过期,实测取数正常(`data_lake/research_pdf/` 逐日有真实文件落地),真正卡点是下游解析/分类/抽取链 4 类具体 bug,且无失败退避,同批必败文件被逐小时重试,持续把噪声灌入 `research_ledger`(抽样最近 100 条运行,68 条为该管线重复失败,非真实待审候选),稀释研究台账信噪比。
+  · **结构性观察(非本轮可修)**:主仓物理工作目录当前 checkout 在 `codex/xiaochengxu`,与 `main` 是两条独立演化的线,互相缺对方的已落地功能/进行中实验——是否需要一次分支收敛窗口留给 owner 裁决。
+  · 详见 `factor_research/reports/research/research_director_review_round3_findings.md`(完整证据链接、逐条来源路径)。本轮零新搜索/零新候选,`trials_recorded=0`;未碰 registry 写入口/workflow promote/部署清单/成本模型/holdout boundary。
+
 **2026-07-03(孤岛回收四项:拥挤归因 + 保质期复核环 + 基本面质量因子族 + 被丢信号销账)**:
   · **拥挤 → 衰减归因**:`capacity.strategy_pool_crowding`(零调用方孤岛回收)接进 `decay_monitor` 周度——池级(等权"策略组合"复用 calculate_crowding_score)+ 逐腿 `max_pair_corr` 点名"和谁拥挤"(阈值单源 = governance.marginal.REDUNDANT_CORR)。对抗测试抓到真设计缺陷:逐腿对池均值相关会被正交腿稀释漏检双胞胎(corr 0.99 的孪生对池仅 0.64),已改两两口径。<2 腿/样本不足诚实拒判不给 0 分假绿。测试 5/5。
   · **保质期复核环**:`services/read/knowledge_expiry.py`(check_expiry 此前只挂 CLI 手动命令,结论过期没人重测)——findings 过期+父过期级联 + 方向条目过期(带 revival_condition)→ 决策收件箱**第九源**(info 级:「重测还是带新证据续期?」,裸续期=永久墓碑警示)。测试 6/6。
