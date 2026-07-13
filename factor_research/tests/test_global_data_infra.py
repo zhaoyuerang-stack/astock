@@ -358,6 +358,16 @@ def test_alpha_vantage_commodity_source_is_registered_as_planned_candidate():
     assert source.allowlist_for("commodity_daily") == ("CL=F", "BZ=F", "NG=F", "GC=F", "SI=F")
 
 
+def test_fred_commodity_source_is_registered_for_energy_review_subset():
+    from lake.global_catalog import get_source_spec
+
+    source = get_source_spec("fred_commodity_spot_v1")
+
+    assert source.provider == "fredcommodity"
+    assert source.datasets == ("commodity_daily",)
+    assert source.allowlist_for("commodity_daily") == ("CL=F", "BZ=F", "NG=F")
+
+
 def test_alpha_vantage_commodity_provider_maps_close_only_spot_series():
     from dataclasses import replace
 
@@ -395,6 +405,41 @@ def test_alpha_vantage_commodity_provider_maps_close_only_spot_series():
     assert result.quarantine.empty
     assert result.clean[["open", "high", "low"]].isna().all().all()
     assert result.clean.iloc[0]["ohlc_quality"] == "close_only_spot_series"
+
+
+def test_fred_commodity_provider_maps_close_only_spot_series():
+    from dataclasses import replace
+
+    from lake.global_catalog import get_dataset_spec, get_source_spec
+    from lake.global_normalizers import normalize_global_frame
+    from lake.global_validator import validate_global_frame
+    from lake.sources.fred_commodity import FredCommodityProvider
+
+    def fake_request(params):
+        payloads = {
+            "DCOILWTICO": {"observations": [{"date": "2025-01-02", "value": "73.13"}, {"date": "2025-01-03", "value": "."}]},
+            "DCOILBRENTEU": {"observations": [{"date": "2025-01-02", "value": "75.11"}]},
+            "DHHNGSP": {"observations": [{"date": "2025-01-02", "value": "3.24"}]},
+        }
+        return payloads[params["series_id"]]
+
+    source = replace(
+        get_source_spec("fred_commodity_spot_v1"),
+        admission_status="approved", license_status="approved", license_checked_at="2026-07-13",
+    )
+    provider = FredCommodityProvider(
+        source=source,
+        environ={"FRED_API_KEY": "test"},
+        request_json=fake_request,
+    )
+    raw = provider.fetch(get_dataset_spec("commodity_daily"), start="2025-01-01", end="2025-01-03")
+
+    assert set(raw["symbol"]) == {"CL=F", "BZ=F", "NG=F"}
+    assert len(raw) == 3
+    canonical = normalize_global_frame(raw, source=source, spec=get_dataset_spec("commodity_daily"), ingest_id="fred-commodity-unit")
+    result = validate_global_frame(canonical, source=source, spec=get_dataset_spec("commodity_daily"))
+    assert result.rejected is False
+    assert result.quarantine.empty
 
 
 def test_commodity_validator_allows_negative_close_events():
@@ -907,6 +952,42 @@ def test_reconcile_global_prices_uses_adjusted_close_review_path(monkeypatch):
     assert report["summary"]["ok"] is True
     assert report["summary"]["primary_source"] == "global_cboe_us_price_v1"
     assert report["summary"]["secondary_source"] == "global_fmp_us_price_v1"
+
+
+def test_reconcile_global_prices_uses_raw_close_for_commodity(monkeypatch):
+    from scripts.data import reconcile_global_prices
+
+    monkeypatch.setattr(
+        reconcile_global_prices,
+        "_select_primary",
+        lambda *args, **kwargs: pd.DataFrame({
+            "symbol": ["CL=F"],
+            "session_date": ["2025-01-02"],
+            "raw_close": [73.13],
+            "source_id": ["alpha_vantage_commodity_spot_v1"],
+        }),
+    )
+    monkeypatch.setattr(
+        reconcile_global_prices,
+        "_fetch_secondary",
+        lambda *args, **kwargs: pd.DataFrame({
+            "symbol": ["CL=F"],
+            "session_date": ["2025-01-02"],
+            "raw_close": [73.13],
+            "source_id": ["fred_commodity_spot_v1"],
+        }),
+    )
+
+    report = reconcile_global_prices.run_reconciliation(
+        dataset_id="commodity_daily",
+        primary_source_id="alpha_vantage_commodity_spot_v1",
+        secondary_source_id="fred_commodity_spot_v1",
+        start="2025-01-02",
+    )
+
+    assert report["summary"]["ok"] is True
+    assert report["summary"]["primary_source"] == "alpha_vantage_commodity_spot_v1"
+    assert report["summary"]["secondary_source"] == "fred_commodity_spot_v1"
 
 
 def test_reconcile_global_prices_cli_returns_structured_failure(monkeypatch, capsys):

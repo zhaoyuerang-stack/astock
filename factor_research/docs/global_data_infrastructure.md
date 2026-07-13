@@ -67,6 +67,10 @@ Current local admission:
   enabled for the research commodity panel with an API key. It covers daily
   spot series for WTI, Brent, natural gas, gold, and silver as a close-only
   spot contract, not a futures chain.
+- `fred_commodity_spot_v1`: official FRED second-source review path for the
+  energy subset of `commodity_daily`. It currently covers WTI, Brent, and Henry
+  Hub natural gas as close-only spot series and is intended for reconciliation,
+  not primary ingestion.
 - `global_etf_price_v1`: global ETF proxy allowlist, `research_only`. OpenBB remains
   an optional probe/provider route, but no ETF source is admitted until it supplies
   exchange, session-close, currency and corporate-action semantics required by the

@@ -20,6 +20,14 @@ from lake.global_validator import validate_global_frame  # noqa: E402
 from scripts.data.update_global_data import _provider  # noqa: E402
 
 
+def _price_column(dataset_id: str) -> str:
+    if dataset_id in {"market_price_daily", "etf_daily"}:
+        return "adjusted_close"
+    if dataset_id in {"fx_daily", "commodity_daily"}:
+        return "raw_close"
+    raise ValueError(f"no reconciliation price column configured for {dataset_id}")
+
+
 def _select_primary(
     dataset_id: str,
     *,
@@ -56,7 +64,10 @@ def _fetch_secondary(
     if configured_key_env:
         source = replace(source, api_key_env=configured_key_env)
     client = _provider(provider_mode=source.provider, api_key_envs=settings.api_key_envs, source=source)
-    raw = client.fetch(spec, start=start, end=end, adjustment_override="splits_only")
+    kwargs = {"start": start, "end": end}
+    if source.provider == "openbb" and dataset_id in {"market_price_daily", "etf_daily"}:
+        kwargs["adjustment_override"] = "splits_only"
+    raw = client.fetch(spec, **kwargs)
     canonical = normalize_global_frame(raw, source=source, spec=spec, ingest_id="reconcile-review")
     validation = validate_global_frame(canonical, source=source, spec=spec)
     if validation.rejected:
@@ -96,8 +107,8 @@ def run_reconciliation(
     if selected_symbols:
         secondary = secondary.loc[secondary["symbol"].astype(str).isin(selected_symbols)].copy()
     result = reconcile_price_observations(
-        prepare_price_observations(primary, source_label=primary_source_id, price_column="adjusted_close"),
-        prepare_price_observations(secondary, source_label=secondary_source_id, price_column="adjusted_close"),
+        prepare_price_observations(primary, source_label=primary_source_id, price_column=_price_column(dataset_id)),
+        prepare_price_observations(secondary, source_label=secondary_source_id, price_column=_price_column(dataset_id)),
         tolerance_bps=tolerance_bps,
         severe_bps=severe_bps,
     )

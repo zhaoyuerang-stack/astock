@@ -94,7 +94,7 @@ def validate_global_frame(
 ) -> GlobalValidationResult:
     """Validate canonical data and isolate row-level errors before lake writes."""
     dataset_columns = _dataset_columns(spec)
-    if source.source_id in {"global_cboe_us_price_v1", "alpha_vantage_commodity_spot_v1"}:
+    if source.source_id in {"global_cboe_us_price_v1", "alpha_vantage_commodity_spot_v1", "fred_commodity_spot_v1"}:
         dataset_columns = tuple(column for column in dataset_columns if column not in {"open", "high", "low"})
     required = COMMON_COLUMNS + dataset_columns
     missing = [column for column in required if column not in frame.columns]
@@ -140,7 +140,7 @@ def validate_global_frame(
     if spec.dataset_id in {"market_price_daily", "etf_daily", "fx_daily", "commodity_daily"}:
         price_columns = (
             ("close", "volume")
-            if source.source_id in {"global_cboe_us_price_v1", "alpha_vantage_commodity_spot_v1"}
+            if source.source_id in {"global_cboe_us_price_v1", "alpha_vantage_commodity_spot_v1", "fred_commodity_spot_v1"}
             else ("open", "high", "low", "close", "volume")
         )
         for column in price_columns:
@@ -148,7 +148,7 @@ def validate_global_frame(
         if spec.dataset_id != "commodity_daily":
             _append_reason(reasons, out["close"] <= 0, "non_positive_price")
         _append_reason(reasons, out["volume"] < 0, "negative_volume")
-        if source.source_id not in {"global_cboe_us_price_v1", "alpha_vantage_commodity_spot_v1"}:
+        if source.source_id not in {"global_cboe_us_price_v1", "alpha_vantage_commodity_spot_v1", "fred_commodity_spot_v1"}:
             lower = out["low"] > out[["open", "close"]].min(axis=1)
             upper = out["high"] < out[["open", "close"]].max(axis=1)
             _append_reason(reasons, lower | upper, "ohlc_inconsistent")
