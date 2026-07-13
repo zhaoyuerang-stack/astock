@@ -517,159 +517,11 @@ def show():
                       f"PBO={ng.get('pbo','?')} WF_sharpe={ng.get('wf_sharpe','?')}")
 
 
-def seed_registry():
-    """初始化/更新基础台账（v1/v2/v2.1 归入 small-cap-size 母策略，大盘成长对冲归入 large-cap-growth-hedged）。"""
-    register_family(
-        "small-cap-size", "小盘成交额因子",
-        hypothesis="小盘流动性溢价 / size 因子（-log 60日均成交额，选小盘）",
-        regime="小盘占优市；小盘等权指数 > MA16 时持仓，否则空仓",
-        decay_signal="小盘等权指数滚动跑输沪深300 / size 因子 IC 转负（定量阈值待定）",
-        status="active")
-
-    register("small-cap-size", "v1.0", "原始达标策略（小盘60+小盘指数MA16择时+1.25x杠杆）",
-             config={"factor": "size60(-log成交额60均)", "timing": "小盘指数MA16",
-                     "top_n": 25, "rebal_days": 20, "leverage": 1.25},
-             data_scope={"source": "data_full", "period": "2018-2026", "survivorship_bias": True},
-             metrics={"annual": 0.404, "maxdd": -0.146, "sharpe": 2.06, "calmar": 2.77, "hit": True},
-             status="参考",
-             notes="❌含幸存者偏差水分(active过滤剔退市股)，高估约8.5%")
-
-    register("small-cap-size", "v2.0", "data_lake 干净口径(不复权成交额)+真实成本+预热",
-             config={"factor": "size60", "timing": "小盘指数MA16",
-                     "top_n": 25, "rebal_days": 20, "leverage": 1.25,
-                     "cost": {"buy": 0.00225, "sell": 0.00275, "financing_rate": 0.065}},
-             data_scope={"source": "data_lake", "period": "2018-2026", "survivorship_bias": False},
-             metrics={"annual": 0.2593, "maxdd": -0.1943, "sharpe": 1.69, "calmar": 1.33},
-             status="参考",
-             notes="seed 基线记录;正式在册状态以现行台账为准(standalone 在册须 DSR 证据,seed 无 nine_gate 不得直入在册)。"
-                   "✅干净口径(修复amount复权污染)+预热(从2010切2018)。达满意线未达卓越；剔极端年(15/21/25)常态仅15%/夏普0.9，满意线靠小盘疯牛年；容量~2千万小资金可实盘。(旧污染口径曾报21.2%/夏普1.22)")
-
-    register("small-cap-size", "v2.1", "v2.0全历史压力测试（真实成本，含2015股灾/2017小盘崩盘）",
-             config={"factor": "size60", "timing": "小盘指数MA16",
-                     "top_n": 25, "rebal_days": 20, "leverage": 1.25,
-                     "cost": {"buy": 0.00225, "sell": 0.00275, "financing_rate": 0.065}},
-             data_scope={"source": "data_lake", "period": "2010-2026", "survivorship_bias": False},
-             metrics={"annual": 0.242, "maxdd": -0.317, "sharpe": 1.27, "calmar": 0.76, "hit": False},
-             status="参考",
-             notes="干净口径压力测试：剔极端年常态仅12%/夏普0.71；2011/2018小盘逆风长期阴跌(-32%回撤)；超额强依赖2015/2021/2025疯牛年")
-
-    register_family(
-        "large-cap-growth-hedged", "大盘成长多空对冲策略",
-        hypothesis="做多最贵、增长最快的白马龙头，等额做空大盘等权指数（剥离 Beta），并叠加策略级 Hysteresis MA120 择时过滤以控制摩擦和回撤。",
-        regime="大盘蓝筹/核心资产占占优或防御占优市；策略 NAV > MA120 (带 1% Hysteresis) 时持仓，否则空仓",
-        decay_signal="与小盘策略相关性转为强正相关 / 长期无 alpha 超额 / 创不出新高",
-        status="active")
-
-    register("large-cap-growth-hedged", "v1.0", "样本外验证版：大盘成长对冲 + MA120 + 1% 滞后缓冲",
-             config={"factor": "comp_premium(Growth+Valuation)", "timing": "Hysteresis NAV-MA120 (buf 1%)",
-                     "top_n": 25, "rebal_days": 40, "leverage": 1.0,
-                     "cost": {"hedge_cost_annual": 0.015, "switch_friction": 0.0025}},
-             data_scope={"source": "data_lake", "period": "2023-2026", "survivorship_bias": False},
-             metrics={"annual": 0.0297, "maxdd": -0.1131, "sharpe": 0.33, "calmar": 0.26},
-             status="在册",
-             admission={"track": "diversifier",
-                        "rationale": "与小盘策略相关性 -0.096 负相关，作 Beta 对冲分流腿，单体低收益但对组合有增量"},
-             notes="✅样本外测试（2023-2026）表现良好：超额为正，最大回撤 11.3% 控制在 15% 以内，年化调仓降至 3.6 次，与小盘策略相关性 -0.096 负相关，符合第二母策略分流要求。")
-
-    register("large-cap-growth-hedged", "v1.0-full", "全历史压力测试版：大盘成长对冲 + MA120 + 2% 滞后缓冲",
-             config={"factor": "comp_premium(Growth+Valuation)", "timing": "Hysteresis NAV-MA120 (buf 2%)",
-                     "top_n": 25, "rebal_days": 40, "leverage": 1.0,
-                     "cost": {"hedge_cost_annual": 0.015, "switch_friction": 0.0025}},
-             data_scope={"source": "data_lake", "period": "2010-2026", "survivorship_bias": False},
-             metrics={"annual": -0.0289, "maxdd": -0.4454, "sharpe": -0.34, "calmar": -0.06, "hit": False},
-             status="参考",
-             notes="全历史测试（2010-2026）：大盘蓝筹在 2021-2024 年经历漫长估值出清，且均值回归型 Spread 导致频繁空仓，长期回报受拖累，但与小盘股表现呈强负相关（-0.102）。")
-
-    register("large-cap-growth-hedged", "v1.1", "自适应 CPV 惩罚版：大盘成长对冲 + MA120 自适应 CPV 惩罚 ($w_{max}=0.5$)",
-             config={"factor": "comp_premium(Growth+Valuation - w*CPV)", "w_cpv_max": 0.5, "timing": "Hysteresis NAV-MA120 (buf 1%)",
-                     "top_n": 25, "rebal_days": 40, "leverage": 1.0,
-                     "cost": {"hedge_cost_annual": 0.015, "switch_friction": 0.0025}},
-             data_scope={"source": "data_lake", "period": "2023-2026", "survivorship_bias": False},
-             metrics={"annual": 0.0566, "maxdd": -0.1053, "sharpe": 0.58, "calmar": 0.54},
-             status="在册",
-             admission={"track": "diversifier",
-                        "rationale": "大盘成长对冲腿，与小盘主力负相关，单体低收益但对组合夏普有正增量"},
-             notes="✅自适应 CPV 惩罚版：样本外（2023-2026）年化提升至 5.66%（超越 Baseline 3.97%），最大回撤控制在 10.53%，成功避开了 2023-2026 年高股息红利央国企的拥挤抱团误伤。")
-
-    register("large-cap-growth-hedged", "v1.1-full", "全历史压力测试自适应 CPV 惩罚版：大盘成长对冲 + MA120 自适应 CPV 惩罚 ($w_{max}=0.5$)",
-             config={"factor": "comp_premium(Growth+Valuation - w*CPV)", "w_cpv_max": 0.5, "timing": "Hysteresis NAV-MA120 (buf 1%)",
-                     "top_n": 25, "rebal_days": 40, "leverage": 1.0,
-                     "cost": {"hedge_cost_annual": 0.015, "switch_friction": 0.0025}},
-             data_scope={"source": "data_lake", "period": "2012-2026", "survivorship_bias": False},
-             metrics={"annual": 0.0138, "maxdd": -0.2698, "sharpe": 0.19, "calmar": 0.05},
-             status="在册",
-             admission={"track": "diversifier",
-                        "rationale": "全历史对冲腿，与小盘负相关；单体不达标，价值在组合层 Beta 对冲与回撤压缩"},
-             notes="全历史压力测试：将全历史收益从 -3.03% 扭转为 +1.38%（夏普 0.19），且最大回撤由 -48.69% 压缩至 -26.98%，相比 baseline 有巨大的绝对与相对优化。")
-
-    register_family(
-        "industry-neglect-rotation", "中观行业反拥挤度轮动策略",
-        hypothesis="在A股市场，热门拥挤行业易估值见顶回落，而成交量极端萎缩的冷门行业（反拥挤度）因被市场遗忘而存在显著低估 and 反弹不对称性。",
-        regime="行业轮动剧烈、市场无明显主线时期；月频对申万L2行业成交量萎缩度排名，选最冷门行业配置。",
-        decay_signal="冷门行业超额收益长期转负 / 与其他母策略相关性显著上升。",
-        status="active")
-
-    register("industry-neglect-rotation", "v1.0", "首选行业 ETF 轮动版：中观反拥挤度轮动",
-             config={"factor": "AMT_GROWTH(成交额萎缩度) + Reversal + Low Vol", "timing": "月频轮动(20d)",
-                     "top_k_industries": 10, "cost": {"etf_fee_double_side": 0.0005}},
-             data_scope={"source": "data_lake", "period": "2012-2026", "survivorship_bias": False},
-             metrics={"annual": 0.1374, "maxdd": -0.2964, "sharpe": 0.81, "calmar": 0.46},
-             status="参考",
-             notes="首选行业 ETF 轮动：样本外（2023-2026）年化 +20.09%，跑赢行业等权基准 +5.98%（IR 0.81）；但全历史单体不达标（回撤 -29.6%>20%），已被 v1.3 取代，留作参考。")
-
-    register("industry-neglect-rotation", "v1.1", "低频个股轮动版：冷门行业 + 绩优股筛选",
-             config={"factor": "Contrarian Industry + Stock Quality(ROE+NPY)", "timing": "慢速半年频轮动(120d)",
-                     "top_k_industries": 10, "top_n_stocks": 2,
-                     "cost": {"buy": 0.00225, "sell": 0.00275}},
-             data_scope={"source": "data_lake", "period": "2012-2026", "survivorship_bias": False},
-             metrics={"annual": 0.1155, "maxdd": -0.5903, "sharpe": 0.56, "calmar": 0.20, "hit": False},
-             status="参考",
-             notes="个股执行版：通过 120 日慢速调仓降低个股换手摩擦成本，持有冷门行业内的龙头绩优股。")
-
-    register("industry-neglect-rotation", "v1.2", "反拥挤度个股轮动版：中观成交额缩量 + ROE + NPY 选股 - 0.5 * Rank_Product_CPV 惩罚",
-             config={"factor": "Contrarian Industry + Stock Quality(ROE+NPY) - 0.5*Rank_Product_CPV", "timing": "月频轮动(20d)",
-                     "top_k_industries": 10, "top_n_stocks": 2, "w_cpv": 0.5,
-                     "cost": {"buy": 0.00225, "sell": 0.00275}},
-             data_scope={"source": "data_lake", "period": "2012-2026", "survivorship_bias": False},
-             metrics={"annual": 0.1123, "maxdd": -0.2663, "sharpe": 0.75, "calmar": 0.42},
-             status="参考",
-             notes="反拥挤度个股选股版：升级为 CPV_rank * M_rank 秩乘积加权版，过滤掉高放大系数且过度放量的个股。相较 Baseline（7.82%/-51.77%/0.42）有提升；但全历史单体不达标（年化 11.23%<15% 且回撤 -26.63%>20%），已被 v1.3 取代，留作参考。")
-
-    register_family(
-        "hq-momentum-hedged", "高质量动量对冲策略",
-        hypothesis="做多稳步上涨（Kaufman ER 高）、基本面优秀（ROE / 毛利率高 / 现金流充沛）的动量龙头，等额做空 Top 800 等权指数以对冲 Beta。",
-        regime="大盘及中盘成长风格占优、有清晰基本面主线时期；月频（20d）调仓，选 Top 25 股票。",
-        decay_signal="与大盘对冲策略相关性转为强正相关 / 长期无超额收益 / 动量因子系统性失效",
-        status="active")
-
-    register("hq-momentum-hedged", "v1.0", "高质量动量对冲策略样本外验证版：60日动量 + 60日 Kaufman ER + 40% 财务质量过滤",
-             config={"factor": "Smooth Momentum (Mom60 * ER60) with 40% Quality Filter", "lookback": 60, "top_n": 25, "rebal_days": 20, "leverage": 1.0,
-                     "cost": {"hedge_cost_annual": 0.015}},
-             data_scope={"source": "data_lake", "period": "2023-2026", "survivorship_bias": False},
-             metrics={"annual": 0.1086, "maxdd": -0.1906, "sharpe": 0.70, "calmar": 0.57},
-             status="在册",
-             admission={"track": "diversifier",
-                        "rationale": "等额做空 Top800 等权对冲 Beta，与大盘对冲腿/小盘负相关；单体年化 10.86%<15% 不达标，价值在组合层去 Beta 增量"},
-             notes="✅高质量动量对冲样本外（2023-2026）表现良好：超额为正，年化回报 10.86%，夏普比率达到 0.70，展现出在震荡下行市中极强的抗风险与选股阿尔法能力。")
-
-    register("hq-momentum-hedged", "v1.0-full", "高质量动量对冲策略全历史压力测试版：60日动量 + 60日 Kaufman ER + 40% 财务质量过滤",
-             config={"factor": "Smooth Momentum (Mom60 * ER60) with 40% Quality Filter", "lookback": 60, "top_n": 25, "rebal_days": 20, "leverage": 1.0,
-                     "cost": {"hedge_cost_annual": 0.015}},
-             data_scope={"source": "data_lake", "period": "2012-2026", "survivorship_bias": False},
-             metrics={"annual": 0.0533, "maxdd": -0.4795, "sharpe": 0.39, "calmar": 0.11},
-             status="在册",
-             admission={"track": "diversifier",
-                        "rationale": "全历史对冲腿，质量+路径平滑过滤抗动量崩塌；单体不达标，价值在组合层对冲与抗崩塌"},
-             notes="全历史压力测试（2012-2026）：经历多次动量崩塌（Momentum Crash），由于质量和路径平滑度过滤，全历史年化保持为正（+5.33%，夏普 0.39），显著优于原始动量（-13.90%，夏普 -0.67）。")
-
-
-
 # ── 命令行入口 ──
 if __name__ == "__main__":
     import os; os.chdir(Path(__file__).parent)
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--seed", action="store_true", help="初始化/更新基础母策略台账")
     ap.add_argument("--migrate", action="store_true",
                     help="重算全台账 hit + 双轨准入裁定（apply）")
     ap.add_argument("--dry-run", action="store_true", help="配合 --migrate：只预览不落盘")
@@ -687,10 +539,6 @@ if __name__ == "__main__":
             print(f"{mark}{t['id']:<38}{str(t['old_status']):>6}{str(t['new_status']):>9}"
                   f"{str(t['old_hit']):>7}{str(t['new_hit']):>7}  {t['track']}")
         print()
-        show()
-    elif args.seed:
-        seed_registry()
-        print("已初始化/更新基础母策略台账：\n")
         show()
     else:
         print("当前母策略台账：\n")

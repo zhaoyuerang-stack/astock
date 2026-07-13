@@ -1,9 +1,8 @@
-"""strategy_registry 台账健壮性回归测试(原子写/legacy 防清空/seed 可跑/版本自然序)。
+"""strategy_registry 台账健壮性回归测试(原子写/legacy 防清空/版本自然序)。
 
 对抗性说明(每项在旧代码上必失败):
   · legacy list 旧代码静默返回空 → 后续 _save 清空台账;新代码必须抛 ValueError。
   · _save 旧代码 truncate-then-write;新代码必须经临时文件 os.replace 原子替换。
-  · seed_registry 旧代码在 small-cap-size/v2.0(在册+hit 自动 standalone+无 dsr_p)撞 DSR 门必炸。
   · 版本排序旧代码字符串序('v1.10' < 'v1.2')。
 全部测试用 tmp_path 假台账,绝不触碰真实 strategy_versions.json。
 """
@@ -60,17 +59,6 @@ def test_version_natural_sort(tmp_registry):
     data = json.loads(tmp_registry.read_text())
     fam = next(f for f in data["families"] if f["id"] == "fam-x")
     assert [x["version"] for x in fam["versions"]] == ["v1.1", "v1.2", "v1.10"]
-
-
-def test_seed_registry_runs_clean(tmp_registry):
-    sr.seed_registry()  # 旧代码在 v2.0 的 standalone DSR 门抛 ValueError
-    data = json.loads(tmp_registry.read_text())
-    fams = {f["id"] for f in data["families"]}
-    assert "small-cap-size" in fams
-    v20 = next(v for f in data["families"] if f["id"] == "small-cap-size"
-               for v in f["versions"] if v["version"] == "v2.0")
-    # seed 不得伪造 DSR 直入在册:v2.0 必须是非在册状态
-    assert v20["status"] != "在册"
 
 
 if __name__ == "__main__":
