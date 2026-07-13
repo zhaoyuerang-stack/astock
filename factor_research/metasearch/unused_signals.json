@@ -1,17 +1,17 @@
 {
   "summary": {
     "small_cap_timing": {
-      "n_calls": 88,
+      "n_calls": 82,
       "total_outputs": 3,
       "discard_counts": [
         15,
-        87,
-        59
+        81,
+        53
       ],
       "discard_rates": [
-        0.17045454545454544,
-        0.9886363636363636,
-        0.6704545454545454
+        0.18292682926829268,
+        0.9878048780487805,
+        0.6463414634146342
       ],
       "patterns": [
         "timing, _, _ = small_cap_timing(...)",
@@ -20,11 +20,11 @@
       ]
     },
     "spearmanr": {
-      "n_calls": 27,
+      "n_calls": 26,
       "total_outputs": 2,
       "discard_counts": [
         0,
-        27
+        26
       ],
       "discard_rates": [
         0.0,
@@ -37,13 +37,13 @@
       ]
     },
     "np.linalg.lstsq": {
-      "n_calls": 4,
+      "n_calls": 5,
       "total_outputs": 4,
       "discard_counts": [
         0,
-        4,
-        4,
-        4
+        5,
+        5,
+        5
       ],
       "discard_rates": [
         0.0,
@@ -53,8 +53,8 @@
       ],
       "patterns": [
         "beta, _, _, _ = np.linalg.lstsq(...)",
-        "b, _, _, _ = np.linalg.lstsq(...)",
-        "coef, _, _, _ = np.linalg.lstsq(...)"
+        "coef, _, _, _ = np.linalg.lstsq(...)",
+        "b, _, _, _ = np.linalg.lstsq(...)"
       ]
     },
     "capped_weight": {
@@ -106,6 +106,21 @@
         "skip, _ = reloaded.should_skip(...)"
       ]
     },
+    "_rows": {
+      "n_calls": 1,
+      "total_outputs": 2,
+      "discard_counts": [
+        0,
+        1
+      ],
+      "discard_rates": [
+        0.0,
+        1.0
+      ],
+      "patterns": [
+        "factor, _ = _rows(...)"
+      ]
+    },
     "_synthetic": {
       "n_calls": 7,
       "total_outputs": 3,
@@ -125,13 +140,44 @@
         "close, volume, amount, net_profit_yoy, _ = _synthetic(...)"
       ]
     },
-    "_synthetic_panel": {
+    "_fixture": {
+      "n_calls": 2,
+      "total_outputs": 2,
+      "discard_counts": [
+        0,
+        2
+      ],
+      "discard_rates": [
+        0.0,
+        1.0
+      ],
+      "patterns": [
+        "close, _ = _fixture(...)",
+        "close, _ = _fixture(...)"
+      ]
+    },
+    "frontier_from_distances": {
       "n_calls": 1,
+      "total_outputs": 2,
+      "discard_counts": [
+        0,
+        1
+      ],
+      "discard_rates": [
+        0.0,
+        1.0
+      ],
+      "patterns": [
+        "top, _ = frontier_from_distances(...)"
+      ]
+    },
+    "_synthetic_panel": {
+      "n_calls": 4,
       "total_outputs": 3,
       "discard_counts": [
         0,
         0,
-        1
+        4
       ],
       "discard_rates": [
         0.0,
@@ -139,6 +185,8 @@
         1.0
       ],
       "patterns": [
+        "close, volume, _ = _synthetic_panel(...)",
+        "close, volume, _ = _synthetic_panel(...)",
         "close, volume, _ = _synthetic_panel(...)"
       ]
     },
@@ -177,6 +225,22 @@
         "_, s2 = pg.pricing_gap(...)"
       ]
     },
+    "_load_earnings_cache": {
+      "n_calls": 2,
+      "total_outputs": 2,
+      "discard_counts": [
+        1,
+        1
+      ],
+      "discard_rates": [
+        0.5,
+        0.5
+      ],
+      "patterns": [
+        "fc, _ = _load_earnings_cache(...)",
+        "_, ex = _load_earnings_cache(...)"
+      ]
+    },
     "load_quality_fundamentals": {
       "n_calls": 3,
       "total_outputs": 4,
@@ -198,6 +262,25 @@
         "roe, gross_margin, cfo_yield, _ = load_quality_fundamentals(...)"
       ]
     },
+    "load_price_panels": {
+      "n_calls": 16,
+      "total_outputs": 3,
+      "discard_counts": [
+        2,
+        15,
+        4
+      ],
+      "discard_rates": [
+        0.125,
+        0.9375,
+        0.25
+      ],
+      "patterns": [
+        "close, _, _ = load_price_panels(...)",
+        "close, _, amount = load_price_panels(...)",
+        "close, _, _ = load_price_panels(...)"
+      ]
+    },
     "_load_panels": {
       "n_calls": 1,
       "total_outputs": 3,
@@ -213,25 +296,6 @@
       ],
       "patterns": [
         "close, _, _ = _load_panels(...)"
-      ]
-    },
-    "load_price_panels": {
-      "n_calls": 13,
-      "total_outputs": 3,
-      "discard_counts": [
-        2,
-        12,
-        2
-      ],
-      "discard_rates": [
-        0.15384615384615385,
-        0.9230769230769231,
-        0.15384615384615385
-      ],
-      "patterns": [
-        "close, _, amount = load_price_panels(...)",
-        "close, _, amount = load_price_panels(...)",
-        "close, _, amount = load_price_panels(...)"
       ]
     },
     "evaluate_candidate": {
@@ -262,6 +326,24 @@
       ],
       "patterns": [
         "icon, _ = STATUS_COLORS.get(...)"
+      ]
+    },
+    "small_cap_exposure_signal": {
+      "n_calls": 2,
+      "total_outputs": 3,
+      "discard_counts": [
+        0,
+        2,
+        2
+      ],
+      "discard_rates": [
+        0.0,
+        1.0,
+        1.0
+      ],
+      "patterns": [
+        "timing, _, _ = small_cap_exposure_signal(...)",
+        "timing, _, _ = small_cap_exposure_signal(...)"
       ]
     },
     "compose": {
@@ -387,6 +469,21 @@
         "ret_nb, _ = backtest_weights(...)"
       ]
     },
+    "build_ma_trend": {
+      "n_calls": 1,
+      "total_outputs": 2,
+      "discard_counts": [
+        0,
+        1
+      ],
+      "discard_rates": [
+        0.0,
+        1.0
+      ],
+      "patterns": [
+        "t, _ = build_ma_trend(...)"
+      ]
+    },
     "run_v3_with_cap": {
       "n_calls": 1,
       "total_outputs": 2,
@@ -474,40 +571,6 @@
         "main_row, main_weights, main_ret, _ = run_case(...)",
         "ex_row, ex_weights, ex_ret, _ = run_case(...)",
         "row, _, _, _ = run_case(...)"
-      ]
-    },
-    "build_timing": {
-      "n_calls": 1,
-      "total_outputs": 3,
-      "discard_counts": [
-        0,
-        1,
-        1
-      ],
-      "discard_rates": [
-        0.0,
-        1.0,
-        1.0
-      ],
-      "patterns": [
-        "timing, _, _ = build_timing(...)"
-      ]
-    },
-    "dsr_p": {
-      "n_calls": 1,
-      "total_outputs": 3,
-      "discard_counts": [
-        0,
-        1,
-        0
-      ],
-      "discard_rates": [
-        0.0,
-        1.0,
-        0.0
-      ],
-      "patterns": [
-        "p, _, sig = dsr_p(...)"
       ]
     },
     "run_production_engine_backtest": {
@@ -799,23 +862,6 @@
       "patterns": [
         "_, adjusted_n_jobs = _assess_memory_safety(...)"
       ]
-    },
-    "_load_price_panels_internal": {
-      "n_calls": 1,
-      "total_outputs": 3,
-      "discard_counts": [
-        1,
-        1,
-        0
-      ],
-      "discard_rates": [
-        1.0,
-        1.0,
-        0.0
-      ],
-      "patterns": [
-        "_, _, amount_loaded = _load_price_panels_internal(...)"
-      ]
     }
   },
   "events": [
@@ -863,7 +909,7 @@
     },
     {
       "caller_file": "factor_research/core/engine.py",
-      "caller_line": 585,
+      "caller_line": 589,
       "callee_name": "spearmanr",
       "discarded_indices": [
         1
@@ -915,7 +961,7 @@
     },
     {
       "caller_file": "factor_research/strategies/catalog.py",
-      "caller_line": 63,
+      "caller_line": 67,
       "callee_name": "small_cap_timing",
       "discarded_indices": [
         0,
@@ -926,7 +972,7 @@
     },
     {
       "caller_file": "factor_research/strategies/catalog.py",
-      "caller_line": 82,
+      "caller_line": 86,
       "callee_name": "small_cap_timing",
       "discarded_indices": [
         1,
@@ -1046,6 +1092,16 @@
       "full_pattern": "skip, _ = kg.should_skip(...)"
     },
     {
+      "caller_file": "factor_research/tests/test_run_daily_selection.py",
+      "caller_line": 37,
+      "callee_name": "_rows",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "factor, _ = _rows(...)"
+    },
+    {
       "caller_file": "factor_research/tests/test_factor_store_scoring.py",
       "caller_line": 71,
       "callee_name": "_synthetic",
@@ -1067,6 +1123,16 @@
       "full_pattern": "factor, close, _ = _synthetic(...)"
     },
     {
+      "caller_file": "factor_research/tests/test_northbound_factors.py",
+      "caller_line": 53,
+      "callee_name": "_fixture",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "close, _ = _fixture(...)"
+    },
+    {
       "caller_file": "factor_research/tests/test_factor_store_backfill.py",
       "caller_line": 51,
       "callee_name": "_synthetic",
@@ -1077,8 +1143,28 @@
       "full_pattern": "close, volume, amount, net_profit_yoy, _ = _synthetic(...)"
     },
     {
+      "caller_file": "factor_research/tests/test_metasearch_exports.py",
+      "caller_line": 74,
+      "callee_name": "frontier_from_distances",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "top, _ = frontier_from_distances(...)"
+    },
+    {
+      "caller_file": "factor_research/tests/test_earnings_factors.py",
+      "caller_line": 45,
+      "callee_name": "_fixture",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "close, _ = _fixture(...)"
+    },
+    {
       "caller_file": "factor_research/tests/test_autoresearch_engine.py",
-      "caller_line": 949,
+      "caller_line": 967,
       "callee_name": "_synthetic_panel",
       "discarded_indices": [
         2
@@ -1088,7 +1174,37 @@
     },
     {
       "caller_file": "factor_research/tests/test_autoresearch_engine.py",
-      "caller_line": 888,
+      "caller_line": 1625,
+      "callee_name": "_synthetic_panel",
+      "discarded_indices": [
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "close, volume, _ = _synthetic_panel(...)"
+    },
+    {
+      "caller_file": "factor_research/tests/test_autoresearch_engine.py",
+      "caller_line": 1661,
+      "callee_name": "_synthetic_panel",
+      "discarded_indices": [
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "close, volume, _ = _synthetic_panel(...)"
+    },
+    {
+      "caller_file": "factor_research/tests/test_autoresearch_engine.py",
+      "caller_line": 1729,
+      "callee_name": "_synthetic_panel",
+      "discarded_indices": [
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "close, volume, _ = _synthetic_panel(...)"
+    },
+    {
+      "caller_file": "factor_research/tests/test_autoresearch_engine.py",
+      "caller_line": 904,
       "callee_name": "generate_llm_candidates",
       "discarded_indices": [
         2
@@ -1098,7 +1214,7 @@
     },
     {
       "caller_file": "factor_research/tests/test_autoresearch_engine.py",
-      "caller_line": 1445,
+      "caller_line": 1481,
       "callee_name": "generate_llm_candidates",
       "discarded_indices": [
         1,
@@ -1170,6 +1286,26 @@
       "full_pattern": "_, s2 = pg.pricing_gap(...)"
     },
     {
+      "caller_file": "factor_research/factors/earnings.py",
+      "caller_line": 43,
+      "callee_name": "_load_earnings_cache",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "fc, _ = _load_earnings_cache(...)"
+    },
+    {
+      "caller_file": "factor_research/factors/earnings.py",
+      "caller_line": 54,
+      "callee_name": "_load_earnings_cache",
+      "discarded_indices": [
+        0
+      ],
+      "total_outputs": 2,
+      "full_pattern": "_, ex = _load_earnings_cache(...)"
+    },
+    {
       "caller_file": "factor_research/factors/hq_momentum.py",
       "caller_line": 45,
       "callee_name": "load_quality_fundamentals",
@@ -1178,6 +1314,29 @@
       ],
       "total_outputs": 4,
       "full_pattern": "roe, gross_margin, cfo_yield, _ = load_quality_fundamentals(...)"
+    },
+    {
+      "caller_file": "factor_research/factors/autoresearch_dsl.py",
+      "caller_line": 369,
+      "callee_name": "np.linalg.lstsq",
+      "discarded_indices": [
+        1,
+        2,
+        3
+      ],
+      "total_outputs": 4,
+      "full_pattern": "coef, _, _, _ = np.linalg.lstsq(...)"
+    },
+    {
+      "caller_file": "factor_research/scratch/audit_portfolio_regime.py",
+      "caller_line": 94,
+      "callee_name": "load_price_panels",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "close, _, _ = load_price_panels(...)"
     },
     {
       "caller_file": "factor_research/scratch/evaluate_d_le_sc_marginal.py",
@@ -1276,6 +1435,17 @@
       "full_pattern": "b, _, _, _ = np.linalg.lstsq(...)"
     },
     {
+      "caller_file": "factor_research/scratch/compare_adaptive_schemes.py",
+      "caller_line": 60,
+      "callee_name": "load_price_panels",
+      "discarded_indices": [
+        1,
+        2
+      ],
+      "total_outputs": 3,
+      "full_pattern": "close, _, _ = load_price_panels(...)"
+    },
+    {
       "caller_file": "factor_research/scratch/optimize_hq_momentum.py",
       "caller_line": 65,
       "callee_name": "load_quality_fundamentals",
@@ -1287,7 +1457,7 @@
     },
     {
       "caller_file": "factor_research/workflow/promote.py",
-      "caller_line": 294,
+      "caller_line": 300,
       "callee_name": "evaluate_candidate",
       "discarded_indices": [
         0
@@ -1319,7 +1489,7 @@
     },
     {
       "caller_file": "factor_research/workflow/phase2_backtest.py",
-      "caller_line": 288,
+      "caller_line": 343,
       "callee_name": "small_cap_timing",
       "discarded_indices": [
         1,
@@ -1330,7 +1500,7 @@
     },
     {
       "caller_file": "factor_research/metasearch/information_map.py",
-      "caller_line": 190,
+      "caller_line": 246,
       "callee_name": "STATUS_COLORS.get",
       "discarded_indices": [
         1
@@ -1341,13 +1511,13 @@
     {
       "caller_file": "factor_research/portfolio/regime_gate.py",
       "caller_line": 25,
-      "callee_name": "small_cap_timing",
+      "callee_name": "small_cap_exposure_signal",
       "discarded_indices": [
         1,
         2
       ],
       "total_outputs": 3,
-      "full_pattern": "timing, _, _ = small_cap_timing(...)"
+      "full_pattern": "timing, _, _ = small_cap_exposure_signal(...)"
     },
     {
       "caller_file": "factor_research/portfolio/regime_gate.py",
@@ -1452,7 +1622,7 @@
     },
     {
       "caller_file": "factor_research/engine/neutralize.py",
-      "caller_line": 60,
+      "caller_line": 66,
       "callee_name": "np.linalg.lstsq",
       "discarded_indices": [
         1,
@@ -1534,6 +1704,16 @@
       "full_pattern": "_, small_nav, dist = small_cap_timing(...)"
     },
     {
+      "caller_file": "factor_research/services/read/regime_audit.py",
+      "caller_line": 48,
+      "callee_name": "load_price_panels",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 3,
+      "full_pattern": "close, _, amount = load_price_panels(...)"
+    },
+    {
       "caller_file": "factor_research/services/actions/research_workspace.py",
       "caller_line": 64,
       "callee_name": "_review_autoresearch_with_generic_ledger",
@@ -1555,7 +1735,7 @@
     },
     {
       "caller_file": "factor_research/services/actions/autoresearch_search.py",
-      "caller_line": 206,
+      "caller_line": 252,
       "callee_name": "_load_validation_data",
       "discarded_indices": [
         3
@@ -1565,7 +1745,7 @@
     },
     {
       "caller_file": "factor_research/services/actions/autoresearch_search.py",
-      "caller_line": 75,
+      "caller_line": 93,
       "callee_name": "generate_llm_candidates",
       "discarded_indices": [
         1
@@ -1679,6 +1859,16 @@
       "full_pattern": "ic, _ = spearmanr(...)"
     },
     {
+      "caller_file": "factor_research/scripts/research/promote_holder_count.py",
+      "caller_line": 63,
+      "callee_name": "build_ma_trend",
+      "discarded_indices": [
+        1
+      ],
+      "total_outputs": 2,
+      "full_pattern": "t, _ = build_ma_trend(...)"
+    },
+    {
       "caller_file": "factor_research/scripts/research/rotation_structure_audit.py",
       "caller_line": 45,
       "callee_name": "small_cap_timing",
@@ -1709,17 +1899,6 @@
       ],
       "total_outputs": 4,
       "full_pattern": "close, volume, amount, _ = _load_validation_data(...)"
-    },
-    {
-      "caller_file": "factor_research/scripts/research/value_rescue.py",
-      "caller_line": 98,
-      "callee_name": "small_cap_timing",
-      "discarded_indices": [
-        1,
-        2
-      ],
-      "total_outputs": 3,
-      "full_pattern": "timing, _, _ = small_cap_timing(...)"
     },
     {
       "caller_file": "factor_research/scripts/research/midcap_factor.py",
@@ -2320,27 +2499,6 @@
       "full_pattern": "pt_timing, _, _ = small_cap_timing(...)"
     },
     {
-      "caller_file": "factor_research/scripts/research/toc_right_tail_experiment.py",
-      "caller_line": 128,
-      "callee_name": "build_timing",
-      "discarded_indices": [
-        1,
-        2
-      ],
-      "total_outputs": 3,
-      "full_pattern": "timing, _, _ = build_timing(...)"
-    },
-    {
-      "caller_file": "factor_research/scripts/research/illiq_largecap_audit.py",
-      "caller_line": 90,
-      "callee_name": "spearmanr",
-      "discarded_indices": [
-        1
-      ],
-      "total_outputs": 2,
-      "full_pattern": "ic, _ = spearmanr(...)"
-    },
-    {
       "caller_file": "factor_research/scripts/research/v21_strategy_analysis.py",
       "caller_line": 28,
       "callee_name": "small_cap_timing",
@@ -2516,17 +2674,6 @@
       "full_pattern": "binary, _, dist = small_cap_timing(...)"
     },
     {
-      "caller_file": "factor_research/scripts/research/factor_pool_screen.py",
-      "caller_line": 77,
-      "callee_name": "small_cap_timing",
-      "discarded_indices": [
-        1,
-        2
-      ],
-      "total_outputs": 3,
-      "full_pattern": "timing, _, _ = small_cap_timing(...)"
-    },
-    {
       "caller_file": "factor_research/scripts/research/amount_timing_dd_scan.py",
       "caller_line": 164,
       "callee_name": "small_cap_timing",
@@ -2629,16 +2776,6 @@
       ],
       "total_outputs": 3,
       "full_pattern": "timing, _, _ = small_cap_timing(...)"
-    },
-    {
-      "caller_file": "factor_research/scripts/research/toc_dsr_multiple_testing.py",
-      "caller_line": 59,
-      "callee_name": "dsr_p",
-      "discarded_indices": [
-        1
-      ],
-      "total_outputs": 3,
-      "full_pattern": "p, _, sig = dsr_p(...)"
     },
     {
       "caller_file": "factor_research/scripts/research/ah_premium_factor.py",
@@ -2817,17 +2954,6 @@
       ],
       "total_outputs": 3,
       "full_pattern": "_, _, dist = small_cap_timing(...)"
-    },
-    {
-      "caller_file": "factor_research/scripts/research/illiquidity_evidence_pack.py",
-      "caller_line": 48,
-      "callee_name": "small_cap_timing",
-      "discarded_indices": [
-        1,
-        2
-      ],
-      "total_outputs": 3,
-      "full_pattern": "timing, _, _ = small_cap_timing(...)"
     },
     {
       "caller_file": "factor_research/scripts/research/amount_timing_tradable_universe.py",
@@ -3111,7 +3237,7 @@
     },
     {
       "caller_file": "factor_research/scripts/research/run_nine_gates_all.py",
-      "caller_line": 238,
+      "caller_line": 335,
       "callee_name": "small_cap_timing",
       "discarded_indices": [
         1
@@ -3193,17 +3319,6 @@
     {
       "caller_file": "factor_research/scripts/research/salience_small_cap.py",
       "caller_line": 76,
-      "callee_name": "small_cap_timing",
-      "discarded_indices": [
-        1,
-        2
-      ],
-      "total_outputs": 3,
-      "full_pattern": "timing, _, _ = small_cap_timing(...)"
-    },
-    {
-      "caller_file": "factor_research/scripts/research/fundamental_factor_screen.py",
-      "caller_line": 99,
       "callee_name": "small_cap_timing",
       "discarded_indices": [
         1,
@@ -3316,7 +3431,7 @@
     },
     {
       "caller_file": "factor_research/scripts/ops/paper_trade.py",
-      "caller_line": 223,
+      "caller_line": 255,
       "callee_name": "small_cap_timing",
       "discarded_indices": [
         1
@@ -4065,17 +4180,6 @@
       "full_pattern": "_, adjusted_n_jobs = _assess_memory_safety(...)"
     },
     {
-      "caller_file": "factor_research/factors/derived/ai_compute_toc_bottleneck.py",
-      "caller_line": 35,
-      "callee_name": "_load_price_panels_internal",
-      "discarded_indices": [
-        0,
-        1
-      ],
-      "total_outputs": 3,
-      "full_pattern": "_, _, amount_loaded = _load_price_panels_internal(...)"
-    },
-    {
       "caller_file": "factor_research/factors/alpha/blend.py",
       "caller_line": 203,
       "callee_name": "spearmanr",
@@ -4087,7 +4191,7 @@
     },
     {
       "caller_file": "factor_research/core/analysis/nine_gates.py",
-      "caller_line": 332,
+      "caller_line": 358,
       "callee_name": "stats.spearmanr",
       "discarded_indices": [
         1
@@ -4097,7 +4201,7 @@
     },
     {
       "caller_file": "factor_research/core/analysis/nine_gates.py",
-      "caller_line": 281,
+      "caller_line": 307,
       "callee_name": "stats.spearmanr",
       "discarded_indices": [
         1
@@ -4107,7 +4211,7 @@
     },
     {
       "caller_file": "factor_research/core/analysis/nine_gates.py",
-      "caller_line": 433,
+      "caller_line": 459,
       "callee_name": "np.linalg.lstsq",
       "discarded_indices": [
         1,
@@ -4119,7 +4223,7 @@
     },
     {
       "caller_file": "factor_research/core/analysis/nine_gates.py",
-      "caller_line": 449,
+      "caller_line": 477,
       "callee_name": "stats.spearmanr",
       "discarded_indices": [
         1
@@ -4129,7 +4233,7 @@
     },
     {
       "caller_file": "factor_research/core/analysis/nine_gates.py",
-      "caller_line": 471,
+      "caller_line": 499,
       "callee_name": "stats.spearmanr",
       "discarded_indices": [
         1
@@ -4139,7 +4243,7 @@
     },
     {
       "caller_file": "factor_research/core/analysis/nine_gates.py",
-      "caller_line": 355,
+      "caller_line": 381,
       "callee_name": "stats.spearmanr",
       "discarded_indices": [
         1
@@ -4160,7 +4264,7 @@
     },
     {
       "caller_file": "factor_research/strategies/catalog.py",
-      "caller_line": 63,
+      "caller_line": 67,
       "callee_name": "small_cap_timing",
       "discarded_indices": [
         0,
@@ -4171,7 +4275,7 @@
     },
     {
       "caller_file": "factor_research/strategies/catalog.py",
-      "caller_line": 82,
+      "caller_line": 86,
       "callee_name": "small_cap_timing",
       "discarded_indices": [
         1,
@@ -4193,13 +4297,13 @@
     {
       "caller_file": "factor_research/portfolio/regime_gate.py",
       "caller_line": 25,
-      "callee_name": "small_cap_timing",
+      "callee_name": "small_cap_exposure_signal",
       "discarded_indices": [
         1,
         2
       ],
       "total_outputs": 3,
-      "full_pattern": "timing, _, _ = small_cap_timing(...)"
+      "full_pattern": "timing, _, _ = small_cap_exposure_signal(...)"
     },
     {
       "caller_file": "factor_research/portfolio/regime_gate.py",
