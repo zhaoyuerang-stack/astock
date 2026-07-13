@@ -20,6 +20,7 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 
+from factors.registry import register_factor
 from factors.utils import mad_clip, safe_zscore
 
 
@@ -47,6 +48,12 @@ def _align_to_close(panel_field: pd.DataFrame, close: pd.DataFrame) -> pd.DataFr
     return out[common_cols].reindex(columns=close.columns)
 
 
+@register_factor(
+    "net_profit_yoy",
+    data=("fundamental/net_profit_yoy",),
+    input="close",
+    searchable=True,
+)
 def net_profit_yoy(close, **_):
     """净利润同比增长 — size_earnings v1.0 LIVE 实证基本面动量."""
     panel = _load_fundamental_cache()
@@ -54,6 +61,12 @@ def net_profit_yoy(close, **_):
     return safe_zscore(mad_clip(aligned))
 
 
+@register_factor(
+    "revenue_yoy",
+    data=("fundamental/revenue_yoy",),
+    input="close",
+    searchable=True,
+)
 def revenue_yoy(close, **_):
     """营收同比增长 — 顶层成长信号."""
     panel = _load_fundamental_cache()
@@ -61,6 +74,12 @@ def revenue_yoy(close, **_):
     return safe_zscore(mad_clip(aligned))
 
 
+@register_factor(
+    "roe",
+    data=("fundamental/roe",),
+    input="close",
+    searchable=True,
+)
 def roe(close, **_):
     """ROE — 经典质量因子."""
     panel = _load_fundamental_cache()
@@ -68,6 +87,12 @@ def roe(close, **_):
     return safe_zscore(mad_clip(aligned))
 
 
+@register_factor(
+    "gross_margin",
+    data=("fundamental/gross_margin",),
+    input="close",
+    searchable=False,
+)
 def gross_margin(close, **_):
     """毛利率 — 质量信号."""
     panel = _load_fundamental_cache()
@@ -81,6 +106,12 @@ def _load_raw_close_cache():
     return load_raw_close(start="2010-01-01")
 
 
+@register_factor(
+    "bp_proxy",
+    data=("price/close", "fundamental/bps"),
+    input="close",
+    searchable=True,
+)
 def bp_proxy(close, **_):
     """BP = bps / raw_close. 价值因子 (contrarian, 选股范围多大盘金融/周期)."""
     panel = _load_fundamental_cache()
@@ -90,6 +121,12 @@ def bp_proxy(close, **_):
     return safe_zscore(mad_clip(bp))
 
 
+@register_factor(
+    "ep_proxy",
+    data=("price/close", "fundamental/eps_ttm"),
+    input="close",
+    searchable=True,
+)
 def ep_proxy(close, **_):
     """EP = eps_ttm / raw_close. 价值因子."""
     panel = _load_fundamental_cache()
@@ -99,6 +136,12 @@ def ep_proxy(close, **_):
     return safe_zscore(mad_clip(ep))
 
 
+@register_factor(
+    "cfo_quality",
+    data=("fundamental/cfo_ps",),
+    input="close",
+    searchable=False,
+)
 def cfo_quality(close, **_):
     """cfo_ps z-score. 现金流质量 (与 net_profit 互补,绕过应收账款操纵)."""
     panel = _load_fundamental_cache()

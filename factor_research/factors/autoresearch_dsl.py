@@ -18,52 +18,12 @@ import pandas as pd
 from factors.utils import mad_clip, safe_zscore
 
 
-_FACTOR_CALLS = {
-    "momentum": ("factors.momentum", "mom_n", {"window": "n"}),
-    "volume_ratio": ("factors.momentum", "vol_ratio", {"window": "short"}),
-    "volatility": ("factors.momentum", "volatility", {"window": "n"}),
-    "illiquidity": ("factors.momentum", "illiquidity", {"window": "n"}),
-    "roe": ("factors.fundamental", "roe", {}),
-    "net_profit_yoy": ("factors.fundamental", "net_profit_yoy", {}),
-    "revenue_yoy": ("factors.fundamental", "revenue_yoy", {}),
-    "bp_proxy": ("factors.fundamental", "bp_proxy", {}),
-    "ep_proxy": ("factors.fundamental", "ep_proxy", {}),
-    # 独立数据族隔离岛(LOOP_ENGINEERING.md #5):股东行为 + 资金流,与价量簇正交
+# 手工条目仅保留尚未 @register_factor 的接线(股东/大单)。
+# momentum/fundamental/northbound/alpha101/… 由 discover 自动注入。
+_FACTOR_CALLS: dict[str, tuple] = {
     "holder_count_chg": ("factors.shareholder", "holder_count_chg", {"window": "window"}),
     "holdertrade_net": ("factors.shareholder", "holdertrade_net", {"window": "window"}),
     "large_order_net_ratio": ("factors.capital_flow", "large_order_net_ratio", {"window": "window"}),
-    # 北向资金正交族(与 factory.autoresearch.registry.ALLOWED_FACTORS 同步)
-    "northbound_accumulation": ("factors.northbound", "northbound_accumulation", {"window": "window"}),
-    "northbound_hold_level": ("factors.northbound", "northbound_hold_level", {}),
-    "northbound_flow_strength": ("factors.northbound", "northbound_flow_strength", {"window": "window"}),
-    # 与 factory.autoresearch.registry.ALLOWED_FACTORS 同步;退化/近重复项不进 DSL
-    # (alpha_005/020/022/024/033/049 已移出,实现仍保留在 alpha101.py 供对照)。
-    "alpha_001": ("factors.alpha101", "alpha_001", {}),
-    "alpha_002": ("factors.alpha101", "alpha_002", {}),
-    "alpha_003": ("factors.alpha101", "alpha_003", {}),
-    "alpha_006": ("factors.alpha101", "alpha_006", {}),
-    "alpha_008": ("factors.alpha101", "alpha_008", {}),
-    "alpha_009": ("factors.alpha101", "alpha_009", {}),
-    "alpha_012": ("factors.alpha101", "alpha_012", {}),
-    "alpha_013": ("factors.alpha101", "alpha_013", {}),
-    "alpha_014": ("factors.alpha101", "alpha_014", {}),
-    "alpha_015": ("factors.alpha101", "alpha_015", {}),
-    "alpha_017": ("factors.alpha101", "alpha_017", {}),
-    "alpha_018": ("factors.alpha101", "alpha_018", {}),
-    "alpha_019": ("factors.alpha101", "alpha_019", {}),
-    "alpha_021": ("factors.alpha101", "alpha_021", {}),
-    "alpha_023": ("factors.alpha101", "alpha_023", {}),
-    "alpha_025": ("factors.alpha101", "alpha_025", {}),
-    "alpha_028": ("factors.alpha101", "alpha_028", {}),
-    "alpha_030": ("factors.alpha101", "alpha_030", {}),
-    "alpha_032": ("factors.alpha101", "alpha_032", {}),
-    "alpha_034": ("factors.alpha101", "alpha_034", {}),
-    "alpha_037": ("factors.alpha101", "alpha_037", {}),
-    "alpha_038": ("factors.alpha101", "alpha_038", {}),
-    "alpha_040": ("factors.alpha101", "alpha_040", {}),
-    "alpha_044": ("factors.alpha101", "alpha_044", {}),
-    "alpha_050": ("factors.alpha101", "alpha_050", {}),
-    "alpha_055": ("factors.alpha101", "alpha_055", {}),
 }
 
 # ── @register_factor 自动接线: factors 层登记的因子自动补进 DSL 调用表(手工优先)──
@@ -71,7 +31,9 @@ _FACTOR_CALLS = {
 from factors.registry import discover as _discover_factors  # noqa: E402
 
 for _name, _rec in _discover_factors().items():
-    _FACTOR_CALLS.setdefault(_name, (_rec.fn.__module__, _rec.fn.__name__, dict(_rec.arg_map)))
+    _FACTOR_CALLS.setdefault(
+        _name, (_rec.fn.__module__, _rec.fn.__name__, dict(_rec.arg_map))
+    )
 
 
 _BASE_FACTOR_MEM_CACHE: dict = {}
@@ -212,7 +174,7 @@ def _call_factor(name: str, close: pd.DataFrame, volume: pd.DataFrame | None, pa
         out = fn(volume, **mapped)
     elif name == "illiquidity":
         # Canonical Amihud uses amount; DSL surface proxies amount≈volume×close
-        # inside factors.momentum.illiquidity (aligned with AmihudIlliq).
+        # inside factors.liquidity.illiquidity (aligned with AmihudIlliq).
         if volume is None:
             raise ValueError("illiquidity requires volume (amount proxy = volume×close)")
         out = fn(close, volume, **mapped)

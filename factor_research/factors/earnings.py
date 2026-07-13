@@ -17,6 +17,7 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 
+from factors.registry import register_factor
 from factors.utils import mad_clip, safe_zscore
 
 
@@ -44,6 +45,12 @@ def _forecast_midpoint(close: pd.DataFrame) -> pd.DataFrame:
     return (lo + hi) / 2
 
 
+@register_factor(
+    "sue",
+    data=("tushare/forecast", "tushare/express"),
+    input="close",
+    searchable=False,  # probe-ready;未进工厂搜索宇宙(须显式 opt-in)
+)
 def sue(close, **_):
     """标准化未预期盈余:实际(快报 yoy_net_profit)优先、缺则预告(p_change 中点),截面 z-score。
 
@@ -56,6 +63,12 @@ def sue(close, **_):
     return safe_zscore(mad_clip(surprise.replace([np.inf, -np.inf], np.nan)))
 
 
+@register_factor(
+    "earnings_forecast_surprise",
+    data=("tushare/forecast",),
+    input="close",
+    searchable=False,
+)
 def earnings_forecast_surprise(close, **_):
     """仅预告口径的盈余惊喜(p_change 净利变动幅度中点),截面 z-score。"""
     return safe_zscore(mad_clip(_forecast_midpoint(close).replace([np.inf, -np.inf], np.nan)))

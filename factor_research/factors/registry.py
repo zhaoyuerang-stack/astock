@@ -57,10 +57,17 @@ def register_factor(name: str, *, params: dict | None = None,
 # 含 @register_factor 的因子模块(eager import 触发注册)。
 # 不吞异常:模块坏了要响,不静默漂移(与 catalog 不静默 fallback 同精神)。
 _MODULES = (
+    "factors.price_action",
+    "factors.liquidity",
+    "factors.fundamental",
+    "factors.northbound",
+    "factors.alpha101",
+    "factors.earnings",
     "factors.microstructure",
     "factors.shareholder",
     "factors.capital_flow",
     "factors.industry_prosperity",
+    "factors.top_inst",
 )
 _discovered = False
 

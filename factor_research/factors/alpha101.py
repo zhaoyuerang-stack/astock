@@ -174,3 +174,43 @@ def alpha_055(close: pd.DataFrame, volume: pd.DataFrame | None = None) -> pd.Dat
     high_12 = close.rolling(12).max()
     stoch = (close - low_12) / (high_12 - low_12 + 1e-6)
     return -C(R(stoch), R(volume), 6)
+
+
+# ── @register_factor: 可搜索 alpha 进 FACTOR_REGISTRY(退化项不进 searchable)──
+# DSL 执行面仍按 name.startswith("alpha_") 喂 (close, volume);此处只做三面元数据。
+from factors.registry import register_factor as _register_factor  # noqa: E402
+
+_ALPHA_CV = ("price/close", "price/volume")
+_ALPHA_C = ("price/close",)
+# 与 factory.autoresearch 白名单一致;alpha_005/020/022/024/033/049 已剔除
+_SEARCHABLE_ALPHAS: dict[str, tuple[str, ...]] = {
+    "alpha_001": _ALPHA_CV,
+    "alpha_002": _ALPHA_CV,
+    "alpha_003": _ALPHA_CV,
+    "alpha_006": _ALPHA_CV,
+    "alpha_008": _ALPHA_C,
+    "alpha_009": _ALPHA_C,
+    "alpha_012": _ALPHA_CV,
+    "alpha_013": _ALPHA_CV,
+    "alpha_014": _ALPHA_CV,
+    "alpha_015": _ALPHA_CV,
+    "alpha_017": _ALPHA_C,
+    "alpha_018": _ALPHA_C,
+    "alpha_019": _ALPHA_C,
+    "alpha_021": _ALPHA_C,
+    "alpha_023": _ALPHA_C,
+    "alpha_025": _ALPHA_C,
+    "alpha_028": _ALPHA_CV,
+    "alpha_030": _ALPHA_CV,
+    "alpha_032": _ALPHA_C,
+    "alpha_034": _ALPHA_C,
+    "alpha_037": _ALPHA_C,
+    "alpha_038": _ALPHA_C,
+    "alpha_040": _ALPHA_CV,
+    "alpha_044": _ALPHA_CV,
+    "alpha_050": _ALPHA_CV,
+    "alpha_055": _ALPHA_CV,
+}
+
+for _name, _data in _SEARCHABLE_ALPHAS.items():
+    _register_factor(_name, data=_data, input="close", searchable=True)(globals()[_name])
