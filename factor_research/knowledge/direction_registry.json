@@ -102,10 +102,7 @@
       "direction": "隐含预期差(兑现口径):估值隐含增速 vs 已兑现 netprofit_yoy 的差/比",
       "status": "falsified",
       "action": "DEPRIORITIZE",
-      "scope_factors": [
-        "implied_growth_gap",
-        "peg_inverse"
-      ],
+      "scope_factors": [],
       "evidence": [
         "reports/research/probe_expectation_gap_20260712.md(全市场 probe:残差 IS ICIR 0.30 → OOS 归零/翻负,留存 −0%/7%;正交保留率 211-231%,真正交但不泛化)",
         "reports/research/probe_expectation_gap_implied_growth_gap.json",
@@ -121,9 +118,7 @@
       "direction": "隐含预期差(指引口径):业绩预告/快报指引 vs 估值隐含要求(guidance_gap)",
       "status": "weak",
       "action": "DEPRIORITIZE",
-      "scope_factors": [
-        "guidance_gap"
-      ],
+      "scope_factors": [],
       "evidence": [
         "reports/research/probe_expectation_gap_20260712.md(唯一残差 OOS 不塌成员:留存 68%,但 OOS 残差 IC 0.0089/ICIR 0.14 落入 northbound-holder『真正交但太弱』量级带;原始形态 size 相关 0.44、正交保留率仅 66%)",
         "reports/research/probe_expectation_gap_guidance_gap.json"
@@ -138,11 +133,7 @@
       "direction": "资产负债表运营质量族:净占款议价权/应收强度改善/存货强度改善(存量结构全市场直接截面)",
       "status": "weak",
       "action": "DEPRIORITIZE",
-      "scope_factors": [
-        "bargaining_power",
-        "receivable_intensity_chg",
-        "inventory_intensity_chg"
-      ],
+      "scope_factors": [],
       "evidence": [
         "reports/research/probe_fundamental_quality_20260712.md(全市场 probe:bargaining_power 正交保留率 17%=size/流动性伪装+残差 IC≈0;两 Δ 强度因子 IS 符号与设计假设相反且 OOS 塌缩/翻号,留存 9%/−49%)",
         "reports/research/probe_fundamental_quality_bargaining_power.json",

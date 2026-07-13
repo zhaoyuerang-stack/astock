@@ -1,5 +1,7 @@
 """隐含预期差因子族(市场预期层的因子化,probe 前候选)。
 
+Disposition: dormant — 已 probe 全阴性(2026-07-12:implied_growth_gap/peg_inverse 真正交但 OOS 塌缩翻负,guidance_gap 落「真正交但太弱」量级带;登记簿两条 DEPRIORITIZE 180d,报告 reports/research/probe_expectation_gap_20260712.md);复活条件=湖内添真前瞻一致预期/预期修正数据源后整族重测(R-ARCH-005 精神)。
+
 为什么:估值(pe_ttm)与增长(netprofit_yoy)各自已在因子层(value/fundamental),
 但「价格隐含的增长要求 vs PIT 已知的增长兑现/指引」的**差**从未进入因子层——
 市场交易的是预期差,不是利润本身;方向登记簿 frontier-fundamental-family(BOOST)
