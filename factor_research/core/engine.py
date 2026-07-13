@@ -71,8 +71,8 @@ class PricePanel:
     volume: pd.DataFrame         # in 手 (×100 for shares)
     amount: pd.DataFrame         # turnover in CNY  (volume*100*raw_close)
     raw_close: Optional[pd.DataFrame] = None  # unadjusted close (for valuation / order sizing)
-    # Optional extensions for live-trade simulation
-    raw_open: Optional[pd.DataFrame] = None
+    # 注:曾有 raw_open 字段(暗示开盘成交)但引擎从不读取 → 已删,避免误导。执行契约 = T+1 收盘
+    # (见下方 Signal.execution_timing);若要 T+1 开盘/VWAP 成交须新增 T_PLUS_1_OPEN 分支 + 立 ADR。
 
 
 # ---------------------------------------------------------------------------
@@ -112,6 +112,10 @@ class Signal:
     # Metadata
     family: str = ""
     version: str = ""
+    # 官方执行契约(R-BT-001 唯一权威;同步 SPEC.md §统一回测内核):成交口径 = **T+1 收盘**。
+    # 决策日 T 的权重在下一交易日 T+1 收盘建仓、从其再次日起赚(无当日成交、无未来函数);
+    # `_map_decisions_to_fill_dates` 对任何非 "T_PLUS_1_CLOSE" 值硬报错。
+    # 注:此口径比"清单理想 T+1 开盘/VWAP"晚一档——实盘冲击/滑点建模须按收盘口径。
     execution_timing: str = "T_PLUS_1_CLOSE"
 
     def _resolve_weights(self, prices: PricePanel) -> pd.DataFrame:
