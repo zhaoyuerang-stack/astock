@@ -14,7 +14,7 @@
 1. 阅读本文件的 `P0 / P1` 规则。
 2. 阅读 `STATUS.md`，确认当前进度、最近失败项、未完成任务。
 3. 运行或要求查看 `git status --short`，确认工作树是否已有他人改动（多 agent 共享工作树）。
-4. 判断任务类型：`data / factor / engine / strategy / workflow / registry / production / web / docs`。
+4. 判断任务类型：`data / factor / engine / strategy / workflow / registry / production / web / docs`；命中 `docs/agent_skills/` 固定剧本的任务**先读剧本再动手**（尤其：接入/回填新数据源 → 必读 [`data_source_onboarding.md`](factor_research/docs/agent_skills/data_source_onboarding.md) 按 S0-S7 执行，临场自创接入流程 = 工程事故源）。
 5. 只修改本任务相关文件；不得顺手重构无关模块。
 6. 修改前说明计划；修改后运行对应检查(§13)。
 7. 提交前只显式 stage 本次文件，必须检查 `git diff --cached --stat` 和 `git diff --cached`。
@@ -67,7 +67,7 @@
 | 决策      | `DECISIONS.md`                                | ADR 决策记录，append-only                          |
 | 经验      | `LESSONS.md`                                  | 踩坑、故障、修复经验、接口血泪铁律细节                           |
 | Agent 操作层 | `factor_research/docs/agent_operating_model.md` | Agent 如何用 skill/工具:分层操作模型(读事实/选动作/禁越权)、控制平面入口 |
-| Agent 技能   | `factor_research/docs/agent_skills/`            | 技能剧本(data-health / factor-audit / candidate-promote / production-readiness / module-cleanup / literature-scan) |
+| Agent 技能   | `factor_research/docs/agent_skills/`            | 技能剧本(data-health / data-source-onboarding / factor-audit / candidate-promote / production-readiness / module-cleanup / literature-scan) |
 | 归档      | `docs/archive/`                               | 已完成或废弃方案，只作历史参考，不作实现依据                        |
 
 消歧规则：
@@ -82,7 +82,7 @@
 **Agent 操作层(控制平面)入口**：任何 AI/Agent 操作 `factor_research` 应经受控**读事实 / 选动作**入口，而非自由乱翻仓库（详见 [`agent_operating_model.md`](factor_research/docs/agent_operating_model.md)）：
 
 * **读事实**：`services.read.module_inventory`（模块状态/角色/边界，源 各模块 `MODULE_STATUS.md`）、`services.read.artifact_inventory`（各产物区读/写/是否可作正式证据）、`services.read.strategy_lifecycle`（family/version 生命周期与允许/禁止动作）、及既有 `services.read.*`。
-* **选动作**：写台账 / 写数据湖 / 晋级 / 部署 / 用某路径作正式证据**前，先问** `services.read.action_policy.can_agent_do(action, target)` —— 它判允/拒并指向 canonical 入口（`strategy_registry.register`、`workflow.promote`、`run_daily.py`、受控 lake writer）。任务剧本见 [`docs/agent_skills/`](factor_research/docs/agent_skills/)（data-health / factor-audit / candidate-promote / production-readiness / module-cleanup / literature-scan）。
+* **选动作**：写台账 / 写数据湖 / 晋级 / 部署 / 用某路径作正式证据**前，先问** `services.read.action_policy.can_agent_do(action, target)` —— 它判允/拒并指向 canonical 入口（`strategy_registry.register`、`workflow.promote`、`run_daily.py`、受控 lake writer）。任务剧本见 [`docs/agent_skills/`](factor_research/docs/agent_skills/)（data-health / data-source-onboarding / factor-audit / candidate-promote / production-readiness / module-cleanup / literature-scan）。
 * **边界(重要)**：该层是**建议(advisory)不是强制** —— `can_agent_do` 只答"该不该"，**挡不住**绕过它直接 `open()` 写文件。真正的强制仍是 §16 的确定性 CI 守卫 + `strategy_registry.register` 唯一写入口。故：走入口是纪律，不是护栏；守卫全绿前不得报"完成"。参见 `DECISIONS.md` ADR-030。
 
 ---
@@ -253,7 +253,7 @@ version id、所属 family、因子定义、参数配置、股票池、调仓频
 
 ## 9. 数据纪律
 
-细节见 [`data_infrastructure.md`](factor_research/docs/data_infrastructure.md) + [`data_lake/README.md`](factor_research/data_lake/README.md)；**接口反封禁/超时血泪铁律细节见** [`LESSONS.md`](LESSONS.md)。本文保留不可违反原则 + 最关键操作铁律：
+细节见 [`data_infrastructure.md`](factor_research/docs/data_infrastructure.md) + [`data_lake/README.md`](factor_research/data_lake/README.md)；**接口反封禁/超时血泪铁律细节见** [`LESSONS.md`](LESSONS.md)。**接入任何新数据源必须走固定剧本** [`data_source_onboarding.md`](factor_research/docs/agent_skills/data_source_onboarding.md)（S0 立项五判 → 探针 → 契约声明含时间轴口径三选一 → 回填 → 质量门 → 加载层 → 登记，逐步 fail-closed；不得临场自创接入流程）。本文保留不可违反原则 + 最关键操作铁律：
 
 原则：① 全市场优先，不用幸存者样本；② point-in-time 优先，不未来泄露；③ 统一数据湖优先，不临时拼私有口径；④ 质量报告优先，不忽略 OHLC 错误/负价/异常跳变；⑤ A股正常现象（停牌/新股首日/一字板/涨跌停）不得误判为脏数据；⑥ 接口异常不得通过改变研究口径绕过；⑦ 数据更新失败必须显式记录，不得静默使用半截数据。
 

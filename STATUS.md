@@ -22,6 +22,12 @@
   · **worktree 数据链**:data_lake 六目录+fundamental_batch symlink 主仓(gitignored 只读),此前环境性失败的 test_engine/test_data_layer/test_e2e/test_services_phase0/test_style_neutralization 全部转绿;test_autoresearch_engine 单例(`test_island_fitness_penalizes_correlation_to_book`)失败经 `git stash -u` 基线复现为**预存**(同 06-30/07-02 记录),非本次引入。
   · **CI 缺口发现**:test_all.sh 手工枚举测试文件,check_test_discovery 只验"可收集"不验"被执行"——pytest-only 新测试(test_fundamental_quality/test_expectation_gap)从不被 CI 跑;已立后台任务(补兜底 pytest 块)。
 
+**2026-07-10(新数据源接入固定剧本 data-source-onboarding,纯文档)**:
+  · **补的缺口**:接入纪律散在 data_infrastructure/data_dimensions/LESSONS/CLAUDE §9 四处,agent 被叫去"接入 XX 源"只能临场拼流程(封禁/单位错/幸存者偏差/未来函数每次重踩);backlog 条目的 playbook 只指 probe-signal-source(信息体检),「外部源→data_lake canonical」工程接入这半段没有 canonical 剧本。
+  · **新增** `docs/agent_skills/data_source_onboarding.md`:固定流水线 S0-S7 逐步 fail-closed——S0 立项五判(信息假设对方向登记簿/PIT 可得性/全市场含退市覆盖/配额封禁账/停发预案)→ S1 小样本探针(单位·主键·时间戳·退市股·极值 top3)→ S2 契约声明(接入=INTERFACES/Fetcher 注册非新脚本;**时间轴口径三选一强制声明进加载层路由**,拿不准选最晚可见)→ S3 回填(canonical writer+manifest,限速铁律)→ S4 质量门(PIT 抽查/量纲对账/第二源 reconcile,不过不进加载层)→ S5 统一加载入口 → S6 增量+data_dimensions 登记+backlog 销账 → S7 交棒 probe-signal-source(数据健康≠信息有价值)。含雷区速查表(全部指向 LESSONS 已踩坑)。
+  · **路由接线**:CLAUDE.md §2 两处技能清单 + §9 数据纪律加强制入口;data_infrastructure.md 头部指针;data_source_backlog.json readme 写明「先 onboarding 后 probe」执行顺序。零新代码/守卫(元系统冻结:强制仍靠既有 check_lake_writers 等守卫;本剧本直接服务 TASKS「第一批新维度接入」与 backlog 待接条目)。
+  · **触发点二次接线(owner 要求,防漏读)**:CLAUDE.md §0 接手协议第 4 步加「命中 agent_skills 剧本先读剧本再动手,接入新源必读 onboarding」;AGENTS.md 共通铁律加同款条目——Codex/Cursor/Antigravity 等非 Claude 工具只读 AGENTS.md 也能命中,不再依赖恰好翻到 §9。
+
 **2026-07-05(daily-round-3:研究总监审视,算力再分配,不改口径不碰台账写入口)**:
   · **在册池清零**:`decay_status.json` 机械确认 `no_registered=true`;`strategy_versions.json` 30 个 family 全落在 候选/参考/退役/已证伪/`REJECTED_BY_ADVERSARIAL_DECAY`,此前仅剩的两个 diversifier(`hq-momentum-hedged`/`large-cap-growth-hedged`)已完成 TASKS 待办的退役复核,当前**无一在册**。
   · **并行 agent 实时活动**:另一并行 agent(`codex/xiaochengxu` 分支)当日在跑组合再构成(`composite-portfolio` v1.1/v1.2-no-mom,均被 `REJECTED_BY_ADVERSARIAL_DECAY`,DSR p=0.23~0.26)与跨资产腿搜索(`cross_asset_leg_search`,纳指 ETF 513100/MA240 shadow_recommend=true),覆盖了 metasearch 06-23 指出的空白区之一(跨资产腿)——本轮建议下轮不重复投入该方向。
