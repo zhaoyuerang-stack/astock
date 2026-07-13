@@ -145,7 +145,8 @@ def validate_global_frame(
         )
         for column in price_columns:
             _append_reason(reasons, out[column].isna(), f"invalid_{column}")
-        _append_reason(reasons, out["close"] <= 0, "non_positive_price")
+        if spec.dataset_id != "commodity_daily":
+            _append_reason(reasons, out["close"] <= 0, "non_positive_price")
         _append_reason(reasons, out["volume"] < 0, "negative_volume")
         if source.source_id not in {"global_cboe_us_price_v1", "alpha_vantage_commodity_spot_v1"}:
             lower = out["low"] > out[["open", "close"]].min(axis=1)

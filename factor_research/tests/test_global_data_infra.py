@@ -59,7 +59,7 @@ def test_repository_settings_admit_alfred_as_auxiliary_research_data():
     assert global_data.provider_mode == "alfred"
     assert global_data.datasets == (
         "macro_daily", "macro_monthly", "rates_daily",
-        "market_price_daily", "etf_daily", "fx_daily",
+        "market_price_daily", "etf_daily", "fx_daily", "commodity_daily",
     )
     assert global_data.api_key_envs == {"alfred": "FRED_API_KEY"}
     admission = global_data.source_admissions["alfred_macro_v1"]
@@ -68,6 +68,7 @@ def test_repository_settings_admit_alfred_as_auxiliary_research_data():
     assert admission["allowed_use"] == "research_only"
     assert global_data.source_admissions["global_cboe_us_price_v1"]["admission_status"] == "approved"
     assert global_data.source_admissions["global_fmp_fx_v1"]["admission_status"] == "approved"
+    assert global_data.source_admissions["alpha_vantage_commodity_spot_v1"]["admission_status"] == "approved"
     assert global_data.source_admissions["global_yfinance_fx_v1"]["admission_status"] == "planned"
     assert global_data.source_admissions["global_yfinance_commodity_v1"]["admission_status"] == "planned"
 
@@ -370,8 +371,8 @@ def test_alpha_vantage_commodity_provider_maps_close_only_spot_series():
             "WTI": {"data": [{"date": "2025-01-02", "value": "73.13"}]},
             "BRENT": {"data": [{"date": "2025-01-02", "value": "75.11"}]},
             "NATURAL_GAS": {"data": [{"date": "2025-01-02", "value": "3.24"}]},
-            "GOLD_SILVER_HISTORY:GOLD": {"data": [{"date": "2025-01-02", "value": "2645.2"}]},
-            "GOLD_SILVER_HISTORY:SILVER": {"data": [{"date": "2025-01-02", "value": "29.8"}]},
+            "GOLD_SILVER_HISTORY:GOLD": {"data": [{"date": "2025-01-02", "price": "2645.2"}]},
+            "GOLD_SILVER_HISTORY:SILVER": {"data": [{"date": "2025-01-02", "price": "29.8"}]},
         }
         key = params["function"] if params["function"] != "GOLD_SILVER_HISTORY" else f"{params['function']}:{params['symbol']}"
         return payloads[key]
@@ -394,6 +395,41 @@ def test_alpha_vantage_commodity_provider_maps_close_only_spot_series():
     assert result.quarantine.empty
     assert result.clean[["open", "high", "low"]].isna().all().all()
     assert result.clean.iloc[0]["ohlc_quality"] == "close_only_spot_series"
+
+
+def test_commodity_validator_allows_negative_close_events():
+    from dataclasses import replace
+
+    from lake.global_catalog import get_dataset_spec, get_source_spec
+    from lake.global_normalizers import normalize_global_frame
+    from lake.global_validator import validate_global_frame
+
+    spec = get_dataset_spec("commodity_daily")
+    source = replace(
+        get_source_spec("alpha_vantage_commodity_spot_v1"),
+        admission_status="approved", license_status="approved", license_checked_at="2026-07-13",
+    )
+    raw = pd.DataFrame({
+        "session_date": ["2020-04-20"],
+        "symbol": ["CL=F"],
+        "exchange": ["ALPHAVANTAGE_SPOT"],
+        "session_close_at": ["2020-04-20T23:59:59Z"],
+        "available_at": ["2020-04-20T23:59:59Z"],
+        "open": [pd.NA],
+        "high": [pd.NA],
+        "low": [pd.NA],
+        "close": [-36.98],
+        "volume": [0.0],
+        "is_adjusted": [False],
+        "adjustment_version": ["alphavantage_spot_v1"],
+        "currency": ["USD"],
+    })
+    canonical = normalize_global_frame(raw, source=source, spec=spec, ingest_id="negative-commodity")
+    result = validate_global_frame(canonical, source=source, spec=spec)
+
+    assert result.rejected is False
+    assert result.quarantine.empty
+    assert result.clean.iloc[0]["close"] == -36.98
 
 
 def test_global_writer_manifest_and_price_loader(tmp_path):

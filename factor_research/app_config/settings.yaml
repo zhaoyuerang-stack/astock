@@ -27,7 +27,7 @@ global_data:
   enabled: true
   required: false
   provider_mode: alfred
-  datasets: [macro_daily, macro_monthly, rates_daily, market_price_daily, etf_daily, fx_daily]
+  datasets: [macro_daily, macro_monthly, rates_daily, market_price_daily, etf_daily, fx_daily, commodity_daily]
   api_key_envs:
     alfred: FRED_API_KEY
   source_admissions:
@@ -50,6 +50,11 @@ global_data:
       admission_status: approved
       license_status: approved
       license_checked_at: "2026-07-12"
+      allowed_use: research_only
+    alpha_vantage_commodity_spot_v1:
+      admission_status: approved
+      license_status: approved
+      license_checked_at: "2026-07-13"
       allowed_use: research_only
     global_yfinance_fx_v1:
       admission_status: planned

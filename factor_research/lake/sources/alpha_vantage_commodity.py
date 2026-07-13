@@ -17,11 +17,11 @@ from lake.sources.openbb_global import ProviderUnavailable
 ALPHA_VANTAGE_BASE_URL = "https://www.alphavantage.co/query"
 
 _SERIES_SPECS = {
-    "CL=F": {"function": "WTI"},
-    "BZ=F": {"function": "BRENT"},
-    "NG=F": {"function": "NATURAL_GAS"},
-    "GC=F": {"function": "GOLD_SILVER_HISTORY", "symbol": "GOLD"},
-    "SI=F": {"function": "GOLD_SILVER_HISTORY", "symbol": "SILVER"},
+    "CL=F": {"function": "WTI", "value_field": "value"},
+    "BZ=F": {"function": "BRENT", "value_field": "value"},
+    "NG=F": {"function": "NATURAL_GAS", "value_field": "value"},
+    "GC=F": {"function": "GOLD_SILVER_HISTORY", "symbol": "GOLD", "value_field": "price"},
+    "SI=F": {"function": "GOLD_SILVER_HISTORY", "symbol": "SILVER", "value_field": "price"},
 }
 
 
@@ -113,6 +113,7 @@ class AlphaVantageCommodityProvider:
             query = dict(_SERIES_SPECS.get(canonical_symbol) or {})
             if not query:
                 raise ProviderUnavailable(f"no Alpha Vantage query mapping for {canonical_symbol}")
+            value_field = str(query.pop("value_field", "value"))
             query["datatype"] = "json"
             query["interval"] = "daily"
             payload = self._request(query)
@@ -122,7 +123,9 @@ class AlphaVantageCommodityProvider:
                     continue
                 if end_day is not None and session_date > end_day:
                     continue
-                close = pd.to_numeric(item.get("value"), errors="coerce")
+                close = pd.to_numeric(item.get(value_field), errors="coerce")
+                if pd.isna(close):
+                    continue
                 rows.append({
                     "symbol": canonical_symbol,
                     "exchange": "ALPHAVANTAGE_SPOT",
