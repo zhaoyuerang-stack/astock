@@ -1117,6 +1117,22 @@ def test_island_fitness_penalizes_turnover():
     assert turns == sorted(turns)
 
 
+def _momentum_variant_seeds():
+    """在册腿(momentum 20)的窗口近邻种子:保证初始种群机械含对册高相关候选。
+
+    相关性惩罚/重发现闸的断言需要种群里真的存在相关候选;靠随机种子碰运气会随
+    上游种子目录/变异算子演化而漂移(2026-07-02 基线预存失败的根因)。"""
+    seeds = []
+    for w in (10, 15, 20, 25, 30, 40):
+        ast = {"type": "linear_combo", "direction": "positive",
+               "terms": [{"factor": "momentum", "params": {"window": w},
+                          "transforms": ["mad_clip", "zscore", "rank"], "weight": 1.0}],
+               "thesis": {"mechanism": "在册动量腿的窗口近邻,注入以保证对册相关候选存在。",
+                          "citation": "test"}}
+        seeds.append(validate_candidate_ast(ast))
+    return seeds
+
+
 def test_island_fitness_penalizes_correlation_to_book():
     """corr_weight>0 时,适应度 = |ICIR| − corr_weight×对在册相关(novelty=0 隔离)。
 
@@ -1152,6 +1168,7 @@ def test_island_fitness_penalizes_correlation_to_book():
             vintage_id="synthetic",
             n_islands=2, generations=1, population=4, top_k=4, rng_seed=7,
             novelty_weight=0.0, corr_weight=1.0, rediscovery_corr=0.0,  # 隔离软罚,关硬闸
+            seeds=_momentum_variant_seeds(),
             reference_panels=[book_panel],
             runners={"l0": fake_l0},
             repository=CandidateRepository(root / "candidates.jsonl"),
@@ -1234,6 +1251,7 @@ def test_rediscovery_gate_zeros_edge_above_corr_threshold():
             vintage_id="synthetic",
             n_islands=2, generations=1, population=4, top_k=4, rng_seed=7,
             novelty_weight=0.0, corr_weight=1.0, turnover_weight=0.0,
+            seeds=_momentum_variant_seeds(),
             rediscovery_corr=0.5, reference_panels=[book_panel],
             runners={"l0": fake_l0},
             repository=CandidateRepository(root / "candidates.jsonl"),
