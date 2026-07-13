@@ -144,6 +144,36 @@
       "created": "2026-07-12",
       "expires": "2027-01-08",
       "prompt_note": "资负表科目存量结构(议价权/应收/存货强度)全市场直接截面已 probe 阴性:议价权大半是 size/流动性伪装(正交保留率 17%,残差≈0);强度改善类 IS 符号与设计假设相反且 OOS 翻号。不要再提『资负表科目/总资产直接截面』类候选;有行业中性化再重开。"
+    },
+    {
+      "id": "price-channel-breakout-reversal-mirror",
+      "direction": "价格通道突破+量能确认(Donchian breakout family,机制假设=Hong-Stein 惯性延续)",
+      "status": "falsified",
+      "action": "NOTE",
+      "scope_factors": [],
+      "evidence": [
+        "reports/research/strong_ai_rounds.jsonl:round=1(2026-07-03,daily-round-1)——price_channel_breakout 与既有 price_position/short_reversal 反转因子相关 -0.54~-0.59,方向与惯性延续假设相反(更像超买回调);breakout_volume_confirm 被机械 discard",
+        "claude/daily-round-1 分支 commit 73cda770(factors/breakout.py + test_breakout_factors.py,未合并主线,代码只存在于该孤立分支)"
+      ],
+      "revival_condition": "换机制假设(承认其反转性质而非延续性质设计),或换持仓期/宇宙重新验证是否仍是既有反转簇的镜像",
+      "created": "2026-07-13",
+      "expires": "2027-01-13",
+      "prompt_note": "价格通道突破(Donchian/量能确认)已被 round-1 证伪:price_channel_breakout 是既有反转簇(price_position/short_reversal)的较弱镜像变体,非新正交方向,不要再提『价格突破+量能确认』类候选,除非明确换机制假设。"
+    },
+    {
+      "id": "broker-recommend-breadth-size-proxy",
+      "direction": "券商月度金股覆盖广度(analyst_recommend_breadth)作为分析师关注度信号",
+      "status": "falsified",
+      "action": "NOTE",
+      "scope_factors": [],
+      "evidence": [
+        "reports/research/strong_ai_rounds.jsonl:round=2(2026-07-04,daily-round-2)——analyst_recommend_breadth 实测 corr(size)=0.30~0.35(覆盖广度本质是规模代理),IS→OOS 全部翻负(留存 -61%~-129%)",
+        "claude/daily-round-2 分支 commit 7169e53b(factors/analyst_recommend.py,未合并主线)"
+      ],
+      "revival_condition": "先解决 size 暴露(强制行业/规模中性化)且验证 OOS 稳定性;真正信息量更高的 report_rc(逐条 EPS 预测修正)因积分墙硬配额未解除(见 TASKS.md)",
+      "created": "2026-07-13",
+      "expires": "2027-01-13",
+      "prompt_note": "券商月度金股覆盖广度是规模代理(corr size 0.30-0.35)且 IS→OOS 翻负,不要再提『分析师覆盖广度/金股上榜数』类候选;真正有信息量的 report_rc 逐条盈利预测修正因积分墙不可得(见 TASKS.md)。"
     }
   ]
 }

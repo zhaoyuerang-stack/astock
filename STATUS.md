@@ -1,8 +1,16 @@
 # STATUS — 当前进度
 
-> 更新:2026-07-12。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
+> 更新:2026-07-13。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
+
+**2026-07-13(daily-round-6:研究总监审视,实证一次真实重复算力浪费 + 修复 main 登记簿测试红灯)**:
+  · **核心发现(不是假设,已实证)**:round3(07-05)警告的"多分支互相看不到对方成果"风险,8 天内真实发生——round4(07-06,分支 `claude/daily-round-4`,从未合并 main)对资产负债表运营质量三因子(bargaining_power/receivable_intensity_chg/inventory_intensity_chg)做的 probe-signal-source 体检,因分支孤立对 main 不可见;07-12 另一次独立研究在 `main` 上对**同样三个因子**重新跑了几乎相同的 probe,产出几乎相同的阴性结论(现已作为 `balancesheet-operational-quality-weak` 条目存在于登记簿)。一次可精确定位日期/文件名的重复浪费。
+  · **修复 main 当前的红灯测试**:07-12 新增的 3 条 `direction_registry.json` 条目把未接入 `ALLOWED_FACTORS` 白名单的因子名(`implied_growth_gap`/`peg_inverse`/`guidance_gap`/`bargaining_power` 等)写进了 `scope_factors`,违反 `test_shipped_registry_is_valid_and_evidence_backed` 的白名单存在性断言——在本轮工作分支(基于 `main@f66cd419`)上复现为红灯。本轮按 round4 已建立的既有惯例(因子未进白名单则 `scope_factors` 留空)清空这 3 处,`test_direction_registry.py` 12/12、`test_knowledge.py` 9/9、`check_layer_deps.py` 均转绿。
+  · **补记两条此前从未回写的方向教训**:round1(`price_channel_breakout`,与既有反转簇相关 -0.54~-0.59)、round2(`analyst_recommend_breadth`,size 代理 corr 0.30-0.35 且 IS→OOS 翻负)——结论此前只存在于 `strong_ai_rounds.jsonl` 与孤立分支,登记簿(生成器实际消费的机器可读知识源)里没有,本轮补记 `price-channel-breakout-reversal-mirror` / `broker-recommend-breadth-size-proxy` 两条(证据门控通过)。
+  · **另确认**:台账仍 0 在册(与 round3 一致,8 天未变);metasearch 信息地图已 20 天未刷新(建议尽快重跑);研报-NLP 管线 07-12 起 0 失败但 `data_lake/research_pdf/` 同期无新文件落地,**不能定性为已修复**(可能只是无新输入可失败,待核实);跨资产腿/composite-portfolio 仍由其他分支活跃产出,维持不重复投入。
+  · **needs_human**:是否建立"direction_registry.json 优先快速合并"机制(该文件是防重复浪费的专用机制,留在孤立分支就失效);research_pdf 停更是否为新问题;metasearch 是否近期重跑。均非阻塞性。
+  · 详见 `factor_research/reports/research/research_director_review_round6_findings.md`(完整证据链)。本轮零新搜索/零新候选(`trials_recorded=0`,与 round3 同类);未碰 registry 写入口/workflow promote/部署清单/成本模型/holdout boundary/`ALLOWED_FACTORS` 白名单本身。
 
 **2026-07-12(CI 兜底执行未枚举测试 + 两处预存失败修复)**:
   · **CI 执行缺口收口**:`test_all.sh` 手工枚举 + `check_test_discovery.py` 只验"可收集"不验"被执行"→ **76 个 pytest 风格 test_*.py 从不被 CI 真跑**。末尾新增兜底块:枚举清单从脚本自身机械提取(不维护第二份手工清单),未枚举者统一 `pytest` 执行;无 `def test_` 的脚本式测试豁免(同 discovery 守卫口径);已枚举文件不重复计账。对抗验证:必失败金丝雀真被执行且 `set -e` 下真传播(exit 1,"🎉"不出);脚本式金丝雀真豁免;已枚举真不重复。
