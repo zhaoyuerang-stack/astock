@@ -1,5 +1,7 @@
 """业绩 SUE(标准化未预期盈余)因子族 — 事件/基本面正交数据源。
 
+Disposition: dormant — 零消费者且无在案 probe 立项;复活须先立 probe-signal-source 体检项(R-ARCH-005 精神)。
+
 立项动机(打破小盘坍缩,同 northbound):现有因子取材偏价量/市值/流动性,缺事件/盈余维度。
 业绩预告(forecast)+ 快报(express)是早于正式财报的盈余信号,与价量簇正交。
 

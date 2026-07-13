@@ -10,6 +10,12 @@
   · **agent knowledge runtime 检索修复**(兜底块揭出的腐烂测试):两个真实缺陷——动态状态文档的**空心标题 chunk**(只有标题无内容)靠关键词高分挤占检索席位;静态文档(DECISIONS 等)随时间增长把 runtime chunk 挤出 top-N。修:标题并入首节不再单独成 chunk + 实时状态类查询保留一个 runtime 席位。`test_agent_knowledge` 8/8。
   · **验证**:9 静态守卫全绿;枚举 47 块逐个跑 40 绿,7 失败全部机械归因 worktree 缺数据湖(`No objects to concatenate`/`codes.parquet` 缺失等,同 07-02 先例,非代码);兜底 76 文件 pytest 全绿。数据完整环境(主仓)下的端到端全绿确认留待合并后。
 
+**2026-07-12(因子词表守卫落地:词表端防熵第一步,机制分析 → check_factor_registry)**:
+  · **机制诊断**:因子库分析发现守卫全押"结论端"(台账/回测/holdout),"词表端"(因子定义/白名单/接线)零守卫 → 口径分叉(DSL `illiquidity`=|ret|/volume vs canonical Amihud=|ret|/amount,同名不同义)、退化因子(alpha_005 含恒常子项)、三面手工接线漂移(holder_count_chg 注册 (20,120) vs 白名单 (40,240))、六个零消费者死模块匿名沉淀、factor_store 980面板/36GB 无 manifest 无 GC 且缓存 key 不含源码版本(改实现静默复用旧值,R-DATA-001 级隐患)。
+  · **第一步落地**:`factors/registry.py` 升格语义权威——FactorRecord 加 `definition`(口径必填)/`evidence`(searchable 必带 probe 指针)/`source_hash`(源码摘要自动算),注册期 fail-closed(空口径/无证据/同名不同源码 import 即炸);新守卫 `scripts/ci/check_factor_registry.py`(C1 三面手工接线 AST 冻结,legacy 94 条只减不增,新因子必走 @register_factor;C2 口径/证据/同源码重复注册;C3 注册名与手工条目撞名;C4 factors/ 零消费者模块必带 `Disposition:` 标记且标记不得说谎)已接 `test_all.sh`。
+  · **顺手收编**:holder_count_chg 迁 searchable=True(evidence=research_ledger:e6e655401623899d,参数统一 (40,240) 消除注册/白名单分叉),删两处手工接线,行为等价由测试逐位钉死;六个零消费者模块打标(fundamental_quality=probe-pending 有立项,earnings/flow/quality/value/gap_reversal=dormant 复活须 probe)。
+  · **对抗测试** 16/16(空口径真拒/无证据真拒/撞名真拒/新手工条目真拒/legacy 清单陈条真拒/同 hash 真拒/死模块无标记真拒/标记说谎真被抓/holder_count_chg spec 逐位不变/真实仓库守卫绿);既有 11 守卫全绿;test_autoresearch_engine 2 例失败经 stash 基线复测为预存。CLAUDE.md §16 加守卫行;后续(94 条迁移含 illiquidity 口径修复/alpha101 退化扫描/缓存 source_hash+GC+回流活性表/R-ARCH-006 入宪提案待 owner)已立 TASKS「因子词表治理」节。
+
 **2026-07-03(孤岛回收四项:拥挤归因 + 保质期复核环 + 基本面质量因子族 + 被丢信号销账)**:
   · **拥挤 → 衰减归因**:`capacity.strategy_pool_crowding`(零调用方孤岛回收)接进 `decay_monitor` 周度——池级(等权"策略组合"复用 calculate_crowding_score)+ 逐腿 `max_pair_corr` 点名"和谁拥挤"(阈值单源 = governance.marginal.REDUNDANT_CORR)。对抗测试抓到真设计缺陷:逐腿对池均值相关会被正交腿稀释漏检双胞胎(corr 0.99 的孪生对池仅 0.64),已改两两口径。<2 腿/样本不足诚实拒判不给 0 分假绿。测试 5/5。
   · **保质期复核环**:`services/read/knowledge_expiry.py`(check_expiry 此前只挂 CLI 手动命令,结论过期没人重测)——findings 过期+父过期级联 + 方向条目过期(带 revival_condition)→ 决策收件箱**第九源**(info 级:「重测还是带新证据续期?」,裸续期=永久墓碑警示)。测试 6/6。

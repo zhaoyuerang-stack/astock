@@ -28,7 +28,7 @@ _FACTOR_CALLS = {
     "bp_proxy": ("factors.fundamental", "bp_proxy", {}),
     "ep_proxy": ("factors.fundamental", "ep_proxy", {}),
     # 独立数据族隔离岛(LOOP_ENGINEERING.md #5):股东行为 + 资金流,与价量簇正交
-    "holder_count_chg": ("factors.shareholder", "holder_count_chg", {"window": "window"}),
+    # (holder_count_chg 已迁 @register_factor,经文件末自动接线进入,不再手工列)
     "holdertrade_net": ("factors.shareholder", "holdertrade_net", {"window": "window"}),
     "large_order_net_ratio": ("factors.capital_flow", "large_order_net_ratio", {"window": "window"}),
     # 北向资金正交族(与 factory.autoresearch.registry.ALLOWED_FACTORS 同步)

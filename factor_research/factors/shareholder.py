@@ -34,8 +34,12 @@ def _align_to_close(panel: pd.DataFrame, close: pd.DataFrame) -> pd.DataFrame:
     return out[common].reindex(columns=close.columns)
 
 
-@register_factor("holder_count_chg", params={"window": (20, 120)},
-                 data=("holder/holdernumber",), input="close", arg_map={"window": "window"})
+@register_factor("holder_count_chg",
+                 definition="股东户数 window 期环比变化取负,anndate ffill 对齐交易日后 MAD截尾+截面z;正=户数减少(筹码集中,预期正超额)",
+                 params={"window": (40, 240)},
+                 data=("holder/holdernumber",), input="close", arg_map={"window": "window"},
+                 searchable=True,
+                 evidence="research_ledger:e6e655401623899d;knowledge/direction_registry:northbound-holder-flow-weak-longonly(残差IC真正交但量级弱,DEPRIORITIZE)")
 def holder_count_chg(close, window: int = 60, **_):
     """股东户数环比变化,负号:户数减少 → 筹码集中 → 因子值升高(买入)。"""
     panel = _align_to_close(_load_holdernumber_cache(), close)

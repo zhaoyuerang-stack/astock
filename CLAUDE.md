@@ -344,6 +344,7 @@ Web 不是本文件主要作用域。涉及 Web 必须先读 [`web/CLAUDE.md`](w
 | 测试发现完整                | P1 | `check_test_discovery.py` | 全量收集 `test_*.py`，杜绝漏跑的手工清单           |
 | R-DATA-001 禁用旧口径      | P0 | `check_no_legacy_data.py`  | AST 禁代码 import data_full / 从 data_full 目录读盘(放过注释/口径标签/迁移目录) |
 | R-ARCH-002 生产层隔离      | P1 | `check_layer_deps.py`(覆盖) | production 禁 import research 在依赖图内强制 |
+| 因子词表完整性(词表端防熵)   | P1 | `check_factor_registry.py` + `factors.registry.register_factor`(注册期校验) | 手工三面接线冻结(legacy 只减不增,新因子必走 @register_factor);definition 口径必填;searchable 须带 probe 证据;禁同名双 spec/同源码重复注册;factors/ 零消费者模块必带 Disposition 标记 |
 | Git 禁止一锅端             | P1 | 人工 diff                   | 多 agent 共享工作树必守，无脚本可代替               |
 
 凡“缺/待建”的守卫，应在 `TASKS.md` 立项。
