@@ -45,7 +45,9 @@ def large_order_net_ratio(close, window: int = 5, **_):
     return safe_zscore(mad_clip(ratio.replace([np.inf, -np.inf], np.nan)))
 
 
-@register_factor("smart_money_divergence", params={"window": (5, 60)},
+@register_factor("smart_money_divergence",
+                 definition="特大单净流入占比 z 减同窗价格收益 z(量价背离,吸筹构造);正=流入强而价未涨(机构疲弱处吸筹,预期正超额)",
+                 params={"window": (5, 60)},
                  data=("moneyflow",), input="close", arg_map={"window": "window"})
 def smart_money_divergence(close, window: int = 20, **_):
     """吸筹背离:特大单(elg)净流入强 × 价格未涨 → 机构于价格疲弱处吸筹。

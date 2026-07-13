@@ -1,5 +1,7 @@
 """Gap reversal factors — exploit A-share retail overreaction to overnight gaps.
 
+Disposition: dormant — 零消费者(未接 catalog/DSL/白名单,无脚本引用);复活须先走 probe-signal-source 体检(R-ARCH-005 精神)。
+
 A-share is retail-dominated (~80% volume). Retail investors overreact to
 overnight price gaps: chasing gap-ups and panic-selling gap-downs. This
 creates predictable mean-reversion over the following 1-5 days.

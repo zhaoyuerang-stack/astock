@@ -1,5 +1,7 @@
 """资产负债表运营质量因子族(孤岛回收①:深层基本面 → frontier 空白区)。
 
+Disposition: probe-pending — 已立项(TASKS「probe 执行·需数据湖」),体检通过才接 DSL 白名单。
+
 为什么(ADR-034 后续):产业基本面 Phase 1 已把资产负债表科目(应收/应付/存货/
 票据,`data_lake/financials/balancesheet_all.parquet`,anndate 公告日 PIT)摄取进湖,
 但从未进入因子层——而 information_map 的 frontier 恰好指向基本面族是现有池最独立

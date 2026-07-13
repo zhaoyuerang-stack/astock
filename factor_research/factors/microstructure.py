@@ -37,7 +37,9 @@ def price_position(close: pd.DataFrame, n: int = 60) -> pd.DataFrame:
     return safe_zscore(mad_clip(-pos))
 
 
-@register_factor("zero_ret_days", params={"window": (10, 120)},
+@register_factor("zero_ret_days",
+                 definition="N日内零收益(|日收益|<1e-6 且已上市)天数 rolling 求和,MAD截尾+截面z;正=价格停滞天数多(Lesmond 流动性/低关注溢价)",
+                 params={"window": (10, 120)},
                  data=("price/close",), input="close", arg_map={"window": "n"})
 def zero_ret_days(close: pd.DataFrame, n: int = 60) -> pd.DataFrame:
     """N 日内零收益(价格停滞)天数 —— Lesmond 流动性/低关注代理。

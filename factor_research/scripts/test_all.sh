@@ -48,6 +48,14 @@ echo "=== check_lake_writers.py (数据湖唯一写入口) ==="
 python3 scripts/ci/check_lake_writers.py
 
 echo ""
+echo "=== check_factor_registry.py (因子词表:手工接线冻结/口径与证据/撞名/死模块处置) ==="
+python3 scripts/ci/check_factor_registry.py
+
+echo ""
+echo "=== test_factor_registry_guard.py (词表守卫 + 注册门 对抗回归) ==="
+python3 tests/test_factor_registry_guard.py
+
+echo ""
 echo "=== test_engine.py ==="
 python3 test_engine.py
 
