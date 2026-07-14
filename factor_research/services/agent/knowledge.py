@@ -139,6 +139,10 @@ def _score(query: str, text: str, source_type: str) -> float:
     if source_type == "runtime":
         if any(k in q for k in ("目前", "实时", "状态", "当下", "现在", "实际", "当前", "最新", "运行", "真实")):
             score += 4.0
+        if "风险" in q and any(k in text for k in ("风控", "评估", "数据质量", "异常")):
+            # Prefer an actionable live risk/data-quality chunk over the
+            # runtime document's title-only chunk.
+            score += 6.0
     return score
 
 
@@ -318,4 +322,3 @@ def citation_from_hit(hit: KnowledgeHit) -> dict:
         "source_path": hit.source_path,
         "excerpt": excerpt,
     }
-
