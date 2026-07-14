@@ -138,34 +138,39 @@ test("diagnosis service keeps longer conversation history for active threads", a
   assert.equal(result.turns.at(-2).content, "继续看最大风险");
 });
 
-test("diagnosis service uses Pi explanation as the assistant reply when available", async () => {
+test("diagnosis service does not display unsupported Pi narrative as financial evidence", async () => {
   const { createDiagnosisService } = await import("../src/main/diagnosisService.cjs");
-  const piText = "基于已读取证据，当前主要问题是 20 日和 60 日收益都偏弱；先按观察处理，不生成交易指令。";
+  const piText = "这家公司主营某个 CLI 未返回的业务，而且未来一定增长。";
+  const profile = {
+    code: "600519",
+    name: "贵州茅台",
+    price_cny: 1182.19,
+    basic_date: "20260709",
+    latest_price: { date: "2026-07-09", close: 8352.0053 },
+    returns: { ret_20d: -0.041, ret_60d: -0.153 },
+    daily_basic: {},
+    moneyflow: {},
+    data_sources: ["price/daily/600519.parquet"],
+    warnings: [],
+  };
   const service = createDiagnosisService({
     readClient: {
       async resolveStockCode() {
-        return "600519";
+        throw new Error("HTTP fallback resolver must not run when Pi returned CLI evidence");
       },
-      async getStockProfile(code) {
-        return {
-          code,
-          name: "贵州茅台",
-          price_cny: 1182.19,
-          basic_date: "20260709",
-          latest_price: { date: "2026-07-09", close: 8352.0053 },
-          returns: { ret_20d: -0.041, ret_60d: -0.153 },
-          daily_basic: {},
-          moneyflow: {},
-          data_sources: ["price/daily/600519.parquet"],
-          warnings: [],
-        };
+      async getStockProfile() {
+        throw new Error("HTTP fallback profile must not run when Pi returned CLI evidence");
       },
     },
     piBridge: {
-      async explainDiagnosis(_diagnosis, options) {
+      async runAgentTurn(options) {
         assert.equal(options.prompt, "600519 最大风险是什么");
         assert.equal(options.context.currentThread.code, "600519");
-        return { ready: true, text: piText };
+        return {
+          ready: true,
+          text: piText,
+          cliCalls: [{ capability: "stock_profile", arguments: { code: "600519" }, result: profile, isError: false }],
+        };
       },
     },
   });
@@ -174,8 +179,9 @@ test("diagnosis service uses Pi explanation as the assistant reply when availabl
     currentThread: { id: "stock-600519", code: "600519", name: "贵州茅台" },
   });
 
-  assert.equal(result.piExplanation, piText);
-  assert.equal(result.turns.at(-1).content, piText);
+  assert.equal(result.piExplanation, "");
+  assert(!result.turns.at(-1).content.includes("未来一定增长"));
+  assert(result.turns.at(-1).content.includes("下行风险"));
 });
 
 test("diagnosis service keeps an unresolved workspace when a stock is later identified", async () => {
@@ -253,55 +259,50 @@ test("diagnosis service records selected stock skills from the local registry", 
   assert(result.limits.some((item) => item.includes("Skill 边界")));
 });
 
-test("diagnosis service lets Pi orchestrate a whitelisted stock skill plan", async () => {
+test("diagnosis service lets Pi read a stock profile through the system CLI", async () => {
   const { createDiagnosisService } = await import("../src/main/diagnosisService.cjs");
-  const profileCalls = [];
+  const profile = {
+    code: "600519",
+    name: "贵州茅台",
+    price_cny: 1182.19,
+    basic_date: "20260709",
+    latest_price: { date: "2026-07-09", close: 8352.0053 },
+    returns: { ret_20d: -0.041, ret_60d: -0.153 },
+    daily_basic: { pe_ttm: 17.8666, pb: 5.4554, ps_ttm: 8.5848, total_mv: 147783396.6704 },
+    moneyflow: {},
+    data_sources: ["price/daily/600519.parquet"],
+    warnings: [],
+  };
   const service = createDiagnosisService({
     readClient: {
       async resolveStockCode() {
-        throw new Error("direct resolver should not run when Pi supplied profile code");
+        throw new Error("direct resolver should not run when Pi supplied CLI profile");
       },
-      async getStockProfile(code) {
-        profileCalls.push(code);
-        return {
-          code,
-          name: "贵州茅台",
-          price_cny: 1182.19,
-          basic_date: "20260709",
-          latest_price: { date: "2026-07-09", close: 8352.0053 },
-          returns: { ret_20d: -0.041, ret_60d: -0.153 },
-          daily_basic: { pe_ttm: 17.8666, pb: 5.4554, ps_ttm: 8.5848, total_mv: 147783396.6704 },
-          moneyflow: {},
-          data_sources: ["price/daily/600519.parquet"],
-          warnings: [],
-        };
+      async getStockProfile() {
+        throw new Error("HTTP fallback should not run when Pi supplied CLI profile");
       },
     },
     piBridge: {
-      async orchestrateSkillExecution() {
+      async runAgentTurn() {
         return {
           ready: true,
-          selectedSkillId: "valuation-snapshot",
-          toolRequests: [{ tool: "get_stock_profile", args: { code: "600519" } }],
-          blockedToolRequests: [],
-          rationale: "用户询问估值，先读取股票画像。",
+          text: "估值数据已从系统 CLI 读取，当前只做相对压力判断。",
+          cliCalls: [{ capability: "stock_profile", arguments: { code: "600519" }, result: profile, isError: false }],
         };
-      },
-      async explainDiagnosis() {
-        return { ready: false, text: "" };
       },
     },
   });
 
-  const result = await service.runDiagnosis("茅台估值贵不贵");
+  const result = await service.runDiagnosis("茅台估值贵不贵", { selectedSkillId: "valuation-snapshot" });
 
-  assert.deepEqual(profileCalls, ["600519"]);
   assert.equal(result.activeSkills[0].id, "valuation-snapshot");
   assert.equal(result.agentTrace.orchestrator, "pi");
-  assert(result.taskSteps[0].name.includes("Pi agent 编排"));
-  assert(result.evidence.some((item) => item.includes("白名单工具 get_stock_profile")));
-  assert(result.limits.some((item) => item.includes("Pi agent 工具白名单")));
-  assert(result.sourceChips.includes("tool-whitelist"));
+  assert.deepEqual(result.agentTrace.cliCapabilities, ["stock_profile"]);
+  assert.equal(result.agentTrace.fallbackUsed, false);
+  assert(result.taskSteps[0].name.includes("Pi agent 读取系统 CLI"));
+  assert(result.evidence.some((item) => item.includes("Pi CLI stock_profile")));
+  assert(result.limits.some((item) => item.includes("系统 CLI")));
+  assert(result.sourceChips.includes("system-cli"));
 });
 
 test("diagnosis service supports strategy precheck skill without fake backtest data", async () => {
@@ -337,37 +338,87 @@ test("diagnosis service supports strategy precheck skill without fake backtest d
   assert(result.sourceChips.includes("no-fake-curve"));
 });
 
-test("Pi bridge uses an ephemeral no-tools command by default", async () => {
-  const { buildPiArgs } = await import("../src/main/piBridge.cjs");
+test("Pi bridge enables only the AStock CLI extension tool", async () => {
+  const { buildPiAgentArgs } = await import("../src/main/piBridge.cjs");
 
-  const args = buildPiArgs("解释当前诊断", { model: "openai/gpt-4o-mini", skillPaths: ["/tmp/safe-skill.md"] });
+  const args = buildPiAgentArgs("解释当前诊断", {
+    model: "openai/gpt-4o-mini",
+    thinking: "low",
+    extensionPath: "/tmp/astockCli.ts",
+    skillPaths: ["/tmp/safe-skill.md"],
+  });
 
-  assert(args.includes("--no-tools"));
+  assert(args.includes("--no-builtin-tools"));
+  assert(args.includes("--no-extensions"));
   assert(args.includes("--no-session"));
-  assert(args.includes("--mode"));
-  assert(args.includes("text"));
+  assert(args.includes("--extension"));
+  assert(args.includes("/tmp/astockCli.ts"));
+  assert(args.includes("--tools"));
+  assert(args.includes("astock_cli"));
+  assert(args.includes("json"));
+  assert(args.includes("--thinking"));
+  assert(args.includes("low"));
   assert(args.includes("--skill"));
   assert(args.includes("/tmp/safe-skill.md"));
   assert(args.includes("-p"));
+  assert(!args.includes("--no-tools"));
   assert(!args.includes("bash"));
   assert(!args.includes("write"));
 });
 
-test("Pi bridge sanitizes skill orchestration plans to whitelisted tools", async () => {
-  const { sanitizeOrchestrationPlan } = await import("../src/main/piBridge.cjs");
-  const plan = sanitizeOrchestrationPlan(JSON.stringify({
-    selectedSkillId: "valuation-snapshot",
-    toolRequests: [
-      { tool: "get_stock_profile", args: { code: "600519" } },
-      { tool: "bash", args: { cmd: "curl example.com" } },
-    ],
-    rationale: "read profile",
-  }), [{ id: "valuation-snapshot" }]);
+test("Pi bridge parses CLI tool results and the final assistant message", async () => {
+  const { parsePiJsonEventStream } = await import("../src/main/piBridge.cjs");
+  const output = [
+    { type: "tool_execution_start", toolCallId: "call-1", toolName: "astock_cli", args: { capability: "resolve_stock_code", argumentsJson: "{\"query\":\"汇川技术\"}" } },
+    { type: "tool_execution_end", toolCallId: "call-1", toolName: "astock_cli", result: { details: { capability: "resolve_stock_code", payload: "300124" } }, isError: false },
+    { type: "message_end", message: { role: "assistant", content: [{ type: "text", text: "已经识别为汇川技术 300124。" }] } },
+    { type: "agent_end", messages: [] },
+  ].map((event) => JSON.stringify(event)).join("\n");
 
-  assert.equal(plan.selectedSkillId, "valuation-snapshot");
-  assert.deepEqual(plan.toolRequests, [{ tool: "get_stock_profile", args: { code: "600519" } }]);
-  assert.equal(plan.blockedToolRequests.length, 1);
-  assert.equal(plan.blockedToolRequests[0].tool, "bash");
+  const parsed = parsePiJsonEventStream(output);
+
+  assert.equal(parsed.ready, true);
+  assert.equal(parsed.text, "已经识别为汇川技术 300124。");
+  assert.deepEqual(parsed.cliCalls, [{
+    capability: "resolve_stock_code",
+    arguments: { query: "汇川技术" },
+    result: "300124",
+    isError: false,
+  }]);
+});
+
+test("Pi bridge distinguishes installed Pi from configured models", async () => {
+  const { parseConfiguredModels } = await import("../src/main/piBridge.cjs");
+  const listed = [
+    "provider     model                   context  max-out  thinking  images",
+    "deepseek     deepseek-v4-flash       1M       384K     yes       no",
+    "kimi-coding  kimi-for-coding         262.1K   32.8K   yes       yes",
+  ].join("\n");
+
+  assert.deepEqual(parseConfiguredModels(listed), [
+    "deepseek/deepseek-v4-flash",
+    "kimi-coding/kimi-for-coding",
+  ]);
+  assert.deepEqual(parseConfiguredModels("No models available. Use /login."), []);
+});
+
+test("Pi bridge streams JSON events without retaining verbose model deltas", async () => {
+  const { runPiJsonProcess } = await import("../src/main/piBridge.cjs");
+  const script = [
+    "const events = [",
+    "{type:'message_update', payload:'x'.repeat(2 * 1024 * 1024)},",
+    "{type:'tool_execution_start',toolCallId:'1',toolName:'astock_cli',args:{capability:'resolve_stock_code',argumentsJson:'{\\\"query\\\":\\\"汇川技术\\\"}'}},",
+    "{type:'tool_execution_end',toolCallId:'1',toolName:'astock_cli',result:{details:{payload:'300124'}},isError:false},",
+    "{type:'message_end',message:{role:'assistant',content:[{type:'text',text:'完成'}]}},",
+    "{type:'agent_end',messages:[]}",
+    "]; for (const event of events) process.stdout.write(JSON.stringify(event) + '\\n');",
+  ].join("");
+
+  const result = await runPiJsonProcess(process.execPath, ["-e", script], { timeout: 5000 });
+
+  assert.equal(result.ready, true);
+  assert.equal(result.text, "完成");
+  assert.equal(result.cliCalls[0].result, "300124");
 });
 
 test("read service client parses six-digit codes without relying on aliases", async () => {

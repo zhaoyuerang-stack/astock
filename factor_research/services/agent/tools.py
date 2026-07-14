@@ -28,6 +28,7 @@ class Tool:
     risk: str
     desc: str
     fn: Optional[Callable]   # None = 仅提案不执行(高风险动作)
+    args: tuple[str, ...] = ()
 
 
 def tool_registry() -> dict[str, Tool]:
@@ -37,7 +38,7 @@ def tool_registry() -> dict[str, Tool]:
     """
     from services.read import factors as fac, registry as reg
     from services.read import experiments as ex, portfolio as pf, risk as rk, state as st
-    from services.read.stocks import stock_profile
+    from services.read.stocks import resolve_stock_code, stock_profile
 
     def _backtest(**kw):
         from services.actions.run_backtest import run_backtest
@@ -45,7 +46,20 @@ def tool_registry() -> dict[str, Tool]:
 
     return {
         "data_quality":  Tool("data_quality", RISK_READONLY, "数据质量状态", lambda: st.data_quality().model_dump()),
-        "stock_profile": Tool("stock_profile", RISK_READONLY, "个股数据画像", lambda code: stock_profile(code)),
+        "resolve_stock_code": Tool(
+            "resolve_stock_code",
+            RISK_READONLY,
+            "把股票名称或用户文本解析为 6 位 A 股代码；无法确认时返回 null",
+            lambda query: resolve_stock_code(query),
+            ("query",),
+        ),
+        "stock_profile": Tool(
+            "stock_profile",
+            RISK_READONLY,
+            "读取个股价格日期、收益、估值、资金流和数据来源画像",
+            lambda code: stock_profile(code),
+            ("code",),
+        ),
         "market_state":  Tool("market_state", RISK_READONLY, "当前持仓/动作状态", lambda: st.market_state().model_dump()),
         "factors":       Tool("factors", RISK_READONLY, "alpha 因子家族", lambda: [f.model_dump() for f in fac.list_factors()]),
         "strategies":    Tool("strategies", RISK_READONLY, "母策略台账", lambda: [s.model_dump() for s in reg.list_strategies()]),

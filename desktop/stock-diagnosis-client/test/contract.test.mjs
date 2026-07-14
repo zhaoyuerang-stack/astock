@@ -10,6 +10,7 @@ const requiredFiles = [
   "src/main/main.cjs",
   "src/main/preload.cjs",
   "src/main/piBridge.cjs",
+  "src/main/piExtensions/astockCli.ts",
   "src/main/readServiceClient.cjs",
   "src/main/diagnosisService.cjs",
   "src/renderer/App.jsx",
@@ -49,12 +50,17 @@ assert(main.includes("apiVersion"), "runtime status must include IPC API version
 assert(main.includes("readService"), "runtime status must include read service health");
 
 const piBridge = readFileSync(join(root, "src/main/piBridge.cjs"), "utf8");
-assert(piBridge.includes("--no-tools"), "Pi bridge must disable Pi tools by default");
+const piExtension = readFileSync(join(root, "src/main/piExtensions/astockCli.ts"), "utf8");
+assert(piBridge.includes("--no-builtin-tools"), "Pi bridge must disable Pi built-in tools");
+assert(piBridge.includes("--no-extensions"), "Pi bridge must disable ambient Pi extensions");
 assert(piBridge.includes("--no-session"), "Pi bridge must keep diagnosis prompts ephemeral by default");
-assert(piBridge.includes("orchestrateSkillExecution"), "Pi bridge must expose skill orchestration");
-assert(piBridge.includes("ALLOWED_SKILL_TOOLS"), "Pi bridge must define a tool whitelist");
-assert(piBridge.includes("record_strategy_precheck"), "Pi bridge must include strategy precheck as a whitelisted tool");
-assert(!piBridge.includes("bash"), "Pi bridge must not enable arbitrary shell tools");
+assert(piBridge.includes("runAgentTurn"), "Pi bridge must expose one complete agent turn");
+assert(piBridge.includes("--mode"), "Pi bridge must consume Pi JSON events");
+assert(piBridge.includes("astock_cli"), "Pi bridge must allow only the AStock CLI extension tool");
+assert(!piBridge.includes('"--tools", "bash"'), "Pi bridge must not enable arbitrary shell tools");
+assert(piExtension.includes('name: "astock_cli"'), "Pi extension must register the AStock CLI tool");
+assert(piExtension.includes('item?.risk === "readonly"'), "Pi extension must filter the CLI catalog to readonly capabilities");
+assert(!piExtension.includes('name: "bash"'), "Pi extension must not register a shell tool");
 
 const app = readFileSync(join(root, "src/renderer/App.jsx"), "utf8");
 const visualization = readFileSync(join(root, "src/renderer/visualizations/VisualizationWorkspace.jsx"), "utf8");
@@ -82,7 +88,7 @@ const requiredUiMarkers = [
   "sameThreadIdentity",
   "upsertThreadList",
   "dedupeThreadList",
-  "正在编排 Skill",
+  "正在调用系统 CLI",
   "问一只股票，或继续推进当前诊断",
   "图形化展示",
   "选择 Skill",
@@ -90,7 +96,7 @@ const requiredUiMarkers = [
   "策略预检",
   "不展示伪造曲线",
   "等待输入",
-  "本地数据服务不可用",
+  "本地能力不可用",
 ];
 
 for (const marker of requiredUiMarkers) {

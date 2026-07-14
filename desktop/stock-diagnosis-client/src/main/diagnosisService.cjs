@@ -1,12 +1,12 @@
 const { extractStockCode } = require("./readServiceClient.cjs");
-const { ALLOWED_SKILL_TOOLS } = require("./piBridge.cjs");
+const { PI_CLI_TOOL } = require("./piBridge.cjs");
 const skillDefinitions = require("../shared/skills.json");
 
 const TASK_STEPS = [
   { name: "识别股票", desc: "解析名称、代码和市场。", status: "done" },
   { name: "检查数据新鲜度", desc: "确认可用交易日、PIT 对齐和缺口。", status: "done" },
   { name: "读取风险快照", desc: "汇总流动性、波动、行业和估值风险。", status: "done" },
-  { name: "生成保守诊断卡", desc: "拆分未持有与已持有两种动作语境。", status: "done" },
+  { name: "生成保守诊断", desc: "拆分未持有与已持有两种动作语境。", status: "done" },
 ];
 const MAX_CONTEXT_TURNS = 40;
 const MAX_TURN_CHARS = 1200;
@@ -73,10 +73,6 @@ function normalizeSelectedSkill(context = {}) {
   return skillDefinitions.find((skill) => skill.id === requestedId) || null;
 }
 
-function skillById(skillId) {
-  return skillDefinitions.find((skill) => skill.id === skillId) || null;
-}
-
 function skillTaskStep(skill) {
   return {
     name: `启用 Skill: ${skill.name}`,
@@ -100,39 +96,52 @@ function withSkillContext(diagnosis, skill) {
   };
 }
 
-function attachPiOrchestration(diagnosis, orchestration, toolResult = {}) {
-  if (!orchestration?.ready) return diagnosis;
-  const blockedTools = orchestration.blockedToolRequests || [];
+function cliCallEvidence(call) {
+  if (call.isError) return `Pi CLI ${call.capability || "unknown"}: 调用失败`;
+  if (call.capability === "resolve_stock_code") {
+    return `Pi CLI resolve_stock_code: ${call.result || "未识别股票代码"}`;
+  }
+  if (call.capability === "stock_profile") {
+    return `Pi CLI stock_profile: ${call.result?.name || call.result?.code || "已读取"} ${call.result?.code || ""}`.trim();
+  }
+  return `Pi CLI ${call.capability}: 已读取系统只读能力`;
+}
+
+function attachPiAgentTurn(diagnosis, agentTurn, options = {}) {
+  const cliCalls = Array.isArray(agentTurn?.cliCalls) ? agentTurn.cliCalls : [];
+  if (!agentTurn?.ready && cliCalls.length === 0) return diagnosis;
+  const successfulCalls = cliCalls.filter((call) => !call.isError);
   return {
     ...diagnosis,
     agentTrace: {
       orchestrator: "pi",
-      selectedSkillId: orchestration.selectedSkillId || diagnosis.activeSkills?.[0]?.id || "",
-      toolWhitelist: ALLOWED_SKILL_TOOLS,
-      toolRequests: orchestration.toolRequests || [],
-      blockedToolRequests: blockedTools,
-      rationale: orchestration.rationale || "",
+      selectedSkillId: diagnosis.activeSkills?.[0]?.id || "",
+      toolWhitelist: [PI_CLI_TOOL],
+      cliCapabilities: successfulCalls.map((call) => call.capability),
+      cliCalls,
+      fallbackUsed: Boolean(options.fallbackUsed),
     },
     taskSteps: [
       {
-        name: "Pi agent 编排 Skill",
-        desc: `已按白名单工具计划执行；允许工具: ${ALLOWED_SKILL_TOOLS.join(", ")}。`,
+        name: "Pi agent 读取系统 CLI",
+        desc: options.fallbackUsed
+          ? "Pi 未返回完整 CLI 证据，已降级到本地 read service。"
+          : `Pi 已通过唯一工具 ${PI_CLI_TOOL} 读取 readonly 能力。`,
         status: "done",
       },
       ...(diagnosis.taskSteps || []),
     ],
     evidence: [
-      `Pi agent 编排: ${orchestration.rationale || "已返回白名单工具计划"}`,
-      ...(toolResult.toolEvidence || []),
-      ...(toolResult.toolErrors || []).map((item) => `白名单工具失败: ${item}`),
+      ...cliCalls.map(cliCallEvidence),
       ...(diagnosis.evidence || []),
     ],
     limits: [
       ...(diagnosis.limits || []),
-      `Pi agent 工具白名单: ${ALLOWED_SKILL_TOOLS.join(", ")}。`,
-      ...blockedTools.map((item) => `已阻止 Pi 请求的非白名单工具: ${item.tool}`),
+      `Pi agent 只能调用 ${PI_CLI_TOOL}；系统 CLI 只执行登记为 readonly 的能力。`,
+      ...(options.fallbackUsed ? ["本轮使用 HTTP read service 兜底，未把该路径伪装成 Pi CLI 调用。"] : []),
     ],
-    sourceChips: ["Pi agent", "tool-whitelist", ...(diagnosis.sourceChips || [])],
+    sourceChips: ["Pi agent", "system-cli", ...(diagnosis.sourceChips || [])],
+    piExplanation: options.useText && agentTurn.text ? agentTurn.text : diagnosis.piExplanation,
   };
 }
 
@@ -373,87 +382,37 @@ function appendTurns(context, prompt, diagnosis) {
   ];
 }
 
-async function requestPiOrchestration(piBridge, prompt, context, selectedSkill) {
-  if (!piBridge?.orchestrateSkillExecution) {
-    return { ready: false, toolRequests: [], blockedToolRequests: [] };
+async function requestPiAgentTurn(piBridge, prompt, context, selectedSkill) {
+  if (!piBridge?.runAgentTurn) {
+    return { ready: false, text: "", cliCalls: [], error: "Pi agent turn is unavailable" };
   }
   try {
-    return await piBridge.orchestrateSkillExecution({
+    return await piBridge.runAgentTurn({
       prompt,
       context,
       skills: skillDefinitions,
       selectedSkill,
     });
   } catch (error) {
-    return { ready: false, error: error.message, toolRequests: [], blockedToolRequests: [] };
+    return { ready: false, text: "", cliCalls: [], error: error.message };
   }
 }
 
-async function executeWhitelistedToolRequests(readClient, toolRequests = [], prompt, context = {}) {
-  const result = {
-    resolvedCode: "",
-    profile: null,
-    strategyPrecheckRequested: false,
-    toolEvidence: [],
-    toolErrors: [],
-  };
+function successfulCliCall(agentTurn, capability) {
+  const calls = Array.isArray(agentTurn?.cliCalls) ? agentTurn.cliCalls : [];
+  return [...calls].reverse().find((call) => call.capability === capability && !call.isError) || null;
+}
 
-  for (const request of toolRequests) {
-    if (request.tool === "resolve_stock_code") {
-      try {
-        const query = String(request.args?.query || prompt || "");
-        const code = await (readClient.resolveStockCode
-          ? readClient.resolveStockCode(query)
-          : extractStockCode(query));
-        if (code) {
-          result.resolvedCode = code;
-          result.toolEvidence.push(`白名单工具 resolve_stock_code: ${code}`);
-        } else {
-          result.toolEvidence.push("白名单工具 resolve_stock_code: 未识别股票代码");
-        }
-      } catch (error) {
-        result.toolErrors.push(`resolve_stock_code: ${error.message}`);
-      }
-      continue;
-    }
-
-    if (request.tool === "get_stock_profile") {
-      try {
-        const requestedCode = extractStockCode(request.args?.code || "") || result.resolvedCode || contextStockCode(context);
-        const codeOrQuery = requestedCode || String(request.args?.query || prompt || "");
-        if (!codeOrQuery) {
-          result.toolErrors.push("get_stock_profile 缺少股票代码或查询文本");
-          continue;
-        }
-        result.profile = await readClient.getStockProfile(codeOrQuery);
-        result.resolvedCode = result.profile?.code || requestedCode || "";
-        result.toolEvidence.push(`白名单工具 get_stock_profile: ${result.profile?.name || result.resolvedCode} ${result.resolvedCode}`);
-      } catch (error) {
-        result.toolErrors.push(`get_stock_profile: ${error.message}`);
-      }
-      continue;
-    }
-
-    if (request.tool === "record_strategy_precheck") {
-      result.strategyPrecheckRequested = true;
-      result.toolEvidence.push("白名单工具 record_strategy_precheck: 已记录策略想法，等待 Shadow 模拟盘 read model。");
-    }
-  }
-
+function profileFromAgentTurn(agentTurn) {
+  const result = successfulCliCall(agentTurn, "stock_profile")?.result;
+  if (!result || typeof result !== "object" || Array.isArray(result)) return null;
   return result;
 }
 
-async function explainWithPi(piBridge, diagnosis, prompt, context) {
-  if (!piBridge?.explainDiagnosis) return diagnosis;
-  try {
-    const explanation = await piBridge.explainDiagnosis(diagnosis, { prompt, context });
-    if (explanation?.text) {
-      return { ...diagnosis, piExplanation: explanation.text };
-    }
-  } catch (_error) {
-    return diagnosis;
-  }
-  return diagnosis;
+function codeFromAgentTurn(agentTurn) {
+  const profile = profileFromAgentTurn(agentTurn);
+  if (profile?.code) return extractStockCode(profile.code);
+  return extractStockCode(successfulCliCall(agentTurn, "resolve_stock_code")?.result || "");
 }
 
 function createDiagnosisService({ readClient, piBridge }) {
@@ -462,20 +421,19 @@ function createDiagnosisService({ readClient, piBridge }) {
   return {
     async runDiagnosis(prompt, context = {}) {
       const requestedSkill = normalizeSelectedSkill(context);
-      const orchestration = await requestPiOrchestration(piBridge, prompt, context, requestedSkill);
-      const toolResult = await executeWhitelistedToolRequests(readClient, orchestration.toolRequests, prompt, context);
-      const selectedSkill = requestedSkill || skillById(orchestration.selectedSkillId) || (toolResult.strategyPrecheckRequested ? skillById("strategy-precheck") : null);
+      const agentTurn = await requestPiAgentTurn(piBridge, prompt, context, requestedSkill);
+      const selectedSkill = requestedSkill;
 
       if (selectedSkill && selectedSkill.mode === "strategy_precheck") {
         let diagnosis = strategyPrecheckDiagnosis(prompt, selectedSkill, context);
-        diagnosis = attachPiOrchestration(diagnosis, orchestration, toolResult);
-        diagnosis = await explainWithPi(piBridge, diagnosis, prompt, context);
+        diagnosis = attachPiAgentTurn(diagnosis, agentTurn, { useText: false });
         diagnosis.turns = appendTurns(context, prompt, diagnosis);
         return diagnosis;
       }
 
+      const cliProfile = profileFromAgentTurn(agentTurn);
       let resolveError;
-      const promptCode = toolResult.resolvedCode || await (async () => {
+      const promptCode = codeFromAgentTurn(agentTurn) || await (async () => {
         try {
           return readClient.resolveStockCode
             ? await readClient.resolveStockCode(prompt)
@@ -488,12 +446,17 @@ function createDiagnosisService({ readClient, piBridge }) {
       const code = promptCode || contextStockCode(context);
       if (!code) {
         if (resolveError) throw resolveError;
-        const diagnosis = unresolvedDiagnosis(prompt, selectedSkill, context);
+        let diagnosis = unresolvedDiagnosis(prompt, selectedSkill, context);
+        diagnosis = attachPiAgentTurn(diagnosis, agentTurn, {
+          fallbackUsed: Boolean(agentTurn?.ready),
+          useText: false,
+        });
         diagnosis.turns = appendTurns(context, prompt, diagnosis);
         return diagnosis;
       }
 
-      const profile = toolResult.profile || await readClient.getStockProfile(code);
+      const profile = cliProfile || await readClient.getStockProfile(code);
+      const fallbackUsed = !cliProfile;
       const decision = buildDecision(profile);
       let diagnosis = {
         thread: {
@@ -522,8 +485,10 @@ function createDiagnosisService({ readClient, piBridge }) {
         piExplanation: "",
       };
       diagnosis = withSkillContext(diagnosis, selectedSkill);
-      diagnosis = attachPiOrchestration(diagnosis, orchestration, toolResult);
-      diagnosis = await explainWithPi(piBridge, diagnosis, prompt, context);
+      diagnosis = attachPiAgentTurn(diagnosis, agentTurn, {
+        fallbackUsed,
+        useText: false,
+      });
       diagnosis.turns = appendTurns(context, prompt, diagnosis);
       return diagnosis;
     },
@@ -535,7 +500,8 @@ module.exports = {
   createDiagnosisService,
   buildDecision,
   chooseVerdict,
-  executeWhitelistedToolRequests,
   normalizeSelectedSkill,
   buildAssistantReply,
+  codeFromAgentTurn,
+  profileFromAgentTurn,
 };

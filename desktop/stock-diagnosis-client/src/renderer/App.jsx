@@ -5,15 +5,15 @@ import VisualizationWorkspace from "./visualizations/VisualizationWorkspace.jsx"
 const initialDiagnosis = {
   thread: { id: "empty", name: "等待输入", code: "", status: "等待输入" },
   taskSteps: [
-    { name: "识别股票", desc: "等待输入股票名称或 6 位代码。", status: "pending" },
-    { name: "检查数据新鲜度", desc: "提交后读取本地 Python read service。", status: "pending" },
+    { name: "理解问题", desc: "等待输入股票、持仓问题或策略想法。", status: "pending" },
+    { name: "读取系统能力", desc: "Pi agent 提交后调用本地 readonly CLI。", status: "pending" },
     { name: "读取风险快照", desc: "汇总真实股价、估值、收益和资金流。", status: "pending" },
-    { name: "生成保守诊断卡", desc: "拆分未持有与已持有两种动作语境。", status: "pending" },
+    { name: "生成保守诊断", desc: "只使用 CLI 返回的已检查证据。", status: "pending" },
   ],
   decision: {
     verdict: "等待输入",
     note: "还没有读取任何股票画像。",
-    summary: "输入股票名或 6 位代码后，客户端会先解析代码，再从本地 Python read service 读取真实数据。",
+    summary: "输入股票名或 6 位代码后，Pi agent 会读取系统 CLI，再由确定性代码整理证据。",
     notHeld: "先输入目标股票，再进入观察池判断。",
     held: "先读取本地画像，再讨论持有风险。",
   },
@@ -57,27 +57,27 @@ function statusClass(status) {
 function unavailableDiagnosis(prompt, message, selectedSkill = null) {
   const activeSkills = selectedSkill ? [publicSkill(selectedSkill)] : [];
   return {
-    thread: { id: `error-${Date.now()}`, name: "本地数据服务不可用", code: "", status: "错误" },
+    thread: { id: `error-${Date.now()}`, name: "本地能力不可用", code: "", status: "错误" },
     taskSteps: [
       { name: "识别股票", desc: "请求已收到。", status: "done" },
-      { name: "连接本地数据服务", desc: "读取 Python read service 失败。", status: "blocked" },
+      { name: "调用 Pi 与系统 CLI", desc: "Agent CLI 与本地 read service 均未返回可用证据。", status: "blocked" },
       { name: "读取风险快照", desc: "未读取到真实数据。", status: "pending" },
-      { name: "生成保守诊断卡", desc: "已停止，避免用假数据填充。", status: "blocked" },
+      { name: "生成保守诊断", desc: "已停止，避免用假数据填充。", status: "blocked" },
     ],
     decision: {
       verdict: "错误",
-      note: "本地数据服务不可用。",
+      note: "本地 Agent 能力不可用。",
       summary: `用户问题：“${prompt}”。客户端没有拿到真实数据，因此不会展示 demo 结论。错误: ${message}`,
       notHeld: "先不要进入候选。",
       held: "先不要按当前失败结果调整仓位。",
     },
-    risks: ["未读取到本地 Python read service。", "当前界面没有使用假数据兜底。"],
+    risks: ["未读取到 Pi CLI 或本地 read service 证据。", "当前界面没有使用假数据兜底。"],
     evidence: [...(selectedSkill ? [`选中 Skill: ${selectedSkill.name}`] : []), `用户输入: ${prompt}`, `错误: ${message}`],
-    limits: ["需要启动本地 read service 后才能诊断。", ...(selectedSkill ? [`Skill 边界: ${selectedSkill.boundary}`] : [])],
+    limits: ["需要 Pi CLI 或本地 read service 至少一条读取路径可用。", ...(selectedSkill ? [`Skill 边界: ${selectedSkill.boundary}`] : [])],
     sourceChips: [...(selectedSkill ? [`Skill: ${selectedSkill.shortName || selectedSkill.name}`] : []), "offline", "no-demo"],
     activeSkills,
     piExplanation: "",
-    turns: [{ role: "user", content: prompt }, { role: "assistant", content: `本地数据服务不可用: ${message}` }],
+    turns: [{ role: "user", content: prompt }, { role: "assistant", content: `本地能力不可用: ${message}` }],
   };
 }
 
@@ -132,8 +132,8 @@ function pendingDiagnosis(diagnosis, text, selectedSkill) {
     },
     taskSteps: [
       {
-        name: "Pi agent 编排中",
-        desc: `正在按 ${skillName} 准备白名单工具计划，并等待本地证据返回。`,
+        name: "Pi agent 执行中",
+        desc: `正在按 ${skillName} 读取系统 readonly CLI。`,
         status: "pending",
       },
       ...(diagnosis.taskSteps || []),
@@ -141,7 +141,7 @@ function pendingDiagnosis(diagnosis, text, selectedSkill) {
     turns: [
       ...(diagnosis.turns || []),
       { role: "user", content: text },
-      { role: "assistant", content: "正在编排 Skill、调用本地 read service，并检查证据边界。", pending: true },
+      { role: "assistant", content: "正在调用系统 CLI，并检查返回证据。", pending: true },
     ],
   };
 }
@@ -370,12 +370,18 @@ function Workspace({
   onClearSkill,
 }) {
   const [skillMenuOpen, setSkillMenuOpen] = useState(false);
-  const readServiceOffline = runtime?.readService?.available === false;
-  const runtimeLabel = runtime?.readService
-    ? readServiceOffline
-      ? "Read service offline"
-      : "Local API mode"
-    : "Checking local API";
+  const piCliReady = runtime?.pi?.available === true
+    && runtime.pi.cliAvailable === true
+    && runtime.pi.modelAvailable === true;
+  const readServiceReady = runtime?.readService?.available === true;
+  const runtimeOffline = Boolean(runtime) && !piCliReady && !readServiceReady;
+  const runtimeLabel = !runtime
+    ? "Checking local runtime"
+    : piCliReady
+      ? "Pi agent · CLI mode"
+      : readServiceReady
+        ? "Read service fallback"
+        : "Local runtime offline";
 
   return (
     <main className="workspace" data-testid="diagnosis-workspace">
@@ -411,7 +417,7 @@ function Workspace({
             </button>
           </div>
           <div className="top-meta">
-            <span className={`status-dot ${readServiceOffline ? "offline" : ""}`} aria-hidden="true"></span>
+            <span className={`status-dot ${runtimeOffline ? "offline" : ""}`} aria-hidden="true"></span>
             <span>{runtimeLabel}</span>
           </div>
         </div>
@@ -547,7 +553,7 @@ export default function App() {
             ];
         result.turns = [
           ...baseTurns,
-          { role: "assistant", content: `本地数据服务不可用: ${error?.message || String(error)}` },
+          { role: "assistant", content: `本地能力不可用: ${error?.message || String(error)}` },
         ];
       }
       setDiagnoses((prev) => upsertDiagnosisList(prev, result, pending?.thread));
