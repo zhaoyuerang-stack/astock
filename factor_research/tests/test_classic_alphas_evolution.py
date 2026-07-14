@@ -51,15 +51,16 @@ class TestClassicAlphasEvolution(unittest.TestCase):
         self.close, self.volume, self.amount = _synthetic_panel()
         self.forward_ret = precompute_forward_returns(self.close)
 
-    def test_compute_all_alpha101_factors(self):
-        """Verify that all 32 registered Alpha101 factors can compute values via compute_dsl_factor."""
+    def test_compute_all_searchable_alpha101_factors(self):
+        """Verify that every searchable Alpha101 factor validates and computes."""
+        # The six degenerate/near-duplicate implementations intentionally excluded
+        # by test_alpha101_degeneracy remain available for audit, not DSL search.
         alpha_factors = [
-            "alpha_001", "alpha_002", "alpha_003", "alpha_005", "alpha_006",
+            "alpha_001", "alpha_002", "alpha_003", "alpha_006",
             "alpha_008", "alpha_009", "alpha_012", "alpha_013", "alpha_014",
-            "alpha_015", "alpha_017", "alpha_018", "alpha_019", "alpha_020",
-            "alpha_021", "alpha_022", "alpha_023", "alpha_024", "alpha_025",
-            "alpha_028", "alpha_030", "alpha_032", "alpha_033", "alpha_034",
-            "alpha_037", "alpha_038", "alpha_040", "alpha_044", "alpha_049",
+            "alpha_015", "alpha_017", "alpha_018", "alpha_019", "alpha_021",
+            "alpha_023", "alpha_025", "alpha_028", "alpha_030", "alpha_032",
+            "alpha_034", "alpha_037", "alpha_038", "alpha_040", "alpha_044",
             "alpha_050", "alpha_055"
         ]
 

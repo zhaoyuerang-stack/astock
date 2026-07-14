@@ -240,8 +240,19 @@ def test_clean_ledger_passes():
     )
     led = _ledger([
         _active_standalone(nine_gate=ng, evidence={"nine_gate_receipt": receipt}),
-        {"id": "famF", "status": "候选", "versions": [  # 候选无证据 → 不要求,不报
-            {"version": "v1.0", "admission": {"track": None}, "nine_gate": {}}]},
+        {"id": "famF", "status": "候选", "versions": [
+            {  # 候选无 DSR 已显式标记 PENDING → 合法,但仍不得被误读为已审计
+                "version": "v1.0",
+                "admission": {"track": None},
+                "nine_gate": {},
+                "evidence": {
+                    "nine_gate_audit": {
+                        "status": "PENDING",
+                        "classification": "EMPTY",
+                    },
+                },
+            },
+        ]},
     ])
     assert check(led, research_records=[record]) == 0
 

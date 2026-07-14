@@ -186,6 +186,11 @@ def test_live_launchd_equivalent_dry_run_force():
         env=env,
     )
     combined = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    if proc.returncode == 2:
+        assert "scheduled_daily_update started_at=" in combined
+        assert "dry_run=True" in combined
+        assert "[lock] another scheduled update is running; skip" in combined
+        pytest.skip("active scheduled update owns the production lock; dry-run was not executed")
     assert proc.returncode == 0, combined[-2000:]
     assert "scheduled_daily_update started_at=" in combined
     assert "dry_run=True" in combined or "[dry-run]" in combined

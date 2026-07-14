@@ -24,11 +24,19 @@ def _schema_ref(operation: dict) -> str:
 
 def test_backtest_contract_exposes_dynamic_band_not_fixed_leverage():
     spec = app.openapi()
-    params = {
+    operation = spec["paths"]["/backtest/run"]["get"]
+    query_params = {
         p["name"]
-        for p in spec["paths"]["/backtest/run"]["get"].get("parameters", [])
+        for p in operation.get("parameters", [])
+        if p["in"] == "query"
     }
-    assert params == {"start", "top_n", "rebalance_days", "factor_window", "timing_ma"}
+    header_params = {
+        p["name"]
+        for p in operation.get("parameters", [])
+        if p["in"] == "header"
+    }
+    assert query_params == {"start", "top_n", "rebalance_days", "factor_window", "timing_ma"}
+    assert "X-Action-Token" in header_params
 
     defaults = production_defaults()
     assert "leverage" not in defaults
