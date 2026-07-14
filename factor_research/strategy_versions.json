@@ -2110,6 +2110,9 @@
             "rebal_days": 20,
             "leverage": 1.0,
             "cost": {
+              "buy_cost": 0.00225,
+              "sell_cost": 0.00275,
+              "financing_rate": 0.065,
               "hedge_cost_annual": 0.015
             }
           },
@@ -2119,21 +2122,157 @@
             "survivorship_bias": false
           },
           "metrics": {
-            "annual": -0.0546,
-            "maxdd": -0.3676,
-            "sharpe": -0.2175,
-            "calmar": -0.1486,
+            "annual": -0.05515585411011235,
+            "vol": 0.13747605171786223,
+            "sharpe": -0.40120336175574034,
+            "maxdd": -0.20007147118763746,
+            "calmar": -0.27568075439593437,
+            "n": 484,
             "hit": false
           },
           "status": "退役",
-          "notes": "✅高质量动量对冲样本外（2023-2026）表现良好：超额为正，年化回报 10.86%，夏普比率达到 0.70，展现出在震荡下行市中极强的抗风险与选股阿尔法能力。",
+          "notes": "R-COST-001 成本重述：2023-01-03~2024-12-31 long 腿按 canonical CostModel(买0.225%/卖0.275%/融资6.5%)重算；年化 -5.52%、最大回撤 -20.01%、Sharpe -0.40。旧免成本绩效与组合边际叙述作废；保留原生命周期状态，Nine-Gate 未在本次重述中重新认证。",
           "evidence": {
             "retirement": {
               "reason": "已衰退失效 (06-22 9-Gate 审计：回撤较大，WF夏普已趋近于0，超额收益耗尽)",
               "evidence_refs": [],
               "retired_at": "2026-06-25T14:44:13.972644+00:00",
               "actor": "manual_governance"
-            }
+            },
+            "execution_cost_restatements": [
+              {
+                "audit_id": "R-COST-001/hq-momentum-hedged/v1.0/c89d8572f0afafb6",
+                "rule": "R-COST-001 / ADR-032",
+                "run_at": "2026-07-11T06:34:59.148924+00:00",
+                "runner": "strategies.hq_momentum",
+                "runner_config": {
+                  "version": "v1.0-full",
+                  "start": "2012-01-01"
+                },
+                "sample_start": "2023-01-03",
+                "sample_end": "2024-12-31",
+                "holdout_boundary": "2025-01-01",
+                "n_observations": 484,
+                "return_digest": "c89d8572f0afafb62eecb8d0f99177ae16bb0949231aad3d44ef193fe22e3473",
+                "long_leg_cost_total": 0.08059999999999999,
+                "long_leg_cost_digest": "86d2ba50f9bd6a57cfbd668a4ea7f1ab70e40b5c61dd2e06c0e65e64aaf61c55",
+                "data_vintage": {
+                  "manifest": "data_lake/_manifest.json",
+                  "manifest_sha256": "628bfe2119a2e7953a884bbd8a658350770f7b033744e77c913316891421eac0",
+                  "fingerprint": "5382173037b9",
+                  "last_date": "2026-07-10"
+                },
+                "source_hashes": {
+                  "core/engine.py": "9a574be69814974bf9d3418536ef137297086100056f840c47d11e8b568a345f",
+                  "strategies/hq_momentum.py": "15d5a7a491206ac650ed2118d74b3cc4d8635df32f41a97965ed91e4208c4369",
+                  "scripts/repair/restate_hedged_execution_costs.py": "7fdd2e2b451058060bbcf8343ba69cd2868a8170991b40cff2a0c0e9386c3b1e"
+                },
+                "nine_gate_recertified": false,
+                "prior_record": {
+                  "metrics": {
+                    "annual": -0.0546,
+                    "maxdd": -0.3676,
+                    "sharpe": -0.2175,
+                    "calmar": -0.1486,
+                    "hit": false
+                  },
+                  "config_cost": {
+                    "hedge_cost_annual": 0.015
+                  },
+                  "notes": "✅高质量动量对冲样本外（2023-2026）表现良好：超额为正，年化回报 10.86%，夏普比率达到 0.70，展现出在震荡下行市中极强的抗风险与选股阿尔法能力。",
+                  "admission": {
+                    "track": "diversifier",
+                    "rationale": "✅高质量动量对冲样本外（2023-2026）表现良好：超额为正，年化回报 10.86%，夏普比率达到 0.70，展现出在震荡下行市中极强的抗风险与选股阿尔法能力。",
+                    "note": "迁移自动归类：对冲母策略，单体低收益+负相关，靠组合层增量入册"
+                  }
+                },
+                "corrected_metrics": {
+                  "annual": -0.05515585411011231,
+                  "vol": 0.13747605171786223,
+                  "sharpe": -0.40120336175574006,
+                  "maxdd": -0.20007147118763746,
+                  "calmar": -0.2756807543959342,
+                  "n": 484,
+                  "hit": false
+                },
+                "canonical_long_leg_cost": {
+                  "buy_cost": 0.00225,
+                  "sell_cost": 0.00275,
+                  "financing_rate": 0.065
+                }
+              },
+              {
+                "audit_id": "R-COST-001/hq-momentum-hedged/v1.0/20bc54b29f4b-133e616b7820",
+                "rule": "R-COST-001 / ADR-032",
+                "run_at": "2026-07-11T07:05:17.038360+00:00",
+                "runner": "strategies.hq_momentum",
+                "runner_config": {
+                  "version": "v1.0-full",
+                  "start": "2012-01-01"
+                },
+                "sample_start": "2023-01-03",
+                "sample_end": "2024-12-31",
+                "holdout_boundary": "2025-01-01",
+                "n_observations": 484,
+                "return_digest": "20bc54b29f4be81eda4f8fb791e76f34051fe49f8b512a599318988dab90d127",
+                "version_returns_digest": "20bc54b29f4be81eda4f8fb791e76f34051fe49f8b512a599318988dab90d127",
+                "long_leg_cost_total": 0.08059999999999999,
+                "long_leg_cost_digest": "86d2ba50f9bd6a57cfbd668a4ea7f1ab70e40b5c61dd2e06c0e65e64aaf61c55",
+                "data_vintage": {
+                  "manifest": "data_lake/_manifest.json",
+                  "manifest_sha256": "628bfe2119a2e7953a884bbd8a658350770f7b033744e77c913316891421eac0",
+                  "fingerprint": "5382173037b9",
+                  "last_date": "2026-07-10"
+                },
+                "source_hashes": {
+                  "core/engine.py": "9a574be69814974bf9d3418536ef137297086100056f840c47d11e8b568a345f",
+                  "core/hedged_portfolio.py": "7930e51dfaef3c173425236376b13fb1199a17b55ab5ea906061b756259acea3",
+                  "strategies/hq_momentum.py": "6c1a9ff93e5ca36740aba05e9b624e681b821273afbe4f1942ab50e0fe4276c5",
+                  "scripts/repair/restate_hedged_execution_costs.py": "2f10dc2b065da4dda68cc55028d5faa38a094f28d53ed4c68614df9611530fd5"
+                },
+                "source_bundle_digest": "133e616b78201f59d01bb82dbe02fc4b7bef1f9425fc7eda33006948c4950148",
+                "nine_gate_recertified": false,
+                "prior_record": {
+                  "metrics": {
+                    "annual": -0.05515585411011231,
+                    "vol": 0.13747605171786223,
+                    "sharpe": -0.40120336175574006,
+                    "maxdd": -0.20007147118763746,
+                    "calmar": -0.2756807543959342,
+                    "n": 484,
+                    "hit": false
+                  },
+                  "config_cost": {
+                    "buy_cost": 0.00225,
+                    "sell_cost": 0.00275,
+                    "financing_rate": 0.065,
+                    "hedge_cost_annual": 0.015
+                  },
+                  "notes": "R-COST-001 成本重述：2023-01-03~2024-12-31 long 腿按 canonical CostModel(买0.225%/卖0.275%/融资6.5%)重算；年化 -5.52%、最大回撤 -20.01%、Sharpe -0.40。旧免成本绩效与组合边际叙述作废；保留原生命周期状态，Nine-Gate 未在本次重述中重新认证。",
+                  "admission": {
+                    "track": "diversifier",
+                    "rationale": "历史 diversifier 准入依据受 long 腿零交易成本口径污染，已作废；不得用于重新准入，须按修正成本重跑组合边际。",
+                    "note": "历史迁移记录保留；原组合边际证据已由 R-COST-001 作废。",
+                    "evidence_status": "INVALIDATED_BY_COST_RESTATEMENT",
+                    "invalidated_by": "R-COST-001/hq-momentum-hedged/v1.0/c89d8572f0afafb6"
+                  }
+                },
+                "corrected_metrics": {
+                  "annual": -0.05515585411011235,
+                  "vol": 0.13747605171786223,
+                  "sharpe": -0.40120336175574034,
+                  "maxdd": -0.20007147118763746,
+                  "calmar": -0.27568075439593437,
+                  "n": 484,
+                  "hit": false
+                },
+                "canonical_long_leg_cost": {
+                  "buy_cost": 0.00225,
+                  "sell_cost": 0.00275,
+                  "financing_rate": 0.065
+                }
+              }
+            ]
           },
           "nine_gate": {
             "run_date": "2026-07-05",
@@ -2183,8 +2322,10 @@
           },
           "admission": {
             "track": "diversifier",
-            "rationale": "✅高质量动量对冲样本外（2023-2026）表现良好：超额为正，年化回报 10.86%，夏普比率达到 0.70，展现出在震荡下行市中极强的抗风险与选股阿尔法能力。",
-            "note": "迁移自动归类：对冲母策略，单体低收益+负相关，靠组合层增量入册"
+            "rationale": "历史 diversifier 准入依据受 long 腿零交易成本口径污染，已作废；不得用于重新准入，须按修正成本重跑组合边际。",
+            "note": "历史迁移记录保留；原组合边际证据已由 R-COST-001 作废。",
+            "evidence_status": "INVALIDATED_BY_COST_RESTATEMENT",
+            "invalidated_by": "R-COST-001/hq-momentum-hedged/v1.0/20bc54b29f4b-133e616b7820"
           },
           "decay_check": {
             "n_days": 835,
@@ -2208,6 +2349,9 @@
             "rebal_days": 20,
             "leverage": 1.0,
             "cost": {
+              "buy_cost": 0.00225,
+              "sell_cost": 0.00275,
+              "financing_rate": 0.065,
               "hedge_cost_annual": 0.015
             }
           },
@@ -2217,21 +2361,157 @@
             "survivorship_bias": false
           },
           "metrics": {
-            "annual": -0.0468,
-            "maxdd": -0.9416,
-            "sharpe": -0.1324,
-            "calmar": -0.0497,
+            "annual": -0.10666417262048801,
+            "vol": 0.13892215564473553,
+            "sharpe": -0.7677981393641732,
+            "maxdd": -0.7912807784388032,
+            "calmar": -0.13479939804798038,
+            "n": 3156,
             "hit": false
           },
           "status": "退役",
-          "notes": "全历史压力测试（2012-2026）：经历多次动量崩塌（Momentum Crash），由于质量和路径平滑度过滤，全历史年化保持为正（+5.33%，夏普 0.39），显著优于原始动量（-13.90%，夏普 -0.67）。",
+          "notes": "R-COST-001 成本重述：2012-01-04~2024-12-31 long 腿按 canonical CostModel(买0.225%/卖0.275%/融资6.5%)重算；年化 -10.67%、最大回撤 -79.13%、Sharpe -0.77。旧免成本绩效与组合边际叙述作废；保留原生命周期状态，Nine-Gate 未在本次重述中重新认证。",
           "evidence": {
             "retirement": {
               "reason": "已衰退失效 (06-22 9-Gate 审计：回撤较大，WF夏普已趋近于0，超额收益耗尽)",
               "evidence_refs": [],
               "retired_at": "2026-06-25T14:44:13.974235+00:00",
               "actor": "manual_governance"
-            }
+            },
+            "execution_cost_restatements": [
+              {
+                "audit_id": "R-COST-001/hq-momentum-hedged/v1.0-full/4b9a3b675a52cf80",
+                "rule": "R-COST-001 / ADR-032",
+                "run_at": "2026-07-11T06:34:59.148924+00:00",
+                "runner": "strategies.hq_momentum",
+                "runner_config": {
+                  "version": "v1.0-full",
+                  "start": "2012-01-01"
+                },
+                "sample_start": "2012-01-04",
+                "sample_end": "2024-12-31",
+                "holdout_boundary": "2025-01-01",
+                "n_observations": 3156,
+                "return_digest": "4b9a3b675a52cf80925b3447df46606c888ca5027738fbbe450a359d97623d54",
+                "long_leg_cost_total": 0.474,
+                "long_leg_cost_digest": "5ce359983e9ccf915f2d8785b2f59d5c5c17c633e0bb7d875c7230efdaf6a50f",
+                "data_vintage": {
+                  "manifest": "data_lake/_manifest.json",
+                  "manifest_sha256": "628bfe2119a2e7953a884bbd8a658350770f7b033744e77c913316891421eac0",
+                  "fingerprint": "5382173037b9",
+                  "last_date": "2026-07-10"
+                },
+                "source_hashes": {
+                  "core/engine.py": "9a574be69814974bf9d3418536ef137297086100056f840c47d11e8b568a345f",
+                  "strategies/hq_momentum.py": "15d5a7a491206ac650ed2118d74b3cc4d8635df32f41a97965ed91e4208c4369",
+                  "scripts/repair/restate_hedged_execution_costs.py": "7fdd2e2b451058060bbcf8343ba69cd2868a8170991b40cff2a0c0e9386c3b1e"
+                },
+                "nine_gate_recertified": false,
+                "prior_record": {
+                  "metrics": {
+                    "annual": -0.0468,
+                    "maxdd": -0.9416,
+                    "sharpe": -0.1324,
+                    "calmar": -0.0497,
+                    "hit": false
+                  },
+                  "config_cost": {
+                    "hedge_cost_annual": 0.015
+                  },
+                  "notes": "全历史压力测试（2012-2026）：经历多次动量崩塌（Momentum Crash），由于质量和路径平滑度过滤，全历史年化保持为正（+5.33%，夏普 0.39），显著优于原始动量（-13.90%，夏普 -0.67）。",
+                  "admission": {
+                    "track": "diversifier",
+                    "rationale": "全历史压力测试（2012-2026）：经历多次动量崩塌（Momentum Crash），由于质量和路径平滑度过滤，全历史年化保持为正（+5.33%，夏普 0.39），显著优于原始动量（-13.90%，夏普 -0.67）。",
+                    "note": "迁移自动归类：对冲母策略，单体低收益+负相关，靠组合层增量入册"
+                  }
+                },
+                "corrected_metrics": {
+                  "annual": -0.10666417262048802,
+                  "vol": 0.13892215564473553,
+                  "sharpe": -0.7677981393641733,
+                  "maxdd": -0.7912807784388035,
+                  "calmar": -0.13479939804798036,
+                  "n": 3156,
+                  "hit": false
+                },
+                "canonical_long_leg_cost": {
+                  "buy_cost": 0.00225,
+                  "sell_cost": 0.00275,
+                  "financing_rate": 0.065
+                }
+              },
+              {
+                "audit_id": "R-COST-001/hq-momentum-hedged/v1.0-full/dc41225451c3-133e616b7820",
+                "rule": "R-COST-001 / ADR-032",
+                "run_at": "2026-07-11T07:05:17.038360+00:00",
+                "runner": "strategies.hq_momentum",
+                "runner_config": {
+                  "version": "v1.0-full",
+                  "start": "2012-01-01"
+                },
+                "sample_start": "2012-01-04",
+                "sample_end": "2024-12-31",
+                "holdout_boundary": "2025-01-01",
+                "n_observations": 3156,
+                "return_digest": "dc41225451c30aaf5bd6d8933ab2045c3336256547e7f0ededafb65a1f29c275",
+                "version_returns_digest": "dc41225451c30aaf5bd6d8933ab2045c3336256547e7f0ededafb65a1f29c275",
+                "long_leg_cost_total": 0.474,
+                "long_leg_cost_digest": "5ce359983e9ccf915f2d8785b2f59d5c5c17c633e0bb7d875c7230efdaf6a50f",
+                "data_vintage": {
+                  "manifest": "data_lake/_manifest.json",
+                  "manifest_sha256": "628bfe2119a2e7953a884bbd8a658350770f7b033744e77c913316891421eac0",
+                  "fingerprint": "5382173037b9",
+                  "last_date": "2026-07-10"
+                },
+                "source_hashes": {
+                  "core/engine.py": "9a574be69814974bf9d3418536ef137297086100056f840c47d11e8b568a345f",
+                  "core/hedged_portfolio.py": "7930e51dfaef3c173425236376b13fb1199a17b55ab5ea906061b756259acea3",
+                  "strategies/hq_momentum.py": "6c1a9ff93e5ca36740aba05e9b624e681b821273afbe4f1942ab50e0fe4276c5",
+                  "scripts/repair/restate_hedged_execution_costs.py": "2f10dc2b065da4dda68cc55028d5faa38a094f28d53ed4c68614df9611530fd5"
+                },
+                "source_bundle_digest": "133e616b78201f59d01bb82dbe02fc4b7bef1f9425fc7eda33006948c4950148",
+                "nine_gate_recertified": false,
+                "prior_record": {
+                  "metrics": {
+                    "annual": -0.10666417262048802,
+                    "vol": 0.13892215564473553,
+                    "sharpe": -0.7677981393641733,
+                    "maxdd": -0.7912807784388035,
+                    "calmar": -0.13479939804798036,
+                    "n": 3156,
+                    "hit": false
+                  },
+                  "config_cost": {
+                    "buy_cost": 0.00225,
+                    "sell_cost": 0.00275,
+                    "financing_rate": 0.065,
+                    "hedge_cost_annual": 0.015
+                  },
+                  "notes": "R-COST-001 成本重述：2012-01-04~2024-12-31 long 腿按 canonical CostModel(买0.225%/卖0.275%/融资6.5%)重算；年化 -10.67%、最大回撤 -79.13%、Sharpe -0.77。旧免成本绩效与组合边际叙述作废；保留原生命周期状态，Nine-Gate 未在本次重述中重新认证。",
+                  "admission": {
+                    "track": "diversifier",
+                    "rationale": "历史 diversifier 准入依据受 long 腿零交易成本口径污染，已作废；不得用于重新准入，须按修正成本重跑组合边际。",
+                    "note": "历史迁移记录保留；原组合边际证据已由 R-COST-001 作废。",
+                    "evidence_status": "INVALIDATED_BY_COST_RESTATEMENT",
+                    "invalidated_by": "R-COST-001/hq-momentum-hedged/v1.0-full/4b9a3b675a52cf80"
+                  }
+                },
+                "corrected_metrics": {
+                  "annual": -0.10666417262048801,
+                  "vol": 0.13892215564473553,
+                  "sharpe": -0.7677981393641732,
+                  "maxdd": -0.7912807784388032,
+                  "calmar": -0.13479939804798038,
+                  "n": 3156,
+                  "hit": false
+                },
+                "canonical_long_leg_cost": {
+                  "buy_cost": 0.00225,
+                  "sell_cost": 0.00275,
+                  "financing_rate": 0.065
+                }
+              }
+            ]
           },
           "nine_gate": {
             "run_date": "2026-07-05",
@@ -2281,8 +2561,10 @@
           },
           "admission": {
             "track": "diversifier",
-            "rationale": "全历史压力测试（2012-2026）：经历多次动量崩塌（Momentum Crash），由于质量和路径平滑度过滤，全历史年化保持为正（+5.33%，夏普 0.39），显著优于原始动量（-13.90%，夏普 -0.67）。",
-            "note": "迁移自动归类：对冲母策略，单体低收益+负相关，靠组合层增量入册"
+            "rationale": "历史 diversifier 准入依据受 long 腿零交易成本口径污染，已作废；不得用于重新准入，须按修正成本重跑组合边际。",
+            "note": "历史迁移记录保留；原组合边际证据已由 R-COST-001 作废。",
+            "evidence_status": "INVALIDATED_BY_COST_RESTATEMENT",
+            "invalidated_by": "R-COST-001/hq-momentum-hedged/v1.0-full/dc41225451c3-133e616b7820"
           },
           "decay_check": {
             "n_days": 3507,
@@ -3437,6 +3719,9 @@
             "rebal_days": 40,
             "leverage": 1.0,
             "cost": {
+              "buy_cost": 0.00225,
+              "sell_cost": 0.00275,
+              "financing_rate": 0.065,
               "hedge_cost_annual": 0.015,
               "switch_friction": 0.0025
             }
@@ -3447,21 +3732,163 @@
             "survivorship_bias": false
           },
           "metrics": {
-            "annual": -0.0895,
-            "maxdd": -0.2289,
-            "sharpe": -0.83,
-            "calmar": -0.3911,
+            "annual": -0.037284604625763614,
+            "vol": 0.029430515925644045,
+            "sharpe": -1.266868875828166,
+            "maxdd": -0.0907948119691202,
+            "calmar": -0.4106468620524739,
+            "n": 484,
             "hit": false
           },
           "status": "退役",
-          "notes": "✅样本外测试（2023-2026）表现良好：超额为正，最大回撤 11.3% 控制在 15% 以内，年化调仓降至 3.6 次，与小盘策略相关性 -0.096 负相关，符合第二母策略分流要求。",
+          "notes": "R-COST-001 成本重述：2023-01-03~2024-12-31 long 腿按 canonical CostModel(买0.225%/卖0.275%/融资6.5%)重算；年化 -3.73%、最大回撤 -9.08%、Sharpe -1.27。旧免成本绩效与组合边际叙述作废；保留原生命周期状态，Nine-Gate 未在本次重述中重新认证。",
           "evidence": {
             "retirement": {
               "reason": "已衰退失效 (06-22 9-Gate 审计：回撤较大，WF夏普已趋近于0，超额收益耗尽)",
               "evidence_refs": [],
               "retired_at": "2026-06-25T14:44:13.975441+00:00",
               "actor": "manual_governance"
-            }
+            },
+            "execution_cost_restatements": [
+              {
+                "audit_id": "R-COST-001/large-cap-growth-hedged/v1.0/cae27d35d7082446",
+                "rule": "R-COST-001 / ADR-032",
+                "run_at": "2026-07-11T06:34:59.148924+00:00",
+                "runner": "strategies.large_cap",
+                "runner_config": {
+                  "version": "v1.0",
+                  "start": "2023-01-01",
+                  "buffer_size": 0.01,
+                  "w_cpv_max": 0.0
+                },
+                "sample_start": "2023-01-03",
+                "sample_end": "2024-12-31",
+                "holdout_boundary": "2025-01-01",
+                "n_observations": 484,
+                "return_digest": "cae27d35d7082446f403118c68a982853ded4a520f5b1671342f071608141476",
+                "long_leg_cost_total": 0.0042,
+                "long_leg_cost_digest": "c1818ab68315e368b61fd64a28b20304c6d50547e07356ccb158ba24fbe53b5f",
+                "data_vintage": {
+                  "manifest": "data_lake/_manifest.json",
+                  "manifest_sha256": "628bfe2119a2e7953a884bbd8a658350770f7b033744e77c913316891421eac0",
+                  "fingerprint": "5382173037b9",
+                  "last_date": "2026-07-10"
+                },
+                "source_hashes": {
+                  "core/engine.py": "9a574be69814974bf9d3418536ef137297086100056f840c47d11e8b568a345f",
+                  "strategies/large_cap.py": "b0d880f13758db8ae3742ccd1d045f2e2dbf8f4306758eb8edebf9db3b263e8c",
+                  "scripts/repair/restate_hedged_execution_costs.py": "7fdd2e2b451058060bbcf8343ba69cd2868a8170991b40cff2a0c0e9386c3b1e"
+                },
+                "nine_gate_recertified": false,
+                "prior_record": {
+                  "metrics": {
+                    "annual": -0.0895,
+                    "maxdd": -0.2289,
+                    "sharpe": -0.83,
+                    "calmar": -0.3911,
+                    "hit": false
+                  },
+                  "config_cost": {
+                    "hedge_cost_annual": 0.015,
+                    "switch_friction": 0.0025
+                  },
+                  "notes": "✅样本外测试（2023-2026）表现良好：超额为正，最大回撤 11.3% 控制在 15% 以内，年化调仓降至 3.6 次，与小盘策略相关性 -0.096 负相关，符合第二母策略分流要求。",
+                  "admission": {
+                    "track": "diversifier",
+                    "rationale": "✅样本外测试（2023-2026）表现良好：超额为正，最大回撤 11.3% 控制在 15% 以内，年化调仓降至 3.6 次，与小盘策略相关性 -0.096 负相关，符合第二母策略分流要求。",
+                    "note": "迁移自动归类：对冲母策略，单体低收益+负相关，靠组合层增量入册"
+                  }
+                },
+                "corrected_metrics": {
+                  "annual": -0.037284604625763614,
+                  "vol": 0.029430515925644045,
+                  "sharpe": -1.266868875828166,
+                  "maxdd": -0.0907948119691202,
+                  "calmar": -0.4106468620524739,
+                  "n": 484,
+                  "hit": false
+                },
+                "canonical_long_leg_cost": {
+                  "buy_cost": 0.00225,
+                  "sell_cost": 0.00275,
+                  "financing_rate": 0.065
+                }
+              },
+              {
+                "audit_id": "R-COST-001/large-cap-growth-hedged/v1.0/2e4c8e5442e5-a77ca8c7e0eb",
+                "rule": "R-COST-001 / ADR-032",
+                "run_at": "2026-07-11T07:05:17.038360+00:00",
+                "runner": "strategies.large_cap",
+                "runner_config": {
+                  "version": "v1.0",
+                  "start": "2023-01-01",
+                  "buffer_size": 0.01,
+                  "w_cpv_max": 0.0
+                },
+                "sample_start": "2023-01-03",
+                "sample_end": "2024-12-31",
+                "holdout_boundary": "2025-01-01",
+                "n_observations": 484,
+                "return_digest": "2e4c8e5442e55faf3f909c18502d5efc79aa37f066265bfff22da3af7deaf45c",
+                "version_returns_digest": "2e4c8e5442e55faf3f909c18502d5efc79aa37f066265bfff22da3af7deaf45c",
+                "long_leg_cost_total": 0.0042,
+                "long_leg_cost_digest": "c1818ab68315e368b61fd64a28b20304c6d50547e07356ccb158ba24fbe53b5f",
+                "data_vintage": {
+                  "manifest": "data_lake/_manifest.json",
+                  "manifest_sha256": "628bfe2119a2e7953a884bbd8a658350770f7b033744e77c913316891421eac0",
+                  "fingerprint": "5382173037b9",
+                  "last_date": "2026-07-10"
+                },
+                "source_hashes": {
+                  "core/engine.py": "9a574be69814974bf9d3418536ef137297086100056f840c47d11e8b568a345f",
+                  "core/hedged_portfolio.py": "7930e51dfaef3c173425236376b13fb1199a17b55ab5ea906061b756259acea3",
+                  "strategies/large_cap.py": "13af292f7c2d140a163af9dfaabc768749ac7f8fcad4be82160bb9522349dc5f",
+                  "scripts/repair/restate_hedged_execution_costs.py": "2f10dc2b065da4dda68cc55028d5faa38a094f28d53ed4c68614df9611530fd5"
+                },
+                "source_bundle_digest": "a77ca8c7e0eb892052bef05c55409d0eee56da1872cf96d70487071d5d2cc4bf",
+                "nine_gate_recertified": false,
+                "prior_record": {
+                  "metrics": {
+                    "annual": -0.037284604625763614,
+                    "vol": 0.029430515925644045,
+                    "sharpe": -1.266868875828166,
+                    "maxdd": -0.0907948119691202,
+                    "calmar": -0.4106468620524739,
+                    "n": 484,
+                    "hit": false
+                  },
+                  "config_cost": {
+                    "buy_cost": 0.00225,
+                    "sell_cost": 0.00275,
+                    "financing_rate": 0.065,
+                    "hedge_cost_annual": 0.015,
+                    "switch_friction": 0.0025
+                  },
+                  "notes": "R-COST-001 成本重述：2023-01-03~2024-12-31 long 腿按 canonical CostModel(买0.225%/卖0.275%/融资6.5%)重算；年化 -3.73%、最大回撤 -9.08%、Sharpe -1.27。旧免成本绩效与组合边际叙述作废；保留原生命周期状态，Nine-Gate 未在本次重述中重新认证。",
+                  "admission": {
+                    "track": "diversifier",
+                    "rationale": "历史 diversifier 准入依据受 long 腿零交易成本口径污染，已作废；不得用于重新准入，须按修正成本重跑组合边际。",
+                    "note": "历史迁移记录保留；原组合边际证据已由 R-COST-001 作废。",
+                    "evidence_status": "INVALIDATED_BY_COST_RESTATEMENT",
+                    "invalidated_by": "R-COST-001/large-cap-growth-hedged/v1.0/cae27d35d7082446"
+                  }
+                },
+                "corrected_metrics": {
+                  "annual": -0.037284604625763614,
+                  "vol": 0.029430515925644045,
+                  "sharpe": -1.266868875828166,
+                  "maxdd": -0.0907948119691202,
+                  "calmar": -0.4106468620524739,
+                  "n": 484,
+                  "hit": false
+                },
+                "canonical_long_leg_cost": {
+                  "buy_cost": 0.00225,
+                  "sell_cost": 0.00275,
+                  "financing_rate": 0.065
+                }
+              }
+            ]
           },
           "nine_gate": {
             "run_date": "2026-07-05",
@@ -3511,8 +3938,10 @@
           },
           "admission": {
             "track": "diversifier",
-            "rationale": "✅样本外测试（2023-2026）表现良好：超额为正，最大回撤 11.3% 控制在 15% 以内，年化调仓降至 3.6 次，与小盘策略相关性 -0.096 负相关，符合第二母策略分流要求。",
-            "note": "迁移自动归类：对冲母策略，单体低收益+负相关，靠组合层增量入册"
+            "rationale": "历史 diversifier 准入依据受 long 腿零交易成本口径污染，已作废；不得用于重新准入，须按修正成本重跑组合边际。",
+            "note": "历史迁移记录保留；原组合边际证据已由 R-COST-001 作废。",
+            "evidence_status": "INVALIDATED_BY_COST_RESTATEMENT",
+            "invalidated_by": "R-COST-001/large-cap-growth-hedged/v1.0/2e4c8e5442e5-a77ca8c7e0eb"
           },
           "decay_check": {
             "n_days": 835,
@@ -3534,6 +3963,9 @@
             "rebal_days": 40,
             "leverage": 1.0,
             "cost": {
+              "buy_cost": 0.00225,
+              "sell_cost": 0.00275,
+              "financing_rate": 0.065,
               "hedge_cost_annual": 0.015,
               "switch_friction": 0.0025
             }
@@ -3544,15 +3976,148 @@
             "survivorship_bias": false
           },
           "metrics": {
-            "annual": -0.0022,
-            "maxdd": -0.5055,
-            "sharpe": -0.0126,
-            "calmar": -0.0044,
+            "annual": -0.01521738517782562,
+            "vol": 0.04163604098286206,
+            "sharpe": -0.36548588238947344,
+            "maxdd": -0.2500079809248864,
+            "calmar": -0.06086759759240488,
+            "n": 3633,
             "hit": false
           },
           "status": "参考",
-          "notes": "全历史测试（2010-2026）：大盘蓝筹在 2021-2024 年经历漫长估值出清，且均值回归型 Spread 导致频繁空仓，长期回报受拖累，但与小盘股表现呈强负相关（-0.102）。",
-          "evidence": {},
+          "notes": "R-COST-001 成本重述：2010-01-05~2024-12-31 long 腿按 canonical CostModel(买0.225%/卖0.275%/融资6.5%)重算；年化 -1.52%、最大回撤 -25.00%、Sharpe -0.37。旧免成本绩效与组合边际叙述作废；保留原生命周期状态，Nine-Gate 未在本次重述中重新认证。",
+          "evidence": {
+            "execution_cost_restatements": [
+              {
+                "audit_id": "R-COST-001/large-cap-growth-hedged/v1.0-full/d09f7906aa8e59f9",
+                "rule": "R-COST-001 / ADR-032",
+                "run_at": "2026-07-11T06:34:59.148924+00:00",
+                "runner": "strategies.large_cap",
+                "runner_config": {
+                  "version": "v1.0-full",
+                  "start": "2010-01-01",
+                  "buffer_size": 0.02,
+                  "w_cpv_max": 0.0
+                },
+                "sample_start": "2010-01-05",
+                "sample_end": "2024-12-31",
+                "holdout_boundary": "2025-01-01",
+                "n_observations": 3633,
+                "return_digest": "d09f7906aa8e59f9d776d27c7e4c6b34d3db84954ce241e1ae34ed01e3d18fa0",
+                "long_leg_cost_total": 0.05565,
+                "long_leg_cost_digest": "a50a421be9912c622b0281205f78fb5c95e94fe1ca44a93edb8db6afd270f691",
+                "data_vintage": {
+                  "manifest": "data_lake/_manifest.json",
+                  "manifest_sha256": "628bfe2119a2e7953a884bbd8a658350770f7b033744e77c913316891421eac0",
+                  "fingerprint": "5382173037b9",
+                  "last_date": "2026-07-10"
+                },
+                "source_hashes": {
+                  "core/engine.py": "9a574be69814974bf9d3418536ef137297086100056f840c47d11e8b568a345f",
+                  "strategies/large_cap.py": "b0d880f13758db8ae3742ccd1d045f2e2dbf8f4306758eb8edebf9db3b263e8c",
+                  "scripts/repair/restate_hedged_execution_costs.py": "7fdd2e2b451058060bbcf8343ba69cd2868a8170991b40cff2a0c0e9386c3b1e"
+                },
+                "nine_gate_recertified": false,
+                "prior_record": {
+                  "metrics": {
+                    "annual": -0.0022,
+                    "maxdd": -0.5055,
+                    "sharpe": -0.0126,
+                    "calmar": -0.0044,
+                    "hit": false
+                  },
+                  "config_cost": {
+                    "hedge_cost_annual": 0.015,
+                    "switch_friction": 0.0025
+                  },
+                  "notes": "全历史测试（2010-2026）：大盘蓝筹在 2021-2024 年经历漫长估值出清，且均值回归型 Spread 导致频繁空仓，长期回报受拖累，但与小盘股表现呈强负相关（-0.102）。",
+                  "admission": {}
+                },
+                "corrected_metrics": {
+                  "annual": -0.015217385177825633,
+                  "vol": 0.04163604098286206,
+                  "sharpe": -0.36548588238947377,
+                  "maxdd": -0.25000798092488663,
+                  "calmar": -0.06086759759240487,
+                  "n": 3633,
+                  "hit": false
+                },
+                "canonical_long_leg_cost": {
+                  "buy_cost": 0.00225,
+                  "sell_cost": 0.00275,
+                  "financing_rate": 0.065
+                }
+              },
+              {
+                "audit_id": "R-COST-001/large-cap-growth-hedged/v1.0-full/881f2587c780-a77ca8c7e0eb",
+                "rule": "R-COST-001 / ADR-032",
+                "run_at": "2026-07-11T07:05:17.038360+00:00",
+                "runner": "strategies.large_cap",
+                "runner_config": {
+                  "version": "v1.0-full",
+                  "start": "2010-01-01",
+                  "buffer_size": 0.02,
+                  "w_cpv_max": 0.0
+                },
+                "sample_start": "2010-01-05",
+                "sample_end": "2024-12-31",
+                "holdout_boundary": "2025-01-01",
+                "n_observations": 3633,
+                "return_digest": "881f2587c7806b4e4e3c71c941e414e6f30cabd7d67a82680dddf09f747ed501",
+                "version_returns_digest": "881f2587c7806b4e4e3c71c941e414e6f30cabd7d67a82680dddf09f747ed501",
+                "long_leg_cost_total": 0.05565,
+                "long_leg_cost_digest": "a50a421be9912c622b0281205f78fb5c95e94fe1ca44a93edb8db6afd270f691",
+                "data_vintage": {
+                  "manifest": "data_lake/_manifest.json",
+                  "manifest_sha256": "628bfe2119a2e7953a884bbd8a658350770f7b033744e77c913316891421eac0",
+                  "fingerprint": "5382173037b9",
+                  "last_date": "2026-07-10"
+                },
+                "source_hashes": {
+                  "core/engine.py": "9a574be69814974bf9d3418536ef137297086100056f840c47d11e8b568a345f",
+                  "core/hedged_portfolio.py": "7930e51dfaef3c173425236376b13fb1199a17b55ab5ea906061b756259acea3",
+                  "strategies/large_cap.py": "13af292f7c2d140a163af9dfaabc768749ac7f8fcad4be82160bb9522349dc5f",
+                  "scripts/repair/restate_hedged_execution_costs.py": "2f10dc2b065da4dda68cc55028d5faa38a094f28d53ed4c68614df9611530fd5"
+                },
+                "source_bundle_digest": "a77ca8c7e0eb892052bef05c55409d0eee56da1872cf96d70487071d5d2cc4bf",
+                "nine_gate_recertified": false,
+                "prior_record": {
+                  "metrics": {
+                    "annual": -0.015217385177825633,
+                    "vol": 0.04163604098286206,
+                    "sharpe": -0.36548588238947377,
+                    "maxdd": -0.25000798092488663,
+                    "calmar": -0.06086759759240487,
+                    "n": 3633,
+                    "hit": false
+                  },
+                  "config_cost": {
+                    "buy_cost": 0.00225,
+                    "sell_cost": 0.00275,
+                    "financing_rate": 0.065,
+                    "hedge_cost_annual": 0.015,
+                    "switch_friction": 0.0025
+                  },
+                  "notes": "R-COST-001 成本重述：2010-01-05~2024-12-31 long 腿按 canonical CostModel(买0.225%/卖0.275%/融资6.5%)重算；年化 -1.52%、最大回撤 -25.00%、Sharpe -0.37。旧免成本绩效与组合边际叙述作废；保留原生命周期状态，Nine-Gate 未在本次重述中重新认证。",
+                  "admission": {}
+                },
+                "corrected_metrics": {
+                  "annual": -0.01521738517782562,
+                  "vol": 0.04163604098286206,
+                  "sharpe": -0.36548588238947344,
+                  "maxdd": -0.2500079809248864,
+                  "calmar": -0.06086759759240488,
+                  "n": 3633,
+                  "hit": false
+                },
+                "canonical_long_leg_cost": {
+                  "buy_cost": 0.00225,
+                  "sell_cost": 0.00275,
+                  "financing_rate": 0.065
+                }
+              }
+            ]
+          },
           "nine_gate": {
             "run_date": "2026-07-05",
             "passed_all": false,
@@ -3613,6 +4178,9 @@
             "rebal_days": 40,
             "leverage": 1.0,
             "cost": {
+              "buy_cost": 0.00225,
+              "sell_cost": 0.00275,
+              "financing_rate": 0.065,
               "hedge_cost_annual": 0.015,
               "switch_friction": 0.0025
             }
@@ -3623,21 +4191,163 @@
             "survivorship_bias": false
           },
           "metrics": {
-            "annual": 0.0218,
-            "maxdd": -0.2321,
-            "sharpe": 0.1427,
-            "calmar": 0.094,
+            "annual": -0.020606922228456705,
+            "vol": 0.03699416274465727,
+            "sharpe": -0.5570317233745957,
+            "maxdd": -0.10796319142955446,
+            "calmar": -0.19086988774227406,
+            "n": 484,
             "hit": false
           },
           "status": "退役",
-          "notes": "✅自适应 CPV 惩罚版：样本外（2023-2026）年化提升至 5.66%（超越 Baseline 3.97%），最大回撤控制在 10.53%，成功避开了 2023-2026 年高股息红利央国企的拥挤抱团误伤。",
+          "notes": "R-COST-001 成本重述：2023-01-03~2024-12-31 long 腿按 canonical CostModel(买0.225%/卖0.275%/融资6.5%)重算；年化 -2.06%、最大回撤 -10.80%、Sharpe -0.56。旧免成本绩效与组合边际叙述作废；保留原生命周期状态，Nine-Gate 未在本次重述中重新认证。",
           "evidence": {
             "retirement": {
               "reason": "已衰退失效 (06-22 9-Gate 审计：回撤较大，WF夏普已趋近于0，超额收益耗尽)",
               "evidence_refs": [],
               "retired_at": "2026-06-25T14:44:13.976591+00:00",
               "actor": "manual_governance"
-            }
+            },
+            "execution_cost_restatements": [
+              {
+                "audit_id": "R-COST-001/large-cap-growth-hedged/v1.1/1f0db875faf9c2bb",
+                "rule": "R-COST-001 / ADR-032",
+                "run_at": "2026-07-11T06:34:59.148924+00:00",
+                "runner": "strategies.large_cap",
+                "runner_config": {
+                  "version": "v1.1-full",
+                  "start": "2012-01-01",
+                  "buffer_size": 0.01,
+                  "w_cpv_max": 0.5
+                },
+                "sample_start": "2023-01-03",
+                "sample_end": "2024-12-31",
+                "holdout_boundary": "2025-01-01",
+                "n_observations": 484,
+                "return_digest": "1f0db875faf9c2bba3b6c2358610c19cb0692e47ef22448c1d19a29897f86a29",
+                "long_leg_cost_total": 0.031,
+                "long_leg_cost_digest": "dea7c6ad76092a44d6ac143a6fbb4df18ea4c22d3ca941606e6b1d3a36c69006",
+                "data_vintage": {
+                  "manifest": "data_lake/_manifest.json",
+                  "manifest_sha256": "628bfe2119a2e7953a884bbd8a658350770f7b033744e77c913316891421eac0",
+                  "fingerprint": "5382173037b9",
+                  "last_date": "2026-07-10"
+                },
+                "source_hashes": {
+                  "core/engine.py": "9a574be69814974bf9d3418536ef137297086100056f840c47d11e8b568a345f",
+                  "strategies/large_cap.py": "b0d880f13758db8ae3742ccd1d045f2e2dbf8f4306758eb8edebf9db3b263e8c",
+                  "scripts/repair/restate_hedged_execution_costs.py": "7fdd2e2b451058060bbcf8343ba69cd2868a8170991b40cff2a0c0e9386c3b1e"
+                },
+                "nine_gate_recertified": false,
+                "prior_record": {
+                  "metrics": {
+                    "annual": 0.0218,
+                    "maxdd": -0.2321,
+                    "sharpe": 0.1427,
+                    "calmar": 0.094,
+                    "hit": false
+                  },
+                  "config_cost": {
+                    "hedge_cost_annual": 0.015,
+                    "switch_friction": 0.0025
+                  },
+                  "notes": "✅自适应 CPV 惩罚版：样本外（2023-2026）年化提升至 5.66%（超越 Baseline 3.97%），最大回撤控制在 10.53%，成功避开了 2023-2026 年高股息红利央国企的拥挤抱团误伤。",
+                  "admission": {
+                    "track": "diversifier",
+                    "rationale": "✅自适应 CPV 惩罚版：样本外（2023-2026）年化提升至 5.66%（超越 Baseline 3.97%），最大回撤控制在 10.53%，成功避开了 2023-2026 年高股息红利央国企的拥挤抱团误伤。",
+                    "note": "迁移自动归类：对冲母策略，单体低收益+负相关，靠组合层增量入册"
+                  }
+                },
+                "corrected_metrics": {
+                  "annual": -0.0206069222284567,
+                  "vol": 0.03699416274465727,
+                  "sharpe": -0.5570317233745956,
+                  "maxdd": -0.10796319142955446,
+                  "calmar": -0.19086988774227404,
+                  "n": 484,
+                  "hit": false
+                },
+                "canonical_long_leg_cost": {
+                  "buy_cost": 0.00225,
+                  "sell_cost": 0.00275,
+                  "financing_rate": 0.065
+                }
+              },
+              {
+                "audit_id": "R-COST-001/large-cap-growth-hedged/v1.1/c7526b6cb152-a77ca8c7e0eb",
+                "rule": "R-COST-001 / ADR-032",
+                "run_at": "2026-07-11T07:05:17.038360+00:00",
+                "runner": "strategies.large_cap",
+                "runner_config": {
+                  "version": "v1.1-full",
+                  "start": "2012-01-01",
+                  "buffer_size": 0.01,
+                  "w_cpv_max": 0.5
+                },
+                "sample_start": "2023-01-03",
+                "sample_end": "2024-12-31",
+                "holdout_boundary": "2025-01-01",
+                "n_observations": 484,
+                "return_digest": "c7526b6cb152045e770e0a7b6518359084eca53943945f04477aaab7bf5bfb5c",
+                "version_returns_digest": "c7526b6cb152045e770e0a7b6518359084eca53943945f04477aaab7bf5bfb5c",
+                "long_leg_cost_total": 0.031,
+                "long_leg_cost_digest": "dea7c6ad76092a44d6ac143a6fbb4df18ea4c22d3ca941606e6b1d3a36c69006",
+                "data_vintage": {
+                  "manifest": "data_lake/_manifest.json",
+                  "manifest_sha256": "628bfe2119a2e7953a884bbd8a658350770f7b033744e77c913316891421eac0",
+                  "fingerprint": "5382173037b9",
+                  "last_date": "2026-07-10"
+                },
+                "source_hashes": {
+                  "core/engine.py": "9a574be69814974bf9d3418536ef137297086100056f840c47d11e8b568a345f",
+                  "core/hedged_portfolio.py": "7930e51dfaef3c173425236376b13fb1199a17b55ab5ea906061b756259acea3",
+                  "strategies/large_cap.py": "13af292f7c2d140a163af9dfaabc768749ac7f8fcad4be82160bb9522349dc5f",
+                  "scripts/repair/restate_hedged_execution_costs.py": "2f10dc2b065da4dda68cc55028d5faa38a094f28d53ed4c68614df9611530fd5"
+                },
+                "source_bundle_digest": "a77ca8c7e0eb892052bef05c55409d0eee56da1872cf96d70487071d5d2cc4bf",
+                "nine_gate_recertified": false,
+                "prior_record": {
+                  "metrics": {
+                    "annual": -0.0206069222284567,
+                    "vol": 0.03699416274465727,
+                    "sharpe": -0.5570317233745956,
+                    "maxdd": -0.10796319142955446,
+                    "calmar": -0.19086988774227404,
+                    "n": 484,
+                    "hit": false
+                  },
+                  "config_cost": {
+                    "buy_cost": 0.00225,
+                    "sell_cost": 0.00275,
+                    "financing_rate": 0.065,
+                    "hedge_cost_annual": 0.015,
+                    "switch_friction": 0.0025
+                  },
+                  "notes": "R-COST-001 成本重述：2023-01-03~2024-12-31 long 腿按 canonical CostModel(买0.225%/卖0.275%/融资6.5%)重算；年化 -2.06%、最大回撤 -10.80%、Sharpe -0.56。旧免成本绩效与组合边际叙述作废；保留原生命周期状态，Nine-Gate 未在本次重述中重新认证。",
+                  "admission": {
+                    "track": "diversifier",
+                    "rationale": "历史 diversifier 准入依据受 long 腿零交易成本口径污染，已作废；不得用于重新准入，须按修正成本重跑组合边际。",
+                    "note": "历史迁移记录保留；原组合边际证据已由 R-COST-001 作废。",
+                    "evidence_status": "INVALIDATED_BY_COST_RESTATEMENT",
+                    "invalidated_by": "R-COST-001/large-cap-growth-hedged/v1.1/1f0db875faf9c2bb"
+                  }
+                },
+                "corrected_metrics": {
+                  "annual": -0.020606922228456705,
+                  "vol": 0.03699416274465727,
+                  "sharpe": -0.5570317233745957,
+                  "maxdd": -0.10796319142955446,
+                  "calmar": -0.19086988774227406,
+                  "n": 484,
+                  "hit": false
+                },
+                "canonical_long_leg_cost": {
+                  "buy_cost": 0.00225,
+                  "sell_cost": 0.00275,
+                  "financing_rate": 0.065
+                }
+              }
+            ]
           },
           "nine_gate": {
             "run_date": "2026-07-05",
@@ -3687,8 +4397,10 @@
           },
           "admission": {
             "track": "diversifier",
-            "rationale": "✅自适应 CPV 惩罚版：样本外（2023-2026）年化提升至 5.66%（超越 Baseline 3.97%），最大回撤控制在 10.53%，成功避开了 2023-2026 年高股息红利央国企的拥挤抱团误伤。",
-            "note": "迁移自动归类：对冲母策略，单体低收益+负相关，靠组合层增量入册"
+            "rationale": "历史 diversifier 准入依据受 long 腿零交易成本口径污染，已作废；不得用于重新准入，须按修正成本重跑组合边际。",
+            "note": "历史迁移记录保留；原组合边际证据已由 R-COST-001 作废。",
+            "evidence_status": "INVALIDATED_BY_COST_RESTATEMENT",
+            "invalidated_by": "R-COST-001/large-cap-growth-hedged/v1.1/c7526b6cb152-a77ca8c7e0eb"
           },
           "decay_check": {
             "n_days": 835,
@@ -3713,6 +4425,9 @@
             "rebal_days": 40,
             "leverage": 1.0,
             "cost": {
+              "buy_cost": 0.00225,
+              "sell_cost": 0.00275,
+              "financing_rate": 0.065,
               "hedge_cost_annual": 0.015,
               "switch_friction": 0.0025
             }
@@ -3723,21 +4438,163 @@
             "survivorship_bias": false
           },
           "metrics": {
-            "annual": 0.0636,
-            "maxdd": -0.4773,
-            "sharpe": 0.3276,
-            "calmar": 0.1332,
+            "annual": -0.010627254679359368,
+            "vol": 0.05623294287100653,
+            "sharpe": -0.18898627987045535,
+            "maxdd": -0.29067354337769313,
+            "calmar": -0.036560791036804506,
+            "n": 3156,
             "hit": false
           },
           "status": "退役",
-          "notes": "全历史压力测试：将全历史收益从 -3.03% 扭转为 +1.38%（夏普 0.19），且最大回撤由 -48.69% 压缩至 -26.98%，相比 baseline 有巨大的绝对与相对优化。",
+          "notes": "R-COST-001 成本重述：2012-01-04~2024-12-31 long 腿按 canonical CostModel(买0.225%/卖0.275%/融资6.5%)重算；年化 -1.06%、最大回撤 -29.07%、Sharpe -0.19。旧免成本绩效与组合边际叙述作废；保留原生命周期状态，Nine-Gate 未在本次重述中重新认证。",
           "evidence": {
             "retirement": {
               "reason": "已衰退失效 (06-22 9-Gate 审计：回撤较大，WF夏普已趋近于0，超额收益耗尽)",
               "evidence_refs": [],
               "retired_at": "2026-06-25T14:44:13.977731+00:00",
               "actor": "manual_governance"
-            }
+            },
+            "execution_cost_restatements": [
+              {
+                "audit_id": "R-COST-001/large-cap-growth-hedged/v1.1-full/41179e4bf1e525da",
+                "rule": "R-COST-001 / ADR-032",
+                "run_at": "2026-07-11T06:34:59.148924+00:00",
+                "runner": "strategies.large_cap",
+                "runner_config": {
+                  "version": "v1.1-full",
+                  "start": "2012-01-01",
+                  "buffer_size": 0.01,
+                  "w_cpv_max": 0.5
+                },
+                "sample_start": "2012-01-04",
+                "sample_end": "2024-12-31",
+                "holdout_boundary": "2025-01-01",
+                "n_observations": 3156,
+                "return_digest": "41179e4bf1e525da9496cec7dddcb177bbed96124495ea72eee94a968142b0f5",
+                "long_leg_cost_total": 0.2092,
+                "long_leg_cost_digest": "36366c2f7cccbc14268f7066eb84efbd85617be3fe8e4df08d4661ed545d42f2",
+                "data_vintage": {
+                  "manifest": "data_lake/_manifest.json",
+                  "manifest_sha256": "628bfe2119a2e7953a884bbd8a658350770f7b033744e77c913316891421eac0",
+                  "fingerprint": "5382173037b9",
+                  "last_date": "2026-07-10"
+                },
+                "source_hashes": {
+                  "core/engine.py": "9a574be69814974bf9d3418536ef137297086100056f840c47d11e8b568a345f",
+                  "strategies/large_cap.py": "b0d880f13758db8ae3742ccd1d045f2e2dbf8f4306758eb8edebf9db3b263e8c",
+                  "scripts/repair/restate_hedged_execution_costs.py": "7fdd2e2b451058060bbcf8343ba69cd2868a8170991b40cff2a0c0e9386c3b1e"
+                },
+                "nine_gate_recertified": false,
+                "prior_record": {
+                  "metrics": {
+                    "annual": 0.0636,
+                    "maxdd": -0.4773,
+                    "sharpe": 0.3276,
+                    "calmar": 0.1332,
+                    "hit": false
+                  },
+                  "config_cost": {
+                    "hedge_cost_annual": 0.015,
+                    "switch_friction": 0.0025
+                  },
+                  "notes": "全历史压力测试：将全历史收益从 -3.03% 扭转为 +1.38%（夏普 0.19），且最大回撤由 -48.69% 压缩至 -26.98%，相比 baseline 有巨大的绝对与相对优化。",
+                  "admission": {
+                    "track": "diversifier",
+                    "rationale": "全历史压力测试：将全历史收益从 -3.03% 扭转为 +1.38%（夏普 0.19），且最大回撤由 -48.69% 压缩至 -26.98%，相比 baseline 有巨大的绝对与相对优化。",
+                    "note": "迁移自动归类：对冲母策略，单体低收益+负相关，靠组合层增量入册"
+                  }
+                },
+                "corrected_metrics": {
+                  "annual": -0.01062725467935938,
+                  "vol": 0.05623294287100653,
+                  "sharpe": -0.18898627987045558,
+                  "maxdd": -0.29067354337769313,
+                  "calmar": -0.03656079103680455,
+                  "n": 3156,
+                  "hit": false
+                },
+                "canonical_long_leg_cost": {
+                  "buy_cost": 0.00225,
+                  "sell_cost": 0.00275,
+                  "financing_rate": 0.065
+                }
+              },
+              {
+                "audit_id": "R-COST-001/large-cap-growth-hedged/v1.1-full/75ddc788b9d5-a77ca8c7e0eb",
+                "rule": "R-COST-001 / ADR-032",
+                "run_at": "2026-07-11T07:05:17.038360+00:00",
+                "runner": "strategies.large_cap",
+                "runner_config": {
+                  "version": "v1.1-full",
+                  "start": "2012-01-01",
+                  "buffer_size": 0.01,
+                  "w_cpv_max": 0.5
+                },
+                "sample_start": "2012-01-04",
+                "sample_end": "2024-12-31",
+                "holdout_boundary": "2025-01-01",
+                "n_observations": 3156,
+                "return_digest": "75ddc788b9d5785218f847ba8915fecd672b5e9a18fd0d25bbd26716c8015de4",
+                "version_returns_digest": "75ddc788b9d5785218f847ba8915fecd672b5e9a18fd0d25bbd26716c8015de4",
+                "long_leg_cost_total": 0.2092,
+                "long_leg_cost_digest": "36366c2f7cccbc14268f7066eb84efbd85617be3fe8e4df08d4661ed545d42f2",
+                "data_vintage": {
+                  "manifest": "data_lake/_manifest.json",
+                  "manifest_sha256": "628bfe2119a2e7953a884bbd8a658350770f7b033744e77c913316891421eac0",
+                  "fingerprint": "5382173037b9",
+                  "last_date": "2026-07-10"
+                },
+                "source_hashes": {
+                  "core/engine.py": "9a574be69814974bf9d3418536ef137297086100056f840c47d11e8b568a345f",
+                  "core/hedged_portfolio.py": "7930e51dfaef3c173425236376b13fb1199a17b55ab5ea906061b756259acea3",
+                  "strategies/large_cap.py": "13af292f7c2d140a163af9dfaabc768749ac7f8fcad4be82160bb9522349dc5f",
+                  "scripts/repair/restate_hedged_execution_costs.py": "2f10dc2b065da4dda68cc55028d5faa38a094f28d53ed4c68614df9611530fd5"
+                },
+                "source_bundle_digest": "a77ca8c7e0eb892052bef05c55409d0eee56da1872cf96d70487071d5d2cc4bf",
+                "nine_gate_recertified": false,
+                "prior_record": {
+                  "metrics": {
+                    "annual": -0.01062725467935938,
+                    "vol": 0.05623294287100653,
+                    "sharpe": -0.18898627987045558,
+                    "maxdd": -0.29067354337769313,
+                    "calmar": -0.03656079103680455,
+                    "n": 3156,
+                    "hit": false
+                  },
+                  "config_cost": {
+                    "buy_cost": 0.00225,
+                    "sell_cost": 0.00275,
+                    "financing_rate": 0.065,
+                    "hedge_cost_annual": 0.015,
+                    "switch_friction": 0.0025
+                  },
+                  "notes": "R-COST-001 成本重述：2012-01-04~2024-12-31 long 腿按 canonical CostModel(买0.225%/卖0.275%/融资6.5%)重算；年化 -1.06%、最大回撤 -29.07%、Sharpe -0.19。旧免成本绩效与组合边际叙述作废；保留原生命周期状态，Nine-Gate 未在本次重述中重新认证。",
+                  "admission": {
+                    "track": "diversifier",
+                    "rationale": "历史 diversifier 准入依据受 long 腿零交易成本口径污染，已作废；不得用于重新准入，须按修正成本重跑组合边际。",
+                    "note": "历史迁移记录保留；原组合边际证据已由 R-COST-001 作废。",
+                    "evidence_status": "INVALIDATED_BY_COST_RESTATEMENT",
+                    "invalidated_by": "R-COST-001/large-cap-growth-hedged/v1.1-full/41179e4bf1e525da"
+                  }
+                },
+                "corrected_metrics": {
+                  "annual": -0.010627254679359368,
+                  "vol": 0.05623294287100653,
+                  "sharpe": -0.18898627987045535,
+                  "maxdd": -0.29067354337769313,
+                  "calmar": -0.036560791036804506,
+                  "n": 3156,
+                  "hit": false
+                },
+                "canonical_long_leg_cost": {
+                  "buy_cost": 0.00225,
+                  "sell_cost": 0.00275,
+                  "financing_rate": 0.065
+                }
+              }
+            ]
           },
           "nine_gate": {
             "run_date": "2026-07-05",
@@ -3787,8 +4644,10 @@
           },
           "admission": {
             "track": "diversifier",
-            "rationale": "全历史压力测试：将全历史收益从 -3.03% 扭转为 +1.38%（夏普 0.19），且最大回撤由 -48.69% 压缩至 -26.98%，相比 baseline 有巨大的绝对与相对优化。",
-            "note": "迁移自动归类：对冲母策略，单体低收益+负相关，靠组合层增量入册"
+            "rationale": "历史 diversifier 准入依据受 long 腿零交易成本口径污染，已作废；不得用于重新准入，须按修正成本重跑组合边际。",
+            "note": "历史迁移记录保留；原组合边际证据已由 R-COST-001 作废。",
+            "evidence_status": "INVALIDATED_BY_COST_RESTATEMENT",
+            "invalidated_by": "R-COST-001/large-cap-growth-hedged/v1.1-full/75ddc788b9d5-a77ca8c7e0eb"
           },
           "decay_check": {
             "n_days": 3507,

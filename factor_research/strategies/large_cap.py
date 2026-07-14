@@ -3,11 +3,10 @@
 Implementation of the second mother strategy family.
 """
 from dataclasses import dataclass, asdict
-from pathlib import Path
-import numpy as np
-import pandas as pd
+from functools import partial
 
 from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
+from core.hedged_portfolio import HedgedReturnPolicy, equal_weight_universe_returns
 from factors.large_cap import load_clean_panels_with_growth, build_large_cap_premium_factor, large_cap_timing_hysteresis
 from strategies.small_cap import build_rebalance_weights
 
@@ -56,59 +55,45 @@ def run_large_cap_strategy(config=StrategyConfig()):
     # Engine configuration (Always run from 2010-01-01 to warm up MAs)
     engine_config = BacktestConfig(
         start="2010-01-01",
-        cost=CostModel(buy_cost=0.0, sell_cost=0.0, financing_rate=0.0),
+        # R-COST-001: the long stock leg pays the same canonical A-share
+        # execution costs as every other formal strategy.  The hedge borrow
+        # cost and strategy-level switch friction are charged separately below.
+        cost=CostModel(),
         leverage=config.leverage,
     )
     engine = BacktestEngine(prices=prices, config=engine_config)
     long_signal = Signal(weights=scheduled, timing=None)
     res_long = engine.run(long_signal)
 
-    # Compute Universe Benchmark (Shifted 1 Day to avoid leak)
-    daily_ret = close.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan).fillna(0.0)
-    bench_returns = pd.Series(0.0, index=daily_ret.index)
-    univ_shifted = univ.shift(1)
-    for dt in daily_ret.index:
-        active = univ_shifted.loc[dt] if dt in univ_shifted.index else pd.Series(False, index=univ.columns)
-        active = active.fillna(False).astype(bool)
-        active_codes = active[active].index
-        if len(active_codes) > 0:
-            bench_returns.loc[dt] = daily_ret.loc[dt, active_codes].mean()
-
-    # Align dates
-    common_idx = res_long.returns.index.intersection(bench_returns.index)
-    r_long = res_long.returns.loc[common_idx]
-    r_bench = bench_returns.loc[common_idx]
-
-    # Hedged long-short return
-    daily_hedge_cost = config.hedge_cost_annual / 252.0
-    r_neutral = r_long - r_bench - daily_hedge_cost
-
-    # Hysteresis timing on neutral NAV
-    nav_neutral = (1 + r_neutral).cumprod()
-    timing_signal = large_cap_timing_hysteresis(nav_neutral, window=config.ma_window, buffer=config.buffer_size)
-
-    # Timed returns (including switch friction)
-    transitions = timing_signal.diff().fillna(0.0) != 0.0
-    r_timed = r_neutral * timing_signal - config.switch_friction * transitions
-
-    # Slice outputs to the requested start date to ensure MA warm-up
-    start_dt = pd.Timestamp(config.start)
-    r_timed_sliced = r_timed.loc[start_dt:]
-    r_long_sliced = r_long.loc[start_dt:]
-    r_bench_sliced = r_bench.loc[start_dt:]
-    r_neutral_sliced = r_neutral.loc[start_dt:]
-    timing_signal_sliced = timing_signal.loc[start_dt:]
+    # Canonical hedged-return policy, shared verbatim with Nine-Gate replays.
+    # The timing overlay is intentionally applied after neutral NAV is built.
+    policy = HedgedReturnPolicy(
+        benchmark_returns=equal_weight_universe_returns(close, univ),
+        hedge_cost_annual=config.hedge_cost_annual,
+        timing_builder=partial(
+            large_cap_timing_hysteresis,
+            window=config.ma_window,
+            buffer=config.buffer_size,
+        ),
+        switch_friction=config.switch_friction,
+        warmup_start="2010-01-01",
+    )
+    hedged = policy.apply(res_long, statistics_start=config.start)
 
     return {
-        "returns": r_timed_sliced,
-        "long_returns": r_long_sliced,
-        "bench_returns": r_bench_sliced,
-        "neutral_returns": r_neutral_sliced,
-        "timing": timing_signal_sliced,
+        "returns": hedged.result.returns,
+        "long_returns": hedged.long_returns,
+        "bench_returns": hedged.benchmark_returns,
+        "neutral_returns": hedged.neutral_returns,
+        "timing": hedged.timing,
         "scheduled_weights": scheduled,
         "factor": comp_premium,
         "close": close,
+        "volume": volume,
+        "amount": amount,
         "engine_result": res_long,
+        "portfolio_result": hedged.result,
+        "portfolio_policy": policy,
     }
 
 def latest_signal(config=StrategyConfig()):

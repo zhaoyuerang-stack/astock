@@ -3,11 +3,9 @@
 Long top N highest smooth momentum stocks from a high-quality fundamental universe, hedged with CSI 800 equal-weighted index.
 """
 from dataclasses import dataclass, asdict
-from pathlib import Path
-import numpy as np
-import pandas as pd
 
 from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
+from core.hedged_portfolio import HedgedReturnPolicy, equal_weight_universe_returns
 from factors.hq_momentum import build_hq_momentum_factor
 from strategies.small_cap import build_rebalance_weights
 
@@ -53,44 +51,35 @@ def run_hq_momentum_strategy(config=StrategyConfig()):
     # Engine configuration
     engine_config = BacktestConfig(
         start="2010-01-01",  # Warm-up from 2010
-        cost=CostModel(buy_cost=0.0, sell_cost=0.0, financing_rate=0.0),
+        # R-COST-001: hedge borrow cost does not replace long-leg turnover
+        # costs.  Use the canonical A-share cost model for the stock book.
+        cost=CostModel(),
         leverage=config.leverage,
     )
     engine = BacktestEngine(prices=prices, config=engine_config)
     long_signal = Signal(weights=scheduled, timing=None)
     res_long = engine.run(long_signal)
 
-    # Compute Universe Benchmark (Shifted 1 Day to avoid leak)
-    daily_ret = close.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan).fillna(0.0)
-    bench_returns = pd.Series(0.0, index=daily_ret.index)
-    univ_shifted = univ.shift(1)
-    for dt in daily_ret.index:
-        active = univ_shifted.loc[dt] if dt in univ_shifted.index else pd.Series(False, index=univ.columns)
-        active = active.fillna(False).astype(bool)
-        active_codes = active[active].index
-        if len(active_codes) > 0:
-            bench_returns.loc[dt] = daily_ret.loc[dt, active_codes].mean()
+    # Canonical hedged-return policy, shared verbatim with Nine-Gate replays.
+    policy = HedgedReturnPolicy(
+        benchmark_returns=equal_weight_universe_returns(close, univ),
+        hedge_cost_annual=config.hedge_cost_annual,
+        warmup_start="2010-01-01",
+    )
+    hedged = policy.apply(res_long, statistics_start=config.start)
 
-    # Align dates
-    common_idx = res_long.returns.index.intersection(bench_returns.index)
-    r_long = res_long.returns.loc[common_idx]
-    r_bench = bench_returns.loc[common_idx]
-
-    # Hedged long-short return
-    daily_hedge_cost = config.hedge_cost_annual / 252.0
-    r_neutral = r_long - r_bench - daily_hedge_cost
-
-    # Slice outputs to the requested start date
-    start_dt = pd.Timestamp(config.start)
-    
     return {
-        "returns": r_neutral.loc[start_dt:],
-        "long_returns": r_long.loc[start_dt:],
-        "bench_returns": r_bench.loc[start_dt:],
+        "returns": hedged.result.returns,
+        "long_returns": hedged.long_returns,
+        "bench_returns": hedged.benchmark_returns,
         "scheduled_weights": scheduled,
         "factor": comp_factor,
         "close": close,
+        "volume": volume,
+        "amount": amount,
         "engine_result": res_long,
+        "portfolio_result": hedged.result,
+        "portfolio_policy": policy,
     }
 
 def latest_signal(config=StrategyConfig()):
