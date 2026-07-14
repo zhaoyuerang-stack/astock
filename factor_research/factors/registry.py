@@ -67,7 +67,6 @@ _MODULES = (
     "factors.shareholder",
     "factors.capital_flow",
     "factors.industry_prosperity",
-    "factors.top_inst",
 )
 _discovered = False
 

@@ -11,10 +11,19 @@ from __future__ import annotations
 
 import sys
 import warnings
+from importlib.util import find_spec
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+
+
+def test_every_eager_factor_module_exists_in_a_clean_checkout():
+    """Registry discovery must not depend on an untracked local module."""
+    from factors.registry import _MODULES
+
+    missing = [module for module in _MODULES if find_spec(module) is None]
+    assert missing == []
 
 
 def test_discover_includes_migrated_searchable_families():
