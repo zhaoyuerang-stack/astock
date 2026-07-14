@@ -3,6 +3,7 @@
 Run:
     cd factor_research && python3 tests/test_autoresearch_engine.py
 """
+import hashlib
 import os
 import sys
 import tempfile
@@ -1282,7 +1283,7 @@ def test_rediscovery_gate_zeros_edge_above_corr_threshold():
     assert gated >= 1
 
 
-def test_walk_forward_search_truncates_train_and_scores_oos_after_cutoff():
+def test_walk_forward_search_truncates_train_and_scores_oos_after_cutoff(monkeypatch):
     """元级防未来:进化选择回路只见 <=cutoff 的物理截断面板;冠军在 cutoff 后一次性 OOS 评分。"""
     from factory.autoresearch.walkforward import run_walk_forward_search
     from factory.lines.line2_validation.l0_ic_scan import run_l0
@@ -1315,20 +1316,51 @@ def test_walk_forward_search_truncates_train_and_scores_oos_after_cutoff():
 
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
+        repository = CandidateRepository(root / "candidates.jsonl")
+        experiment_log = ExperimentLog(root / "experiment_log.jsonl")
+        review_queue = ReviewQueue(root / "review_queue.jsonl")
+
+        # Keep factor-panel disk caching inside this fixture as well.  The
+        # production default is a canonical cache under data_lake/factor_store.
+        from factors import autoresearch_dsl as dsl
+
+        def cache_path(name, params, data_signature=None, *, source_hash=None):
+            token = hashlib.sha256(
+                repr((name, params, data_signature, source_hash)).encode("utf-8")
+            ).hexdigest()
+            return root / "factor_cache" / f"{token}.parquet"
+
+        monkeypatch.setattr(dsl, "_get_cache_path", cache_path)
+
+        # The injected repositories are part of the hermetic contract.  Any
+        # hidden fallback to the operator's default repos must fail this test.
+        from factory.autoresearch import repositories as repository_module
+        default_repository_calls = []
+
+        def reject_default_repository(*args, **kwargs):
+            default_repository_calls.append((args, kwargs))
+            raise AssertionError("synthetic walk-forward opened a default repository")
+
+        monkeypatch.setattr(repository_module, "CandidateRepository", reject_default_repository)
+        monkeypatch.setattr(repository_module, "ExperimentLog", reject_default_repository)
+
         result = run_walk_forward_search(
             close, volume, amount,
             cutoff=cutoff,
             vintage_id="synthetic-wf",
-            repository=CandidateRepository(root / "candidates.jsonl"),
+            repository=repository,
             runners={"l0": spy_l0},
             seeds=hermetic_seeds,
             n_islands=2, generations=1, population=1, top_k=2, rng_seed=7,
+            novelty_weight=0.0, corr_weight=0.0, orth_weight=0.0,
+            turnover_weight=0.0, stability_weight=0.0,
             sample_dates=60,
-            experiment_log=ExperimentLog(root / "experiment_log.jsonl"),
-            review_queue=ReviewQueue(root / "review_queue.jsonl"),
+            experiment_log=experiment_log,
+            review_queue=review_queue,
         )
 
     assert seen["train_calls"] > 0
+    assert default_repository_calls == []
     assert len(result.champions) == 2
     assert len(seen["oos_windows"]) == 2  # 每冠军恰好 OOS 评一次,绝不回流训练选择
     assert result.cutoff < result.oos_start <= result.oos_end

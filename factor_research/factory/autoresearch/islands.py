@@ -687,8 +687,10 @@ def run_island_search(
     historical_lessons = []
     try:
         from factory.autoresearch.repositories import ExperimentLog, CandidateRepository, CandidateDecision
-        exp_repo = ExperimentLog()
-        cand_repo = CandidateRepository()
+        # Respect dependency injection: tests, replay jobs, and isolated workers
+        # must not silently read the operator's canonical repositories.
+        exp_repo = experiment_log if experiment_log is not None else ExperimentLog()
+        cand_repo = repository if repository is not None else CandidateRepository()
         ast_map = {c.fingerprint: c.ast for c in cand_repo.all()}
         for eval_res in exp_repo.iter_all():
             ast = ast_map.get(eval_res.fingerprint)
