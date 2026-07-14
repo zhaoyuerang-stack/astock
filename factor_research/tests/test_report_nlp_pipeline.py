@@ -33,6 +33,9 @@ class TestReportNLPPipeline(unittest.TestCase):
             patch("scripts.research.report_nlp_pipeline.LOGIC_CHAIN_DIR", self.tmp_dir / "research_signals/logic_chains"),
             patch("scripts.research.report_nlp_pipeline.INBOX_STATE_FILE", self.tmp_dir / "research_pdf/_inbox_state.json"),
             patch("scripts.research.report_nlp_pipeline.FAILURES_LOG_FILE", self.tmp_dir / "report_nlp_failures.jsonl"),
+            # The record helper has dedicated temp-ledger coverage elsewhere;
+            # inbox behavior tests must never append to the canonical lake.
+            patch("scripts.research.report_nlp_pipeline.record_report_nlp_research_run"),
         ]
         for p in self.patchers:
             p.start()

@@ -5,6 +5,7 @@ Run: cd /Users/kiki/astcok/factor_research && python3 tests/test_research_run_le
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
 import sys
 import tempfile
@@ -17,6 +18,34 @@ os.chdir(ROOT)
 
 def _tmp_path(name: str) -> Path:
     return Path(tempfile.mkdtemp()) / name
+
+
+def _append_research_runs(path: str, worker: int, count: int, start_event) -> None:
+    from research_ledger.ledger import ResearchLedger, ResearchRunRecord
+
+    ledger = ResearchLedger(path=path)
+    if not start_event.wait(timeout=10):
+        raise RuntimeError("timed out waiting for concurrent ledger start")
+    for index in range(count):
+        ledger.log_research_run(ResearchRunRecord(
+            script="tests/concurrent_research_ledger.py",
+            hypothesis=f"worker-{worker}/run-{index}",
+            data_vintage={},
+            metrics={"worker": worker, "index": index},
+            verdict="PENDING_REVIEW",
+            artifact_paths=[],
+            next_action="HUMAN_REVIEW",
+            source="test",
+            run_at=f"2026-07-11T00:{worker:02d}:{index:02d}",
+        ))
+
+
+def test_default_ledger_path_is_forbidden_under_pytest():
+    import pytest
+    from research_ledger.ledger import ResearchLedger
+
+    with pytest.raises(RuntimeError, match="temporary ResearchLedger"):
+        ResearchLedger()
 
 
 def test_record_research_run_appends_hash_chain_and_index():
@@ -49,6 +78,7 @@ def test_record_research_run_appends_hash_chain_and_index():
     assert len(runs) == 1
     assert runs[0].script == "scripts/research/run_nine_gates_all.py"
     assert out["decision_state"] == "promote"
+    assert len(out["entry_hash"]) == 64
 
     index = load_research_run_index(index_path)
     assert index["summary"]["total_runs"] == 1
@@ -135,6 +165,62 @@ def test_priority_research_entrypoints_record_runs():
     assert decisions["promote"] == 1
     assert decisions["pending_review"] == 1
     assert decisions["shadow"] == 1
+
+
+def test_concurrent_research_run_appends_preserve_one_hash_chain(tmp_path):
+    from research_ledger.ledger import ResearchLedger
+
+    ledger_path = tmp_path / "research_ledger.jsonl"
+    context = multiprocessing.get_context("spawn")
+    start_event = context.Event()
+    processes = [
+        context.Process(
+            target=_append_research_runs,
+            args=(str(ledger_path), worker, 6, start_event),
+        )
+        for worker in range(4)
+    ]
+    try:
+        for process in processes:
+            process.start()
+        start_event.set()
+        for process in processes:
+            process.join(timeout=30)
+    finally:
+        for process in processes:
+            if process.is_alive():
+                process.terminate()
+                process.join(timeout=5)
+
+    assert [process.exitcode for process in processes] == [0, 0, 0, 0]
+    ledger = ResearchLedger(path=ledger_path)
+    ok, problems = ledger.verify_chain()
+    assert ok, problems
+    assert len(ledger.list_research_runs()) == 24
+
+
+def test_tampered_research_ledger_refuses_new_append(tmp_path):
+    import pytest
+    from research_ledger.ledger import ResearchLedger, ResearchRunRecord
+
+    ledger_path = tmp_path / "research_ledger.jsonl"
+    ledger = ResearchLedger(path=ledger_path)
+    record = ResearchRunRecord(
+        script="tests/tamper.py", hypothesis="H", data_vintage={}, metrics={"x": 1},
+        verdict="PENDING_REVIEW", artifact_paths=[], next_action="HUMAN_REVIEW",
+        source="test", run_at="2026-07-11T00:00:00",
+    )
+    ledger.log_research_run(record)
+    tampered = json.loads(ledger_path.read_text(encoding="utf-8"))
+    tampered["metrics"] = {"x": 999}
+    ledger_path.write_text(json.dumps(tampered) + "\n", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="refusing to append"):
+        ledger.log_research_run(ResearchRunRecord(
+            script="tests/tamper.py", hypothesis="H2", data_vintage={}, metrics={},
+            verdict="PENDING_REVIEW", artifact_paths=[], next_action="HUMAN_REVIEW",
+            source="test", run_at="2026-07-11T00:00:01",
+        ))
 
 
 if __name__ == "__main__":

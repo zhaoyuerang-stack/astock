@@ -7,6 +7,10 @@ from __future__ import annotations
 
 import json
 import hashlib
+import fcntl
+import os
+import threading
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -20,6 +24,8 @@ DEFAULT_RESEARCH_RUN_INDEX_PATH = (
     Path(__file__).resolve().parent.parent
     / "reports" / "research_ledger" / "index.json"
 )
+
+_PROCESS_LEDGER_WRITE_LOCK = threading.RLock()
 
 @dataclass
 class LedgerEntry:
@@ -113,31 +119,72 @@ def _chain_hash(prev_hash: str, rec: dict) -> str:
 class ResearchLedger:
     """Immutable ledger logging all factor search and testing experiments."""
 
-    def __init__(self, path: Path = DEFAULT_LEDGER_PATH):
-        self.path = Path(path)
+    def __init__(self, path: Path | str | None = None):
+        if path is None and os.environ.get("PYTEST_CURRENT_TEST"):
+            raise RuntimeError(
+                "tests must inject a temporary ResearchLedger path; refusing to write the canonical lake"
+            )
+        self.path = Path(path) if path is not None else DEFAULT_LEDGER_PATH
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
+    @contextmanager
+    def _write_transaction(self):
+        """Serialize the tail-read + append operation across processes."""
+        lock_path = self.path.with_name(f".{self.path.name}.lock")
+        with _PROCESS_LEDGER_WRITE_LOCK:
+            with lock_path.open("a+b") as lock_file:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
     def _last_hash(self) -> str:
-        """读取链尾 entry_hash（genesis 为空串）。"""
+        """Read and verify the whole chain before accepting a new tail.
+
+        Appending behind malformed, legacy, or tampered history would make the
+        new record look legitimate while preserving a broken prefix.  Fail
+        closed and require an explicit migration/repair instead.
+        """
         last = ""
         if not self.path.exists():
             return last
         with open(self.path, "r", encoding="utf-8") as f:
-            for line in f:
+            for lineno, line in enumerate(f, 1):
                 line = line.strip()
                 if not line:
                     continue
                 try:
-                    last = json.loads(line).get("entry_hash", "") or last
-                except Exception:
-                    pass
+                    rec = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    raise RuntimeError(
+                        f"research ledger line {lineno} is invalid JSON; refusing to append"
+                    ) from exc
+                entry_hash = str(rec.get("entry_hash") or "")
+                if not entry_hash:
+                    raise RuntimeError(
+                        "research ledger contains unhashed legacy rows; "
+                        "run migrate_chain before appending"
+                    )
+                if rec.get("prev_hash", "") != last:
+                    raise RuntimeError(
+                        f"research ledger chain breaks at line {lineno}; refusing to append"
+                    )
+                if _chain_hash(last, rec) != entry_hash:
+                    raise RuntimeError(
+                        f"research ledger content hash fails at line {lineno}; refusing to append"
+                    )
+                last = entry_hash
         return last
 
     def _append_record(self, rec: dict) -> dict:
-        rec["prev_hash"] = self._last_hash()
-        rec["entry_hash"] = _chain_hash(rec["prev_hash"], rec)
-        with open(self.path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
+        with self._write_transaction():
+            rec["prev_hash"] = self._last_hash()
+            rec["entry_hash"] = _chain_hash(rec["prev_hash"], rec)
+            with open(self.path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
+                f.flush()
+                os.fsync(f.fileno())
         return rec
 
     def log_experiment(self, entry: LedgerEntry) -> None:
@@ -347,4 +394,10 @@ def record_research_run(
     if index_path is None:
         index_path = DEFAULT_RESEARCH_RUN_INDEX_PATH
     write_research_run_index(ledger=ledger, path=index_path)
-    return _run_view(ResearchRunRecord.from_dict(appended))
+    view = _run_view(ResearchRunRecord.from_dict(appended))
+    # The immutable entry identity is required to bind downstream registry
+    # evidence to this exact hash-chain record.  It is intentionally returned
+    # to the caller but remains absent from the lossy UI index.
+    view["entry_hash"] = appended.get("entry_hash", "")
+    view["prev_hash"] = appended.get("prev_hash", "")
+    return view

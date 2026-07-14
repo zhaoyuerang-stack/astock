@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import unittest
 import sys
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -32,27 +33,28 @@ from reporting.performance_attribution import attribute_returns
 
 class TestInstitutionalUpgrades(unittest.TestCase):
     def test_model_risk_inventory(self):
-        inventory = ModelInventory()
-        card = ModelCard(
-            strategy_id="test_strat/v1",
-            economic_hypothesis="Test Hypothesis",
-            data_sources=["test_source"],
-            train_period="2018-2020",
-            oos_period="2021-2022",
-            applicable_regimes=["BULL"],
-            capacity_limit=10000000.0,
-            style_exposures={"Beta": 1.0},
-            forbidden_conditions=["PANIC"],
-            known_failure_cases=["2018"],
-            owner="Researcher",
-            approver="Risk Officer"
-        )
-        inventory.register_card(card)
-        
-        retrieved = inventory.get_card("test_strat/v1")
-        self.assertIsNotNone(retrieved)
-        self.assertEqual(retrieved.economic_hypothesis, "Test Hypothesis")
-        self.assertEqual(retrieved.approval_status, "PENDING")
+        with tempfile.TemporaryDirectory() as tmp:
+            inventory = ModelInventory(Path(tmp) / "model_inventory.json")
+            card = ModelCard(
+                strategy_id="test_strat/v1",
+                economic_hypothesis="Test Hypothesis",
+                data_sources=["test_source"],
+                train_period="2018-2020",
+                oos_period="2021-2022",
+                applicable_regimes=["BULL"],
+                capacity_limit=10000000.0,
+                style_exposures={"Beta": 1.0},
+                forbidden_conditions=["PANIC"],
+                known_failure_cases=["2018"],
+                owner="Researcher",
+                approver="Risk Officer"
+            )
+            inventory.register_card(card)
+
+            retrieved = inventory.get_card("test_strat/v1")
+            self.assertIsNotNone(retrieved)
+            self.assertEqual(retrieved.economic_hypothesis, "Test Hypothesis")
+            self.assertEqual(retrieved.approval_status, "PENDING")
 
     def test_independent_validation(self):
         returns = pd.Series(np.random.normal(0.001, 0.01, 100))
@@ -83,29 +85,30 @@ class TestInstitutionalUpgrades(unittest.TestCase):
         self.assertAlmostEqual(np.sum(weights), 1.0, places=4)
 
     def test_research_ledger(self):
-        ledger = ResearchLedger()
-        entry = LedgerEntry(
-            experiment_id="EXP_TEST",
-            parent_experiment_id=None,
-            hypothesis_text="Test hypothesis text",
-            llm_prompt_hash="abc",
-            factor_ast_hash="def",
-            code_commit_hash="commit_hash",
-            data_snapshot_hash="data_hash",
-            universe_version="v1",
-            cost_model_version="v2",
-            random_seed=42,
-            tried_parameters={"param": 1},
-            result_metrics={"sharpe": 1.5},
-            rejection_reason=None,
-            reviewer="Reviewer",
-            run_at="2026-06-16 12:00:00"
-        )
-        ledger.log_experiment(entry)
-        
-        retrieved = ledger.get_by_id("EXP_TEST")
-        self.assertIsNotNone(retrieved)
-        self.assertEqual(retrieved.hypothesis_text, "Test hypothesis text")
+        with tempfile.TemporaryDirectory() as tmp:
+            ledger = ResearchLedger(Path(tmp) / "research_ledger.jsonl")
+            entry = LedgerEntry(
+                experiment_id="EXP_TEST",
+                parent_experiment_id=None,
+                hypothesis_text="Test hypothesis text",
+                llm_prompt_hash="abc",
+                factor_ast_hash="def",
+                code_commit_hash="commit_hash",
+                data_snapshot_hash="data_hash",
+                universe_version="v1",
+                cost_model_version="v2",
+                random_seed=42,
+                tried_parameters={"param": 1},
+                result_metrics={"sharpe": 1.5},
+                rejection_reason=None,
+                reviewer="Reviewer",
+                run_at="2026-06-16 12:00:00"
+            )
+            ledger.log_experiment(entry)
+
+            retrieved = ledger.get_by_id("EXP_TEST")
+            self.assertIsNotNone(retrieved)
+            self.assertEqual(retrieved.hypothesis_text, "Test hypothesis text")
 
     def test_capacity_and_execution_compliance(self):
         w_df = pd.DataFrame([[0.5, 0.5]], index=[pd.Timestamp("2026-06-16")], columns=["A", "B"])
