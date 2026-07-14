@@ -327,6 +327,12 @@
 - **理由**: seed 不是"崩溃可修",而是"**先污染后崩溃**":`register()` 每调用即 `_save()`(逐版本落盘),种子先登记 `small-cap-size/v1.0` 再到 v2.0 才崩。实测(真台账临时副本跑 `seed_registry()`):v1.0 被陈旧口径覆盖、其已落盘的 GATE2 `nine_gate` 审计块被抹为空,**之后**才在 v2.0 抛错。修它=重造 25 族真实审计值(等于复制台账);留它=活 footgun。故删除是唯一与 R-EVIDENCE-001/R-OBJECTIVE-001/R-ARCH-005 一致的处置。
 - **验证**: `py_compile` 通过;`python3 strategy_registry.py`(默认 show)与 `--migrate --dry-run` 路径 exit 0;`--seed` 被 argparse 拒(`unrecognized arguments: --seed`);全仓无残留 `seed_registry`/`--seed`/`migrate_ledger` 引用;真台账 `strategy_versions.json` 手术前后 **md5 一致**(`6222206c…`,surgery 仅动 .py,未触台账)。
 
+### ADR-036 组合构成规则 v2:inverse-vol + 防守帽(RANKING_VERSION v1→v2)
+- **上下文**: v0.2 探针实证 v1 规则(纯 inverse-vol)对波动悬殊跨资产池失效——2.5% 波动的债腿被灌 87% 权重,组合稀释成"债基+股票点缀"(年化 7.4%)。inverse-vol 是同类股票腿时代的方案,风险均分哲学在跨资产下与年化目标冲突。
+- **决策**: `portfolio/recompose.py` 权重段加**防守帽**:训练窗年化波动 < `DEFENSIVE_VOL_ANNUAL`(0.08,债 ~2.5% vs 股票腿 15-25%,分界不敏感)判防守资产;防守组合计权重超 `DEFENSIVE_CAP`(0.35,60/40~70/30 资产配置惯例区间)时组内等比压缩到帽,释放权重按 inverse-vol 比例分给非防守组;全股票/全防守池不触发(行为同 v1)。`RANKING_VERSION` bump v1→v2。**两常数是一次性口径决策非搜索参数——不扫网格**(扫=烧 n_trials 的 p-hacking 入口)。
+- **结果(v0.3 探针,n_trials=3 真账本)**: 年化 +9.9% / 回撤 -22.0% / 夏普 0.77 / dsr_p=0.27;终窗构成 债 35.0% + small-cap v2.1 44.5% + roc-yc 20.5%。三探针(v0.1/0.2/0.3)连成效率前沿:**现有腿池上限 ≈ 年化 10-12% / 回撤 -20~22% / 夏普 0.8-1.0;15%/20% 双线用现原料不可达**——提年化的唯一真路径是补强腿池(基本面族 probe),不是继续调组合参数。
+- **验证**: `tests/test_portfolio_recompose.py` 11/11(3 新对抗:波动悬殊池防守腿必 ≤35%(v1 行为必挂)/全股票池行为与 v1 一致/全防守池不死锁);`test_portfolio_promotion.py` 6/6 无回归。
+
 ---
 
 ## ③ 投资/交易决策记录

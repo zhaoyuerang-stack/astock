@@ -46,6 +46,10 @@
   · **路由接线**:CLAUDE.md §2 两处技能清单 + §9 数据纪律加强制入口;data_infrastructure.md 头部指针;data_source_backlog.json readme 写明「先 onboarding 后 probe」执行顺序。零新代码/守卫(元系统冻结:强制仍靠既有 check_lake_writers 等守卫;本剧本直接服务 TASKS「第一批新维度接入」与 backlog 待接条目)。
   · **触发点二次接线(owner 要求,防漏读)**:CLAUDE.md §0 接手协议第 4 步加「命中 agent_skills 剧本先读剧本再动手,接入新源必读 onboarding」;AGENTS.md 共通铁律加同款条目——Codex/Cursor/Antigravity 等非 Claude 工具只读 AGENTS.md 也能命中,不再依赖恰好翻到 §9。
 
+**2026-07-06(规则 v2 + v0.3 探针:现有腿池的效率前沿已探明)**:ADR-036——recompose 加防守帽(防守组 vol<8% 判定,合计权重 ≤35%,常数为一次性口径决策不扫网格),RANKING_VERSION v1→v2。`meta-portfolio/v0.3-probe`(n_trials=3):**年化 +9.9% / 回撤 -22.0% / 夏普 0.77**,终窗 债35%+小盘44.5%+roc-yc20.5%。**三探针效率前沿结论**:现有腿池上限 ≈ 年化 10-12%/回撤 -20~22%/夏普 0.8-1.0;15%/20% 双线现原料不可达。逐年分解:防守在 2018(-4.4%)/2022(-1.3%)有效,病灶年=2016(-14%)/2023(0%)——腿池在此类年份缺 alpha,非组合工程可救。**停止调参**(继续烧 n_trials=p-hacking);待 owner 二选一:a) 基本面族 probe 补强腿池后重组(提年化唯一真路径);b) 接受 ~10%/-20% 半步入册首个组合跑 paper(降年化目标须小 ADR)。
+
+**2026-07-06(v0.2 探针:防守腿入池——回撤修复成功,inverse-vol 跨资产失效暴露)**:511010 买入持有防守腿(零择时自由度,截 <boundary,与全部股票腿相关 -0.03~-0.16)注入 9 腿池,`meta-portfolio/v0.2-probe`(n_trials=2 真账本):**回撤 -34.0%→-21.6%(逼近线)、夏普 0.69→0.94,但年化 11.8%→7.4%**——inverse-vol 权重把 87% 灌给 2.5% 波动的债腿(同类资产的权重方案对波动悬殊跨资产池失效),组合被稀释成"债基+股票点缀"。**数学现实**:池内最强腿 17.8%(其余 ≤6.4%),无杠杆凸组合年化上界 17.8%,15% 线需重仓强腿→回撤回升;现原料下 15%/20% 双线大概率不可同时达成,可达成区域 ≈ 10-12%/-20%/夏普~1.0(Sharpe 满意线可到,年化差口)。三选项待 owner:① 构成规则 v2(风险预算/簇间配额,受控变更 bump RANKING_VERSION 记 DECISIONS)做实数字;② 基本面族 probe 补强腿池(提年化的唯一真路径,TASKS 已有);③ 组合层杠杆评估(夏普~1 时 1.25x 数学上勉强,融资 6.5% 吃增益)。
+
 **2026-07-05(daily-round-3:研究总监审视,算力再分配,不改口径不碰台账写入口)**:
   · **在册池清零**:`decay_status.json` 机械确认 `no_registered=true`;`strategy_versions.json` 30 个 family 全落在 候选/参考/退役/已证伪/`REJECTED_BY_ADVERSARIAL_DECAY`,此前仅剩的两个 diversifier(`hq-momentum-hedged`/`large-cap-growth-hedged`)已完成 TASKS 待办的退役复核,当前**无一在册**。
   · **并行 agent 实时活动**:另一并行 agent(`codex/xiaochengxu` 分支)当日在跑组合再构成(`composite-portfolio` v1.1/v1.2-no-mom,均被 `REJECTED_BY_ADVERSARIAL_DECAY`,DSR p=0.23~0.26)与跨资产腿搜索(`cross_asset_leg_search`,纳指 ETF 513100/MA240 shadow_recommend=true),覆盖了 metasearch 06-23 指出的空白区之一(跨资产腿)——本轮建议下轮不重复投入该方向。
