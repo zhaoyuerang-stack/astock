@@ -15,14 +15,18 @@ class InvalidResearchStageTransition(ValueError):
 
 def load_stage_data(start: str):
     from factory.lines.line2_validation.l0_ic_scan import precompute_forward_returns
+    from governance.holdout import assert_search_clean, boundary
     from lake.load_lake import load_prices, load_raw_close
     from lake.units import implied_amount
 
     px = load_prices(start=start, fields=("close", "volume"))
-    close, volume = px["close"], px["volume"]
+    b = boundary()
+    close = px["close"].loc[px["close"].index < b]
+    volume = px["volume"].reindex(index=close.index, columns=close.columns)
     raw = load_raw_close(start=start).reindex(index=volume.index, columns=volume.columns)
     # canonical lake volume unit = share; amount CNY = shares × raw CNY/share
     amount = implied_amount(volume, raw)
+    assert_search_clean(close.index, label="research workspace stage data")
     forward = precompute_forward_returns(close)
     vintage = f"data_lake@{close.index[-1].strftime('%Y-%m-%d')}"
     return close, volume, amount, forward, vintage
@@ -80,6 +84,8 @@ def run_hypothesis_stage(
         )
 
     close, volume, amount, forward, vintage = data_loader(start)
+    from governance.holdout import assert_search_clean
+    assert_search_clean(close.index, label=f"hypothesis {stage} stage")
     runner = (runners or default_stage_runners())[stage]
     if stage == "l0":
         exp = runner(item, close, volume, amount, forward, vintage_id=vintage, sample_dates=sample_dates)
@@ -156,6 +162,8 @@ def run_autoresearch_stage(
         )
 
     close, volume, amount, forward, vintage = data_loader(start)
+    from governance.holdout import assert_search_clean
+    assert_search_clean(close.index, label=f"AutoResearch {stage} stage")
     runner = (runners or default_stage_runners())[stage]
     hyp = replace(ast_to_hypothesis(candidate), status=hyp_status[stage])
     prior = [row for row in experiment_log.iter_all() if row.fingerprint == item_id]

@@ -10,6 +10,10 @@ from __future__ import annotations
 
 import json
 import hashlib
+import fcntl
+import os
+import threading
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -18,6 +22,7 @@ import pandas as pd
 
 _DEFAULT_BOUNDARY = "2025-01-01"
 _VALIDATIONS = Path(__file__).resolve().parents[1] / "data_lake" / "governance" / "holdout_validations.jsonl"
+_VALIDATION_PROCESS_LOCK = threading.RLock()
 
 
 class HoldoutBreach(Exception):
@@ -47,8 +52,8 @@ def boundary() -> pd.Timestamp:
         import yaml
         cfg = yaml.safe_load(_SETTINGS_YAML.read_text()) or {}
         start = (cfg.get("holdout") or {}).get("start", start)
-    except Exception:
-        pass
+    except Exception as exc:
+        raise RuntimeError(f"cannot load holdout boundary from {_SETTINGS_YAML}: {exc}") from exc
     return pd.Timestamp(start)
 
 
@@ -159,6 +164,10 @@ def assert_search_clean(dates, *, label: str = "") -> None:
 
     dates:回测收益/面板的 DatetimeIndex,或单个最大日期。供 screener/factory 自纠。
     """
+    if dates is None or (hasattr(dates, "__len__") and len(dates) == 0):
+        # Empty synthetic/unit-test fixtures contain no observation that could
+        # touch the vault. Real selection paths will fail later on no data.
+        return
     if isinstance(dates, (pd.Series, pd.DataFrame, pd.DatetimeIndex)):
         idx = dates.index if hasattr(dates, "index") and not isinstance(dates, pd.DatetimeIndex) else dates
         max_date = pd.Timestamp(pd.DatetimeIndex(idx).max())
@@ -175,6 +184,39 @@ def assert_search_clean(dates, *, label: str = "") -> None:
 _MIN_HOLDOUT_OBS = 20  # holdout 段至少这么多观测才算得动 DSR(短段 DSR 不可靠,留 None)
 
 
+@contextmanager
+def _validation_transaction(path: Path):
+    """Lock the complete identity-check, trial-count, and append transaction."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = path.with_name(f".{path.name}.lock")
+    with _VALIDATION_PROCESS_LOCK:
+        with lock_path.open("a+b") as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
+def _read_validation_records(path: Path) -> list[dict]:
+    if not path.exists():
+        return []
+    records = []
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(
+                f"holdout validation ledger line {lineno} is invalid JSON"
+            ) from exc
+        if not isinstance(record, dict):
+            raise RuntimeError(f"holdout validation ledger line {lineno} must be an object")
+        records.append(record)
+    return records
+
+
 def holdout_trials(path: Path | None = None, *, boundary_filter=None) -> int:
     """已在金库上验证过的**不同候选**数 = 金库的跨候选多重检验负担(§5.2 缝②)。
 
@@ -185,23 +227,16 @@ def holdout_trials(path: Path | None = None, *, boundary_filter=None) -> int:
     peek 不再计入新金库的多重检验负担——新金库是新数据不背旧债。缺省数全部(向后兼容)。
     """
     p = path or _VALIDATIONS
-    if not p.exists():
-        return 0
     bf = str(pd.Timestamp(boundary_filter).date()) if boundary_filter is not None else None
-    ids = set()
-    for line in p.read_text().splitlines():
-        if not line.strip():
-            continue
-        try:
-            rec = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        cid = rec.get("candidate_id")
-        rec_b = rec.get("holdout_boundary") or rec.get("boundary", "")
-        if bf is not None and rec_b != bf:
-            continue
-        if cid:
-            ids.add((cid, rec.get("spec_hash", ""), rec.get("data_fingerprint", ""), rec_b))
+    with _validation_transaction(p):
+        ids = set()
+        for rec in _read_validation_records(p):
+            cid = rec.get("candidate_id")
+            rec_b = rec.get("holdout_boundary") or rec.get("boundary", "")
+            if bf is not None and rec_b != bf:
+                continue
+            if cid:
+                ids.add((cid, rec.get("spec_hash", ""), rec.get("data_fingerprint", ""), rec_b))
     return len(ids)
 
 
@@ -247,7 +282,6 @@ def validate_on_holdout(
     return_hash = _return_hash(r_ho)
 
     p = path or _VALIDATIONS
-    p.parent.mkdir(parents=True, exist_ok=True)
     identity = (
         candidate_id,
         str(spec_hash),
@@ -257,16 +291,10 @@ def validate_on_holdout(
     # ADR-023:多重检验与身份检查都**只看 active 金库(本次 b)**的记录。旧(superseded)金库的
     # peek 既不计入新金库的 n_trials,也不阻挡同一候选对新金库的合法重校验(新金库=新数据)。
     cur_b = str(b.date())
-    seen_identities: set[tuple[str, str, str, str]] = set()
-    same_candidate: list[dict] = []
-    if p.exists():
-        for line in p.read_text().splitlines():
-            if not line.strip():
-                continue
-            try:
-                d = json.loads(line)
-            except json.JSONDecodeError:
-                continue
+    with _validation_transaction(p):
+        seen_identities: set[tuple[str, str, str, str]] = set()
+        same_candidate: list[dict] = []
+        for d in _read_validation_records(p):
             rec_b = str(d.get("holdout_boundary") or d.get("boundary", ""))
             if rec_b != cur_b:
                 continue  # 跨金库(旧/作废)记录不参与 active 金库的检验与计数
@@ -281,59 +309,61 @@ def validate_on_holdout(
             if cid == candidate_id:
                 same_candidate.append(d)
 
-    exact = next((
-        rec for rec in same_candidate
-        if (
-            rec.get("candidate_id"),
-            str(rec.get("spec_hash", "")),
-            str(rec.get("data_fingerprint", "")),
-            str(rec.get("holdout_boundary") or rec.get("boundary", "")),
-        ) == identity
-    ), None)
-    if exact is not None:
-        if exact.get("return_hash") != return_hash:
-            raise HoldoutAlreadyConsumed(
-                f"holdout identity {candidate_id} 已消费且本次 return_hash 不同"
+        exact = next((
+            rec for rec in same_candidate
+            if (
+                rec.get("candidate_id"),
+                str(rec.get("spec_hash", "")),
+                str(rec.get("data_fingerprint", "")),
+                str(rec.get("holdout_boundary") or rec.get("boundary", "")),
+            ) == identity
+        ), None)
+        if exact is not None:
+            if exact.get("return_hash") != return_hash:
+                raise HoldoutAlreadyConsumed(
+                    f"holdout identity {candidate_id} 已消费且本次 return_hash 不同"
+                )
+            if not idempotent_retry:
+                raise HoldoutAlreadyConsumed(
+                    f"holdout identity {candidate_id} 已消费;禁止第二次主动评估"
+                )
+            return _result_from_record(exact, idempotent_retry=True)
+        if same_candidate:
+            raise HoldoutIdentityMismatch(
+                f"candidate_id={candidate_id!r} 已绑定其他 spec/data/boundary;"
+                "语义或数据变化必须创建新 candidate identity"
             )
-        if not idempotent_retry:
-            raise HoldoutAlreadyConsumed(
-                f"holdout identity {candidate_id} 已消费;禁止第二次主动评估"
-            )
-        return _result_from_record(exact, idempotent_retry=True)
-    if same_candidate:
-        raise HoldoutIdentityMismatch(
-            f"candidate_id={candidate_id!r} 已绑定其他 spec/data/boundary;"
-            "语义或数据变化必须创建新 candidate identity"
-        )
 
-    peek = 1
-    n_trials = len(seen_identities | {identity})
+        peek = 1
+        n_trials = len(seen_identities | {identity})
 
-    # 按累计验证数惩罚的 holdout DSR(短段算不动留 None,退回 sharpe 门兜底)
-    dsr_p, dsr_sig = None, None
-    if isinstance(m.get("sharpe"), (int, float)) and m.get("n", 0) >= _MIN_HOLDOUT_OBS:
-        from core.analysis.walk_forward import deflated_sharpe
-        rep = deflated_sharpe(observed_sr=m["sharpe"], n_trials=n_trials, n_periods=m["n"],
-                              skew=m.get("skew", 0.0), kurt=m.get("kurtosis_excess", 0.0) + 3.0,
-                              annualized=True)
-        dsr_p, dsr_sig = round(float(rep["p_value"]), 4), bool(rep["significant_05"])
+        # 按累计验证数惩罚的 holdout DSR(短段算不动留 None,退回 sharpe 门兜底)
+        dsr_p, dsr_sig = None, None
+        if isinstance(m.get("sharpe"), (int, float)) and m.get("n", 0) >= _MIN_HOLDOUT_OBS:
+            from core.analysis.walk_forward import deflated_sharpe
+            rep = deflated_sharpe(observed_sr=m["sharpe"], n_trials=n_trials, n_periods=m["n"],
+                                  skew=m.get("skew", 0.0), kurt=m.get("kurtosis_excess", 0.0) + 3.0,
+                                  annualized=True)
+            dsr_p, dsr_sig = round(float(rep["p_value"]), 4), bool(rep["significant_05"])
 
-    rec = {
-        "ts": ts or datetime.now(timezone.utc).isoformat(),
-        "consumed_at": ts or datetime.now(timezone.utc).isoformat(),
-        "candidate_id": candidate_id,
-        "spec_hash": str(spec_hash),
-        "data_fingerprint": str(data_fingerprint),
-        "holdout_boundary": str(b.date()),
-        "boundary": str(b.date()),
-        "return_hash": return_hash,
-        "peek_count": peek,
-        "holdout_trials": n_trials,
-        "holdout_dsr_p": dsr_p,
-        "holdout_dsr_sig": dsr_sig,
-        "holdout_metrics": {k: (float(m[k]) if isinstance(m.get(k), (int, float, np.floating)) else m.get(k))
-                            for k in ("annual", "sharpe", "maxdd", "n") if k in m},
-    }
-    with open(p, "a") as f:
-        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    return _result_from_record(rec)
+        rec = {
+            "ts": ts or datetime.now(timezone.utc).isoformat(),
+            "consumed_at": ts or datetime.now(timezone.utc).isoformat(),
+            "candidate_id": candidate_id,
+            "spec_hash": str(spec_hash),
+            "data_fingerprint": str(data_fingerprint),
+            "holdout_boundary": str(b.date()),
+            "boundary": str(b.date()),
+            "return_hash": return_hash,
+            "peek_count": peek,
+            "holdout_trials": n_trials,
+            "holdout_dsr_p": dsr_p,
+            "holdout_dsr_sig": dsr_sig,
+            "holdout_metrics": {k: (float(m[k]) if isinstance(m.get(k), (int, float, np.floating)) else m.get(k))
+                                for k in ("annual", "sharpe", "maxdd", "n") if k in m},
+        }
+        with open(p, "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+        return _result_from_record(rec)

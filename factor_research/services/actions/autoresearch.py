@@ -26,14 +26,19 @@ from factory.autoresearch import (
 
 def _load_validation_data(start: str):
     from factory.lines.line2_validation.l0_ic_scan import precompute_forward_returns
+    from governance.holdout import assert_search_clean, boundary
     from lake.load_lake import load_prices, load_raw_close
+
     from lake.units import implied_amount
 
     px = load_prices(start=start, fields=("close", "volume"))
-    close, volume = px["close"], px["volume"]
+    b = boundary()
+    close = px["close"].loc[px["close"].index < b]
+    volume = px["volume"].reindex(index=close.index, columns=close.columns)
     raw = load_raw_close(start=start).reindex(index=volume.index, columns=volume.columns)
     # canonical lake volume unit = share; amount CNY = shares × raw CNY/share
     amount = implied_amount(volume, raw)
+    assert_search_clean(close.index, label="AutoResearch validation data")
     forward_ret = precompute_forward_returns(close)
     return close, volume, amount, forward_ret
 
@@ -64,6 +69,9 @@ def _run_candidates(
         raise ValueError("max_stage must be one of: l0, l1, l2, l3")
     if close is None or volume is None or amount is None or forward_ret is None:
         close, volume, amount, forward_ret = _load_validation_data(start)
+    from governance.holdout import assert_search_clean
+    assert_search_clean(close.index, label="AutoResearch validation pipeline")
+    assert_search_clean(forward_ret.index, label="AutoResearch forward returns")
 
     if vintage_id is None:
         from lake.fingerprint import stamp_vintage

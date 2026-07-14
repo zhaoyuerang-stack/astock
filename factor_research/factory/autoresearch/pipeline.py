@@ -136,6 +136,9 @@ def run_validation_pipeline(
     computation_time_budget: float = 10.0,
 ) -> CandidateEvaluationResult:
     """Run a candidate through the existing real L0/L1/L2/L3 validation functions."""
+    from governance.holdout import assert_search_clean
+    assert_search_clean(close.index, label="AutoResearch L0-L3 pipeline")
+    assert_search_clean(forward_ret.index, label="AutoResearch L0 forward returns")
     repository = repository or CandidateRepository()
     experiment_log = experiment_log or ExperimentLog()
     review_queue = review_queue or ReviewQueue()

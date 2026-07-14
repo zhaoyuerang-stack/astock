@@ -46,19 +46,20 @@ def active_book_panels(close, volume, amount) -> list:
 
     ACTIVE 集 = small-cap-size.v2.0 + illiquidity.v1.0(见 registry_correlation_audit:
     其余为 SHADOW)。面板口径必须与 close 一致(walk-forward 下传截断面板)。
-    任一面板算不出 → 跳过该腿(best-effort,不拖垮搜索)。
+    任一面板算不出 → 阻断相关性惩罚。缺一条参考腿会把候选伪装得更正交，
+    因而不能 best-effort 跳过后继续择优。
     """
     panels = []
     try:
         from factors.small_cap import small_cap_factor
         panels.append(small_cap_factor(amount, 60).reindex(index=close.index, columns=close.columns))
-    except Exception:
-        pass
+    except Exception as exc:
+        raise RuntimeError("small-cap active-book reference panel unavailable") from exc
     try:
         from factors.momentum import illiquidity
         panels.append(illiquidity(close, volume, 20).reindex(index=close.index, columns=close.columns))
-    except Exception:
-        pass
+    except Exception as exc:
+        raise RuntimeError("illiquidity active-book reference panel unavailable") from exc
     return panels
 
 
@@ -66,7 +67,8 @@ def _style_panels(close) -> list:
     """风格面板 [size(log 流通市值), 流动性(换手率)],供正交增量罚(§四修法②)。
 
     size/流动性是当期 PIT 特征(daily_basic by_date,无前瞻),reindex 到 close;
-    walk-forward 下 _style_exposure 会按候选面板日期(≤cutoff)自截断,无泄露。算不出则空。
+    walk-forward 下 _style_exposure 会按候选面板日期(≤cutoff)自截断,无泄露。
+    算不出时阻断启用了 orth_weight 的搜索，避免缺失惩罚被当成零暴露。
     """
     import numpy as np
 
@@ -76,8 +78,8 @@ def _style_panels(close) -> list:
         size = np.log(db["circ_mv"]).reindex(index=close.index, columns=close.columns)
         liq = db["turnover_rate"].reindex(index=close.index, columns=close.columns)
         return [size, liq]
-    except Exception:
-        return []
+    except Exception as exc:
+        raise RuntimeError("style reference panels unavailable") from exc
 
 
 def _llm_seeds(islands: int, adapter, repository, experiment_log=None) -> tuple[list, str]:
@@ -147,6 +149,8 @@ def run_autoresearch_island_search(
 ) -> AutoResearchIslandSearchResponse:
     if close is None or volume is None or amount is None or forward_ret is None:
         close, volume, amount, forward_ret = _load_validation_data(start)
+    from governance.holdout import assert_search_clean
+    assert_search_clean(close.index, label="AutoResearch island action")
     vintage = vintage_id or _stamped_vintage(start, close)
     repository = repository or CandidateRepository()
 
@@ -249,6 +253,9 @@ def run_autoresearch_walk_forward(
     """
     if close is None or volume is None or amount is None:
         close, volume, amount, _ = _load_validation_data(start)
+    from governance.holdout import assert_search_clean
+    requested_end = pd.Timestamp(oos_end) if oos_end else close.index[-1]
+    assert_search_clean(requested_end, label="AutoResearch walk-forward action")
     vintage = vintage_id or _stamped_vintage(start, close)
     repository = repository or CandidateRepository()
 
