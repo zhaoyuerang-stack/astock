@@ -19,6 +19,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
+from lake.artifact_writer import atomic_write_json, atomic_write_text
+
 from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from engine.metrics import metrics
 from factors.small_cap import small_cap_timing
@@ -261,8 +263,7 @@ def _write_markdown(report: dict, path: Path) -> None:
             f"- reasons: {result.get('invalidation_reasons', [])}",
             "",
         ]
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines))
+    atomic_write_text(path, "\n".join(lines))
 
 
 def _apply_invalidations(report: dict) -> None:
@@ -296,8 +297,7 @@ def main() -> int:
     parser.add_argument("--apply-invalidation", action="store_true")
     args = parser.parse_args()
     report = run_blast_radius(args.backup_price, args.current_price, start=args.start)
-    args.output_json.parent.mkdir(parents=True, exist_ok=True)
-    args.output_json.write_text(json.dumps(report, ensure_ascii=False, indent=2, default=float))
+    atomic_write_json(args.output_json, report, default=float)
     _write_markdown(report, args.output_md)
     if args.apply_invalidation:
         _apply_invalidations(report)

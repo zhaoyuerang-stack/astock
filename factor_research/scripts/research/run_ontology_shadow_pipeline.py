@@ -27,6 +27,7 @@ from factory.ontology.industry_ontology_engine import IndustryOntologyPredictor
 from factory.ontology.report_logic import TransmissionNodeCategory, NodeChange
 from strategies.small_cap import load_price_panels
 from lake.load_lake import load_fundamental_panel
+from lake.artifact_writer import atomic_write_json
 
 # Output Paths
 SHADOW_LOG = ROOT / "data_lake" / "agent" / "shadow_incubation_log.json"
@@ -272,8 +273,7 @@ def run_ontology_shadow_pipeline():
             "details": shock["details"]
         })
         
-    PREDICTIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    PREDICTIONS_FILE.write_text(json.dumps(predictions_output, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_json(PREDICTIONS_FILE, predictions_output)
     print(f"[+] Saved ontology predictions to {PREDICTIONS_FILE.name}")
 
     # 8. Build Shadow Portfolio NAV Curve (Simulated on Real Close Prices)
@@ -329,8 +329,7 @@ def run_ontology_shadow_pipeline():
                 "benchmark_nav": benchmark_nav.values.tolist()
             }
             
-            PERFORMANCE_FILE.parent.mkdir(parents=True, exist_ok=True)
-            PERFORMANCE_FILE.write_text(json.dumps(perf_data, ensure_ascii=False, indent=2), encoding="utf-8")
+            atomic_write_json(PERFORMANCE_FILE, perf_data)
             print(f"[+] Saved shadow NAV performance to {PERFORMANCE_FILE.name}")
             
     except Exception as e:
@@ -357,8 +356,7 @@ def run_ontology_shadow_pipeline():
         }
     }
     
-    SHADOW_LOG.parent.mkdir(parents=True, exist_ok=True)
-    SHADOW_LOG.write_text(json.dumps(log_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_json(SHADOW_LOG, log_data)
     print(f"[+] Updated shadow incubation log in {SHADOW_LOG.name}")
 
 if __name__ == "__main__":

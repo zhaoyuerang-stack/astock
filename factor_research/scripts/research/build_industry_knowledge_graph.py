@@ -14,6 +14,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from lake.artifact_writer import atomic_write_json
+
 LOGIC_CHAIN_DIR = ROOT / "data_lake" / "research_signals" / "logic_chains"
 GRAPH_OUTPUT_FILE = ROOT / "data_lake" / "research_signals" / "industry_knowledge_graph.json"
 
@@ -109,8 +111,7 @@ def build_graph():
     }
     
     # 落盘保存
-    GRAPH_OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    GRAPH_OUTPUT_FILE.write_text(json.dumps(graph_data, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_json(GRAPH_OUTPUT_FILE, graph_data)
     print(f"[+] 成功生成全市场产业知识图谱: {GRAPH_OUTPUT_FILE.name}")
     print(f"    - 节点总数 (Nodes): {len(nodes_list)}")
     print(f"    - 因果关联总数 (Links): {len(links_list)}")

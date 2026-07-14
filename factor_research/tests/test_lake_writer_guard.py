@@ -1,4 +1,5 @@
 """数据湖写入口守卫回归测试。"""
+import subprocess
 import sys
 from pathlib import Path
 
@@ -7,6 +8,33 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.ci.check_lake_writers import discover_python_files, scan_source
+
+
+def test_migrated_writer_scripts_bootstrap_canonical_writer_from_repo_parent():
+    """Direct script execution must resolve ``lake`` before project imports."""
+    factor_root = Path(__file__).resolve().parents[1]
+    scripts = (
+        "scripts/ops/auto_download_reports.py",
+        "scripts/ops/decay_monitor.py",
+        "scripts/ops/simulate_hot_reports.py",
+        "scripts/research/build_industry_knowledge_graph.py",
+        "scripts/research/incubation_policy.py",
+        "scripts/research/price_unit_blast_radius.py",
+        "scripts/research/report_feedback_loop.py",
+        "scripts/research/report_nlp_pipeline.py",
+        "scripts/research/run_ontology_shadow_pipeline.py",
+    )
+    code = "import runpy\n" + "\n".join(
+        f"runpy.run_path({str(factor_root / relative)!r}, run_name='writer_probe_{index}')"
+        for index, relative in enumerate(scripts)
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=factor_root.parent,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_file_discovery_falls_back_without_git_metadata(tmp_path):

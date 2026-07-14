@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 from strategy_registry import register_family, register
 from factory.ontology import Hypothesis, EconomicThesis, HypothesisStatus
+from lake.artifact_writer import atomic_write_json
 
 # 影子日志与表现记录路径
 SHADOW_LOG = ROOT / "data_lake" / "agent" / "shadow_incubation_log.json"
@@ -106,8 +107,7 @@ def configure_shadow_incubation():
         "performance_metrics_history": []
     }
     
-    with open(SHADOW_LOG, "w", encoding="utf-8") as f:
-        json.dump(log_data, f, ensure_ascii=False, indent=2)
+    atomic_write_json(SHADOW_LOG, log_data)
         
     print(f"  [+] 影子孵化配置文件已初始化: {SHADOW_LOG.relative_to(ROOT)}")
     

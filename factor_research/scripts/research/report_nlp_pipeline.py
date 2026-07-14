@@ -32,6 +32,7 @@ from factory.ontology.report_logic import (
     TransmissionNodeCategory,
     NodeChange
 )
+from lake.artifact_writer import append_jsonl, atomic_write_json
 
 # 设定输入与输出路径
 PDF_DIR = ROOT / "data_lake" / "research_pdf"
@@ -70,8 +71,7 @@ def load_inbox_state() -> dict:
 def save_inbox_state(state: dict):
     """Save the processed files state to JSON."""
     try:
-        INBOX_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        INBOX_STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        atomic_write_json(INBOX_STATE_FILE, state)
     except Exception as e:
         print(f"[!] 保存 _inbox_state.json 失败: {e}")
 
@@ -85,8 +85,7 @@ def log_failure(file_path: Path, error_msg: str):
             "file_name": file_path.name,
             "error": error_msg
         }
-        with FAILURES_LOG_FILE.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        append_jsonl(FAILURES_LOG_FILE, entry)
     except Exception as e:
         print(f"[!] 写入失败日志失败: {e}")
 
@@ -438,7 +437,7 @@ def process_report_file(pdf_path: Path, is_demo: bool = False) -> dict | None:
             target_dir.mkdir(parents=True, exist_ok=True)
             
             output_path = target_dir / f"{stock_code}_{pdf_path.stem}.json"
-            output_path.write_text(json.dumps(signals, ensure_ascii=False, indent=2), encoding="utf-8")
+            atomic_write_json(output_path, signals)
             print(f"[+] 成功提取个股信号并保存至: {safe_relative_path(output_path)}")
             
         elif report_type == "industry":
@@ -471,7 +470,7 @@ def process_report_file(pdf_path: Path, is_demo: bool = False) -> dict | None:
             # 保存至 logic_chains/ 目录，供 Web 端直接渲染展示
             LOGIC_CHAIN_DIR.mkdir(parents=True, exist_ok=True)
             output_path = LOGIC_CHAIN_DIR / f"{hypothesis_name}.json"
-            output_path.write_text(json.dumps(chain.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
+            atomic_write_json(output_path, chain.to_dict())
             print(f"[+] 成功提取行业逻辑传导链并保存至: {safe_relative_path(output_path)}")
             
             # 同时也往日期目录里存一份归档
@@ -479,7 +478,7 @@ def process_report_file(pdf_path: Path, is_demo: bool = False) -> dict | None:
             archive_dir = SIGNAL_DIR / effective_date
             archive_dir.mkdir(parents=True, exist_ok=True)
             archive_path = archive_dir / f"industry_{hypothesis_name}_{pdf_path.stem}.json"
-            archive_path.write_text(json.dumps(signals, ensure_ascii=False, indent=2), encoding="utf-8")
+            atomic_write_json(archive_path, signals)
             
         else:
             raise ValueError(f"未知的研报类别: {report_type}")

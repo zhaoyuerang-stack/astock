@@ -16,6 +16,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from lake.artifact_writer import atomic_write_json
+
 REGISTRY_FILE = ROOT / "strategy_versions.json"
 GRAPH_FILE = ROOT / "data_lake" / "research_signals" / "industry_knowledge_graph.json"
 FEEDBACK_LEDGER_FILE = ROOT / "reports" / "research" / "report_feedback_ledger.json"
@@ -184,7 +186,7 @@ def run_feedback_loop():
             node["backtest_status"] = "untested"
 
     # 写回图谱文件
-    GRAPH_FILE.write_text(json.dumps(graph, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_json(GRAPH_FILE, graph)
     print(f"[+] 绩效指标与置信度已反向注入产业知识图谱: {GRAPH_FILE.name}")
     
     # 3. 统计并导出失败/证伪的假说台账，供 NLP prompt 动态读取反思
@@ -197,11 +199,10 @@ def run_feedback_loop():
                 "reason": cls["label"]
             })
             
-    FEEDBACK_LEDGER_FILE.parent.mkdir(parents=True, exist_ok=True)
-    FEEDBACK_LEDGER_FILE.write_text(json.dumps({
+    atomic_write_json(FEEDBACK_LEDGER_FILE, {
         "updated_at": Path(GRAPH_FILE).stat().st_mtime if GRAPH_FILE.exists() else 0,
         "refuted_hypotheses": refuted_list
-    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    })
     print(f"[+] 自我反馈失败反思台账已导出: {FEEDBACK_LEDGER_FILE.name} (共 {len(refuted_list)} 个失效假说)")
 
 if __name__ == "__main__":

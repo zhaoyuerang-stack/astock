@@ -19,6 +19,8 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from lake.artifact_writer import atomic_write_bytes
+
 PDF_DIR = ROOT / "data_lake" / "research_pdf"
 INBOX_STATE_FILE = PDF_DIR / "_inbox_state.json"
 
@@ -94,8 +96,7 @@ def download_pdf(info_code: str, target_path: Path) -> bool:
     req = urllib.request.Request(pdf_url, headers=HEADERS)
     try:
         with urllib.request.urlopen(req, timeout=30) as response:
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            target_path.write_bytes(response.read())
+            atomic_write_bytes(target_path, response.read())
         return True
     except urllib.error.HTTPError as he:
         print(f"  [!] HTTP错误下载 PDF {info_code}: {he.code} {he.reason}")

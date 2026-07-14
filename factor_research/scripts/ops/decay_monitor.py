@@ -30,6 +30,7 @@ sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
 from governance.decay import decay_check
+from lake.artifact_writer import append_jsonl
 
 REPORT = ROOT / "data_lake" / "governance" / "decay_monitor.jsonl"
 LATEST = ROOT / "reports" / "decay_status.json"
@@ -93,10 +94,7 @@ def main():
     if no_registered:
         print("无在册策略可复测(0 在册或均缺收益序列)——写诚实空报告刷新陈旧控制面,不早退。")
 
-    REPORT.parent.mkdir(parents=True, exist_ok=True)
-    with open(REPORT, "a") as f:
-        for r in rows:
-            f.write(json.dumps(r, ensure_ascii=False, default=float) + "\n")
+    append_jsonl(REPORT, rows)
 
     print("-" * 72)
     if decayed:

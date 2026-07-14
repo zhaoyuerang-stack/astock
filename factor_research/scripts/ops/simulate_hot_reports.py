@@ -6,12 +6,16 @@ These files will trigger the NLP inbox pipeline in demo mode to generate structu
 """
 
 import os
+import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from lake.artifact_writer import atomic_write_text
+
 def main():
-    # Define root path relative to this script
-    ROOT = Path(__file__).resolve().parents[2]
-    
     # Target directory for simulated PDFs
     target_dir = ROOT / "data_lake" / "research_pdf" / "2026-06-18"
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -27,7 +31,7 @@ def main():
     for filename, content in reports.items():
         filepath = target_dir / filename
         # Overwrite if exists, write simple content
-        filepath.write_text(content, encoding="utf-8")
+        atomic_write_text(filepath, content)
         print(f"  [+] Created {filename}")
         
     print("[*] Simulation setup complete. You can now run the NLP pipeline in demo mode.")
