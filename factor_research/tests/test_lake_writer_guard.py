@@ -6,7 +6,18 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.ci.check_lake_writers import scan_source
+from scripts.ci.check_lake_writers import discover_python_files, scan_source
+
+
+def test_file_discovery_falls_back_without_git_metadata(tmp_path):
+    workflow = tmp_path / "workflow"
+    workflow.mkdir()
+    (workflow / "probe.py").write_text("VALUE = 1\n", encoding="utf-8")
+    cache = workflow / "__pycache__"
+    cache.mkdir()
+    (cache / "ignored.py").write_text("VALUE = 2\n", encoding="utf-8")
+
+    assert discover_python_files(tmp_path) == ["workflow/probe.py"]
 
 
 def test_flags_direct_version_returns_csv_write_outside_lake_layer():

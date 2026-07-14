@@ -282,17 +282,36 @@ def scan_source(src: str, *, rel: str) -> list[str]:
     return []
 
 
+def discover_python_files(root: Path = ROOT) -> list[str]:
+    """Return governed Python paths in a worktree or a source archive.
+
+    Git mode intentionally includes untracked files so a shared-worktree WIP cannot
+    introduce an unguarded canonical writer.  A release/source archive has no
+    ``.git`` metadata, so conservatively scan every Python file on disk instead of
+    crashing or, worse, silently checking nothing.
+    """
+    try:
+        output = subprocess.run(
+            [
+                "git", "ls-files", "--cached", "--others", "--exclude-standard",
+                "--", "*.py",
+            ],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.splitlines()
+        return sorted(set(output))
+    except (OSError, subprocess.CalledProcessError):
+        return sorted(
+            str(path.relative_to(root))
+            for path in root.rglob("*.py")
+            if "__pycache__" not in path.parts
+        )
+
+
 def main() -> int:
-    files = subprocess.run(
-        [
-            "git", "ls-files", "--cached", "--others", "--exclude-standard",
-            "--", "*.py",
-        ],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.splitlines()
+    files = discover_python_files()
 
     violations = []
     for rel in files:
