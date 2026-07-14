@@ -6,6 +6,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import pandas as pd
+import pytest
+
+pytestmark = pytest.mark.requires_data_lake
 from lake.load_lake import load_prices, load_raw_close, load_fundamental_panel, load_capital_panel, load_panel
 from lake.schema import FUNDAMENTAL_FIELDS, CAPITAL_FIELDS
 

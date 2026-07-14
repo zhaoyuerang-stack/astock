@@ -2,7 +2,9 @@
 
 历史:test_all.sh 手工逐文件列调用,漏掉 15 个 test_*.py 从不运行。本守卫扫描
 factor_research/test_*.py 与 factor_research/tests/test_*.py,确认每个都能被 pytest 收集
-(import 无误)。不再维护第二份手工清单 —— 新测试默认进套件。
+(import 无误)。不再维护第二份手工清单 —— 新测试默认进套件。即使文件只有
+``__main__`` 脚本、没有 ``def test_*``，也必须失败而不是静默豁免；canonical runner
+已经不再逐文件直接执行这类脚本。
 
 违规(有文件无法收集 / 被排除)则 exit 1。
 """
@@ -17,14 +19,11 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def discover_test_files() -> set[str]:
-    """含 ≥1 个 `def test_` 函数的 test_*.py 才算 pytest 测试,必须被收集。
-    0 测试函数的脚本式 test_*.py(__main__ 直跑)由 test_all.sh 单独 python3 调用,豁免。"""
+    """Return every test-named file; none may rely on direct script execution."""
     files = set()
     for pat in ("test_*.py", "tests/test_*.py"):
         for p in ROOT.glob(pat):
-            src = p.read_text(encoding="utf-8", errors="ignore")
-            if re.search(r"^\s*def test_\w+", src, re.MULTILINE):
-                files.add(str(p.relative_to(ROOT)))
+            files.add(str(p.relative_to(ROOT)))
     return files
 
 

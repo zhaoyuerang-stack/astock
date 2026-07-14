@@ -2,7 +2,7 @@
 
 Run::
 
-    cd /Users/kiki/astcok/factor_research && /usr/bin/python3 test_engine.py
+    cd factor_research && python3 -m pytest tests/test_engine.py -q
 
 All tests must pass before the Phase-2 migration is considered complete.
 """
@@ -10,10 +10,15 @@ import os
 import sys
 from pathlib import Path
 
-os.chdir(Path(__file__).parent)
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
+os.chdir(PROJECT_ROOT)
 
 import numpy as np
 import pandas as pd
+import pytest
+
+pytestmark = pytest.mark.requires_data_lake
 
 from strategies.small_cap import (
     build_rebalance_weights,

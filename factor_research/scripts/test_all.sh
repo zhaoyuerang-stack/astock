@@ -1,252 +1,31 @@
 #!/bin/bash
-# One-command test runner for the entire project.
+# Canonical one-command verification: governance guards, then every collected test.
 set -e
 
 cd "$(dirname "$0")/.."
 
-echo "=== check_layer_deps.py (分层依赖 + 台账唯一写入口) ==="
-python3 scripts/ci/check_layer_deps.py
+run_guard() {
+    local label="$1"
+    local script="$2"
+    echo "=== ${label} ==="
+    python3 "${script}"
+    echo ""
+}
 
-echo ""
-echo "=== check_test_discovery.py (全量测试发现:防 test_*.py 被静默排除) ==="
-python3 scripts/ci/check_test_discovery.py
+run_guard "check_layer_deps.py (分层依赖 + 台账唯一写入口)" scripts/ci/check_layer_deps.py
+run_guard "check_test_discovery.py (全量测试发现:防 test_*.py 被静默排除)" scripts/ci/check_test_discovery.py
+run_guard "check_control_exceptions.py (控制路径禁静默 except:pass)" scripts/ci/check_control_exceptions.py
+run_guard "check_registry_evidence.py (台账9-Gate证据完整性:防照抄/跳门)" scripts/ci/check_registry_evidence.py
+run_guard "check_holdout_compliance.py (自动选择路径必须 holdout 截断:§5.2 缝③)" scripts/ci/check_holdout_compliance.py
+run_guard "check_no_force_promote.py (自动晋级禁 force=True/run_marginal=False:根因#1)" scripts/ci/check_no_force_promote.py
+run_guard "check_no_legacy_data.py (R-DATA-001 禁代码 import/加载 data_full 旧口径)" scripts/ci/check_no_legacy_data.py
+run_guard "check_naming_taxonomy.py (命名分类体系/防止模糊命名)" scripts/ci/check_naming_taxonomy.py
+run_guard "check_amount_units.py (成交额单位 share×raw，禁 volume×100×price)" scripts/ci/check_amount_units.py
+run_guard "check_cost_model_usage.py (正式路径禁低于 canonical 成本地板)" scripts/ci/check_cost_model_usage.py
+run_guard "check_lake_writers.py (数据湖唯一写入口)" scripts/ci/check_lake_writers.py
 
-echo ""
-echo "=== check_control_exceptions.py (控制路径禁静默 except:pass) ==="
-python3 scripts/ci/check_control_exceptions.py
-
-echo ""
-echo "=== check_registry_evidence.py (台账9-Gate证据完整性:防照抄/跳门) ==="
-python3 scripts/ci/check_registry_evidence.py
-
-echo ""
-echo "=== check_holdout_compliance.py (自动选择路径必须 holdout 截断:§5.2 缝③) ==="
-python3 scripts/ci/check_holdout_compliance.py
-
-echo ""
-echo "=== check_no_force_promote.py (自动晋级禁 force=True/run_marginal=False:根因#1) ==="
-python3 scripts/ci/check_no_force_promote.py
-
-echo ""
-echo "=== check_no_legacy_data.py (R-DATA-001 禁代码 import/加载 data_full 旧口径) ==="
-python3 scripts/ci/check_no_legacy_data.py
-
-echo ""
-echo "=== check_naming_taxonomy.py (命名分类体系/防止模糊命名) ==="
-python3 scripts/ci/check_naming_taxonomy.py
-
-
-echo ""
-echo "=== check_amount_units.py (成交额单位 share×raw，禁 volume×100×price) ==="
-python3 scripts/ci/check_amount_units.py
-
-echo ""
-echo "=== check_cost_model_usage.py (正式路径禁低于 canonical 成本地板) ==="
-python3 scripts/ci/check_cost_model_usage.py
-
-echo ""
-echo "=== test_loop_foundations.py (防自欺地基:trial账本 + holdout金库) ==="
-python3 tests/test_loop_foundations.py
-
-echo ""
-echo "=== check_lake_writers.py (数据湖唯一写入口) ==="
-python3 scripts/ci/check_lake_writers.py
-
-echo ""
-echo "=== test_engine.py ==="
-python3 test_engine.py
-
-echo ""
-echo "=== test_data_layer.py ==="
-python3 tests/test_data_layer.py
-
-echo ""
-echo "=== test_e2e.py ==="
-python3 tests/test_e2e.py
-
-echo ""
-echo "=== test_knowledge.py ==="
-python3 tests/test_knowledge.py
-
-echo ""
-echo "=== test_research_run_ledger.py (研究结果统一归档 + index) ==="
-python3 tests/test_research_run_ledger.py
-
-echo ""
-echo "=== test_autoresearch_engine.py (Auto Factor Research Lite) ==="
-python3 tests/test_autoresearch_engine.py
-
-echo ""
-echo "=== test_agent_loop.py (5-Component Agent Control Loop) ==="
-python3 -m pytest tests/test_agent_loop.py -q
-
-echo ""
-echo "=== test_services_phase0.py (产品 services 接缝;全量比对设 PHASE0_FULL=1) ==="
-python3 tests/test_services_phase0.py
-
-echo ""
-echo "=== test_api_contracts.py (前后端契约 smoke) ==="
-python3 tests/test_api_contracts.py
-
-echo ""
-echo "=== test_risk_phase3.py (风控控制回路;集成设 PHASE3_FULL=1) ==="
-python3 tests/test_risk_phase3.py
-
-echo ""
-echo "=== test_agent_phase5.py (Agent planner + 不越权分级) ==="
-python3 tests/test_agent_phase5.py
-
-echo ""
-echo "=== test_agent_skills.py (Agent skill LLM 意图路由 + 数字护栏) ==="
-python3 tests/test_agent_skills.py
-
-echo ""
-echo "=== test_stock_profile.py (个股画像 · 不复权真实股价) ==="
-python3 tests/test_stock_profile.py
-
-echo ""
-echo "=== test_fundamentals.py (基本面引擎:议价权/预期差 + 读层防未来对齐) ==="
-python3 tests/test_fundamentals.py
-
-echo ""
-echo "=== test_llm_providers.py (Agent LLM 多 provider + 安全不变量) ==="
-python3 tests/test_llm_providers.py
-
-echo ""
-echo "=== test_settings_phase6.py (系统设置 · 成本铁律只读 + 审计) ==="
-python3 tests/test_settings_phase6.py
-
-echo ""
-echo "=== test_action_jobs_phase7.py (动作确认令牌 + 分钟级任务异步 job) ==="
-python3 tests/test_action_jobs_phase7.py
-
-echo ""
-echo "=== test_paper_etf.py (模拟盘债券 ETF 轮动 P5) ==="
-python3 tests/test_paper_etf.py
-
-echo ""
-echo "=== test_alpha_audit.py (research_toolkit Alpha Audit) ==="
-python3 tests/test_alpha_audit.py
-
-echo ""
-echo "=== test_factor_store.py (Factor Store 面板落库 + manifest) ==="
-python3 tests/test_factor_store.py
-
-echo ""
-echo "=== test_factor_store_scoring.py (Factor Store 统一评分层) ==="
-python3 -m pytest tests/test_factor_store_scoring.py -q
-
-echo ""
-echo "=== test_historical_memory_experiment.py (历史相似截面记忆保守实验) ==="
-python3 -m pytest tests/test_historical_memory_experiment.py -q
-
-echo ""
-echo "=== test_factor_store_backfill.py (核心因子真实回填编排) ==="
-python3 -m pytest tests/test_factor_store_backfill.py -q
-
-echo ""
-echo "=== test_regime_gate.py (regime 门控 LIVE 模式,默认关) ==="
-python3 tests/test_regime_gate.py
-
-echo ""
-echo "=== test_composer.py (capped 权重组合) ==="
-python3 tests/test_composer.py
-
-echo ""
-echo "=== test_veto_filter.py (Policy 层 VetoFilter 边际贡献机制) ==="
-python3 tests/test_veto_filter.py
-
-echo ""
-echo "=== test_research_toolkit.py (策略研究与控制规则验证工具箱) ==="
-python3 tests/test_research_toolkit.py
-
-echo ""
-echo "=== test_engine_start_window.py (BacktestConfig.start 统计窗口语义) ==="
-python3 tests/test_engine_start_window.py
-
-echo ""
-echo "=== test_lake_invariants.py (数据湖写路径不变量) ==="
-python3 tests/test_lake_invariants.py
-
-echo ""
-echo "=== test_price_unit_contract.py (价量 canonical 单位) ==="
-python3 -m pytest tests/test_price_unit_contract.py -q
-
-echo ""
-echo "=== test_price_amount_invariant.py (成交额物理量纲写入闸门) ==="
-python3 -m pytest tests/test_price_amount_invariant.py -q
-
-echo ""
-echo "=== test_star_exclude.py (科创板 volume 修正 + 小盘显式排除) ==="
-python3 tests/test_star_exclude.py
-
-echo ""
-echo "=== test_data_vintage.py (每日更新指纹 + 漂移检测) ==="
-python3 tests/test_data_vintage.py
-
-echo ""
-echo "=== test_style_neutralization.py (CNE6 风格中性化审计) ==="
-python3 tests/test_style_neutralization.py
-
-echo ""
-echo "=== test_institutional_upgrades.py (机构级治理/组合/容量模块 smoke) ==="
-python3 tests/test_institutional_upgrades.py
-
-echo ""
-echo "=== test_governance_integrity.py (hit唯一权威/双轨准入/审批映射/ledger链/Nine-Gate摘要) ==="
-python3 tests/test_governance_integrity.py
-
-echo ""
-echo "=== test_promote_nine_gate.py (promote后自动触发Nine-Gate并失败回填) ==="
-python3 tests/test_promote_nine_gate.py
-
-echo ""
-echo "=== test_tushare_daily_basic.py (daily_basic 归一 + pivot) ==="
-python3 tests/test_tushare_daily_basic.py
-
-echo ""
-echo "=== test_tushare_interface_registry.py (tushare 接口声明口径) ==="
-python3 tests/test_tushare_interface_registry.py
-
-echo ""
-echo "=== test_pledge_stat_loader.py (质押统计专用防未来对齐) ==="
-python3 tests/test_pledge_stat_loader.py
-
-echo ""
-echo "=== test_pledge_factors.py (质押风险状态因子) ==="
-python3 tests/test_pledge_factors.py
-
-echo ""
-echo "=== test_fina_indicator.py (财务指标公告日 ffill 防未来) ==="
-python3 tests/test_fina_indicator.py
-
-echo ""
-echo "=== test_macro.py (宏观时序层防未来 lag) ==="
-python3 tests/test_macro.py
-
-echo ""
-echo "=== test_report_nlp_pipeline.py (研报 NLP Inbox 提取管线) ==="
-python3 tests/test_report_nlp_pipeline.py
-
-echo ""
-echo "=== test_report_feedback_loop.py (研报 自我反馈闭环) ==="
-python3 tests/test_report_feedback_loop.py
-
-echo ""
-echo "=== test_ontology_shadow_pipeline.py (影子观察本体策略) ==="
-python3 tests/test_ontology_shadow_pipeline.py
-
-echo ""
-echo "=== test_notify.py (运维告警通道 + 日更失败告警去重/恢复) ==="
-python3 tests/test_notify.py
-
-echo ""
-echo "=== test_catalog_status.py (边际贡献定级 ACTIVE/SHADOW 台账写入口) ==="
-python3 -m pytest tests/test_catalog_status.py -q
-
-echo ""
-echo "=== test_moving_average_overlay.py (防御择时参数独立DSR审计单元测试) ==="
-python3 -m pytest tests/test_moving_average_overlay.py -q
+echo "=== pytest (全部收集测试) ==="
+python3 -m pytest -q
 
 echo ""
 echo "🎉 All tests passed!"

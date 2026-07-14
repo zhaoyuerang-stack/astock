@@ -10,6 +10,8 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
@@ -39,6 +41,7 @@ def test_route_system_status_questions_to_status_skill():
     assert result["output"].citations == []
 
 
+@pytest.mark.requires_data_lake
 def test_route_stock_questions_to_stock_data_skill():
     _offline()
     skill = route_skill("600519 最近情况怎么样", {"current_page": "overview"})
@@ -120,6 +123,7 @@ def test_fabricated_number_is_rejected():
     assert r["output"].summary == det   # 回退确定性摘要
 
 
+@pytest.mark.requires_data_lake
 def test_stock_fabrication_is_rejected():
     _offline()
 
@@ -173,6 +177,7 @@ def test_stock_code_safety_overrides_llm():
     assert sk.name == "stock_data"      # 安全前置:抽到代码必走数据源
 
 
+@pytest.mark.requires_data_lake
 def test_stock_resolves_by_name():
     from services.read.stocks import resolve_stock_code
     assert resolve_stock_code("汇川技术股票怎么样") == "300124"

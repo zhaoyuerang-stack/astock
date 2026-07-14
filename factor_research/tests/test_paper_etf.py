@@ -13,6 +13,8 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
@@ -25,17 +27,14 @@ BOND_PX = 141.0     # ETF 不复权参考价
 STOCK_PX = 10.0
 
 
-def _patch():
-    """股票/ETF 价格全部打桩:股票 10 元、ETF 141 元,永不停牌不涨跌停。"""
-    pe.get_etf_fill = lambda code, date, mode=None: BOND_PX
-    pe.get_etf_close = lambda code, date: BOND_PX
-    pe.buyable_open = lambda code, date, name: STOCK_PX
-    pe.sellable_open = lambda code, date, name: STOCK_PX
-    pe.get_close = lambda code, date: STOCK_PX
-
-
-def setup_function():
-    _patch()
+@pytest.fixture(autouse=True)
+def _patch_prices(monkeypatch):
+    """股票/ETF 价格全部打桩,并在每个测试后恢复模块全局状态。"""
+    monkeypatch.setattr(pe, "get_etf_fill", lambda code, date, mode=None: BOND_PX)
+    monkeypatch.setattr(pe, "get_etf_close", lambda code, date: BOND_PX)
+    monkeypatch.setattr(pe, "buyable_open", lambda code, date, name: STOCK_PX)
+    monkeypatch.setattr(pe, "sellable_open", lambda code, date, name: STOCK_PX)
+    monkeypatch.setattr(pe, "get_close", lambda code, date: STOCK_PX)
 
 
 def _acc(cash=1_000_000.0, positions=None, bond=None):
@@ -219,11 +218,4 @@ def test_bond_instruction_view_exposes_authorization_state():
 
 
 if __name__ == "__main__":
-    _patch()
-    test_bear_buys_bond()
-    test_bull_sells_bond_then_buys_stocks()
-    test_valuation_includes_bond()
-    test_divergence_day_stocks_first_then_bond()
-    test_bond_none_backward_compat()
-    test_estimate_bond_order()
-    print("\n🎉 Paper ETF rotation tests passed!")
+    sys.exit(pytest.main([__file__, "-q"]))

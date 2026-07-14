@@ -9,6 +9,9 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+import pytest
+
+pytestmark = pytest.mark.requires_data_lake
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -19,9 +22,6 @@ _FP = ROOT / "data_lake" / "holder" / "holdernumber_all.parquet"
 
 
 def test_holder_panel_pit_no_future_leak():
-    if not _FP.exists():
-        print("holdernumber parquet 缺失,跳过")
-        return
     # 000001.SZ 已知公告点:ann 20250823→443583(end 0630),ann 20251025→453515(end 0930)
     trade = pd.bdate_range("2025-08-01", "2025-11-15")
     s = load_tushare_panel("holdernumber", trade, codes=["000001"])["holder_num"]["000001"]

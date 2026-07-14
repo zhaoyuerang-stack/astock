@@ -22,3 +22,8 @@ duckdb==1.5.3
 # baostock: ETF/股票日线备用源(akshare 东财挂/被代理时自动 fallback)
 # 完全免费,无 token,数据覆盖 2006-至今,支持后复权/不复权
 baostock==0.9.2
+
+# --- 配置 / 数据源 / 因子实现的直接依赖 ---
+PyYAML==6.0.3
+requests==2.34.2
+scikit-learn==1.9.0
