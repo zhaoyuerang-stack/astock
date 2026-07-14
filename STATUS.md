@@ -30,6 +30,16 @@
   · **worktree 数据链**:data_lake 六目录+fundamental_batch symlink 主仓(gitignored 只读),此前环境性失败的 test_engine/test_data_layer/test_e2e/test_services_phase0/test_style_neutralization 全部转绿;test_autoresearch_engine 单例(`test_island_fitness_penalizes_correlation_to_book`)失败经 `git stash -u` 基线复现为**预存**(同 06-30/07-02 记录),非本次引入。
   · **CI 缺口发现**:test_all.sh 手工枚举测试文件,check_test_discovery 只验"可收集"不验"被执行"——pytest-only 新测试(test_fundamental_quality/test_expectation_gap)从不被 CI 跑;已立后台任务(补兜底 pytest 块)。
 
+**2026-07-10(paper 多账户并行实测闭环,WS-D 执行侧代码完成,生产机验收待人)**:
+  · **执行摘要**:按 [`.claude/plans/PLAN_paper_multiaccount_loop.md`](.claude/plans/PLAN_paper_multiaccount_loop.md) T1→T5 全部执行完毕(7 个 commit,含 2 个补完修正),把单账户 `portfolio/paper_engine.py` 改造为多账户并行实测(排名靠前 top-N 候选各自独立模拟盘账本),接读层/API,web 桌面端并排展示。全程 hermetic 合成数据测试,零真金零下单(R-PROD-001)。
+  · **T1 引擎参数化**:`load_account/save_account/append_trades/upsert_nav` 新增可选路径参数,默认值=现路径,legacy 单账户流零行为变化(parity 探针验证逐字节相同)。
+  · **T2 多账户管理器**:`portfolio/paper_accounts.py`——状态机 active/frozen/blocked/degraded;`provision_from_recompose` 只信 `reports/research/portfolio_recompose.json::paper_candidates`(stale>14天/缺失 fail-closed);目标持仓只经 `strategies/executable.py::build_executable_strategy` canonical 路径(R-BT-001,转不出 spec = 显式 blocked)。账本隔离对抗测试:mutation testing 实测——先注入"模块级共享 acc 缓存"bug 确认变红,恢复实现确认变绿。
+  · **T3 日更入口**:`scripts/ops/paper_accounts_update.py` + `scheduled_daily_update.py` 旁路挂载(与既有 `run_paper_forward_smallcap` 同款——失败不影响日更 status,mutation testing 验证)。
+  · **T4 读层+API**:`services/read/paper_accounts.py` + `GET /paper-accounts`——回测偏差(paper NAV vs 该版本 `data_lake/version_returns` 同窗对比)手算核对通过;展示顺序=recompose 排名顺序(非目录字典序,已修正一处初版偏差)。
+  · **T5 桌面端**:`web/components/paper/PaperAccountsPanel.tsx` 挂 dashboard(PM 交易台,按 `DECISION_COCKPITS.md` 决策归属)"模拟盘账户"区块之后;顺序/状态判别抽成纯函数 `web/lib/paperAccounts.mjs`,mutation testing 验证"客户端重排名"会被测试抓红。
+  · **验证**:python 侧 pytest 18 处失败与改动前基线逐条 diff 为空(零新增);web 侧 tsc/lint 0 错误,`npm test` 38 用例 37 通过(1 处 system-governance 页面既有基线失败,与本次无关);10 个静态守卫全绿。
+  · **留白**:T6 已在 `RUNBOOK.md` §④.5 写好生产机人工验收清单(provision→连续2日观察→legacy 单账户流零 diff 核对);合并到生产分支 + 生产机真实数据验收留人执行。
+
 **2026-07-10(新数据源接入固定剧本 data-source-onboarding,纯文档)**:
   · **补的缺口**:接入纪律散在 data_infrastructure/data_dimensions/LESSONS/CLAUDE §9 四处,agent 被叫去"接入 XX 源"只能临场拼流程(封禁/单位错/幸存者偏差/未来函数每次重踩);backlog 条目的 playbook 只指 probe-signal-source(信息体检),「外部源→data_lake canonical」工程接入这半段没有 canonical 剧本。
   · **新增** `docs/agent_skills/data_source_onboarding.md`:固定流水线 S0-S7 逐步 fail-closed——S0 立项五判(信息假设对方向登记簿/PIT 可得性/全市场含退市覆盖/配额封禁账/停发预案)→ S1 小样本探针(单位·主键·时间戳·退市股·极值 top3)→ S2 契约声明(接入=INTERFACES/Fetcher 注册非新脚本;**时间轴口径三选一强制声明进加载层路由**,拿不准选最晚可见)→ S3 回填(canonical writer+manifest,限速铁律)→ S4 质量门(PIT 抽查/量纲对账/第二源 reconcile,不过不进加载层)→ S5 统一加载入口 → S6 增量+data_dimensions 登记+backlog 销账 → S7 交棒 probe-signal-source(数据健康≠信息有价值)。含雷区速查表(全部指向 LESSONS 已踩坑)。
