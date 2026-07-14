@@ -36,6 +36,29 @@ class TestReportNLPPipeline(unittest.TestCase):
             # The record helper has dedicated temp-ledger coverage elsewhere;
             # inbox behavior tests must never append to the canonical lake.
             patch("scripts.research.report_nlp_pipeline.record_report_nlp_research_run"),
+            # run_inbox_pipeline imports these downstream modules dynamically;
+            # patching only this module's globals otherwise still rewrites the
+            # canonical knowledge graph and feedback ledger.
+            patch(
+                "scripts.research.build_industry_knowledge_graph.LOGIC_CHAIN_DIR",
+                self.tmp_dir / "research_signals/logic_chains",
+            ),
+            patch(
+                "scripts.research.build_industry_knowledge_graph.GRAPH_OUTPUT_FILE",
+                self.tmp_dir / "research_signals/industry_knowledge_graph.json",
+            ),
+            patch(
+                "scripts.research.report_feedback_loop.REGISTRY_FILE",
+                self.tmp_dir / "strategy_versions.json",
+            ),
+            patch(
+                "scripts.research.report_feedback_loop.GRAPH_FILE",
+                self.tmp_dir / "research_signals/industry_knowledge_graph.json",
+            ),
+            patch(
+                "scripts.research.report_feedback_loop.FEEDBACK_LEDGER_FILE",
+                self.tmp_dir / "report_feedback_ledger.json",
+            ),
         ]
         for p in self.patchers:
             p.start()
