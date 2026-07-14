@@ -1291,6 +1291,14 @@ def test_walk_forward_search_truncates_train_and_scores_oos_after_cutoff():
     cutoff = "2022-01-31"
     cutoff_ts = pd.Timestamp(cutoff)
     seen = {"train_calls": 0, "oos_windows": []}
+    # This is a meta-level truncation test, not a data-lake integration test.
+    # Pin two price/volume-only candidates and one individual per island so
+    # mutation cannot introduce a fundamental/holder factor that reads the
+    # operator's real lake.  Evolution/mutation has dedicated tests above.
+    hermetic_seeds = [
+        validate_candidate_ast(_candidate(weight=0.7)),
+        validate_candidate_ast(_candidate(weight=0.6)),
+    ]
 
     def spy_l0(hyp, c, v, a, forward_ret, vintage_id, sample_dates=None, **kwargs):
         if "|train" in vintage_id:
@@ -1313,7 +1321,8 @@ def test_walk_forward_search_truncates_train_and_scores_oos_after_cutoff():
             vintage_id="synthetic-wf",
             repository=CandidateRepository(root / "candidates.jsonl"),
             runners={"l0": spy_l0},
-            n_islands=2, generations=1, population=3, top_k=2, rng_seed=7,
+            seeds=hermetic_seeds,
+            n_islands=2, generations=1, population=1, top_k=2, rng_seed=7,
             sample_dates=60,
             experiment_log=ExperimentLog(root / "experiment_log.jsonl"),
             review_queue=ReviewQueue(root / "review_queue.jsonl"),
