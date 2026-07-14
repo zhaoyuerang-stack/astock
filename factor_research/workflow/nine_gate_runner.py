@@ -13,6 +13,8 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import logging
+import math
 import os
 import sys
 import warnings
@@ -32,6 +34,25 @@ from core.engine import PricePanel, Signal
 from core.analysis.nine_gates import NineGatesEvaluator, NineGatesReport
 from strategies.small_cap import load_price_panels
 
+logger = logging.getLogger(__name__)
+
+
+def _json_safe(value):
+    """Convert evaluator output to strict JSON without disguising missing evidence.
+
+    NaN/Inf are not valid registry evidence.  They become ``None`` so guards
+    can distinguish "not computable" from a real numeric result.
+    """
+    if isinstance(value, dict):
+        return {str(key): _json_safe(child) for key, child in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(child) for child in value]
+    if isinstance(value, np.generic):
+        value = value.item()
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return value
+
 # CLI 策略名 → 台账母策略 id（用于 --persist 把审计摘要写回对应版本）
 STRATEGY_TO_FAMILY = {
     "small_cap": "small-cap-size",
@@ -40,6 +61,9 @@ STRATEGY_TO_FAMILY = {
     "hq_momentum": "hq-momentum-hedged",
     "illiquidity": "illiquidity",
     "roc_yc": "roc-yc",
+    # family id 也可直接当 --strategy(无别名时 identity map)
+    "industry_neglect": "industry-neglect-rotation",
+    "industry-neglect-rotation": "industry-neglect-rotation",
 }
 
 # 台账版本 → 该版本真实 config 的非周期参数（来自 strategy_versions.json 的 config 字段）。
@@ -123,8 +147,8 @@ def _taibook_start(family, version):
             yr = period.split("-")[0].strip()
             if yr.isdigit() and len(yr) == 4:
                 return f"{yr}-01-01"
-    except Exception:
-        pass
+    except Exception as exc:
+        raise RuntimeError(f"cannot load registry window for {family}/{version}: {exc}") from exc
     return None
 
 
@@ -179,8 +203,8 @@ def _load_spec_from_registry(family: str, version: str | None) -> dict | None:
                     for v in fam.get("versions", []):
                         if v.get("executable_spec") and v["executable_spec"].get("spec"):
                             return v["executable_spec"]["spec"]
-        except Exception:
-            pass
+        except Exception as exc:
+            raise RuntimeError(f"cannot inspect executable specs for {family}: {exc}") from exc
         return None
 
     try:
@@ -192,8 +216,8 @@ def _load_spec_from_registry(family: str, version: str | None) -> dict | None:
                     if v["version"] == version:
                         if v.get("executable_spec") and v["executable_spec"].get("spec"):
                             return v["executable_spec"]["spec"]
-    except Exception:
-        pass
+    except Exception as exc:
+        raise RuntimeError(f"cannot inspect executable spec for {family}/{version}: {exc}") from exc
     return None
 
 
@@ -310,7 +334,9 @@ def _build_from_registry_config(family: str, version: str | None, cfg: dict, sta
 
 
 def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: bool = False,
-                   version: str | None = None, start: str | None = None) -> dict:
+                   version: str | None = None, start: str | None = None, *,
+                   report_dir: Path | None = None, research_ledger=None,
+                   research_index_path=None) -> dict:
     print("=" * 80)
     print(f"  Running 9-Gate Evaluation Pipeline for Strategy: {strategy_name}")
     print("=" * 80)
@@ -322,61 +348,78 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
     spec_dict = _load_spec_from_registry(family_id, version)
     registry_config = _load_config_from_registry(family_id, version)
     config_factor_builder = None
+    res = None
+    thesis = None
+    config = None
+    built = False
 
     if spec_dict:
         print(f"  Found executable_spec in registry for {family_id}/{version}. Running dynamically via ExecutableStrategySpec...", flush=True)
-        from core.strategy_spec import ExecutableStrategySpec
-        from strategies.executable import build_executable_strategy
-        from types import SimpleNamespace
-
-        ts = start or _taibook_start(family_id, version) or spec_dict.get("data", {}).get("warmup_start", "2018-01-01")
-        spec_dict["data"]["warmup_start"] = ts
-
-        spec = ExecutableStrategySpec.from_dict(spec_dict)
-        spec.validate()
-
-        from app_config.settings import get_settings
-        warmup = get_settings().data.warmup_start
-        ds = str(min(pd.Timestamp(ts), pd.Timestamp(warmup)).date())
-
-        from strategies.small_cap import load_price_panels
-        close, volume, amount = load_price_panels(ds)
-        prices = PricePanel(close=close, volume=volume, amount=amount)
-
-        strat = build_executable_strategy(spec, prices)
-
-        res = {
-            "close": prices.close,
-            "volume": prices.volume,
-            "amount": prices.amount,
-            "factor": strat.factor,
-            "scheduled_weights": strat.scheduled_weights,
-            "timing": strat.timing,
-        }
-
-        thesis_mechanism = f"Spec-driven execution of {family_id} {version}"
-        thesis_citation = family_id
         try:
-            import strategy_registry
-            data = strategy_registry._load()
-            for fam in data.get("families", []):
-                if fam["id"] == family_id:
-                    thesis_mechanism = fam.get("hypothesis", thesis_mechanism)
-                    thesis_citation = fam.get("name", thesis_citation)
-        except Exception:
-            pass
+            from core.strategy_spec import ExecutableStrategySpec
+            from strategies.executable import build_executable_strategy
+            from strategies.catalog import UnsupportedStrategyComponent
+            from types import SimpleNamespace
 
-        thesis = {
-            "mechanism": thesis_mechanism,
-            "citation": thesis_citation
-        }
-        config = SimpleNamespace(version=spec.version, start=ts)
-    elif _registry_config_supported(family_id, registry_config):
+            ts = start or _taibook_start(family_id, version) or spec_dict.get("data", {}).get("warmup_start", "2018-01-01")
+            spec_work = dict(spec_dict)
+            spec_work.setdefault("data", {})
+            spec_work["data"]["warmup_start"] = ts
+
+            spec = ExecutableStrategySpec.from_dict(spec_work)
+            spec.validate()
+
+            from app_config.settings import get_settings
+            warmup = get_settings().data.warmup_start
+            ds = str(min(pd.Timestamp(ts), pd.Timestamp(warmup)).date())
+
+            from strategies.small_cap import load_price_panels
+            close, volume, amount = load_price_panels(ds)
+            prices = PricePanel(close=close, volume=volume, amount=amount)
+
+            strat = build_executable_strategy(spec, prices)
+
+            res = {
+                "close": prices.close,
+                "volume": prices.volume,
+                "amount": prices.amount,
+                "factor": strat.factor,
+                "scheduled_weights": strat.scheduled_weights,
+                "timing": strat.timing,
+            }
+
+            thesis_mechanism = f"Spec-driven execution of {family_id} {version}"
+            thesis_citation = family_id
+            try:
+                import strategy_registry
+                data = strategy_registry._load()
+                for fam in data.get("families", []):
+                    if fam["id"] == family_id:
+                        thesis_mechanism = fam.get("hypothesis", thesis_mechanism)
+                        thesis_citation = fam.get("name", thesis_citation)
+            except Exception as exc:
+                logger.warning("registry thesis metadata unavailable for %s/%s: %s", family_id, version, exc)
+
+            thesis = {
+                "mechanism": thesis_mechanism,
+                "citation": thesis_citation
+            }
+            config = SimpleNamespace(version=spec.version, start=ts)
+            built = True
+        except (UnsupportedStrategyComponent, ValueError, KeyError) as exc:
+            # e.g. AutoResearch DSL factor type 未进 catalog → 回退 registry config adapter
+            print(f"  executable_spec 不可机械执行({type(exc).__name__}: {exc});尝试 config adapter...", flush=True)
+            if not _registry_config_supported(family_id, registry_config):
+                raise
+
+    if not built and _registry_config_supported(family_id, registry_config):
         print(f"  Found registry config for {family_id}/{version}. Running via config adapter...", flush=True)
         res, thesis, config, config_factor_builder = _build_from_registry_config(
             family_id, version, registry_config, start
         )
-    else:
+        built = True
+
+    if not built:
         if strategy_name == "small_cap":
             from strategies.small_cap import run_small_cap_strategy, StrategyConfig
             config = StrategyConfig()
@@ -469,6 +512,64 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
                               + (";PureTrend MA16 " + ("Band" if spec["timing"] == "band" else "二值") + "择时")),
                 "citation": "Amihud (2002) illiquidity premium",
             }
+        elif strategy_name in ("industry_neglect", "industry-neglect-rotation"):
+            # 台账 industry-neglect-rotation/v1.4(华西量价行业内选股);机械复现走 strategies.industry_rotation
+            from types import SimpleNamespace
+            from strategies.industry_rotation import (
+                StrategyConfig as IndStrategyConfig,
+                run_industry_rotation_strategy,
+            )
+            fam = "industry-neglect-rotation"
+            ver = version or "v1.4"
+            reg_cfg = _load_config_from_registry(fam, ver) or {}
+            ts = start or _taibook_start(fam, ver) or "2012-01-01"
+            ind_cfg = IndStrategyConfig(
+                family=fam,
+                version=ver,
+                start=ts,
+                top_k_industries=int(reg_cfg.get("top_k_industries", 10)),
+                top_n_stocks=int(reg_cfg.get("top_n_stocks", 2)),
+                w_cpv=float(reg_cfg.get("w_cpv", 0.5)),
+                cost_mode="stock",
+            )
+            out = run_industry_rotation_strategy(ind_cfg)
+            close = out["close"]
+            amount = out.get("amount")
+            if amount is None:
+                # industry runner 未单独返回 amount 时用 close 对齐占位(权重路径不依赖 volume)
+                amount = pd.DataFrame(1.0, index=close.index, columns=close.columns)
+            volume = out.get("volume")
+            if volume is None:
+                volume = pd.DataFrame(1.0, index=close.index, columns=close.columns)
+            scheduled = out["scheduled_weights"]
+            timing = out.get("timing")
+            # 因子代理:调仓日持仓权重前填,供 IC/中性化门;组合证据以 scheduled_weights 为准
+            factor = pd.DataFrame(np.nan, index=close.index, columns=close.columns)
+            for dt, w in (scheduled or {}).items():
+                if dt not in factor.index or w is None or len(w) == 0:
+                    continue
+                for code, val in w.items():
+                    if code in factor.columns:
+                        factor.loc[dt, code] = float(val)
+            factor = factor.ffill()
+            res = {
+                "close": close,
+                "volume": volume,
+                "amount": amount,
+                "factor": factor,
+                "scheduled_weights": scheduled,
+                "timing": timing,
+                "returns": out.get("returns"),
+            }
+            config = SimpleNamespace(version=ver, start=ts)
+            thesis = {
+                "mechanism": (
+                    "华西 11 因子行业量价轮动 + 行业内 ROE/NPY 质优选股"
+                    f"(top_k_ind={ind_cfg.top_k_industries}, top_n_stocks={ind_cfg.top_n_stocks}, "
+                    f"w_cpv={ind_cfg.w_cpv});小盘指数 MA16 择时,BEAR 切国债 ETF。"
+                ),
+                "citation": "industry-neglect-rotation / Huaxi volume-price rotation",
+            }
         else:
             raise ValueError(f"Unknown strategy name: {strategy_name}")
 
@@ -501,13 +602,23 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
     timing = res.get("timing")
     if timing is not None:
         timing = timing.loc[timing.index < b]
+    portfolio_policy = res.get("portfolio_policy")
+    if strategy_name in {"large_cap", "hq_momentum"} and portfolio_policy is None:
+        raise RuntimeError(
+            f"{strategy_name} is benchmark-hedged but exposed no canonical portfolio_policy; "
+            "refusing to grade the long leg"
+        )
 
     print(f"  Execution complete. Truncated to < {b.date()} to protect holdout. Loaded {close_tr.shape[1]} stocks x {close_tr.shape[0]} dates.")
+    from governance.holdout import assert_search_clean
+    assert_search_clean(close_tr.index, label="Nine-Gate selection evidence")
 
     # 2. Build Signal
     signal = Signal(
         weights=scheduled,
-        timing=timing,
+        # HedgedReturnPolicy owns the neutral-NAV timing overlay.  Passing the
+        # strategy's reported timing into BacktestEngine would apply it twice.
+        timing=None if portfolio_policy is not None else timing,
         family=strategy_name,
         version=config.version
     )
@@ -534,11 +645,13 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
                                     break
                         if found:
                             break
-            except Exception:
-                pass
+            except Exception as registry_exc:
+                raise TrialCountUnknown(
+                    f"trial_count_unknown and registry evidence unreadable for "
+                    f"{STRATEGY_TO_FAMILY.get(strategy_name, strategy_name)!r}: {registry_exc}"
+                ) from registry_exc
             if n_trials is None:
-                print(f"  ⚠️ Warning: {e}. No search trials logged in governance ledger. Using default n_trials=1.")
-                n_trials = 1
+                raise e
         print(f"  [n_trials] 自动取该母策略台账迭代数 N={n_trials}（逐家族搜索广度，公平多重检验）", flush=True)
     print(f"\n[Step 2] Initializing 9-Gate Evaluator (n_trials={n_trials}, start={config.start}) & running audits...", flush=True)
 
@@ -566,11 +679,38 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
         factor_builder=factor_builder_stub,
         thesis=thesis,
         n_trials=n_trials,
-        forward_days=20
+        forward_days=20,
+        portfolio_policy=portfolio_policy,
+        portfolio_leverage=(
+            float(getattr(config, "leverage", 1.0))
+            if portfolio_policy is not None
+            else 1.25
+        ),
     )
 
     # Run the evaluation
     reports = evaluator.evaluate_all(signal, start=config.start)
+
+    # Fail closed if the shared-policy replay ever drifts from the strategy
+    # runner that produced the candidate.  Persisted version_returns comes from
+    # evaluator.gate5_returns, so this reconciliation protects both Gate 4/5
+    # and downstream lineage/PBO evidence.
+    if portfolio_policy is not None:
+        expected = res.get("returns")
+        actual = evaluator.gate5_returns
+        if not isinstance(expected, pd.Series):
+            raise RuntimeError("hedged strategy runner did not expose canonical returns")
+        expected = expected.loc[(expected.index < b) & (expected.index >= pd.Timestamp(config.start))]
+        if not actual.index.equals(expected.index):
+            raise RuntimeError(
+                "hedged Nine-Gate replay index differs from canonical strategy returns"
+            )
+        max_abs_diff = float((actual - expected).abs().max()) if len(actual) else 0.0
+        if not np.isfinite(max_abs_diff) or max_abs_diff > 1e-12:
+            raise RuntimeError(
+                f"hedged Nine-Gate replay drifted from canonical strategy returns: "
+                f"max_abs_diff={max_abs_diff:.3g}"
+            )
 
     # Check overall passed
     passed_all = all(r.passed for r in reports)
@@ -586,7 +726,7 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
     # 4. Save report
     markdown_content = report.to_markdown()
 
-    report_dir = ROOT / "reports" / "research"
+    report_dir = report_dir or ROOT / "reports" / "research"
     report_dir.mkdir(parents=True, exist_ok=True)
     report_path = report_dir / f"{strategy_name}_9_gates_report.md"
 
@@ -600,18 +740,49 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
     print("\nExecutive Summary:")
     print(markdown_content.split("## Detailed Gate Findings")[0].strip())
 
-    # 5. （可选）把 DSR/PSR/多重检验摘要写回台账对应版本（机构级多重检验证据落库）
-    summary = report.summarize()
+    # 5. 先归档不可变研究记录，再（可选）把摘要与收据原子写回台账。
+    # 顺序不可反：registry 证据必须引用一个已经存在的 hash-chain entry。
+    summary = _json_safe(report.summarize())
     summary.setdefault("status", "PERSISTED" if persist else "COMPLETED")
     summary.setdefault("strategy", strategy_name)
     summary.setdefault("version", config.version)
+    family_id = STRATEGY_TO_FAMILY.get(strategy_name, strategy_name)
+    research_run = None
+    try:
+        research_run = record_nine_gate_research_run(
+            strategy_name=strategy_name,
+            version=config.version,
+            summary=summary,
+            report_path=report_path,
+            ledger=research_ledger,
+            index_path=research_index_path,
+        )
+    except Exception as exc:
+        if persist:
+            raise RuntimeError(
+                "refusing to persist Nine-Gate evidence without an immutable research-ledger record"
+            ) from exc
+        print(f"  [research-ledger] 9-Gate 归档失败: {exc}", flush=True)
+
     if persist:
-        family_id = STRATEGY_TO_FAMILY.get(strategy_name, strategy_name)
         if not family_id:
             print(f"  [persist] 跳过：{strategy_name} 无台账 family 映射")
         else:
+            from research_ledger.receipts import RECEIPT_KEY, build_nine_gate_receipt
             from strategy_registry import attach_nine_gate
-            attach_nine_gate(family_id, config.version, summary)
+            receipt = build_nine_gate_receipt(
+                family_id,
+                config.version,
+                summary,
+                run_id=research_run["run_id"],
+                entry_hash=research_run["entry_hash"],
+            )
+            attach_nine_gate(
+                family_id,
+                config.version,
+                summary,
+                evidence={RECEIPT_KEY: receipt},
+            )
             print(f"  [persist] Nine-Gate 摘要已写入台账 {family_id}/{config.version}："
                   f"DSR_p={summary.get('dsr_p')}, PSR={summary.get('psr')}, n_trials={summary.get('n_trials')}")
             # 留存 gate5 日收益序列 → lineage 相关性 / PBO(2B/2C)复用,避免二次回测
@@ -620,15 +791,6 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
                 from lake.version_returns import write_version_returns
                 ret_path = write_version_returns(rets, family=family_id, version=config.version)
                 print(f"  [persist] 收益序列已留存 ({len(rets)} 日) → version_returns/{ret_path.name}")
-    try:
-        record_nine_gate_research_run(
-            strategy_name=strategy_name,
-            version=config.version,
-            summary=summary,
-            report_path=report_path,
-        )
-    except Exception as exc:
-        print(f"  [research-ledger] 9-Gate 归档失败: {exc}", flush=True)
     return summary
 
 
@@ -644,8 +806,12 @@ def _auditable(strategy_name, version) -> bool:
     family_id = STRATEGY_TO_FAMILY.get(strategy_name, strategy_name)
     if _load_spec_from_registry(family_id, version) is not None:
         return True
-    if strategy_name == "illiquidity":
+    if strategy_name == "illiquidity" or family_id == "illiquidity":
         return version in ILLIQ_SPECS
+    if family_id == "industry-neglect-rotation" and version in {
+        "v1.0", "v1.1", "v1.2", "v1.3", "v1.4",
+    }:
+        return True
     cfg = _load_config_from_registry(family_id, version)
     if _registry_config_supported(family_id, cfg):
         return True

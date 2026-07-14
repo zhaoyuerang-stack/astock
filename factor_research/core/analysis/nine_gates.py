@@ -25,6 +25,7 @@ import pandas as pd
 from scipy import stats
 
 from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel, BacktestResult
+from core.hedged_portfolio import HedgedReturnPolicy
 from core.analysis.walk_forward import deflated_sharpe, walk_forward_windows, wf_metrics
 
 logger = logging.getLogger("nine_gates")  # Task 17:控制路径异常须可见,不得静默 except:pass
@@ -111,6 +112,8 @@ class NineGatesEvaluator:
         thesis: Optional[Dict[str, str] | Any] = None,
         n_trials: int = 1,
         forward_days: int = 20,
+        portfolio_policy: Optional[HedgedReturnPolicy] = None,
+        portfolio_leverage: float = 1.25,
     ):
         self.prices = prices
         self.factor_df = factor_df
@@ -118,6 +121,12 @@ class NineGatesEvaluator:
         self.thesis = thesis
         self.n_trials = n_trials
         self.forward_days = forward_days
+        if portfolio_policy is not None and not isinstance(portfolio_policy, HedgedReturnPolicy):
+            raise TypeError("portfolio_policy must be a HedgedReturnPolicy")
+        if not np.isfinite(portfolio_leverage) or float(portfolio_leverage) <= 0.0:
+            raise ValueError("portfolio_leverage must be finite and positive")
+        self.portfolio_policy = portfolio_policy
+        self.portfolio_leverage = float(portfolio_leverage)
         
         # Precompute forward returns for validation
         self.forward_returns = prices.close.pct_change(forward_days).shift(-forward_days)
@@ -129,6 +138,40 @@ class NineGatesEvaluator:
             from core.engine import _dict_weights_to_df
             weights = _dict_weights_to_df(weights, self.prices.close.index)
         return weights
+
+    def _run_portfolio_backtest(
+        self,
+        signal: Signal,
+        *,
+        start: str | pd.Timestamp,
+        cost: CostModel,
+    ) -> BacktestResult:
+        """Replay the exact portfolio return contract used by the strategy runner."""
+        if self.portfolio_policy is not None and signal.timing is not None:
+            raise ValueError(
+                "HedgedReturnPolicy requires an untimed long-leg Signal; "
+                "the policy owns the post-hedge timing overlay"
+            )
+        simulation_start = (
+            self.portfolio_policy.warmup_start
+            if self.portfolio_policy is not None
+            else start
+        )
+        engine = BacktestEngine(
+            prices=self.prices,
+            config=BacktestConfig(
+                start=str(pd.Timestamp(simulation_start).date()),
+                cost=cost,
+                leverage=self.portfolio_leverage,
+            ),
+        )
+        long_result = engine.run(signal)
+        if self.portfolio_policy is None:
+            return long_result
+        return self.portfolio_policy.apply(
+            long_result,
+            statistics_start=start,
+        ).result
 
     # ───────────────────────────────────────────────────────────────────────
     # Gate 0: Data Audit (数据审计)
@@ -563,16 +606,11 @@ class NineGatesEvaluator:
         metrics = {}
         verdict = "PASS"
         
-        # Initialize backtest config
-        config = BacktestConfig(
+        result = self._run_portfolio_backtest(
+            signal,
             start=start,
             cost=CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065),
-            leverage=1.25
         )
-        
-        # Run BacktestEngine
-        engine = BacktestEngine(prices=self.prices, config=config)
-        result = engine.run(signal)
         
         # Extract metrics
         m = result.metrics
@@ -613,20 +651,21 @@ class NineGatesEvaluator:
         verdict = "PASS"
         
         # 1. Cost Sensitivity: 1x, 2x, 3x costs
-        engine_1x = BacktestEngine(prices=self.prices, config=BacktestConfig(
-            start=start, cost=CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065), leverage=1.25
-        ))
-        res_1x = engine_1x.run(signal)
-        
-        engine_2x = BacktestEngine(prices=self.prices, config=BacktestConfig(
-            start=start, cost=CostModel(buy_cost=0.0045, sell_cost=0.0055, financing_rate=0.065), leverage=1.25
-        ))
-        res_2x = engine_2x.run(signal)
-        
-        engine_3x = BacktestEngine(prices=self.prices, config=BacktestConfig(
-            start=start, cost=CostModel(buy_cost=0.00675, sell_cost=0.00825, financing_rate=0.065), leverage=1.25
-        ))
-        res_3x = engine_3x.run(signal)
+        res_1x = self._run_portfolio_backtest(
+            signal,
+            start=start,
+            cost=CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065),
+        )
+        res_2x = self._run_portfolio_backtest(
+            signal,
+            start=start,
+            cost=CostModel(buy_cost=0.0045, sell_cost=0.0055, financing_rate=0.065),
+        )
+        res_3x = self._run_portfolio_backtest(
+            signal,
+            start=start,
+            cost=CostModel(buy_cost=0.00675, sell_cost=0.00825, financing_rate=0.065),
+        )
         
         metrics["annual_1x"] = res_1x.annual
         metrics["annual_2x"] = res_2x.annual
@@ -686,19 +725,36 @@ class NineGatesEvaluator:
             t_end = win["test_end"]
             
             # Simple simulation for test window
-            config = BacktestConfig(
-                start=str(t_start.date()),
-                cost=CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065),
-                leverage=1.25
-            )
             try:
-                engine = BacktestEngine(prices=self.prices, config=config)
-                # Subset weights for test window
-                weights = self._get_weights(signal)
-                test_weights = weights.loc[t_start:t_end]
-                if len(test_weights) > 10:
-                    res = engine._run_weight_backtest(test_weights, signal.timing, signal)
-                    oos_rets_list.append(res.returns)
+                if self.portfolio_policy is not None:
+                    res = self._run_portfolio_backtest(
+                        signal,
+                        start=t_start,
+                        cost=CostModel(
+                            buy_cost=0.00225,
+                            sell_cost=0.00275,
+                            financing_rate=0.065,
+                        ),
+                    )
+                    test_returns = res.returns.loc[t_start:t_end]
+                    if len(test_returns) > 10:
+                        oos_rets_list.append(test_returns)
+                else:
+                    config = BacktestConfig(
+                        start=str(t_start.date()),
+                        cost=CostModel(
+                            buy_cost=0.00225,
+                            sell_cost=0.00275,
+                            financing_rate=0.065,
+                        ),
+                        leverage=self.portfolio_leverage,
+                    )
+                    engine = BacktestEngine(prices=self.prices, config=config)
+                    weights = self._get_weights(signal)
+                    test_weights = weights.loc[t_start:t_end]
+                    if len(test_weights) > 10:
+                        res = engine._run_weight_backtest(test_weights, signal.timing, signal)
+                        oos_rets_list.append(res.returns)
             except Exception as _e:
                 logger.debug("gate per-item computation skipped: %s: %s", type(_e).__name__, _e)
                 
@@ -730,13 +786,22 @@ class NineGatesEvaluator:
             weights = self._get_weights(signal)
             for delay in [1, 2]:
                 shifted_weights = weights.shift(delay).fillna(0.0)
-                config = BacktestConfig(
-                    start=start,
-                    cost=CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065),
-                    leverage=1.25
+                delayed_signal = Signal(
+                    weights=shifted_weights,
+                    timing=signal.timing,
+                    family=signal.family,
+                    version=signal.version,
+                    execution_timing=signal.execution_timing,
                 )
-                engine = BacktestEngine(prices=self.prices, config=config)
-                res_delayed = engine._run_weight_backtest(shifted_weights, signal.timing, signal)
+                res_delayed = self._run_portfolio_backtest(
+                    delayed_signal,
+                    start=start,
+                    cost=CostModel(
+                        buy_cost=0.00225,
+                        sell_cost=0.00275,
+                        financing_rate=0.065,
+                    ),
+                )
                 metrics[f"annual_delay_{delay}d"] = res_delayed.annual
                 metrics[f"sharpe_delay_{delay}d"] = res_delayed.sharpe
                 
@@ -754,10 +819,15 @@ class NineGatesEvaluator:
         
         # Standard backtest returns
         try:
-            standard_engine = BacktestEngine(prices=self.prices, config=BacktestConfig(
-                start=start, cost=CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065), leverage=1.25
-            ))
-            res_std = standard_engine.run(signal)
+            res_std = self._run_portfolio_backtest(
+                signal,
+                start=start,
+                cost=CostModel(
+                    buy_cost=0.00225,
+                    sell_cost=0.00275,
+                    financing_rate=0.065,
+                ),
+            )
             rets_std = res_std.returns
             
             # Align masks
@@ -833,18 +903,36 @@ class NineGatesEvaluator:
             t_start = win["test_start"]
             t_end = win["test_end"]
             
-            config = BacktestConfig(
-                start=str(t_start.date()),
-                cost=CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065),
-                leverage=1.25
-            )
             try:
-                engine = BacktestEngine(prices=self.prices, config=config)
-                weights = self._get_weights(signal)
-                test_weights = weights.loc[t_start:t_end]
-                if len(test_weights) > 10:
-                    res = engine._run_weight_backtest(test_weights, signal.timing, signal)
-                    oos_rets_list.append(res.returns)
+                if self.portfolio_policy is not None:
+                    res = self._run_portfolio_backtest(
+                        signal,
+                        start=t_start,
+                        cost=CostModel(
+                            buy_cost=0.00225,
+                            sell_cost=0.00275,
+                            financing_rate=0.065,
+                        ),
+                    )
+                    test_returns = res.returns.loc[t_start:t_end]
+                    if len(test_returns) > 10:
+                        oos_rets_list.append(test_returns)
+                else:
+                    config = BacktestConfig(
+                        start=str(t_start.date()),
+                        cost=CostModel(
+                            buy_cost=0.00225,
+                            sell_cost=0.00275,
+                            financing_rate=0.065,
+                        ),
+                        leverage=self.portfolio_leverage,
+                    )
+                    engine = BacktestEngine(prices=self.prices, config=config)
+                    weights = self._get_weights(signal)
+                    test_weights = weights.loc[t_start:t_end]
+                    if len(test_weights) > 10:
+                        res = engine._run_weight_backtest(test_weights, signal.timing, signal)
+                        oos_rets_list.append(res.returns)
             except Exception as _e:
                 logger.debug("gate per-item computation skipped: %s: %s", type(_e).__name__, _e)
                 

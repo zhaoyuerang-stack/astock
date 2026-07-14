@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from core.engine import PricePanel
+from research_ledger.ledger import ResearchLedger
 from scripts.research.run_nine_gates_all import _load_spec_from_registry, run_evaluation
 from workflow.nine_gate_runner import _auditable
 
@@ -59,7 +60,7 @@ def test_load_spec_from_registry():
         assert spec_default["version"] == "v1.0"
 
 
-def test_run_evaluation_with_spec():
+def test_run_evaluation_with_spec(tmp_path: Path):
     mock_registry_data = {
         "families": [
             {
@@ -105,7 +106,14 @@ def test_run_evaluation_with_spec():
          patch("strategy_registry.attach_nine_gate") as mock_attach, \
          patch("scripts.research.run_nine_gates_all._family_n_trials", return_value=5):
          
-        summary = run_evaluation("mock-family", version="v1.0", persist=True)
+        summary = run_evaluation(
+            "mock-family",
+            version="v1.0",
+            persist=True,
+            report_dir=tmp_path / "reports",
+            research_ledger=ResearchLedger(tmp_path / "research_ledger.jsonl"),
+            research_index_path=tmp_path / "research_index.json",
+        )
         assert summary is not None
         assert summary["strategy"] == "mock-family"
         assert summary["version"] == "v1.0"
@@ -116,6 +124,7 @@ def test_run_evaluation_with_spec():
         assert args[0] == "mock-family"
         assert args[1] == "v1.0"
         assert "dsr_p" in args[2]
+        assert "nine_gate_receipt" in kwargs["evidence"]
 
 
 def test_registry_config_versions_are_auditable_when_adapter_supported():
@@ -153,10 +162,10 @@ def test_registry_config_versions_are_auditable_when_adapter_supported():
 
     with patch("strategy_registry._load", return_value=mock_registry_data):
         assert _auditable("small_cap_factor__window45", "v1.0")
-        assert not _auditable("industry-neglect-rotation", "v1.4")
+        assert _auditable("industry-neglect-rotation", "v1.4")
 
 
-def test_run_evaluation_with_registry_config_adapter():
+def test_run_evaluation_with_registry_config_adapter(tmp_path: Path):
     mock_registry_data = {
         "families": [
             {
@@ -201,9 +210,17 @@ def test_run_evaluation_with_registry_config_adapter():
          patch("strategy_registry.attach_nine_gate") as mock_attach, \
          patch("scripts.research.run_nine_gates_all._family_n_trials", return_value=7):
 
-        summary = run_evaluation("small_cap_factor__window45", version="v1.0", persist=True)
+        summary = run_evaluation(
+            "small_cap_factor__window45",
+            version="v1.0",
+            persist=True,
+            report_dir=tmp_path / "reports",
+            research_ledger=ResearchLedger(tmp_path / "research_ledger.jsonl"),
+            research_index_path=tmp_path / "research_index.json",
+        )
 
     assert summary["strategy"] == "small_cap_factor__window45"
     assert summary["version"] == "v1.0"
     mock_attach.assert_called_once()
     assert mock_attach.call_args.args[0] == "small_cap_factor__window45"
+    assert "nine_gate_receipt" in mock_attach.call_args.kwargs["evidence"]
