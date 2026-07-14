@@ -53,6 +53,9 @@ _IMPORTANT_TERMS = {
     "数据", "质量", "策略", "台账", "组合", "风控", "回测", "页面", "使用",
 }
 
+# 查询里出现这些词 → 用户问的是系统"此刻"的真实状态,应引用 runtime 而非静态文档。
+_RUNTIME_QUERY_MARKERS = ("目前", "实时", "状态", "当下", "现在", "实际", "当前", "最新", "运行", "真实")
+
 
 def list_knowledge_sources() -> list[KnowledgeSource]:
     sources: list[KnowledgeSource] = []
@@ -137,7 +140,7 @@ def _score(query: str, text: str, source_type: str) -> float:
     if any(k in q for k in ("策略", "失效", "研究", "台账")) and source_type == "research":
         score += 3.0
     if source_type == "runtime":
-        if any(k in q for k in ("目前", "实时", "状态", "当下", "现在", "实际", "当前", "最新", "运行", "真实")):
+        if any(k in q for k in _RUNTIME_QUERY_MARKERS):
             score += 4.0
     return score
 
@@ -148,7 +151,9 @@ def _get_dynamic_system_info() -> str:
         from services.read import factors as fac, registry as reg
         from services.read import experiments as ex, portfolio as pf, risk as rk, state as st
         
-        lines = ["# 系统当前真实运行与状态数据 (System Runtime Status)\n"]
+        # 不带空行:标题与第一节合并成同一 chunk,避免产出"只有标题没有内容"的空心
+        # chunk(它靠标题关键词高分挤占检索席位,却答不出任何真实状态)。
+        lines = ["# 系统当前真实运行与状态数据 (System Runtime Status)"]
         
         # 1. 数据质量 (Data Quality)
         try:
@@ -304,7 +309,16 @@ def retrieve_knowledge(query: str, *, limit: int = 5) -> list[KnowledgeHit]:
     ]
     found = [h for h in scored if h.score > 0]
     found.sort(key=lambda h: (-h.score, h.source_type, h.source_path, h.source_id))
-    return found[:limit]
+    top = found[:limit]
+
+    # 实时状态类查询保留一个 runtime 席位:静态文档(CLAUDE/DECISIONS 等)会随时间增长,
+    # 纯分数排序下会把 runtime chunk 挤出前 limit,导致"当前状态"问题答不出真实状态。
+    if any(k in (query or "") for k in _RUNTIME_QUERY_MARKERS) and top \
+            and not any(h.source_type == "runtime" for h in top):
+        best_runtime = next((h for h in found if h.source_type == "runtime"), None)
+        if best_runtime is not None:
+            top = top[:-1] + [best_runtime]
+    return top
 
 
 def citation_from_hit(hit: KnowledgeHit) -> dict:

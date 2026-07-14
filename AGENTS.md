@@ -32,4 +32,8 @@
 - **回测唯一权威 = `core.engine.BacktestEngine`**;台账唯一写入口 = `strategy_registry.register()`;
   数据湖写入口 = `lake/` 或 `scripts/data/`。
 - **真实口径不可动**:样本、公式、成本、`shift(1)`、T+1 一律不许为"达标"而改。
+- **接入新数据源必须先读固定剧本** [`data_source_onboarding.md`](factor_research/docs/agent_skills/data_source_onboarding.md)
+  再动手:S0 立项五判 → 小样本探针 → 契约声明(时间轴口径三选一,防未来函数) → 回填 → 质量门 →
+  统一加载层 → 登记,逐步 fail-closed。**不得临场自创接入流程**;历史工程事故(东财封禁/单位错
+  100 倍/幸存者偏差/未来泄露)全部源于跳过这些步骤。数据落湖 ≠ 因子有效,价值判断另走 probe。
 - **一键检查**:`bash factor_research/scripts/test_all.sh`(分层+数据湖守卫 + 全部测试)。

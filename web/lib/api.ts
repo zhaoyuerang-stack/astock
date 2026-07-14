@@ -20,6 +20,7 @@ import type {
   HypothesisView,
   MarketStateView,
   NavCurveView,
+  PaperAccountsListView,
   PaperTradesView,
   PortfolioView,
   RegisteredExperimentView,
@@ -150,6 +151,7 @@ export const api = {
   paperPlan: () => get<TradePlanView>("/paper/plan"),
   paperTrades: (limit = 200) => get<PaperTradesView>(`/paper/trades?limit=${limit}`),
   paperNav: () => get<NavCurveView>("/paper/nav"),
+  paperAccounts: () => get<PaperAccountsListView>("/paper-accounts"),
   risk: () => get<RiskReport>("/risk"),
   funnel: () => get<FunnelView>("/experiments/funnel"),
   hypotheses: (status?: string, limit = 60) =>

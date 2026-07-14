@@ -81,6 +81,99 @@
       "created": "2026-07-02",
       "expires": "2026-12-29",
       "prompt_note": "信息地图显示基本面族(净利增速/ROE/账面市值比)距现有价格类因子池 MI 距离 2.8-2.9,是最独立的空白区;优先提基本面 × 价格量能的跨信息源组合,而非价格族内部换皮。"
+    },
+    {
+      "id": "earnings-event-sue-weak-size-exposed",
+      "direction": "业绩预告/快报事件源:全市场月频 long-only SUE 主腿",
+      "status": "weak",
+      "action": "NOTE",
+      "scope_factors": [],
+      "evidence": [
+        "reports/research/earnings_event_probe_round5_findings.md(sue residual IC IS/OOS/full=0.0043/0.0040/0.0035,留存93%,但 size corr=0.439 且月频样本54<工厂L0最少60)",
+        "reports/research/probe_round5_earnings_forecast_surprise.json(forecast-only residual OOS=-0.0060,IS→OOS翻负)"
+      ],
+      "revival_condition": "改为行业内同类比较、财报季事件窗口、或与基本面质量/估值交互后重探;不要在全市场月频 long-only 下只扫窗口/归一化微调。",
+      "created": "2026-07-06",
+      "expires": "2027-01-06",
+      "prompt_note": "业绩预告/快报事件源 PIT 可用,但全市场月频 long-only SUE 很弱且 size 暴露高;forecast-only 残差 OOS 翻负。除非引入行业内比较/财报季事件窗口/基本面交互,不要把 sue/forecast_surprise 作为主腿搜索白名单。"
+    },
+    {
+      "id": "expectation-gap-trailing-oos-collapse",
+      "direction": "隐含预期差(兑现口径):估值隐含增速 vs 已兑现 netprofit_yoy 的差/比",
+      "status": "falsified",
+      "action": "DEPRIORITIZE",
+      "scope_factors": [],
+      "evidence": [
+        "reports/research/probe_expectation_gap_20260712.md(全市场 probe:残差 IS ICIR 0.30 → OOS 归零/翻负,留存 −0%/7%;正交保留率 211-231%,真正交但不泛化)",
+        "reports/research/probe_expectation_gap_implied_growth_gap.json",
+        "reports/research/probe_expectation_gap_peg_inverse.json"
+      ],
+      "revival_condition": "湖内新增分析师一致预期/预期修正类数据源('预期'腿从已兑现的陈旧 yoy 换成真前瞻预期)后整族重测",
+      "created": "2026-07-12",
+      "expires": "2027-01-08",
+      "prompt_note": "估值(pe_ttm)隐含增速与已兑现增速(netprofit_yoy)作差/作比的『预期差』口径已 probe:正交性极好(残差比原始强)但 OOS(2023-2024)塌缩翻负——已兑现 yoy 是市场消化过的陈旧信息。不要再提『PE 隐含增速 vs 历史 yoy』类候选;湖内有真前瞻预期数据后才值得重开。"
+    },
+    {
+      "id": "expectation-gap-guidance-weak",
+      "direction": "隐含预期差(指引口径):业绩预告/快报指引 vs 估值隐含要求(guidance_gap)",
+      "status": "weak",
+      "action": "DEPRIORITIZE",
+      "scope_factors": [],
+      "evidence": [
+        "reports/research/probe_expectation_gap_20260712.md(唯一残差 OOS 不塌成员:留存 68%,但 OOS 残差 IC 0.0089/ICIR 0.14 落入 northbound-holder『真正交但太弱』量级带;原始形态 size 相关 0.44、正交保留率仅 66%)",
+        "reports/research/probe_expectation_gap_guidance_gap.json"
+      ],
+      "revival_condition": "backlog forecast-express 纯 SUE 口径独立 probe 显示强 OOS 后,重测其估值条件化变体(必须内建 size 中性化)",
+      "created": "2026-07-12",
+      "expires": "2027-01-08",
+      "prompt_note": "业绩指引相对估值要求的预期差(guidance_gap)残差流 OOS 不塌(留存 68%)但量级太弱(ICIR 0.14),且近半是大盘暴露的伪装(size 相关 0.44);不作主腿候选。若提基本面事件族,先走纯 SUE 口径再谈估值条件化。"
+    },
+    {
+      "id": "balancesheet-operational-quality-weak",
+      "direction": "资产负债表运营质量族:净占款议价权/应收强度改善/存货强度改善(存量结构全市场直接截面)",
+      "status": "weak",
+      "action": "DEPRIORITIZE",
+      "scope_factors": [],
+      "evidence": [
+        "reports/research/probe_fundamental_quality_20260712.md(全市场 probe:bargaining_power 正交保留率 17%=size/流动性伪装+残差 IC≈0;两 Δ 强度因子 IS 符号与设计假设相反且 OOS 塌缩/翻号,留存 9%/−49%)",
+        "reports/research/probe_fundamental_quality_bargaining_power.json",
+        "reports/research/probe_fundamental_quality_receivable_intensity_chg.json",
+        "reports/research/probe_fundamental_quality_inventory_intensity_chg.json"
+      ],
+      "revival_condition": "行业分类落湖(产业基本面 Phase 2:index_classify → data_lake/meta/industry.parquet)后,以行业内中性化/行业内 z-score 重新 probe——资负表占款/存货结构强行业性,全市场直接截面主要在比行业构成",
+      "created": "2026-07-12",
+      "expires": "2027-01-08",
+      "prompt_note": "资负表科目存量结构(议价权/应收/存货强度)全市场直接截面已 probe 阴性:议价权大半是 size/流动性伪装(正交保留率 17%,残差≈0);强度改善类 IS 符号与设计假设相反且 OOS 翻号。不要再提『资负表科目/总资产直接截面』类候选;有行业中性化再重开。"
+    },
+    {
+      "id": "price-channel-breakout-reversal-mirror",
+      "direction": "价格通道突破+量能确认(Donchian breakout family,机制假设=Hong-Stein 惯性延续)",
+      "status": "falsified",
+      "action": "NOTE",
+      "scope_factors": [],
+      "evidence": [
+        "reports/research/strong_ai_rounds.jsonl:round=1(2026-07-03,daily-round-1)——price_channel_breakout 与既有 price_position/short_reversal 反转因子相关 -0.54~-0.59,方向与惯性延续假设相反(更像超买回调);breakout_volume_confirm 被机械 discard",
+        "claude/daily-round-1 分支 commit 73cda770(factors/breakout.py + test_breakout_factors.py,未合并主线,代码只存在于该孤立分支)"
+      ],
+      "revival_condition": "换机制假设(承认其反转性质而非延续性质设计),或换持仓期/宇宙重新验证是否仍是既有反转簇的镜像",
+      "created": "2026-07-13",
+      "expires": "2027-01-13",
+      "prompt_note": "价格通道突破(Donchian/量能确认)已被 round-1 证伪:price_channel_breakout 是既有反转簇(price_position/short_reversal)的较弱镜像变体,非新正交方向,不要再提『价格突破+量能确认』类候选,除非明确换机制假设。"
+    },
+    {
+      "id": "broker-recommend-breadth-size-proxy",
+      "direction": "券商月度金股覆盖广度(analyst_recommend_breadth)作为分析师关注度信号",
+      "status": "falsified",
+      "action": "NOTE",
+      "scope_factors": [],
+      "evidence": [
+        "reports/research/strong_ai_rounds.jsonl:round=2(2026-07-04,daily-round-2)——analyst_recommend_breadth 实测 corr(size)=0.30~0.35(覆盖广度本质是规模代理),IS→OOS 全部翻负(留存 -61%~-129%)",
+        "claude/daily-round-2 分支 commit 7169e53b(factors/analyst_recommend.py,未合并主线)"
+      ],
+      "revival_condition": "先解决 size 暴露(强制行业/规模中性化)且验证 OOS 稳定性;真正信息量更高的 report_rc(逐条 EPS 预测修正)因积分墙硬配额未解除(见 TASKS.md)",
+      "created": "2026-07-13",
+      "expires": "2027-01-13",
+      "prompt_note": "券商月度金股覆盖广度是规模代理(corr size 0.30-0.35)且 IS→OOS 翻负,不要再提『分析师覆盖广度/金股上榜数』类候选;真正有信息量的 report_rc 逐条盈利预测修正因积分墙不可得(见 TASKS.md)。"
     }
   ]
 }

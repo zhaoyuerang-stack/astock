@@ -195,3 +195,51 @@ def _run_all():
 
 if __name__ == "__main__":
     sys.exit(1 if _run_all() else 0)
+
+
+# ── v2 防守帽(ADR-036):inverse-vol 跨资产失效修复的对抗测试 ──────────
+def test_defensive_cap_prevents_bond_domination():
+    """波动悬殊池(债 vol~2.5% + 股 vol~20%):v1 的 inverse-vol 会给债 ~89%
+    (v0.2 探针实证 87%),v2 必须压到 DEFENSIVE_CAP——旧实现本测试必挂。"""
+    import numpy as np
+    import pandas as pd
+    from portfolio.recompose import DEFENSIVE_CAP, recompose
+    rng = np.random.default_rng(9)
+    idx = pd.bdate_range("2020-01-01", periods=700)
+    rets = {
+        "bond/bh":  pd.Series(rng.normal(0.00012, 0.0016, 700), index=idx),  # ~2.5% 年波动
+        "stock-a/v1": pd.Series(rng.normal(0.0008, 0.0125, 700), index=idx),
+        "stock-b/v1": pd.Series(rng.normal(0.0006, 0.0125, 700), index=idx),
+    }
+    w = recompose(rets, top_n=3)["proposal"]["weights"]
+    assert "bond/bh" in w, "防守腿应入选(低相关)"
+    assert w["bond/bh"] <= DEFENSIVE_CAP + 1e-9, \
+        f"防守腿权重 {w['bond/bh']:.1%} 超帽 {DEFENSIVE_CAP:.0%}(v1 行为 = 债基化)"
+    assert abs(sum(w.values()) - 1.0) < 1e-6, "权重必须仍归一"
+
+
+def test_all_equity_pool_unaffected_by_cap():
+    """全股票池(无防守腿):v2 行为必须与 v1 完全一致(帽不触发)。"""
+    import numpy as np
+    import pandas as pd
+    from portfolio.recompose import recompose
+    rng = np.random.default_rng(11)
+    idx = pd.bdate_range("2020-01-01", periods=700)
+    rets = {f"s{i}/v1": pd.Series(rng.normal(0.0006, 0.010 + 0.003 * i, 700), index=idx)
+            for i in range(3)}
+    w = recompose(rets, top_n=3)["proposal"]["weights"]
+    assert abs(sum(w.values()) - 1.0) < 1e-6
+    assert max(w.values()) < 0.6, "同类资产 inverse-vol 不应出现极端权重"
+
+
+def test_all_defensive_pool_no_cap_deadlock():
+    """全防守池(无非防守腿接收释放权重):帽不适用,正常归一不死锁。"""
+    import numpy as np
+    import pandas as pd
+    from portfolio.recompose import recompose
+    rng = np.random.default_rng(13)
+    idx = pd.bdate_range("2020-01-01", periods=700)
+    rets = {f"b{i}/bh": pd.Series(rng.normal(0.0001, 0.0015 + 0.0004 * i, 700), index=idx)
+            for i in range(2)}
+    w = recompose(rets, top_n=2)["proposal"]["weights"]
+    assert abs(sum(w.values()) - 1.0) < 1e-6

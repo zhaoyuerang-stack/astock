@@ -55,7 +55,7 @@ ALLOWED_FACTORS: dict[str, FactorSpec] = {
     "alpha_050": FactorSpec("alpha_050", {}, ("price/close", "price/volume")),
     "alpha_055": FactorSpec("alpha_055", {}, ("price/close", "price/volume")),
     # 独立数据族隔离岛(LOOP_ENGINEERING.md #5):股东行为 + 资金流,与价量簇正交
-    "holder_count_chg": FactorSpec("holder_count_chg", {"window": (40, 240)}, ("holder/holdernumber",)),
+    # (holder_count_chg 已迁 @register_factor searchable=True,经下方自动接线进入,不再手工列)
     "holdertrade_net": FactorSpec("holdertrade_net", {"window": (40, 250)}, ("holder/holdertrade",)),
     "large_order_net_ratio": FactorSpec("large_order_net_ratio", {"window": (3, 60)}, ("moneyflow",)),
     # 北向资金(沪深股通持仓):L0 验证与 size/流动性正交(残差 IC 不塌、与小盘 corr≈0),

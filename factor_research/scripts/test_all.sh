@@ -48,6 +48,14 @@ echo "=== check_lake_writers.py (数据湖唯一写入口) ==="
 python3 scripts/ci/check_lake_writers.py
 
 echo ""
+echo "=== check_factor_registry.py (因子词表:手工接线冻结/口径与证据/撞名/死模块处置) ==="
+python3 scripts/ci/check_factor_registry.py
+
+echo ""
+echo "=== test_factor_registry_guard.py (词表守卫 + 注册门 对抗回归) ==="
+python3 tests/test_factor_registry_guard.py
+
+echo ""
 echo "=== test_engine.py ==="
 python3 test_engine.py
 
@@ -230,6 +238,26 @@ python3 -m pytest tests/test_moving_average_overlay.py -q
 echo ""
 echo "=== test_decision_inbox.py (决策收件箱/今日简报:空箱三态 fail-closed + 透传禁更绿) ==="
 python3 tests/test_decision_inbox.py
+
+echo ""
+echo "=== 兜底:未被上方显式枚举的 test_*.py 统一 pytest 执行(防新测试静默漏跑) ==="
+# check_test_discovery.py 只保证"可被收集",不保证"被执行";本块把没进上方清单的
+# pytest 风格测试全部真跑一遍。枚举清单从本脚本自身机械提取(不维护第二份手工清单);
+# 已枚举文件(含直跑脚本)不重复执行,其结果只由上方对应行计账。
+enumerated=$(grep -E '^python3' scripts/test_all.sh | grep -oE '[[:space:]](tests/)?test_[A-Za-z0-9_]+\.py' | tr -d ' \t' | sort -u)
+fallback=()
+for f in test_*.py tests/test_*.py; do
+  [ -e "$f" ] || continue
+  grep -qE '^[[:space:]]*def test_' "$f" || continue  # 纯脚本式测试(无 pytest 函数)豁免,同 check_test_discovery 口径
+  grep -qxF "$f" <<< "$enumerated" && continue
+  fallback+=("$f")
+done
+if [ ${#fallback[@]} -gt 0 ]; then
+  echo "(兜底执行 ${#fallback[@]} 个未枚举测试文件)"
+  python3 -m pytest "${fallback[@]}" -q
+else
+  echo "(无未枚举测试文件,跳过)"
+fi
 
 echo ""
 echo "🎉 All tests passed!"

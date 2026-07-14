@@ -11,20 +11,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routers import (agent, agent_control, backtest, data, experiments, factors, inbox,
-                         paper, portfolio, risk, settings, state, strategies, system,
-                         trade_readiness, governance)
+                         paper, paper_accounts, portfolio, risk, settings, state, strategies,
+                         system, trade_readiness, governance)
 
 app = FastAPI(title="Quant Research Platform API", version="0.0-phase0")
 
-# Phase 1:允许本地 Next.js 开发服务器跨域调用。3001 是 3000 被占用时的 fallback。
+# Phase 1:允许本地 Next.js 开发服务器跨域调用。端口不固定(3000 被占时 dev server
+# 会 fallback 到任意空闲端口),故放开全部本地回环端口;仅限 localhost,不涉及外网暴露。
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3001",
-    ],
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -36,6 +32,7 @@ app.include_router(data.router)
 app.include_router(state.router)
 app.include_router(portfolio.router)
 app.include_router(paper.router)
+app.include_router(paper_accounts.router)
 app.include_router(risk.router)
 app.include_router(experiments.router)
 app.include_router(agent.router)

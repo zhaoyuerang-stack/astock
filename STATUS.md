@@ -1,8 +1,62 @@
 # STATUS — 当前进度
 
-> 更新:2026-07-03。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
+> 更新:2026-07-13。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
+
+**2026-07-13(daily-round-6:研究总监审视,实证一次真实重复算力浪费 + 修复 main 登记簿测试红灯)**:
+  · **核心发现(不是假设,已实证)**:round3(07-05)警告的"多分支互相看不到对方成果"风险,8 天内真实发生——round4(07-06,分支 `claude/daily-round-4`,从未合并 main)对资产负债表运营质量三因子(bargaining_power/receivable_intensity_chg/inventory_intensity_chg)做的 probe-signal-source 体检,因分支孤立对 main 不可见;07-12 另一次独立研究在 `main` 上对**同样三个因子**重新跑了几乎相同的 probe,产出几乎相同的阴性结论(现已作为 `balancesheet-operational-quality-weak` 条目存在于登记簿)。一次可精确定位日期/文件名的重复浪费。
+  · **修复 main 当前的红灯测试**:07-12 新增的 3 条 `direction_registry.json` 条目把未接入 `ALLOWED_FACTORS` 白名单的因子名(`implied_growth_gap`/`peg_inverse`/`guidance_gap`/`bargaining_power` 等)写进了 `scope_factors`,违反 `test_shipped_registry_is_valid_and_evidence_backed` 的白名单存在性断言——在本轮工作分支(基于 `main@f66cd419`)上复现为红灯。本轮按 round4 已建立的既有惯例(因子未进白名单则 `scope_factors` 留空)清空这 3 处,`test_direction_registry.py` 12/12、`test_knowledge.py` 9/9、`check_layer_deps.py` 均转绿。
+  · **补记两条此前从未回写的方向教训**:round1(`price_channel_breakout`,与既有反转簇相关 -0.54~-0.59)、round2(`analyst_recommend_breadth`,size 代理 corr 0.30-0.35 且 IS→OOS 翻负)——结论此前只存在于 `strong_ai_rounds.jsonl` 与孤立分支,登记簿(生成器实际消费的机器可读知识源)里没有,本轮补记 `price-channel-breakout-reversal-mirror` / `broker-recommend-breadth-size-proxy` 两条(证据门控通过)。
+  · **另确认**:台账仍 0 在册(与 round3 一致,8 天未变);metasearch 信息地图已 20 天未刷新(建议尽快重跑);研报-NLP 管线 07-12 起 0 失败但 `data_lake/research_pdf/` 同期无新文件落地,**不能定性为已修复**(可能只是无新输入可失败,待核实);跨资产腿/composite-portfolio 仍由其他分支活跃产出,维持不重复投入。
+  · **needs_human**:是否建立"direction_registry.json 优先快速合并"机制(该文件是防重复浪费的专用机制,留在孤立分支就失效);research_pdf 停更是否为新问题;metasearch 是否近期重跑。均非阻塞性。
+  · 详见 `factor_research/reports/research/research_director_review_round6_findings.md`(完整证据链)。本轮零新搜索/零新候选(`trials_recorded=0`,与 round3 同类);未碰 registry 写入口/workflow promote/部署清单/成本模型/holdout boundary/`ALLOWED_FACTORS` 白名单本身。
+
+**2026-07-12(CI 兜底执行未枚举测试 + 两处预存失败修复)**:
+  · **CI 执行缺口收口**:`test_all.sh` 手工枚举 + `check_test_discovery.py` 只验"可收集"不验"被执行"→ **76 个 pytest 风格 test_*.py 从不被 CI 真跑**。末尾新增兜底块:枚举清单从脚本自身机械提取(不维护第二份手工清单),未枚举者统一 `pytest` 执行;无 `def test_` 的脚本式测试豁免(同 discovery 守卫口径);已枚举文件不重复计账。对抗验证:必失败金丝雀真被执行且 `set -e` 下真传播(exit 1,"🎉"不出);脚本式金丝雀真豁免;已枚举真不重复。
+  · **autoresearch 两例基线预存失败修复**(07-02 记录):根因 = 相关性惩罚/重发现闸断言依赖"随机种群恰好含对册相关候选",随上游种子目录/变异算子演化漂移。测试注入在册腿动量窗口近邻种子(`seeds=` 既有参数),前提从碰运气变机械保证。**顺带解锁**:该失败在 `set -e` 下卡住 test_all.sh 第 72 行,其后 ~40 个枚举块自 07-02 起实际没在 CI 跑。
+  · **agent knowledge runtime 检索修复**(兜底块揭出的腐烂测试):两个真实缺陷——动态状态文档的**空心标题 chunk**(只有标题无内容)靠关键词高分挤占检索席位;静态文档(DECISIONS 等)随时间增长把 runtime chunk 挤出 top-N。修:标题并入首节不再单独成 chunk + 实时状态类查询保留一个 runtime 席位。`test_agent_knowledge` 8/8。
+  · **验证**:9 静态守卫全绿;枚举 47 块逐个跑 40 绿,7 失败全部机械归因 worktree 缺数据湖(`No objects to concatenate`/`codes.parquet` 缺失等,同 07-02 先例,非代码);兜底 76 文件 pytest 全绿。数据完整环境(主仓)下的端到端全绿确认留待合并后。
+
+**2026-07-12(因子词表守卫落地:词表端防熵第一步,机制分析 → check_factor_registry)**:
+  · **机制诊断**:因子库分析发现守卫全押"结论端"(台账/回测/holdout),"词表端"(因子定义/白名单/接线)零守卫 → 口径分叉(DSL `illiquidity`=|ret|/volume vs canonical Amihud=|ret|/amount,同名不同义)、退化因子(alpha_005 含恒常子项)、三面手工接线漂移(holder_count_chg 注册 (20,120) vs 白名单 (40,240))、六个零消费者死模块匿名沉淀、factor_store 980面板/36GB 无 manifest 无 GC 且缓存 key 不含源码版本(改实现静默复用旧值,R-DATA-001 级隐患)。
+  · **第一步落地**:`factors/registry.py` 升格语义权威——FactorRecord 加 `definition`(口径必填)/`evidence`(searchable 必带 probe 指针)/`source_hash`(源码摘要自动算),注册期 fail-closed(空口径/无证据/同名不同源码 import 即炸);新守卫 `scripts/ci/check_factor_registry.py`(C1 三面手工接线 AST 冻结,legacy 94 条只减不增,新因子必走 @register_factor;C2 口径/证据/同源码重复注册;C3 注册名与手工条目撞名;C4 factors/ 零消费者模块必带 `Disposition:` 标记且标记不得说谎)已接 `test_all.sh`。
+  · **顺手收编**:holder_count_chg 迁 searchable=True(evidence=research_ledger:e6e655401623899d,参数统一 (40,240) 消除注册/白名单分叉),删两处手工接线,行为等价由测试逐位钉死;六个零消费者模块打标(fundamental_quality=probe-pending 有立项,earnings/flow/quality/value/gap_reversal=dormant 复活须 probe)。
+  · **对抗测试** 16/16(空口径真拒/无证据真拒/撞名真拒/新手工条目真拒/legacy 清单陈条真拒/同 hash 真拒/死模块无标记真拒/标记说谎真被抓/holder_count_chg spec 逐位不变/真实仓库守卫绿);既有 11 守卫全绿;test_autoresearch_engine 2 例失败经 stash 基线复测为预存。CLAUDE.md §16 加守卫行;后续(94 条迁移含 illiquidity 口径修复/alpha101 退化扫描/缓存 source_hash+GC+回流活性表/R-ARCH-006 入宪提案待 owner)已立 TASKS「因子词表治理」节。
+
+**2026-07-12(两族 probe 闭环全阴性:隐含预期差 + 资负表运营质量;登记簿三条 DEPRIORITIZE)**:
+  · **隐含预期差因子族(新建+probe 全闭环,阴性)**:`factors/expectation_gap.py`(implied_growth_gap / guidance_gap / peg_inverse;机制锚 P/E=(1+g)/(r−g) 反解隐含增速,**信号设计在"已兑现/指引增速 − 价格隐含要求"的差上**,g_implied 单独≡价值因子;pe_ttm by_date 不复权口径 + fina/forecast/express anndate PIT;亏损股诚实 NaN)。对抗测试 9/9(退化成纯价值/纯成长的实现必挂、快报优先于预告、缺字段真拒)。全市场 probe(2018→cutoff 2022→2024,holdout 未触,3 trials 诚实申报):implied_growth_gap / peg_inverse 正交保留率 211-231%(真正交、非小盘代理)但 **OOS 塌缩翻负**(残差留存 −0%/7%)——已兑现 yoy 是市场消化过的陈旧信息;guidance_gap 唯一残差 OOS 不塌(留存 68%)但 ICIR 0.14 落入已关闭的「真正交但太弱」量级带且 size 相关 0.44。**三成员均不接工厂**。登记簿 2 条 DEPRIORITIZE(180d;复活=湖内添真前瞻一致预期数据源)+ backlog forecast-express 补交叉证据(纯 SUE 口径保持开放)。报告:`reports/research/probe_expectation_gap_20260712.md`。
+  · **资负表运营质量族 probe(销 TASKS 账,阴性)**:bargaining_power 正交保留率 17%=size/流动性伪装(残差≈0);两 Δ 强度因子 IS 符号与设计相反且 OOS 翻号。登记簿 DEPRIORITIZE(复活=行业分类落湖后行业内中性化,依赖产业基本面 Phase 2)。报告:`reports/research/probe_fundamental_quality_20260712.md`。
+  · **worktree 数据链**:data_lake 六目录+fundamental_batch symlink 主仓(gitignored 只读),此前环境性失败的 test_engine/test_data_layer/test_e2e/test_services_phase0/test_style_neutralization 全部转绿;test_autoresearch_engine 单例(`test_island_fitness_penalizes_correlation_to_book`)失败经 `git stash -u` 基线复现为**预存**(同 06-30/07-02 记录),非本次引入。
+  · **CI 缺口发现**:test_all.sh 手工枚举测试文件,check_test_discovery 只验"可收集"不验"被执行"——pytest-only 新测试(test_fundamental_quality/test_expectation_gap)从不被 CI 跑;已立后台任务(补兜底 pytest 块)。
+
+**2026-07-10(paper 多账户并行实测闭环,WS-D 执行侧代码完成,生产机验收待人)**:
+  · **执行摘要**:按 [`.claude/plans/PLAN_paper_multiaccount_loop.md`](.claude/plans/PLAN_paper_multiaccount_loop.md) T1→T5 全部执行完毕(7 个 commit,含 2 个补完修正),把单账户 `portfolio/paper_engine.py` 改造为多账户并行实测(排名靠前 top-N 候选各自独立模拟盘账本),接读层/API,web 桌面端并排展示。全程 hermetic 合成数据测试,零真金零下单(R-PROD-001)。
+  · **T1 引擎参数化**:`load_account/save_account/append_trades/upsert_nav` 新增可选路径参数,默认值=现路径,legacy 单账户流零行为变化(parity 探针验证逐字节相同)。
+  · **T2 多账户管理器**:`portfolio/paper_accounts.py`——状态机 active/frozen/blocked/degraded;`provision_from_recompose` 只信 `reports/research/portfolio_recompose.json::paper_candidates`(stale>14天/缺失 fail-closed);目标持仓只经 `strategies/executable.py::build_executable_strategy` canonical 路径(R-BT-001,转不出 spec = 显式 blocked)。账本隔离对抗测试:mutation testing 实测——先注入"模块级共享 acc 缓存"bug 确认变红,恢复实现确认变绿。
+  · **T3 日更入口**:`scripts/ops/paper_accounts_update.py` + `scheduled_daily_update.py` 旁路挂载(与既有 `run_paper_forward_smallcap` 同款——失败不影响日更 status,mutation testing 验证)。
+  · **T4 读层+API**:`services/read/paper_accounts.py` + `GET /paper-accounts`——回测偏差(paper NAV vs 该版本 `data_lake/version_returns` 同窗对比)手算核对通过;展示顺序=recompose 排名顺序(非目录字典序,已修正一处初版偏差)。
+  · **T5 桌面端**:`web/components/paper/PaperAccountsPanel.tsx` 挂 dashboard(PM 交易台,按 `DECISION_COCKPITS.md` 决策归属)"模拟盘账户"区块之后;顺序/状态判别抽成纯函数 `web/lib/paperAccounts.mjs`,mutation testing 验证"客户端重排名"会被测试抓红。
+  · **验证**:python 侧 pytest 18 处失败与改动前基线逐条 diff 为空(零新增);web 侧 tsc/lint 0 错误,`npm test` 38 用例 37 通过(1 处 system-governance 页面既有基线失败,与本次无关);10 个静态守卫全绿。
+  · **留白**:T6 已在 `RUNBOOK.md` §④.5 写好生产机人工验收清单(provision→连续2日观察→legacy 单账户流零 diff 核对);合并到生产分支 + 生产机真实数据验收留人执行。
+
+**2026-07-10(新数据源接入固定剧本 data-source-onboarding,纯文档)**:
+  · **补的缺口**:接入纪律散在 data_infrastructure/data_dimensions/LESSONS/CLAUDE §9 四处,agent 被叫去"接入 XX 源"只能临场拼流程(封禁/单位错/幸存者偏差/未来函数每次重踩);backlog 条目的 playbook 只指 probe-signal-source(信息体检),「外部源→data_lake canonical」工程接入这半段没有 canonical 剧本。
+  · **新增** `docs/agent_skills/data_source_onboarding.md`:固定流水线 S0-S7 逐步 fail-closed——S0 立项五判(信息假设对方向登记簿/PIT 可得性/全市场含退市覆盖/配额封禁账/停发预案)→ S1 小样本探针(单位·主键·时间戳·退市股·极值 top3)→ S2 契约声明(接入=INTERFACES/Fetcher 注册非新脚本;**时间轴口径三选一强制声明进加载层路由**,拿不准选最晚可见)→ S3 回填(canonical writer+manifest,限速铁律)→ S4 质量门(PIT 抽查/量纲对账/第二源 reconcile,不过不进加载层)→ S5 统一加载入口 → S6 增量+data_dimensions 登记+backlog 销账 → S7 交棒 probe-signal-source(数据健康≠信息有价值)。含雷区速查表(全部指向 LESSONS 已踩坑)。
+  · **路由接线**:CLAUDE.md §2 两处技能清单 + §9 数据纪律加强制入口;data_infrastructure.md 头部指针;data_source_backlog.json readme 写明「先 onboarding 后 probe」执行顺序。零新代码/守卫(元系统冻结:强制仍靠既有 check_lake_writers 等守卫;本剧本直接服务 TASKS「第一批新维度接入」与 backlog 待接条目)。
+  · **触发点二次接线(owner 要求,防漏读)**:CLAUDE.md §0 接手协议第 4 步加「命中 agent_skills 剧本先读剧本再动手,接入新源必读 onboarding」;AGENTS.md 共通铁律加同款条目——Codex/Cursor/Antigravity 等非 Claude 工具只读 AGENTS.md 也能命中,不再依赖恰好翻到 §9。
+
+**2026-07-06(规则 v2 + v0.3 探针:现有腿池的效率前沿已探明)**:ADR-036——recompose 加防守帽(防守组 vol<8% 判定,合计权重 ≤35%,常数为一次性口径决策不扫网格),RANKING_VERSION v1→v2。`meta-portfolio/v0.3-probe`(n_trials=3):**年化 +9.9% / 回撤 -22.0% / 夏普 0.77**,终窗 债35%+小盘44.5%+roc-yc20.5%。**三探针效率前沿结论**:现有腿池上限 ≈ 年化 10-12%/回撤 -20~22%/夏普 0.8-1.0;15%/20% 双线现原料不可达。逐年分解:防守在 2018(-4.4%)/2022(-1.3%)有效,病灶年=2016(-14%)/2023(0%)——腿池在此类年份缺 alpha,非组合工程可救。**停止调参**(继续烧 n_trials=p-hacking);待 owner 二选一:a) 基本面族 probe 补强腿池后重组(提年化唯一真路径);b) 接受 ~10%/-20% 半步入册首个组合跑 paper(降年化目标须小 ADR)。
+
+**2026-07-06(v0.2 探针:防守腿入池——回撤修复成功,inverse-vol 跨资产失效暴露)**:511010 买入持有防守腿(零择时自由度,截 <boundary,与全部股票腿相关 -0.03~-0.16)注入 9 腿池,`meta-portfolio/v0.2-probe`(n_trials=2 真账本):**回撤 -34.0%→-21.6%(逼近线)、夏普 0.69→0.94,但年化 11.8%→7.4%**——inverse-vol 权重把 87% 灌给 2.5% 波动的债腿(同类资产的权重方案对波动悬殊跨资产池失效),组合被稀释成"债基+股票点缀"。**数学现实**:池内最强腿 17.8%(其余 ≤6.4%),无杠杆凸组合年化上界 17.8%,15% 线需重仓强腿→回撤回升;现原料下 15%/20% 双线大概率不可同时达成,可达成区域 ≈ 10-12%/-20%/夏普~1.0(Sharpe 满意线可到,年化差口)。三选项待 owner:① 构成规则 v2(风险预算/簇间配额,受控变更 bump RANKING_VERSION 记 DECISIONS)做实数字;② 基本面族 probe 补强腿池(提年化的唯一真路径,TASKS 已有);③ 组合层杠杆评估(夏普~1 时 1.25x 数学上勉强,融资 6.5% 吃增益)。
+
+**2026-07-05(daily-round-3:研究总监审视,算力再分配,不改口径不碰台账写入口)**:
+  · **在册池清零**:`decay_status.json` 机械确认 `no_registered=true`;`strategy_versions.json` 30 个 family 全落在 候选/参考/退役/已证伪/`REJECTED_BY_ADVERSARIAL_DECAY`,此前仅剩的两个 diversifier(`hq-momentum-hedged`/`large-cap-growth-hedged`)已完成 TASKS 待办的退役复核,当前**无一在册**。
+  · **并行 agent 实时活动**:另一并行 agent(`codex/xiaochengxu` 分支)当日在跑组合再构成(`composite-portfolio` v1.1/v1.2-no-mom,均被 `REJECTED_BY_ADVERSARIAL_DECAY`,DSR p=0.23~0.26)与跨资产腿搜索(`cross_asset_leg_search`,纳指 ETF 513100/MA240 shadow_recommend=true),覆盖了 metasearch 06-23 指出的空白区之一(跨资产腿)——本轮建议下轮不重复投入该方向。
+  · **基本面质量因子族解封**:TASKS.md 原「需数据湖机器」阻塞条件经核实不成立(`data_lake/financials/balancesheet_all.parquet` 本机非空),`factors/fundamental_quality.py` 代码+单测早已就绪只欠 probe 步骤 3——是 metasearch 3 个空白区里唯一仍空闲、就绪度最高的方向,建议下轮方向①/②优先执行。
+  · **研报-NLP 管线误诊纠正**:TASKS.md 原描述"缺 PDF 源"已过期,实测取数正常(`data_lake/research_pdf/` 逐日有真实文件落地),真正卡点是下游解析/分类/抽取链 4 类具体 bug,且无失败退避,同批必败文件被逐小时重试,持续把噪声灌入 `research_ledger`(抽样最近 100 条运行,68 条为该管线重复失败,非真实待审候选),稀释研究台账信噪比。
+  · **结构性观察(非本轮可修)**:主仓物理工作目录当前 checkout 在 `codex/xiaochengxu`,与 `main` 是两条独立演化的线,互相缺对方的已落地功能/进行中实验——是否需要一次分支收敛窗口留给 owner 裁决。
+  · 详见 `factor_research/reports/research/research_director_review_round3_findings.md`(完整证据链接、逐条来源路径)。本轮零新搜索/零新候选,`trials_recorded=0`;未碰 registry 写入口/workflow promote/部署清单/成本模型/holdout boundary。
 
 **2026-07-03(孤岛回收四项:拥挤归因 + 保质期复核环 + 基本面质量因子族 + 被丢信号销账)**:
   · **拥挤 → 衰减归因**:`capacity.strategy_pool_crowding`(零调用方孤岛回收)接进 `decay_monitor` 周度——池级(等权"策略组合"复用 calculate_crowding_score)+ 逐腿 `max_pair_corr` 点名"和谁拥挤"(阈值单源 = governance.marginal.REDUNDANT_CORR)。对抗测试抓到真设计缺陷:逐腿对池均值相关会被正交腿稀释漏检双胞胎(corr 0.99 的孪生对池仅 0.64),已改两两口径。<2 腿/样本不足诚实拒判不给 0 分假绿。测试 5/5。

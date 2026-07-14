@@ -1,6 +1,8 @@
 {
   "_readme": [
     "候选新数据源清单(scouting backlog)——研究枯竭时从这里取 1-2 个走 probe-signal-source 剧本。",
+    "接入执行顺序:人批准后,工程接入先走 docs/agent_skills/data_source_onboarding.md 固定剧本",
+    "(立项五判→探针→契约声明→回填→质量门→加载层→登记),数据落湖且守卫全绿后再走 probe。",
     "消费方:services.read.research_exhaustion → 决策收件箱(exhausted 时推给人裁决);",
     "每个条目只是**待证伪的提议**(thesis 必填),接入与否由人批准;接入后的验真仍走",
     "L0-L3/9-Gate/holdout 完整链(R-WF-001),本清单不判有效(R-LLM-001)。",
@@ -64,7 +66,8 @@
       "source": "tushare forecast / express(业绩预告/快报)",
       "thesis": "公告日对齐的盈余惊喜是基本面族空白区(information_map 已指基本面族最独立)的事件版;须严格按公告日对齐(R-DATA-003)。",
       "evidence": [
-        "reports/research/metasearch_findings_20260623.md(基本面族距价格族 MI 2.8-2.9)"
+        "reports/research/metasearch_findings_20260623.md(基本面族距价格族 MI 2.8-2.9)",
+        "reports/research/probe_expectation_gap_20260712.md(相关证据:估值条件化变体 guidance_gap 已 probe——残差 OOS 留存 68% 但 ICIR 0.14 太弱且 size 相关 0.44;**纯 SUE 口径仍待独立 probe**,本条目保持开放)"
       ],
       "playbook": "probe-signal-source",
       "orthogonality_hint": "基本面事件族,与 frontier BOOST 方向一致"

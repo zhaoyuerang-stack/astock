@@ -84,6 +84,32 @@ def probabilistic_sharpe_ratio(
     return float(stats.norm.cdf(z))
 
 
+def _shift_decision_weights(
+    weights: pd.DataFrame,
+    trade_index: pd.DatetimeIndex,
+    delay: int,
+) -> pd.DataFrame:
+    """把稀疏决策权重的每一行沿交易日历向后平移 delay 个交易日。
+
+    直接 ``weights.shift(delay)`` 是按**行**移——决策面板每 ~20 天才一行,
+    等于延迟了一个调仓周期而不是宣称的 1-2 天(Gate7 延迟执行测试因此失真,
+    2026-07-11 review)。本函数按 trade_index 精确移 delay 个交易日;
+    越界行丢弃;同一目标日冲突保留最后一行。
+    """
+    if delay <= 0 or weights.empty:
+        return weights
+    rows: dict = {}
+    for d, row in weights.iterrows():
+        pos = trade_index.searchsorted(pd.Timestamp(d)) + delay
+        if pos < len(trade_index):
+            rows[trade_index[pos]] = row
+    if not rows:
+        return pd.DataFrame(columns=weights.columns, index=pd.DatetimeIndex([]))
+    out = pd.DataFrame.from_dict(rows, orient="index")
+    out.index = pd.DatetimeIndex(out.index)
+    return out.sort_index()
+
+
 # ---------------------------------------------------------------------------
 # 9-Gate Classes
 # ---------------------------------------------------------------------------
@@ -437,7 +463,9 @@ class NineGatesEvaluator:
                 logger.debug("gate per-item computation skipped: %s: %s", type(_e).__name__, _e)
                 
         # Fill non-sampled dates with forward fill for simplified comparison
-        neutral_factor = neutral_factor.reindex(dates).ffill().bfill()
+        # 只 ffill:bfill 会把未来残差回填到更早日期(未来函数隐患);
+        # IC 只在 sample_dates 上算,早期 NaN 由 dropna 自然跳过。
+        neutral_factor = neutral_factor.reindex(dates).ffill()
         
         # Calculate Rank IC of neutralized factor
         ic_series = pd.Series(index=dates, dtype=float)
@@ -566,7 +594,7 @@ class NineGatesEvaluator:
         # Initialize backtest config
         config = BacktestConfig(
             start=start,
-            cost=CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065),
+            cost=CostModel(),
             leverage=1.25
         )
         
@@ -613,18 +641,22 @@ class NineGatesEvaluator:
         verdict = "PASS"
         
         # 1. Cost Sensitivity: 1x, 2x, 3x costs
+        # 压力费率从 CostModel 默认值派生(唯一权威 R-COST-001);融资利率不随倍数缩放(维持原口径)
+        base_cost = CostModel()
         engine_1x = BacktestEngine(prices=self.prices, config=BacktestConfig(
-            start=start, cost=CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065), leverage=1.25
+            start=start, cost=base_cost, leverage=1.25
         ))
         res_1x = engine_1x.run(signal)
-        
+
         engine_2x = BacktestEngine(prices=self.prices, config=BacktestConfig(
-            start=start, cost=CostModel(buy_cost=0.0045, sell_cost=0.0055, financing_rate=0.065), leverage=1.25
+            start=start, cost=CostModel(buy_cost=base_cost.buy_cost * 2, sell_cost=base_cost.sell_cost * 2,
+                                        financing_rate=base_cost.financing_rate), leverage=1.25
         ))
         res_2x = engine_2x.run(signal)
-        
+
         engine_3x = BacktestEngine(prices=self.prices, config=BacktestConfig(
-            start=start, cost=CostModel(buy_cost=0.00675, sell_cost=0.00825, financing_rate=0.065), leverage=1.25
+            start=start, cost=CostModel(buy_cost=base_cost.buy_cost * 3, sell_cost=base_cost.sell_cost * 3,
+                                        financing_rate=base_cost.financing_rate), leverage=1.25
         ))
         res_3x = engine_3x.run(signal)
         
@@ -747,7 +779,7 @@ class NineGatesEvaluator:
             # Simple simulation for test window
             config = BacktestConfig(
                 start=str(t_start.date()),
-                cost=CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065),
+                cost=CostModel(),
                 leverage=1.25
             )
             try:
@@ -788,10 +820,11 @@ class NineGatesEvaluator:
         try:
             weights = self._get_weights(signal)
             for delay in [1, 2]:
-                shifted_weights = weights.shift(delay).fillna(0.0)
+                shifted_weights = _shift_decision_weights(
+                    weights, self.prices.close.index, delay)
                 config = BacktestConfig(
                     start=start,
-                    cost=CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065),
+                    cost=CostModel(),
                     leverage=1.25
                 )
                 engine = BacktestEngine(prices=self.prices, config=config)
@@ -814,7 +847,7 @@ class NineGatesEvaluator:
         # Standard backtest returns
         try:
             standard_engine = BacktestEngine(prices=self.prices, config=BacktestConfig(
-                start=start, cost=CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065), leverage=1.25
+                start=start, cost=CostModel(), leverage=1.25
             ))
             res_std = standard_engine.run(signal)
             rets_std = res_std.returns
@@ -894,7 +927,7 @@ class NineGatesEvaluator:
             
             config = BacktestConfig(
                 start=str(t_start.date()),
-                cost=CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065),
+                cost=CostModel(),
                 leverage=1.25
             )
             try:

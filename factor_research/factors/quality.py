@@ -1,5 +1,6 @@
-"""
-财务质量类因子（基于季报数据）
+"""财务质量类因子（基于季报数据）
+
+Disposition: dormant — 零消费者(未接 catalog/DSL/白名单,无脚本引用);复活须先走 probe-signal-source 体检(R-ARCH-005 精神)。
 """
 import pandas as pd
 import numpy as np

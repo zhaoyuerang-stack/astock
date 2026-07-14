@@ -687,6 +687,40 @@ class NavCurveView(BaseModel):
     max_drawdown: float = 0.0
 
 
+# ── paper 多账户并行实测(WS-D 执行侧,R-PROD-001「不下单 ≠ 不实测」)────────
+class PaperAccountNavPoint(BaseModel):
+    date: str = ""
+    nav: float = 0.0
+    total_return: float = 0.0
+
+
+class PaperAccountView(BaseModel):
+    """一个候选策略版本的独立 paper 账户:状态机 + NAV 曲线 + 回测偏差。"""
+    name: str = ""                  # "{family}.{version}"
+    family: str = ""
+    version: str = ""
+    status: str = ""                # active | frozen | blocked | degraded | unknown
+    reason: str = ""                # blocked/degraded/unknown 的可读原因
+    opened_at: str = ""
+    frozen_at: str = ""
+    last_update_date: str = ""
+    nav_points: list[PaperAccountNavPoint] = Field(default_factory=list)
+    latest_nav: float = 0.0
+    total_return: float = 0.0
+    max_drawdown: float = 0.0
+    backtest_deviation: dict = Field(default_factory=dict)  # {available, reason} 或
+    # {available: True, window_start, window_end, paper_cumulative_return,
+    #  backtest_cumulative_return, cumulative_deviation, tracking_error, common_days}
+
+
+class PaperAccountsListView(BaseModel):
+    """多账户并排展示的顶层视图。顺序 = 后端产物顺序,前端不得重排名(R-PROD-001)。"""
+    healthy: bool = True
+    error: str = ""                 # healthy=False 时的可读原因(summary.json 缺失/过期名单等)
+    generated_at: str = ""
+    accounts: list[PaperAccountView] = Field(default_factory=list)
+
+
 class PaperTradesView(BaseModel):
     trades: list[PaperTradeRow] = Field(default_factory=list)
     total: int = 0

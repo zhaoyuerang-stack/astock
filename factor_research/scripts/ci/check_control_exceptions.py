@@ -27,6 +27,7 @@ CONTROL_PATHS = [
     "governance/state_machine.py",
     "governance/control_events.py",
     "portfolio/paper_engine.py",
+    "portfolio/paper_accounts.py",
 ]
 
 

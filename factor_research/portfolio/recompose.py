@@ -21,7 +21,14 @@ from governance.marginal import REDUNDANT_CORR, marginal_alpha
 from portfolio.portfolio_composer import portfolio_metrics
 
 # 排名口径版本:改评分构成/权重/门槛 = 改口径,必须 bump + 记 DECISIONS(R-OBJECTIVE-001)
-RANKING_VERSION = "v1"
+RANKING_VERSION = "v2"   # v2(ADR-036):inverse-vol + 防守帽(跨资产波动悬殊修复)
+
+# 防守资产判据与权重帽(ADR-036,一次性口径决策非搜索参数——不扫网格):
+# v0.2 探针实证 inverse-vol 对跨资产失效(2.5% 波动债腿被灌 87%,组合稀释成债基)。
+# 训练窗年化波动 < DEFENSIVE_VOL_ANNUAL 判防守资产(债 ~2.5% vs 股票腿 15-25%,分界不敏感);
+# 防守组合计权重帽 DEFENSIVE_CAP(60/40~70/30 资产配置惯例区间取中)。
+DEFENSIVE_VOL_ANNUAL = 0.08
+DEFENSIVE_CAP = 0.35
 RANKING_CRITERION = (
     "score = mean(rank(sharpe), rank(calmar), rank(residual_sharpe 对其余腿 inv-vol book));"
     "decay_check 触发的腿强制垫底不入提案;样本<min_obs 标 insufficient 垫底;"
@@ -148,13 +155,24 @@ def propose_weights(
     vol = df.std()
     inv = 1.0 / vol.replace(0, np.nan)
     w = (inv / inv.sum()).fillna(1.0 / len(selected))
+    # v2 防守帽(ADR-036):inverse-vol 对波动悬殊跨资产池会把权重全灌给低波防守腿
+    # (v0.2 探针实证:87% 债 → 组合稀释成债基)。防守组(年化 vol<DEFENSIVE_VOL_ANNUAL)
+    # 合计权重超帽时组内等比压缩到 DEFENSIVE_CAP,释放权重按 inverse-vol 比例分给
+    # 非防守组。全股票/全防守池不触发(行为同 v1)。
+    ann_vol = vol * np.sqrt(252)
+    defensive = [n for n in selected if float(ann_vol.get(n, np.inf)) < DEFENSIVE_VOL_ANNUAL]
+    offensive = [n for n in selected if n not in defensive]
+    d_sum = float(w[defensive].sum()) if defensive else 0.0
+    if defensive and offensive and d_sum > DEFENSIVE_CAP:
+        w[defensive] = w[defensive] * (DEFENSIVE_CAP / d_sum)
+        w[offensive] = w[offensive] * ((1.0 - DEFENSIVE_CAP) / float(w[offensive].sum()))
     composite = (df * w).sum(axis=1)
     comp_metrics = portfolio_metrics(composite)
     comp_decay = decay_check(composite)
     return {
         "status": "ok",
         "weights": {n: round(float(w[n]), 4) for n in selected},
-        "weighting": "static inverse-vol(全共同样本窗;advisory 提案口径,非执行系统)",
+        "weighting": "static inverse-vol + 防守帽 35%(v2/ADR-036;全共同样本窗;advisory 提案口径,非执行系统)",
         "skipped": skipped,
         "composite_metrics": {k: (round(float(v), 4) if isinstance(v, (int, float)) else v)
                               for k, v in comp_metrics.items()},
