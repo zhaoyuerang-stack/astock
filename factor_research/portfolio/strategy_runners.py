@@ -253,6 +253,15 @@ def run_all_live(start: str = "2018-01-01") -> dict[str, pd.Series]:
     return out
 
 
+def run_research_active(start: str = "2018-01-01") -> dict[str, pd.Series]:
+    """显式运行研究目录中标记 ACTIVE 的版本；不代表生产已部署。"""
+    return {
+        name: spec["fn"](start)
+        for name, spec in RESEARCH_STRATEGY_CATALOG.items()
+        if spec.get("status") == "ACTIVE" and spec.get("fn")
+    }
+
+
 def run_active(start: str = "2018-01-01") -> dict[str, pd.Series]:
     """Run only legs from the validated DeploymentManifest."""
     from runtime.deployment import load_active_deployment, load_deployed_strategy_spec, DeploymentNotReady
@@ -285,11 +294,8 @@ def run_active(start: str = "2018-01-01") -> dict[str, pd.Series]:
                 continue
             raise RuntimeError(f"deployment leg has no canonical runner: {name}")
     except DeploymentNotReady:
-        # Fallback to research catalog ACTIVE versions
+        # 生产事实 fail closed。研究目录须由 run_research_active() 显式调用。
         out = {}
-        for name, spec in RESEARCH_STRATEGY_CATALOG.items():
-            if spec.get("status") == "ACTIVE" and spec.get("fn"):
-                out[name] = spec["fn"](start)
     return out
 
 
@@ -298,7 +304,7 @@ def active_strategies() -> list[str]:
 
     生产事实优先来自 DeploymentManifest(Task 7)：清单可加载时,以其 legs 的
     family/version 为准(映射回目录键 'family.version')。清单未就绪(尚未 spec 化迁移)
-    时回退到研究目录的 ACTIVE 标记,保证研究脚本不被阻断。
+    时返回空列表；研究目录由 research_active_strategies() 显式读取。
     """
     from runtime.deployment import load_active_deployment, DeploymentNotReady
 
@@ -306,7 +312,12 @@ def active_strategies() -> list[str]:
         dep = load_active_deployment()
         return [f"{leg.family}.{leg.version}" for leg in dep.legs]
     except DeploymentNotReady:
-        return [n for n, s in RESEARCH_STRATEGY_CATALOG.items() if s.get("status") == "ACTIVE"]
+        return []
+
+
+def research_active_strategies() -> list[str]:
+    """返回研究目录 ACTIVE 标签，不代表生产部署。"""
+    return [n for n, s in RESEARCH_STRATEGY_CATALOG.items() if s.get("status") == "ACTIVE"]
 
 
 def shadow_strategies() -> list[str]:
@@ -326,7 +337,12 @@ def defensive_strategies() -> set[str]:
             if leg.role == "defensive"
         }
     except DeploymentNotReady:
-        return {
-            n for n, s in RESEARCH_STRATEGY_CATALOG.items()
-            if s.get("status") == "ACTIVE" and s.get("role") == "defensive"
-        }
+        return set()
+
+
+def research_defensive_strategies() -> set[str]:
+    """返回研究目录中的 ACTIVE 防御腿，不代表生产部署。"""
+    return {
+        n for n, s in RESEARCH_STRATEGY_CATALOG.items()
+        if s.get("status") == "ACTIVE" and s.get("role") == "defensive"
+    }
