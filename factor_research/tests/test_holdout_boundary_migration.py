@@ -97,5 +97,43 @@ def test_guard_flags_backward_and_mismatch(tmp_path, monkeypatch):
     assert any("非严格递增" in m for _, m in viol), viol
 
 
+def test_boundary_history_rejects_malformed_nonempty_line(tmp_path):
+    hist = tmp_path / "hist.jsonl"
+    hist.write_text(
+        json.dumps({"boundary": "2025-01-01"}) + "\n" +
+        "{broken json\n" +
+        json.dumps({"boundary": "2026-01-01"}) + "\n"
+    )
+
+    with pytest.raises(H.HoldoutHistoryCorrupt, match="line 2"):
+        H.boundary_history(hist)
+
+
+def test_boundary_rejects_unreadable_settings(tmp_path, monkeypatch):
+    settings = tmp_path / "settings.yaml"
+    settings.write_text("holdout: [broken")
+    monkeypatch.setattr(H, "_SETTINGS_YAML", settings)
+
+    with pytest.raises(RuntimeError, match="cannot load holdout boundary"):
+        H.boundary()
+
+
+def test_guard_flags_malformed_boundary_history_line(tmp_path, monkeypatch):
+    import scripts.ci.check_holdout_compliance as G
+
+    appcfg = tmp_path / "app_config"
+    appcfg.mkdir()
+    (appcfg / "holdout_boundary_history.jsonl").write_text(
+        json.dumps({"boundary": "2025-01-01"}) + "\n{broken json\n"
+    )
+    (appcfg / "settings.yaml").write_text("holdout:\n  start: \"2025-01-01\"\n")
+    monkeypatch.setattr(G, "ROOT", tmp_path)
+    monkeypatch.setattr(G, "SETTINGS_YAML", appcfg / "settings.yaml")
+
+    violations = G.check_boundary_monotonic()
+
+    assert any("line 2" in message for _, message in violations), violations
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))

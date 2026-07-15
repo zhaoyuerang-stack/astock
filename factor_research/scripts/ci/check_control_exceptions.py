@@ -19,6 +19,7 @@ CONTROL_PATHS = [
     "core/analysis/nine_gates.py",
     "core/analysis/nine_gate_policy.py",
     "services/read/trade_readiness.py",
+    "governance/holdout.py",
     "runtime/production_readiness.py",
     "runtime/deployment.py",
     "workflow/admission.py",
