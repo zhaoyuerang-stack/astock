@@ -19,11 +19,13 @@ os.chdir(ROOT); sys.path.insert(0, str(ROOT))
 
 from strategies.small_cap import StrategyConfig, load_price_panels, backtest_weights, build_rebalance_weights
 from factors.small_cap import small_cap_factor, small_cap_timing
+from governance.holdout import assert_search_clean, boundary
 from scipy.stats import spearmanr
 
 OUT = ROOT / "reports" / "research"; OUT.mkdir(parents=True, exist_ok=True)
 ANALYST_DIR = OUT / "analyst_cache"; ANALYST_DIR.mkdir(parents=True, exist_ok=True)
 N_WORKERS = 12  # M5 threads
+RESEARCH_BOUNDARY = boundary()
 
 
 # ══════════════════════════════════════════════════
@@ -34,16 +36,17 @@ def download_one(code, name=""):
     cache_f = ANALYST_DIR / f"{code}.parquet"
     if cache_f.exists():
         df = pd.read_parquet(cache_f)
-        # Check if cache is fresh (has recent data)
+        date_col = '日期' if '日期' in df.columns else 'date'
+        df = df[pd.to_datetime(df[date_col]) < RESEARCH_BOUNDARY].copy()
         if len(df) > 5:
-            date_col = '日期' if '日期' in df.columns else 'date'
-            last = pd.to_datetime(df[date_col]).max()
-            if last > pd.Timestamp('2025-01-01'):
-                return code, df
+            return code, df
 
     try:
         import akshare as ak
         df = ak.stock_research_report_em(symbol=code)
+        if df is not None and len(df) > 5:
+            date_col = '日期' if '日期' in df.columns else 'date'
+            df = df[pd.to_datetime(df[date_col]) < RESEARCH_BOUNDARY].copy()
         if df is not None and len(df) > 5:
             df.to_parquet(cache_f, index=False)
             return code, df
@@ -53,8 +56,10 @@ def download_one(code, name=""):
 
 
 def load_top200_codes():
-    """Get top 200 stocks by recent amount (market cap proxy)."""
-    _, _, amount = load_price_panels("2025-01-01")
+    """Get top 200 stocks by pre-holdout amount (market cap proxy)."""
+    _, _, amount = load_price_panels("2018-01-01")
+    amount = amount[amount.index < RESEARCH_BOUNDARY]
+    assert_search_clean(amount.index, label="analyst factor universe selection")
     avg_amt = amount.iloc[-60:].mean().nlargest(200)
     return [(code, "") for code in avg_amt.index]
 
@@ -85,6 +90,9 @@ print("\nBuilding analyst factor panel...", flush=True)
 
 # Per-stock: map each report to a date+rating, build daily time series
 close, _, amount = load_price_panels("2018-01-01")
+close = close[close.index < RESEARCH_BOUNDARY]
+amount = amount[amount.index < RESEARCH_BOUNDARY]
+assert_search_clean(close.index, label="analyst factor research panel")
 trade_dates = close.index
 
 # Map ratings to numeric scores
@@ -98,6 +106,7 @@ for code, df in ratings_data.items():
     # 列名兼容: 缓存parquet可能用'日期'或'date'
     date_col = '日期' if '日期' in df.columns else 'date'
     df['date'] = pd.to_datetime(df[date_col])
+    df = df[df['date'] < RESEARCH_BOUNDARY]
     df['rating_score'] = df['东财评级'].map(RATING_MAP)
     df = df.dropna(subset=['rating_score', 'date'])
     df = df.sort_values('date')

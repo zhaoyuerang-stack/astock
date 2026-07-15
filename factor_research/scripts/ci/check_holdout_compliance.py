@@ -36,6 +36,146 @@ EXPECTED_BOUNDARY = "2025-01-01"
 EXPECTED_BOUNDARY_HASH = "14973c591b26d5116b3ce3508c60adfe345a1201723a45f18dacc0293da2ec7a"
 
 
+def _assigned_names(node: ast.Assign | ast.AnnAssign) -> set[str]:
+    targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+    return {
+        child.id
+        for target in targets
+        for child in ast.walk(target)
+        if isinstance(child, ast.Name)
+    }
+
+
+def _is_boundary_call(node: ast.AST | None) -> bool:
+    if not isinstance(node, ast.Call):
+        return False
+    if isinstance(node.func, ast.Name):
+        return node.func.id == "boundary"
+    return isinstance(node.func, ast.Attribute) and node.func.attr == "boundary"
+
+
+def _call_name(node: ast.Call) -> str:
+    if isinstance(node.func, ast.Name):
+        return node.func.id
+    if isinstance(node.func, ast.Attribute):
+        return node.func.attr
+    return ""
+
+
+def _contains_boundary_ref(node: ast.AST | None, names: set[str]) -> bool:
+    if node is None:
+        return False
+    return any(
+        (isinstance(child, ast.Name) and child.id in names)
+        or (isinstance(child, ast.Constant) and child.value == EXPECTED_BOUNDARY)
+        for child in ast.walk(node)
+    )
+
+
+def _is_boundary_scalar(node: ast.AST | None, names: set[str]) -> bool:
+    """仅传播边界标量别名，不把 ``frame[frame.index < b]`` 的结果污染为边界。"""
+    if node is None:
+        return False
+    if _is_boundary_call(node):
+        return True
+    if isinstance(node, ast.Name):
+        return node.id in names
+    if isinstance(node, ast.Constant):
+        return node.value == EXPECTED_BOUNDARY
+    return (
+        isinstance(node, ast.Call)
+        and _call_name(node) in {"Timestamp", "to_datetime"}
+        and any(_contains_boundary_ref(arg, names) for arg in node.args)
+    )
+
+
+def _slice_starts_at_boundary(node: ast.AST, names: set[str]) -> bool:
+    if isinstance(node, ast.Slice):
+        return _contains_boundary_ref(node.lower, names)
+    if isinstance(node, ast.Tuple):
+        return any(_slice_starts_at_boundary(elt, names) for elt in node.elts)
+    return False
+
+
+def scan_direct_holdout_access(src: str, label: str = "") -> list[str]:
+    """识别直接读取 >= boundary 的研究代码，不依赖 search/rank 等函数命名。
+
+    允许 ``index < boundary`` 的搜索窗截断；拒绝定义 HOLDOUT_START、从 boundary
+    开始切片、``index >= boundary``，以及把边界或其别名传给评估函数。
+    """
+    try:
+        tree = ast.parse(src)
+    except SyntaxError as exc:
+        return [f"[{label}] 语法错误，无法证明 holdout 合规: {exc}"]
+
+    boundary_names: set[str] = set()
+    direct_start_names: set[str] = set()
+    violations: list[str] = []
+    assignments: list[ast.Assign | ast.AnnAssign] = [
+        node for node in ast.walk(tree) if isinstance(node, (ast.Assign, ast.AnnAssign))
+    ]
+    for node in assignments:
+        names = _assigned_names(node)
+        for name in names:
+            lowered = name.lower()
+            if "holdout" in lowered and "start" in lowered:
+                direct_start_names.add(name)
+                violations.append(
+                    f"[{label}:L{node.lineno}] 研究代码不得定义 {name};"
+                    "金库只能由 governance.holdout.validate_on_holdout 消费"
+                )
+
+    # 固定点传播：START="2025-01-01"、b=boundary()、alias=b 都视为边界引用。
+    changed = True
+    while changed:
+        changed = False
+        for node in assignments:
+            names = _assigned_names(node)
+            if _is_boundary_scalar(node.value, boundary_names):
+                new_names = names - boundary_names
+                if new_names:
+                    boundary_names.update(new_names)
+                    changed = True
+
+    boundary_names.update(direct_start_names)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Subscript) and _slice_starts_at_boundary(node.slice, boundary_names):
+            violations.append(
+                f"[{label}:L{node.lineno}] 检测到从 holdout boundary 开始的直接切片"
+            )
+        elif isinstance(node, ast.Compare):
+            left = node.left
+            for op, right in zip(node.ops, node.comparators):
+                reads_after_boundary = (
+                    isinstance(op, (ast.Gt, ast.GtE))
+                    and _contains_boundary_ref(right, boundary_names)
+                ) or (
+                    isinstance(op, (ast.Lt, ast.LtE))
+                    and _contains_boundary_ref(left, boundary_names)
+                )
+                if reads_after_boundary:
+                    violations.append(
+                        f"[{label}:L{node.lineno}] 检测到 >= holdout boundary 的直接访问"
+                    )
+                    break
+                left = right
+        elif isinstance(node, ast.Call):
+            call_name = _call_name(node).lower()
+            call_args = [*node.args, *[kw.value for kw in node.keywords]]
+            evaluation_call = any(
+                token in call_name
+                for token in ("evaluate", "backtest", "metric", "screen", "probe", "window")
+            )
+            if evaluation_call and any(
+                _contains_boundary_ref(arg, boundary_names) for arg in call_args
+            ):
+                violations.append(
+                    f"[{label}:L{node.lineno}] holdout boundary 被直接传入评估调用，"
+                    "绕过唯一消费入口"
+                )
+    return violations
+
+
 def check_boundary_lock() -> list[tuple[str, str]]:
     """holdout.start 必须 == 钉死值,否则违规(改金库须 ADR + 更新本 pin)。"""
     try:
@@ -71,12 +211,15 @@ def check_boundary_monotonic() -> list[tuple[str, str]]:
         return [("app_config/holdout_boundary_history.jsonl",
                  "边界历史账本缺失:需 genesis 基线(ADR-023 强制)。")]
     hist = []
-    for line in hist_path.read_text(encoding="utf-8").splitlines():
+    for lineno, line in enumerate(hist_path.read_text(encoding="utf-8").splitlines(), 1):
         if line.strip():
             try:
                 hist.append(json.loads(line))
-            except json.JSONDecodeError:
-                pass
+            except json.JSONDecodeError as exc:
+                return [(
+                    "app_config/holdout_boundary_history.jsonl",
+                    f"boundary history line {lineno} JSON 损坏: {exc}",
+                )]
     if not hist:
         return [("app_config/holdout_boundary_history.jsonl",
                  "边界历史账本为空:需 genesis 基线(ADR-023 强制)。")]
@@ -110,6 +253,14 @@ def main() -> int:
     violations = []
     violations.extend(check_boundary_lock())  # P0-B:金库边界配置锁
     violations.extend(check_boundary_monotonic())  # ADR-023:边界只进不退 + 账本一致
+    research_root = ROOT / "scripts" / "research"
+    if research_root.exists():
+        for path in sorted(research_root.rglob("*.py")):
+            if "archive" in path.parts or "__pycache__" in path.parts:
+                continue
+            rel = str(path.relative_to(ROOT))
+            for message in scan_direct_holdout_access(path.read_text(encoding="utf-8"), rel):
+                violations.append((rel, message))
     for rel, why in REQUIRED.items():
         p = ROOT / rel
         if not p.exists():
