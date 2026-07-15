@@ -6,12 +6,20 @@
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import services.read.trade_readiness as TR
+
+
+class _Ready:
+    allowed = True
+
+    def dict(self):
+        return {"allowed": True}
 
 
 def _write_decay(tmp_path, status, strategies=()):
@@ -52,6 +60,57 @@ def test_degraded_health_blocks_auto_trade(tmp_path, monkeypatch):
     v = TR.get_trade_readiness()
     assert v.factor_health == "degraded"
     assert v.allowed_to_trade is False
+
+
+@pytest.mark.parametrize("failed_dependency", ["data", "risk", "model", "production"])
+def test_dependency_failure_blocks_auto_trade_and_requires_human(
+    tmp_path, monkeypatch, failed_dependency
+):
+    """任何准入依赖异常都必须 fail closed，不能由默认绿值掩盖。"""
+    from app_config import settings as settings_module
+    from services.read import governance as governance_module
+
+    monkeypatch.setattr(TR, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        TR,
+        "data_quality",
+        lambda **_: SimpleNamespace(verdict="可用", clean_ratio=1.0),
+    )
+    monkeypatch.setattr(TR, "risk_report", lambda: SimpleNamespace(verdict="正常"))
+    monkeypatch.setattr(TR, "_factor_health_from_decay", lambda: ("normal", {}))
+    monkeypatch.setattr(TR, "get_production_readiness", lambda **_: _Ready())
+    monkeypatch.setattr(
+        settings_module,
+        "get_settings",
+        lambda: SimpleNamespace(strategy=SimpleNamespace(family="toy", version="v1")),
+    )
+    monkeypatch.setattr(
+        governance_module,
+        "get_strategy_gate_status",
+        lambda *_: {
+            "registered": True,
+            "audit_status": "PASS",
+            "dsr_audited": True,
+            "dsr_passed": True,
+        },
+    )
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError(f"{failed_dependency} unavailable")
+
+    if failed_dependency == "data":
+        monkeypatch.setattr(TR, "data_quality", boom)
+    elif failed_dependency == "risk":
+        monkeypatch.setattr(TR, "risk_report", boom)
+    elif failed_dependency == "model":
+        monkeypatch.setattr(governance_module, "get_strategy_gate_status", boom)
+    else:
+        monkeypatch.setattr(TR, "get_production_readiness", boom)
+
+    view = TR.get_trade_readiness()
+
+    assert view.allowed_to_trade is False
+    assert view.human_approval_required is True
 
 
 if __name__ == "__main__":

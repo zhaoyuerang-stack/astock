@@ -43,23 +43,26 @@ def _factor_health_from_decay() -> tuple[str, dict]:
 def get_trade_readiness() -> TradeReadinessView:
     # 1. Check Data status
     data_clean_ratio = None
+    control_errors: dict[str, str] = {}
     try:
         dq = data_quality(with_duckdb=False)
         data_status = dq.verdict
         data_clean_ratio = getattr(dq, "clean_ratio", None)  # 真实清洁率,不再硬编码 0.998
-    except Exception:
-        data_status = "可用"
+    except Exception as exc:
+        data_status = "unknown"
+        control_errors["data_quality"] = type(exc).__name__
 
     # 2. Check risk check limits
     try:
         rr = risk_report()
         portfolio_risk = "within limit" if rr.verdict == "正常" else "breach"
-    except Exception:
-        portfolio_risk = "within limit"
+    except Exception as exc:
+        portfolio_risk = "unknown"
+        control_errors["risk_report"] = type(exc).__name__
 
     # 3. Model approvals: 读生产策略的台账治理闸门(在册 + DSR 多重检验),不再硬编码 approved。
     #    决策含义:在册但 DSR 审计未通过 → 不发自动放行,转人工审批。
-    model_version = "approved"
+    model_version = "unknown"
     model_gate: dict = {}
     try:
         from app_config.settings import get_settings
@@ -76,8 +79,9 @@ def get_trade_readiness() -> TradeReadinessView:
             model_version = "dsr_not_significant"   # 在册但多重检验惩罚后不显著
         else:
             model_version = "approved"
-    except Exception:
-        model_version = "approved"
+    except Exception as exc:
+        model_version = "unknown"
+        control_errors["model_governance"] = type(exc).__name__
 
     # 4. Factor health & decay check —— 读真实 decay 报告,不再硬编码 normal(ADR 修复硬编码桩)。
     #    decay=red(有策略衰减)→ degraded,会拉低 allowed_to_trade,不让衰减期自动放行。
@@ -109,14 +113,12 @@ def get_trade_readiness() -> TradeReadinessView:
     # 7. Kill switch status
     kill_switch_status = "armed"
 
-    # 8. Human approval requirement —— 未审计/审计失败/DSR 未通过均不得自动放行
-    human_approval_required = model_version in {"dsr_pending", "nine_gate_failed", "dsr_not_significant"}
-
     production_readiness = None
     try:
         production_readiness = get_production_readiness(governance_status=model_version)
-    except Exception:
+    except Exception as exc:
         production_readiness = None
+        control_errors["production_readiness"] = type(exc).__name__
 
     # Overall allowed to trade(model_version 非 "approved" 即不自动放行)
     allowed_to_trade = (
@@ -125,8 +127,11 @@ def get_trade_readiness() -> TradeReadinessView:
         and model_version == "approved"
         and factor_health == "normal"
         and kill_switch_status == "armed"
-        and (production_readiness.allowed if production_readiness else True)
+        and production_readiness is not None
+        and production_readiness.allowed
     )
+    # 任何准入条件未知/失败都不得自动放行；人工审批字段用于显式暴露阻断，而非覆盖阻断。
+    human_approval_required = not allowed_to_trade
     details = {
         "data_clean_ratio": data_clean_ratio,  # 真实值;读不到为 None,前端按未知呈现
         "max_exposure_allowed": 1.25,
@@ -138,6 +143,7 @@ def get_trade_readiness() -> TradeReadinessView:
         "model_audit_status": model_gate.get("audit_status", ""),
         "model_audit_label": model_gate.get("audit_label", ""),
         "model_nine_gate_error": model_gate.get("nine_gate_error", ""),
+        "control_errors": control_errors,
     }
     if production_readiness:
         if hasattr(production_readiness, "model_dump"):
