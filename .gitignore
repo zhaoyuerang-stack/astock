@@ -6,6 +6,13 @@ factor_research/data_lake/
 # Python
 __pycache__/
 *.pyc
+*.profraw
+
+# JS / desktop build outputs (reinstall or rebuild)
+node_modules/
+dist/
+.vite/
+.runtime/
 
 # 系统
 .DS_Store
@@ -21,6 +28,29 @@ factor_research/paper/
 # Claude 本地配置
 .claude/settings.local.json
 .worktrees/
+
+# 本地 agent / IDE 运行状态
+.superpowers/
+.workbuddy/
+*.code-workspace
+/.agents/AGENTS.md
+# `.agents/` 不整目录忽略:自包含的项目 skill 可以是共享源码;
+# 本机 symlink/个人安装应写入 `.git/info/exclude`。
+
+# 原型渲染缓存与输出
+prototypes/**/.thumbnails/
+prototypes/**/.waveform-cache/
+prototypes/**/renders/
+prototypes/**/*.wav
+
+# 探索区默认留本地;复用脚本先迁到 scripts/research 或 scripts/ops
+factor_research/scratch/*
+!factor_research/scratch/MODULE_STATUS.md
+
+# 私有配置、凭证与运行时锁
+project.private.config.json
+desktop/stock-diagnosis-client/auth.json
+factor_research/.strategy_versions.json.lock
 
 # 研报/参考资料(二进制,不纳入,留磁盘)
 *.pdf

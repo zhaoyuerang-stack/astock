@@ -66,8 +66,29 @@ python3 scripts/ops/generate_factor_health.py   # 刷新 reports/factor_health.j
 python3 scripts/ops/paper_trade.py              # 纸面账户跟踪 → paper/
 python3 scripts/research/cost_sensitivity.py     # 成本敏感性
 bash scripts/test_all.sh                         # 全套测试 + 分层守卫(改完代码必跑)
+python3 scripts/ops/git_hygiene_audit.py         # 只读审计分支/worktree/脏文件
 ```
 定时任务(launchd):`scripts/ops/install_launchd_jobs.sh`(每日更新 / 每周维护 / FastAPI :8011 / Web :3000)。
+
+### 仓库卫生(每周或合并前)
+
+先刷新远端引用,再运行只读审计:
+
+```bash
+cd /Users/kiki/astcok
+git fetch origin --prune
+python3 factor_research/scripts/ops/git_hygiene_audit.py
+```
+
+报告中的处置口径:
+
+- `unmerged_branches`:逐条进入合并、提取、归档、删除四选一;不能按名称或日期直接删。
+- `clean_merged_worktrees`:仅列 tracked/untracked/ignored 均为空的候选,仍需确认没有运行中的 agent。
+- `merged_branches_without_worktree`:可删除的本地引用候选;远端分支另行审批。
+- `untracked_buckets`:按 `review_source/review_evidence/archive_or_promote/local_ignore/review`
+  分桶;工具不会自动 stage、移动或删除任何文件。
+
+需要机器可读结果时加 `--json`;工具默认不联网,只有显式 `--fetch` 才刷新 `origin`。
 
 ---
 
