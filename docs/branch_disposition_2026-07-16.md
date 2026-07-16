@@ -45,6 +45,7 @@
 
 - 已完成针对性测试：治理 34 项、桌面 19 项、agent 28 项、研究正确性 12 项、质押 14 项、金额 16 项、registry evidence 12 项、组合搜索 7 项。
 - 已通过相关静态守卫：holdout compliance、control exceptions、layer deps、amount units、registry evidence。
-- 全量 `factor_research/scripts/test_all.sh` 在发布前必须通过；结果在本轮完成后补记。
+- 全量 `factor_research/scripts/test_all.sh` 已于 2026-07-16 完整通过：全部守卫通过，
+  146 个 `test_*.py` 均被发现，兜底执行的 96 个未显式枚举文件通过（1 项按设计跳过）。
 - 只有当改动已进入 `main`、`git cherry main <branch>` 不再显示独立补丁、关联工作树无用户文件且无运行进程时，才允许删除分支和工作树。
 - 清理不得使用 `git reset --hard`、强制删除含未知文件的工作树，或以 `git add -A` 打包未归属改动。
