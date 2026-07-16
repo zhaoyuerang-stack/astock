@@ -19,6 +19,7 @@ os.chdir(ROOT)
 from factors.autoresearch_dsl import compute_dsl_factor
 from factory.autoresearch import (
     CandidateRepository,
+    DSLValidationError,
     ExperimentLog,
     ReviewQueue,
     generate_seed_candidates,
@@ -26,6 +27,19 @@ from factory.autoresearch import (
 )
 from factory.autoresearch.islands import run_island_search
 from factory.lines.line2_validation.l0_ic_scan import precompute_forward_returns
+
+
+SEARCHABLE_ALPHA_FACTORS = (
+    "alpha_001", "alpha_002", "alpha_003", "alpha_006", "alpha_008",
+    "alpha_009", "alpha_012", "alpha_013", "alpha_014", "alpha_015",
+    "alpha_017", "alpha_018", "alpha_019", "alpha_021", "alpha_023",
+    "alpha_025", "alpha_028", "alpha_030", "alpha_032", "alpha_034",
+    "alpha_037", "alpha_038", "alpha_040", "alpha_044", "alpha_050",
+    "alpha_055",
+)
+RETIRED_ALPHA_FACTORS = (
+    "alpha_005", "alpha_020", "alpha_022", "alpha_024", "alpha_033", "alpha_049",
+)
 
 
 def _synthetic_panel(n_days: int = 420, n_stocks: int = 25):
@@ -51,19 +65,9 @@ class TestClassicAlphasEvolution(unittest.TestCase):
         self.close, self.volume, self.amount = _synthetic_panel()
         self.forward_ret = precompute_forward_returns(self.close)
 
-    def test_compute_all_alpha101_factors(self):
-        """Verify that all 32 registered Alpha101 factors can compute values via compute_dsl_factor."""
-        alpha_factors = [
-            "alpha_001", "alpha_002", "alpha_003", "alpha_005", "alpha_006",
-            "alpha_008", "alpha_009", "alpha_012", "alpha_013", "alpha_014",
-            "alpha_015", "alpha_017", "alpha_018", "alpha_019", "alpha_020",
-            "alpha_021", "alpha_022", "alpha_023", "alpha_024", "alpha_025",
-            "alpha_028", "alpha_030", "alpha_032", "alpha_033", "alpha_034",
-            "alpha_037", "alpha_038", "alpha_040", "alpha_044", "alpha_049",
-            "alpha_050", "alpha_055"
-        ]
-
-        for factor in alpha_factors:
+    def test_compute_all_searchable_alpha101_factors(self):
+        """Verify that every non-degenerate Alpha101 factor validates and computes."""
+        for factor in SEARCHABLE_ALPHA_FACTORS:
             ast = {
                 "type": "linear_combo",
                 "terms": [
@@ -96,6 +100,23 @@ class TestClassicAlphasEvolution(unittest.TestCase):
                 self.assertGreater(valid_count, 0, f"Factor {factor} returned all NaNs in latter portion")
             except Exception as e:
                 self.fail(f"Computation failed for factor {factor}: {e}")
+
+    def test_degenerate_alpha101_factors_are_not_searchable(self):
+        """Retired duplicate factors remain unavailable to AutoResearch candidates."""
+        for factor in RETIRED_ALPHA_FACTORS:
+            ast = {
+                "type": "linear_combo",
+                "terms": [{
+                    "factor": factor,
+                    "params": {},
+                    "transforms": ["zscore"],
+                    "weight": 1.0,
+                }],
+                "direction": "positive",
+                "thesis": {"mechanism": "test", "citation": "unit test"},
+            }
+            with self.assertRaisesRegex(DSLValidationError, f"unknown factor: {factor}"):
+                validate_candidate_ast(ast)
 
     def test_seed_candidate_generation(self):
         """Verify that seed candidate generator successfully generates classic alpha seeds."""
