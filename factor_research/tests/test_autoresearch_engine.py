@@ -1751,7 +1751,9 @@ def test_dsl_disk_cache_ignores_non_overlapping_panel():
         old_get_cache_path = dsl._get_cache_path
         try:
             dsl.clear_factor_cache()
-            dsl._get_cache_path = lambda name, params, data_signature=None: cache_path
+            dsl._get_cache_path = (
+                lambda name, params, data_signature=None, *, source_hash=None: cache_path
+            )
             factor = dsl.compute_dsl_factor(close, volume, ast=ast, cache_mode="disk")
         finally:
             dsl._get_cache_path = old_get_cache_path
