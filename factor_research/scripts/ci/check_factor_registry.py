@@ -32,8 +32,8 @@ ROOT = Path(__file__).resolve().parents[2]
 # ── C1 冻结清单:2026-07-12 存量手工接线(迁移一条删一条,只减不增) ──────────
 _LEGACY_ALPHA101 = frozenset(
     f"alpha_{i:03d}" for i in (
-        1, 2, 3, 5, 6, 8, 9, 12, 13, 14, 15, 17, 18, 19, 20, 21, 22, 23, 24,
-        25, 28, 30, 32, 33, 34, 37, 38, 40, 44, 49, 50, 55))
+        1, 2, 3, 6, 8, 9, 12, 13, 14, 15, 17, 18, 19, 21, 23, 25, 28, 30,
+        32, 34, 37, 38, 40, 44, 50, 55))
 
 _LEGACY_PRICE_FUND = frozenset({
     "momentum", "volume_ratio", "volatility", "illiquidity",
