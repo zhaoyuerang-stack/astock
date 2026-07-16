@@ -1,4 +1,4 @@
-"""Scheduled Composite Allocation Search — weekly maintenance step (WS2, ADR-034).
+"""Scheduled Composite Allocation Search — weekly research step (WS2, ADR-034).
 
 每周在**边际透镜**下重搜在册腿的组合配置(配权方法 × 腿子集),按对 risk_parity
 基线的 Δsharpe 排序、标 SHADOW 推荐,落 JSON 供人工复核。regime_adaptive 配权的
