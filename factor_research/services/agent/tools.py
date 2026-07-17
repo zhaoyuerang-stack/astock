@@ -65,12 +65,25 @@ def tool_registry() -> dict[str, Tool]:
         )
         return {**raw, "evidence_envelope": env.as_public_dict()}
 
-    def _probe(factor_name: str, idea: str = "", start: str = "2018-01-01",
-               cutoff: str = "2022-12-31", end: str = "2024-12-31"):
+    def _probe(
+        factor_name: str,
+        idea: str = "",
+        start: str = "2018-01-01",
+        cutoff: str = "2022-12-31",
+        end: str = "2024-12-31",
+        universe: str = "all",
+        full: str = "true",
+    ):
         from services.actions.run_signal_probe import run_signal_probe
 
         raw = run_signal_probe(
-            factor_name=factor_name, idea=idea, start=start, cutoff=cutoff, end=end,
+            factor_name=factor_name,
+            idea=idea,
+            start=start,
+            cutoff=cutoff,
+            end=end,
+            universe=universe,
+            full=full,
         )
         tier = EvidenceTier.L0_PROBE if raw.get("registered") else EvidenceTier.PRECHECK
         env = wrap_tool_result(

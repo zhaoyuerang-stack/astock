@@ -133,7 +133,7 @@ def test_run_signal_probe_blocks_past_holdout(tmp_path, monkeypatch):
 def test_run_signal_probe_unregistered_receipt(tmp_path, monkeypatch):
     monkeypatch.chdir(Path(__file__).resolve().parents[1])
     tool = tool_registry()["run_signal_probe"]
-    out = tool.fn(factor_name="definitely_not_registered_factor_zzz", end="2024-06-01")
+    out = tool.fn(factor_name="definitely_not_registered_factor_zzz", end="2024-06-01", full="false")
     assert out["registered"] is False
     assert out["can_claim_valid"] is False
     assert out["evidence_envelope"]["can_claim_valid"] is False
@@ -141,6 +141,59 @@ def test_run_signal_probe_unregistered_receipt(tmp_path, monkeypatch):
     path = Path(out["report_path"])
     assert "reports" in path.parts
     assert "research" in path.parts
+
+
+def test_run_signal_probe_full_uses_probe_fn(monkeypatch):
+    from factors.registry import FACTOR_REGISTRY, FactorRecord
+    from services.actions import run_signal_probe as rsp
+
+    def fake_probe(factor_ref, params, universe, start, cutoff, end):
+        return {
+            "factor": factor_ref,
+            "params": params,
+            "universe": universe,
+            "window": {"start": start, "cutoff": cutoff, "end": end},
+            "raw_ic": {"IS": {"ic": 0.01, "icir": 0.5, "months": 10}, "OOS": {"ic": 0.008, "icir": 0.4, "months": 5}, "full": None},
+            "residual_ic_size_liq": {"IS": None, "OOS": None, "full": None},
+            "style_corr": {"size": 0.1, "liquidity": 0.05, "momentum": 0.0},
+        }
+
+    def dummy_fn(close, window=20):
+        return close
+
+    monkeypatch.setitem(
+        FACTOR_REGISTRY,
+        "unit_test_probe_factor",
+        FactorRecord(
+            name="unit_test_probe_factor",
+            fn=dummy_fn,
+            definition="unit test only",
+            params={"window": (10, 30)},
+            evidence="test",
+            searchable=False,
+        ),
+    )
+    monkeypatch.chdir(Path(__file__).resolve().parents[1])
+    out = rsp.run_signal_probe(
+        factor_name="unit_test_probe_factor",
+        end="2024-06-01",
+        full=True,
+        probe_fn=fake_probe,
+    )
+    assert out["status"] == "l0_probe_complete"
+    assert out["full"] is True
+    assert out["can_claim_valid"] is False
+    assert out["probe"]["raw_ic"]["IS"]["ic"] == 0.01
+    assert "report_path" in out
+    # receipt-only path
+    receipt = rsp.run_signal_probe(
+        factor_name="unit_test_probe_factor",
+        end="2024-06-01",
+        full=False,
+        probe_fn=fake_probe,
+    )
+    assert receipt["status"] == "queued_l0_receipt"
+    assert "probe" not in receipt
 
 
 def test_high_risk_proposal_never_executes():

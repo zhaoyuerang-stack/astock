@@ -32,8 +32,9 @@ from services.agent.tools import (  # noqa: E402
 MAX_ARGUMENTS_BYTES = 16 * 1024
 # Optional args for tools that accept more than required minimum.
 _OPTIONAL_ARGS = {
-    "run_signal_probe": {"idea", "start", "cutoff", "end"},
+    "run_signal_probe": {"idea", "start", "cutoff", "end", "universe", "full"},
     "propose_high_risk_action": {"target", "rationale"},
+    "run_backtest": {"start", "top_n", "rebalance_days", "factor_window", "timing_ma", "family", "version"},
 }
 
 
