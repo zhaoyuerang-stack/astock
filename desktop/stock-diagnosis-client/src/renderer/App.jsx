@@ -48,8 +48,8 @@ function publicSkill(skill) {
 function statusClass(status) {
   if (status === "谨慎持有") return "hold";
   if (status === "等待输入") return "waiting";
-  if (status === "错误") return "error";
-  if (status === "数据不足" || status === "待模拟盘") return "insufficient";
+  if (status === "错误" || status === "数据阻断") return "error";
+  if (status === "数据不足" || status === "待模拟盘" || status === "想法预检") return "insufficient";
   if (status === "处理中") return "waiting";
   return "observe";
 }
@@ -133,7 +133,7 @@ function pendingDiagnosis(diagnosis, text, selectedSkill) {
     taskSteps: [
       {
         name: "Pi agent 执行中",
-        desc: `正在按 ${skillName} 读取系统 readonly CLI。`,
+        desc: `Pi agent 正在按 ${skillName} 通过系统 CLI 读取事实。`,
         status: "pending",
       },
       ...(diagnosis.taskSteps || []),
@@ -141,7 +141,11 @@ function pendingDiagnosis(diagnosis, text, selectedSkill) {
     turns: [
       ...(diagnosis.turns || []),
       { role: "user", content: text },
-      { role: "assistant", content: "正在调用系统 CLI，并检查返回证据。", pending: true },
+      {
+        role: "assistant",
+        content: "Pi agent 正在调用系统 CLI 读取证据…",
+        pending: true,
+      },
     ],
   };
 }
@@ -236,7 +240,7 @@ function ThreadSidebar({ threads, activeId, onSelect, onNew }) {
         <div className="brand-mark">AL</div>
         <div>
           <div className="brand-title">AStock Lens</div>
-          <div className="brand-subtitle">本地优先 · 股票诊断客户端</div>
+          <div className="brand-subtitle">本地优先 · 对话验证客户端</div>
         </div>
       </div>
       <div className="sidebar-toolbar">
@@ -474,7 +478,7 @@ function Workspace({
               ref={inputRef}
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
-              placeholder={selectedSkill ? `${selectedSkill.name}: ${selectedSkill.promptHint}` : "问一只股票，或继续推进当前诊断…"}
+              placeholder={selectedSkill ? `${selectedSkill.name}: ${selectedSkill.promptHint}` : "问股票，或直接说策略想法（如：用 WACC 做因子试策略）…"}
               aria-label="诊断输入"
             />
             <button className="send-button" type="submit" disabled={loading}>

@@ -50,9 +50,11 @@ async function loadCatalog(): Promise<Capability[]> {
 
 const CORE_CAPABILITY_DESCRIPTION = [
   "Call one capability from the live readonly AStock system CLI catalog.",
-  "Common stock capabilities:",
+  "Common capabilities:",
   "- resolve_stock_code(query): resolve a stock name or user sentence to a six-digit code.",
   "- stock_profile(code): read dated price, return, valuation, money-flow, source, and warning fields.",
+  "- strategy_idea_check(idea): deterministic strategy-idea precheck; returns boundaries, cost model, data quality, funnel, related families; never claims validity or fake equity curves.",
+  "- data_quality / factors / strategies / experiments: system readonly facts.",
   "The extension loads the machine-readable catalog before execution and rejects names not registered as readonly.",
 ].join("\n");
 

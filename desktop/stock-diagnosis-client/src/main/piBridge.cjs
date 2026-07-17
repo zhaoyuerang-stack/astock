@@ -13,13 +13,13 @@ const DEFAULT_EXTENSION_PATH = path.join(__dirname, "piExtensions", "astockCli.t
 const DEFAULT_TIMEOUT_MS = 60000;
 
 const SYSTEM_PROMPT = [
-  "你是 AStock Lens 的本地股票与策略诊断 Agent。",
-  `你唯一能调用的工具是 ${PI_CLI_TOOL}，它只暴露系统登记的 readonly CLI 能力。`,
-  "禁止要求或假装执行 bash、文件读写、网络访问、回测、调仓或交易。",
-  "股票问题必须先从 CLI 得到明确代码和股票画像；名称不确定时先调用 resolve_stock_code。",
-  "涉及策略有效性时只能陈述还需确定性回测和门禁验证，不能由语言模型宣布有效。",
-  "只根据工具结果回答，不得编造行情、估值、收益、资金流、净值曲线或交易结论。",
-  "最终用自然、连续的中文回答当前问题，不要输出工具计划或 Markdown 卡片。",
+  "你是 AStock Lens 的本地量化研究 Agent。你像 Codex 一样用工具读系统，而不是靠猜。",
+  `唯一可信的系统事实入口是工具 ${PI_CLI_TOOL}。先按需 catalog/调用能力，再回答。`,
+  "可用能力由 CLI catalog 动态给出（含 resolve_stock_code、stock_profile、strategy_idea_check、data_quality、factors、strategies、experiments 等 readonly 项）。",
+  "判断问题类型后自己选工具：个股→resolve/stock_profile；策略/因子/回测想法→strategy_idea_check(idea=用户原话)，需要时再 factors/strategies/data_quality。",
+  "不要在没有 stock_profile 证据时向用户索要股票代码；策略讨论不需要股票代码。",
+  "禁止宣布策略有效；禁止编造年化/夏普/回撤/净值；数字只能复述 CLI 返回字段。",
+  "内置 bash/write 的输出不是产品证据。用自然中文推进，缺证据就说尚未读取到系统事实。",
 ].join("\n");
 
 function compactTurns(turns = [], limit = 20) {
@@ -37,15 +37,11 @@ function buildPiAgentArgs(prompt, options = {}) {
   const args = [
     "--offline",
     "--no-session",
-    "--no-context-files",
     "--no-prompt-templates",
     "--no-themes",
     "--no-extensions",
-    "--no-builtin-tools",
     "--extension",
     options.extensionPath || DEFAULT_EXTENSION_PATH,
-    "--tools",
-    PI_CLI_TOOL,
     "--mode",
     "json",
     "--system-prompt",
@@ -87,7 +83,9 @@ function publicSkillForPrompt(skill) {
 function buildAgentTurnPrompt({ prompt, context = {}, skills = [], selectedSkill = null }) {
   return [
     "处理下面这次用户输入。沿用 currentThread 和 recentTurns，不要把追问当成新对象。",
-    "若问题需要本地事实，主动调用 astock_cli；不要让用户手工提供系统已经能从 CLI 读取的信息。",
+    "你必须用 astock_cli 自己读取系统；客户端不会替你猜意图、也不会替你直调能力。",
+    "先根据问题选择 capability；argumentsJson 必须是该 capability 要求的字段（例如 strategy_idea_check 用 idea，stock_profile 用 code）。",
+    "回答中的数字只能复述 CLI 已返回字段；没有就写「CLI 未返回」。",
     JSON.stringify({
       currentUserPrompt: String(prompt || ""),
       currentThread: context.currentThread || context.thread || null,

@@ -40,9 +40,9 @@
     "name": "策略预检",
     "shortName": "策略",
     "category": "策略",
-    "description": "把用户策略想法拆成可验证假设、数据需求、回测边界和下一步读模型。",
-    "promptHint": "描述策略想法，例如：低估值 + 资金流转正，每周调仓。",
-    "boundary": "当前只做策略想法预检；Shadow 模拟盘 read model 接入前不生成收益曲线。",
+    "description": "用自然语言讨论并预检策略想法：调 CLI 读成本/数据/漏斗，明确未验证边界。",
+    "promptHint": "描述策略想法，例如：小盘+低换手+反转，每周调仓，持仓30。",
+    "boundary": "只做想法边界预检；禁止伪造收益曲线；有效性只认回测引擎与 9-Gate。",
     "requiresStock": false,
     "mode": "strategy_precheck",
     "piSkillFile": "piSkills/strategy-precheck.md"

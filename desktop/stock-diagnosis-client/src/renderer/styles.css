@@ -725,6 +725,69 @@ input:focus-visible {
   background: rgba(108, 167, 255, 0.08);
 }
 
+.state-pill.neutral {
+  color: var(--text-3);
+  border-color: var(--line);
+  background: rgba(115, 127, 140, 0.08);
+}
+
+.trust-banner {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(216, 168, 79, 0.08), rgba(20, 23, 27, 0.96));
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+.trust-banner.ready {
+  background: linear-gradient(180deg, rgba(118, 200, 147, 0.08), rgba(20, 23, 27, 0.96));
+  border-color: rgba(118, 200, 147, 0.35);
+}
+
+.trust-banner.blocked {
+  background: linear-gradient(180deg, rgba(225, 107, 107, 0.1), rgba(20, 23, 27, 0.96));
+  border-color: rgba(225, 107, 107, 0.4);
+}
+
+.trust-banner.pending {
+  background: linear-gradient(180deg, rgba(216, 168, 79, 0.1), rgba(20, 23, 27, 0.96));
+  border-color: rgba(216, 168, 79, 0.4);
+}
+
+.trust-banner-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.trust-kicker {
+  color: var(--text-3);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.trust-headline {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.trust-detail {
+  margin-top: 6px;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.trust-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+}
+
 .pipeline-map {
   display: grid;
   gap: 12px;

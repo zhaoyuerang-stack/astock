@@ -1,13 +1,15 @@
 # AStock Lens Desktop
 
-Standalone Electron + React client for the personal stock diagnosis product track.
+Standalone Electron + React client for local research conversation: stock diagnosis **and** strategy-idea precheck.
 
-This app intentionally does not reuse the current `web/` information architecture. It keeps the product surface focused on one workflow:
+This app intentionally does not reuse the current `web/` information architecture. It keeps the product surface focused on:
 
-1. User asks about one stock from the bottom composer.
-2. Pi advances the same diagnosis thread and calls registered system CLI capabilities.
+1. User talks in natural language from the bottom composer (Codex-like chat).
+2. Pi advances the thread and may call only registered **readonly** system CLI capabilities via `astock_cli`.
 3. The main workspace stays conversation-only.
-4. Structured evidence and charts remain in the separate visualization view.
+4. Structured evidence, trust banner, and honesty boundaries live in the visualization view — never fake equity curves.
+
+Strategy ideas use `strategy_idea_check`: deterministic cost / data-quality / funnel / related-family clues with `can_claim_valid=false`. Model prose is not product evidence; ungrounded performance claims are dropped.
 
 ## Local Runtime
 

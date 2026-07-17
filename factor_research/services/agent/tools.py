@@ -39,6 +39,7 @@ def tool_registry() -> dict[str, Tool]:
     from services.read import factors as fac, registry as reg
     from services.read import experiments as ex, portfolio as pf, risk as rk, state as st
     from services.read.stocks import resolve_stock_code, stock_profile
+    from services.read.strategy_idea import check_strategy_idea
 
     def _backtest(**kw):
         from services.actions.run_backtest import run_backtest
@@ -59,6 +60,14 @@ def tool_registry() -> dict[str, Tool]:
             "读取个股价格日期、收益、估值、资金流和数据来源画像",
             lambda code: stock_profile(code),
             ("code",),
+        ),
+        "strategy_idea_check": Tool(
+            "strategy_idea_check",
+            RISK_READONLY,
+            "把策略想法拆成可验证边界+系统事实(成本/数据质量/漏斗/相关家族线索);"
+            "永不宣布有效、不产出伪净值",
+            lambda idea: check_strategy_idea(idea),
+            ("idea",),
         ),
         "market_state":  Tool("market_state", RISK_READONLY, "当前持仓/动作状态", lambda: st.market_state().model_dump()),
         "factors":       Tool("factors", RISK_READONLY, "alpha 因子家族", lambda: [f.model_dump() for f in fac.list_factors()]),

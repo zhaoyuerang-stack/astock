@@ -51,13 +51,11 @@ assert(main.includes("readService"), "runtime status must include read service h
 
 const piBridge = readFileSync(join(root, "src/main/piBridge.cjs"), "utf8");
 const piExtension = readFileSync(join(root, "src/main/piExtensions/astockCli.ts"), "utf8");
-assert(piBridge.includes("--no-builtin-tools"), "Pi bridge must disable Pi built-in tools");
+assert(!piBridge.includes("--no-builtin-tools"), "Pi bridge must allow Pi built-in tools");
 assert(piBridge.includes("--no-extensions"), "Pi bridge must disable ambient Pi extensions");
 assert(piBridge.includes("--no-session"), "Pi bridge must keep diagnosis prompts ephemeral by default");
 assert(piBridge.includes("runAgentTurn"), "Pi bridge must expose one complete agent turn");
 assert(piBridge.includes("--mode"), "Pi bridge must consume Pi JSON events");
-assert(piBridge.includes("astock_cli"), "Pi bridge must allow only the AStock CLI extension tool");
-assert(!piBridge.includes('"--tools", "bash"'), "Pi bridge must not enable arbitrary shell tools");
 assert(piExtension.includes('name: "astock_cli"'), "Pi extension must register the AStock CLI tool");
 assert(piExtension.includes('item?.risk === "readonly"'), "Pi extension must filter the CLI catalog to readonly capabilities");
 assert(!piExtension.includes('name: "bash"'), "Pi extension must not register a shell tool");
@@ -89,7 +87,7 @@ const requiredUiMarkers = [
   "upsertThreadList",
   "dedupeThreadList",
   "正在调用系统 CLI",
-  "问一只股票，或继续推进当前诊断",
+  "问股票，或直接说策略想法",
   "图形化展示",
   "选择 Skill",
   "已启用 Skill",
@@ -97,11 +95,22 @@ const requiredUiMarkers = [
   "不展示伪造曲线",
   "等待输入",
   "本地能力不可用",
+  "trust-banner",
+  "honesty-boundary-panel",
+  "can_claim_valid",
 ];
 
 for (const marker of requiredUiMarkers) {
   assert(rendererSurface.includes(marker), `Missing required UI marker/copy: ${marker}`);
 }
+
+assert(piBridge.includes("astock_cli"), "Pi bridge must route system facts through astock_cli");
+assert(piBridge.includes("自己选工具") || piBridge.includes("自己读取系统"), "Pi bridge must let the agent choose tools");
+assert(piExtension.includes("strategy_idea_check"), "Pi CLI extension must document strategy_idea_check");
+assert(skillCatalog.includes("策略预检"), "skill catalog must keep strategy precheck");
+const diagnosisService = readFileSync(join(root, "src/main/diagnosisService.cjs"), "utf8");
+assert(!diagnosisService.includes("callReadonlyCapability"), "host must not bypass Pi with direct capability calls");
+assert(!diagnosisService.includes("isStrategyRequest"), "host must not hardcode strategy intent routing");
 
 assert(!rendererSurface.includes("600519-demo"), "renderer must not ship hard-coded demo diagnosis threads");
 assert(!rendererSurface.includes("seedThreads"), "renderer must not seed fake thread history");

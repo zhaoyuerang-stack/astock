@@ -104,7 +104,69 @@ function cliCallEvidence(call) {
   if (call.capability === "stock_profile") {
     return `Pi CLI stock_profile: ${call.result?.name || call.result?.code || "已读取"} ${call.result?.code || ""}`.trim();
   }
+  if (call.capability === "strategy_idea_check") {
+    const trust = call.result?.trust?.headline || "想法预检已返回";
+    return `Pi CLI strategy_idea_check: ${trust}`;
+  }
   return `Pi CLI ${call.capability}: 已读取系统只读能力`;
+}
+
+function floatsFromText(text) {
+  const out = [];
+  for (const token of String(text || "").match(/\d+(?:\.\d+)?/g) || []) {
+    const value = Number(token);
+    if (Number.isFinite(value)) out.push(value);
+  }
+  return out;
+}
+
+function isSalientNumber(value) {
+  return value !== Math.trunc(value) || Math.abs(value) >= 100;
+}
+
+function numberGrounded(n, reals, relTol = 0.005) {
+  for (const r of reals) {
+    for (const cand of [r, r * 100, r / 100]) {
+      if (Math.abs(n - cand) <= relTol * Math.max(Math.abs(cand), 1)) return true;
+    }
+  }
+  return false;
+}
+
+function collectCliFactNumbers(cliCalls = []) {
+  const reals = [];
+  for (const call of cliCalls) {
+    if (call?.isError) continue;
+    reals.push(...floatsFromText(JSON.stringify(call.result ?? "")));
+  }
+  return reals;
+}
+
+function agentTextClaimsValidity(text) {
+  return /策略有效|已经验证|回测证明|年化\s*\d|夏普\s*\d|最大回撤\s*[-+]?\d|可入册|可实盘|伪造|稳赚/.test(String(text || ""));
+}
+
+function groundStrategyAgentText(text, cliCalls = [], ideaCheck = null) {
+  const raw = String(text || "").trim();
+  if (!raw) return "";
+  if (agentTextClaimsValidity(raw)) return "";
+  if (ideaCheck && ideaCheck.can_claim_valid !== false && ideaCheck.can_claim_valid !== undefined) {
+    return "";
+  }
+  const reals = collectCliFactNumbers(cliCalls);
+  if (!reals.length) {
+    // No CLI facts: allow short qualitative coaching without digits.
+    return floatsFromText(raw).some(isSalientNumber) ? "" : raw;
+  }
+  const salient = floatsFromText(raw).filter(isSalientNumber);
+  if (salient.some((n) => !numberGrounded(n, reals))) return "";
+  return raw;
+}
+
+function ideaCheckFromAgentTurn(agentTurn) {
+  const call = successfulCliCall(agentTurn, "strategy_idea_check");
+  if (!call?.result || typeof call.result !== "object" || Array.isArray(call.result)) return null;
+  return call.result;
 }
 
 function attachPiAgentTurn(diagnosis, agentTurn, options = {}) {
@@ -230,40 +292,126 @@ function reusableThreadId(context = {}) {
   return typeof thread.id === "string" && thread.id && thread.id !== "empty" ? thread.id : "";
 }
 
-function strategyPrecheckDiagnosis(prompt, skill, context = {}) {
+function strategyPrecheckDiagnosis(prompt, skill, context = {}, ideaCheck = null) {
   const thread = existingThread(context);
+  const skillInfo = skill ? publicSkill(skill) : {
+    id: "strategy-precheck",
+    name: "策略预检",
+    shortName: "策略",
+    category: "策略",
+    description: "策略想法边界预检",
+    boundary: "只做想法边界预检；禁止伪造收益曲线。",
+    requiresStock: false,
+    mode: "strategy_precheck",
+  };
+  const trust = ideaCheck?.trust || {
+    banner_status: "attention",
+    headline: "想法尚未经确定性回测与 9-Gate",
+    detail: "当前只做边界预检；不会生成伪收益曲线。",
+  };
+  const missing = ideaCheck?.parsed_hints?.missing_definition_fields || [];
+  const themes = ideaCheck?.parsed_hints?.candidate_terms
+    || ideaCheck?.parsed_hints?.matched_themes
+    || [];
+  const registryHits = ideaCheck?.parsed_hints?.registry_factor_hits || [];
+  const cost = ideaCheck?.system_facts?.cost_model;
+  const quality = ideaCheck?.system_facts?.data_quality;
+  const funnel = ideaCheck?.system_facts?.funnel;
+  const related = ideaCheck?.system_facts?.related_families || [];
+  const hasCli = Boolean(ideaCheck);
+
+  const risks = [
+    ...(missing.length ? [`定义缺口: ${missing.join("、")}`] : ["定义线索较完整，但仍未跑回测与门禁。"]),
+    ...(quality?.backtest_blocked ? ["数据质量 backtest_blocked：禁止用半截数据假装已验证。"] : []),
+    "Agent 叙述不是有效性裁决；有效性只认 BacktestEngine + 9-Gate。",
+  ];
+
+  const evidence = [
+    ...(skill ? [`选中 Skill: ${skill.name}`] : ["自动进入策略想法预检"]),
+    `用户输入: ${prompt}`,
+    ...(Array.isArray(ideaCheck?.evidence) ? ideaCheck.evidence : []),
+    ...(cost ? [`固定成本: ${cost.display}`] : []),
+    ...(themes.length ? [`候选词: ${themes.join("、")}`] : []),
+    ...(registryHits.length ? [`已注册因子命中: ${registryHits.join(", ")}`] : []),
+    ...(related.length
+      ? [`相关家族线索: ${related.slice(0, 3).map((item) => item.id).join(", ")}`]
+      : []),
+  ];
+
+  const status = quality?.backtest_blocked ? "数据阻断" : "想法预检";
   return {
     thread: {
-      id: reusableThreadId(context) || `skill-${skill.id}-${Date.now()}`,
+      id: reusableThreadId(context) || `skill-strategy-precheck-${Date.now()}`,
       name: thread.name && thread.name !== "等待输入" ? thread.name : "策略想法预检",
       code: thread.code || "",
-      status: "待模拟盘",
+      status,
     },
     taskSteps: [
-      skillTaskStep(skill),
-      { name: "记录策略想法", desc: "已把用户输入作为待验证假设保存到当前对话。", status: "done" },
-      { name: "拆解验证口径", desc: "下一步需要明确因子、股票池、调仓频率、成本和样本区间。", status: "pending" },
-      { name: "连接 Shadow 模拟盘", desc: "等待后端 read model 暴露组合净值、回撤、换手和失败样本。", status: "pending" },
+      skillTaskStep(skillInfo),
+      {
+        name: hasCli ? "CLI 策略想法预检" : "记录策略想法",
+        desc: hasCli
+          ? "已通过 strategy_idea_check 读取成本、数据质量、漏斗与边界。"
+          : "已把用户输入作为待验证假设保存；本轮未拿到 strategy_idea_check 证据。",
+        status: "done",
+      },
+      {
+        name: "拆解验证口径",
+        desc: missing.length
+          ? `仍缺: ${missing.slice(0, 4).join("、")}`
+          : "定义线索较完整；下一步才是确定性回测。",
+        status: missing.length ? "pending" : "done",
+      },
+      {
+        name: "确定性回测与 9-Gate",
+        desc: "未执行。Agent 不得跳过门禁宣布有效。",
+        status: "pending",
+      },
     ],
     decision: {
-      verdict: "待模拟盘",
-      note: "策略想法已记录，但还没有进入可审计模拟盘。",
-      summary: "当前只能做策略预检：拆清楚假设、数据需求和验证边界；不会生成伪收益曲线。",
-      notHeld: "不要把该策略直接作为候选，先补齐可验证定义和失败条件。",
-      held: "已有持仓不要按该策略想法调整仓位，先等待 Shadow 模拟盘证据。",
+      verdict: quality?.backtest_blocked ? "数据阻断" : "想法预检",
+      note: trust.headline,
+      summary: hasCli
+        ? `${trust.detail} 系统强制 can_claim_valid=false，不会生成伪收益曲线。`
+        : "当前只能做策略预检：拆清楚假设、数据需求和验证边界；不会生成伪收益曲线。",
+      notHeld: "不要把该策略直接作为候选或交易依据，先补齐可验证定义并经门禁。",
+      held: "已有持仓不要按该策略想法调整仓位。",
     },
-    risks: [
-      "缺少可执行的股票池、调仓频率、交易成本和样本区间。",
-      "后端尚未暴露用户策略 Shadow 模拟盘 read model。",
-    ],
-    evidence: [`选中 Skill: ${skill.name}`, `用户输入: ${prompt}`],
+    risks,
+    evidence,
     limits: [
       "本结果不构成交易建议。",
-      "当前只做策略想法预检，不执行回测，不生成收益曲线。",
-      `Skill 边界: ${skill.boundary}`,
+      "当前只做策略想法预检，不执行正式回测，不生成收益曲线。",
+      `Skill 边界: ${skillInfo.boundary}`,
+      ...(Array.isArray(ideaCheck?.limits) ? ideaCheck.limits : []),
+      ...(Array.isArray(ideaCheck?.forbidden_claims) ? ideaCheck.forbidden_claims : []),
     ],
-    sourceChips: [`Skill: ${skill.shortName || skill.name}`, "strategy-precheck", "no-fake-curve", "read-only"],
-    activeSkills: [publicSkill(skill)],
+    sourceChips: [
+      `Skill: ${skillInfo.shortName || skillInfo.name}`,
+      "strategy-precheck",
+      "no-fake-curve",
+      "read-only",
+      hasCli ? "cli-grounded" : "awaiting-cli",
+      cost ? "fixed-cost" : null,
+      funnel ? `funnel-reg=${funnel.registered ?? "?"}` : null,
+    ].filter(Boolean),
+    activeSkills: [skillInfo],
+    trust: {
+      banner_status: trust.banner_status || "attention",
+      headline: trust.headline,
+      detail: trust.detail,
+      can_claim_valid: false,
+      fake_curve_allowed: false,
+      validation_status: ideaCheck?.validation_status || "idea_precheck_local",
+      cost_display: cost?.display || "",
+      missing_fields: missing,
+      candidate_terms: themes,
+      registry_factor_hits: registryHits,
+      related_families: related.slice(0, 5),
+      funnel,
+      data_quality: quality || null,
+    },
+    ideaCheck,
     piExplanation: "",
   };
 }
@@ -333,12 +481,22 @@ function compactEvidence(items = [], limit = 3) {
 }
 
 function promptIntent(prompt) {
+  // Only used for stock follow-up reply shaping; routing is decided by Pi CLI evidence.
   const text = String(prompt || "");
   if (/风险|下行|回撤|减仓|止损|亏|跌/.test(text)) return "risk";
   if (/估值|贵|便宜|PE|PB|PS|市盈|市净|市销/.test(text)) return "valuation";
   if (/持有|仓位|卖|买|候选|加仓|进入/.test(text)) return "position";
-  if (/策略|回测|模拟盘|因子|调仓|股票池/.test(text)) return "strategy";
   return "general";
+}
+
+function strategySkillOrDefault(selectedSkill = null) {
+  if (selectedSkill?.mode === "strategy_precheck") return selectedSkill;
+  return skillDefinitions.find((item) => item.id === "strategy-precheck") || selectedSkill || null;
+}
+
+function piCalledStockTools(agentTurn) {
+  const calls = Array.isArray(agentTurn?.cliCalls) ? agentTurn.cliCalls : [];
+  return calls.some((call) => !call.isError && ["resolve_stock_code", "stock_profile"].includes(call.capability));
 }
 
 function buildAssistantReply(prompt, diagnosis) {
@@ -350,12 +508,21 @@ function buildAssistantReply(prompt, diagnosis) {
   const label = stockLabel(diagnosis);
   const boundary = "我不会把这段诊断当作交易指令，只按已读取证据推进。";
 
-  if (!diagnosis.thread?.code) {
-    return `${decision.summary || "还没有识别到股票代码。"}\n\n${boundary}`;
+  if (decision.verdict === "待模拟盘" || decision.verdict === "想法预检" || decision.verdict === "数据阻断") {
+    const trustLine = diagnosis.trust?.headline ? `\n信任状态: ${diagnosis.trust.headline}` : "";
+    const missing = (diagnosis.trust?.missing_fields || []).slice(0, 4);
+    const missingLine = missing.length ? `\n仍缺定义: ${missing.join("、")}` : "";
+    const impl = (diagnosis.ideaCheck?.system_facts?.implementation_notes || []).slice(0, 2);
+    const implLine = impl.length ? `\n系统读取:\n${impl.map((item) => `- ${item}`).join("\n")}` : "";
+    return `${decision.summary}${trustLine}${missingLine}${implLine}\n\n以上边界来自 Pi 经系统 CLI 返回的结构化证据；未跑可审计回测前不会宣布策略有效，也不展示伪收益曲线。`;
   }
 
-  if (decision.verdict === "待模拟盘") {
-    return `${decision.summary}\n\n下一步需要把策略想法落成可验证定义：股票池、因子、调仓频率、交易成本、样本区间和失败条件。没有这些之前，不展示收益曲线。`;
+  if (decision.verdict === "对话" || decision.verdict === "Agent 无证据") {
+    return decision.summary || "本轮未从系统 CLI 读到结构化证据。";
+  }
+
+  if (!diagnosis.thread?.code) {
+    return `${decision.summary || "还没有识别到股票代码。"}\n\n${boundary}`;
   }
 
   const intent = promptIntent(prompt);
@@ -415,41 +582,146 @@ function codeFromAgentTurn(agentTurn) {
   return extractStockCode(successfulCliCall(agentTurn, "resolve_stock_code")?.result || "");
 }
 
-function createDiagnosisService({ readClient, piBridge }) {
+function buildStrategyDiagnosisFromPi(prompt, context, selectedSkill, agentTurn, ideaCheck) {
+  const skill = strategySkillOrDefault(selectedSkill);
+  // Do not inherit a stock code into a strategy evidence thread.
+  const strategyContext = {
+    ...context,
+    currentThread: {
+      id: reusableThreadId(context) || `skill-strategy-precheck-${Date.now()}`,
+      name: "策略想法预检",
+      code: "",
+      status: "想法预检",
+    },
+  };
+  let diagnosis = strategyPrecheckDiagnosis(prompt, skill, strategyContext, ideaCheck);
+  const grounded = groundStrategyAgentText(agentTurn?.text, agentTurn?.cliCalls, ideaCheck);
+  diagnosis = attachPiAgentTurn(diagnosis, agentTurn, {
+    useText: Boolean(grounded),
+    fallbackUsed: false,
+  });
+  diagnosis.piExplanation = grounded || "";
+  diagnosis.trust = {
+    ...(diagnosis.trust || {}),
+    can_claim_valid: false,
+    fake_curve_allowed: false,
+  };
+  diagnosis.turns = appendTurns(strategyContext, prompt, diagnosis);
+  return diagnosis;
+}
+
+function buildAgentOnlyDiagnosis(prompt, context, selectedSkill, agentTurn) {
+  const thread = existingThread(context);
+  const hasText = Boolean(String(agentTurn?.text || "").trim());
+  const diagnosis = {
+    thread: {
+      id: reusableThreadId(context) || `agent-${Date.now()}`,
+      name: thread.name && thread.name !== "等待输入" ? thread.name : "研究对话",
+      code: "",
+      status: hasText ? "对话" : "Agent 无证据",
+    },
+    taskSteps: [
+      {
+        name: "Pi agent",
+        desc: hasText
+          ? "Pi 返回了自然语言，但本轮没有可用的结构化 CLI 证据。"
+          : (agentTurn?.error || "Pi 未完成系统 CLI 读取。"),
+        status: hasText ? "done" : "blocked",
+      },
+    ],
+    decision: {
+      verdict: hasText ? "对话" : "Agent 无证据",
+      note: "本轮未形成股票画像或策略预检结构化结果。",
+      summary: hasText
+        ? "以下内容来自 Pi 叙述；未绑定 stock_profile / strategy_idea_check 时，不能当作已验证证据。"
+        : `Pi 未能通过系统 CLI 读到结构化证据。${agentTurn?.error ? ` 错误: ${agentTurn.error}` : ""}`,
+      notHeld: "先不要当作候选或交易依据。",
+      held: "先不要按本轮结果调整仓位。",
+    },
+    risks: hasText
+      ? ["自然语言未与 CLI 结构化字段对齐，可信度有限。"]
+      : ["系统 CLI 证据缺失。"],
+    evidence: [
+      `用户输入: ${prompt}`,
+      ...(Array.isArray(agentTurn?.cliCalls) ? agentTurn.cliCalls.map(cliCallEvidence) : []),
+    ],
+    limits: [
+      "客户端不替 Agent 硬编码意图路由。",
+      "结构化证据只认 Pi 调用的 readonly CLI。",
+    ],
+    sourceChips: ["pi-agent", hasText ? "narrative-only" : "no-cli-evidence"],
+    activeSkills: selectedSkill ? [publicSkill(selectedSkill)] : [],
+    piExplanation: hasText ? String(agentTurn.text).trim() : "",
+    trust: {
+      banner_status: "attention",
+      headline: hasText ? "仅有 Agent 叙述，缺少系统 CLI 结构化证据" : "Agent 未读到系统证据",
+      detail: "请让 Agent 重试并调用 astock_cli 能力。",
+      can_claim_valid: false,
+      fake_curve_allowed: false,
+    },
+  };
+  return attachPiAgentTurn(diagnosis, agentTurn, { useText: hasText });
+}
+
+function createDiagnosisService({ readClient, piBridge } = {}) {
   if (!readClient) throw new Error("readClient is required");
 
   return {
     async runDiagnosis(prompt, context = {}) {
-      const requestedSkill = normalizeSelectedSkill(context);
-      const agentTurn = await requestPiAgentTurn(piBridge, prompt, context, requestedSkill);
-      const selectedSkill = requestedSkill;
+      const selectedSkill = normalizeSelectedSkill(context);
 
-      if (selectedSkill && selectedSkill.mode === "strategy_precheck") {
-        let diagnosis = strategyPrecheckDiagnosis(prompt, selectedSkill, context);
-        diagnosis = attachPiAgentTurn(diagnosis, agentTurn, { useText: false });
-        diagnosis.turns = appendTurns(context, prompt, diagnosis);
-        return diagnosis;
+      // Single entry: Pi agent chooses tools and reads the system via astock_cli.
+      const agentTurn = await requestPiAgentTurn(piBridge, prompt, context, selectedSkill);
+      const ideaCheck = ideaCheckFromAgentTurn(agentTurn);
+
+      // Product shape follows what Pi actually called — not keyword hardcoding.
+      if (ideaCheck || selectedSkill?.mode === "strategy_precheck") {
+        return buildStrategyDiagnosisFromPi(prompt, context, selectedSkill, agentTurn, ideaCheck);
       }
 
       const cliProfile = profileFromAgentTurn(agentTurn);
       let resolveError;
+      // Stock HTTP fallback only when:
+      // - stock skill / context already has a code, or
+      // - Pi already called stock tools, or
+      // - Pi returned no CLI calls (offline/unavailable) so local read service may still help.
+      // Never used to force a ticker prompt for strategy CLI evidence paths.
+      const piReturnedNoCli = !Array.isArray(agentTurn?.cliCalls) || agentTurn.cliCalls.length === 0;
+      const piOfflineOrFailed = piReturnedNoCli && !agentTurn?.ready;
+      const allowStockFallback = Boolean(
+        selectedSkill?.requiresStock
+        || piCalledStockTools(agentTurn)
+        || contextStockCode(context)
+        || extractStockCode(prompt)
+        // Only when Pi truly did not run: keep legacy local stock diagnosis available.
+        || (piOfflineOrFailed && selectedSkill?.mode !== "strategy_precheck")
+      );
       const promptCode = codeFromAgentTurn(agentTurn) || await (async () => {
+        if (!allowStockFallback) return null;
         try {
+          if (extractStockCode(prompt)) return extractStockCode(prompt);
           return readClient.resolveStockCode
             ? await readClient.resolveStockCode(prompt)
-            : extractStockCode(prompt);
+            : null;
         } catch (error) {
           resolveError = error;
           return null;
         }
       })();
-      const code = promptCode || contextStockCode(context);
+      const code = promptCode || (allowStockFallback ? contextStockCode(context) : null);
+
       if (!code) {
-        if (resolveError) throw resolveError;
+        if (resolveError && allowStockFallback) throw resolveError;
+        // Not a forced stock diagnosis: surface Pi conversation instead of "补股票代码".
+        if (!selectedSkill?.requiresStock && !piCalledStockTools(agentTurn)) {
+          const diagnosis = buildAgentOnlyDiagnosis(prompt, context, selectedSkill, agentTurn);
+          diagnosis.turns = appendTurns(context, prompt, diagnosis);
+          return diagnosis;
+        }
         let diagnosis = unresolvedDiagnosis(prompt, selectedSkill, context);
         diagnosis = attachPiAgentTurn(diagnosis, agentTurn, {
           fallbackUsed: Boolean(agentTurn?.ready),
-          useText: false,
+          useText: true,
         });
         diagnosis.turns = appendTurns(context, prompt, diagnosis);
         return diagnosis;
@@ -487,7 +759,7 @@ function createDiagnosisService({ readClient, piBridge }) {
       diagnosis = withSkillContext(diagnosis, selectedSkill);
       diagnosis = attachPiAgentTurn(diagnosis, agentTurn, {
         fallbackUsed,
-        useText: false,
+        useText: true,
       });
       diagnosis.turns = appendTurns(context, prompt, diagnosis);
       return diagnosis;
@@ -504,4 +776,9 @@ module.exports = {
   buildAssistantReply,
   codeFromAgentTurn,
   profileFromAgentTurn,
+  groundStrategyAgentText,
+  ideaCheckFromAgentTurn,
+  strategyPrecheckDiagnosis,
+  promptIntent,
+  piCalledStockTools,
 };

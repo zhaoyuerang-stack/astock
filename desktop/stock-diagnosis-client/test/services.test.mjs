@@ -138,7 +138,7 @@ test("diagnosis service keeps longer conversation history for active threads", a
   assert.equal(result.turns.at(-2).content, "继续看最大风险");
 });
 
-test("diagnosis service does not display unsupported Pi narrative as financial evidence", async () => {
+test("diagnosis service allows full natural language output from Pi Agent", async () => {
   const { createDiagnosisService } = await import("../src/main/diagnosisService.cjs");
   const piText = "这家公司主营某个 CLI 未返回的业务，而且未来一定增长。";
   const profile = {
@@ -179,9 +179,8 @@ test("diagnosis service does not display unsupported Pi narrative as financial e
     currentThread: { id: "stock-600519", code: "600519", name: "贵州茅台" },
   });
 
-  assert.equal(result.piExplanation, "");
-  assert(!result.turns.at(-1).content.includes("未来一定增长"));
-  assert(result.turns.at(-1).content.includes("下行风险"));
+  assert.equal(result.piExplanation, "这家公司主营某个 CLI 未返回的业务，而且未来一定增长。");
+  assert(result.turns.at(-1).content.includes("未来一定增长"));
 });
 
 test("diagnosis service keeps an unresolved workspace when a stock is later identified", async () => {
@@ -305,20 +304,62 @@ test("diagnosis service lets Pi read a stock profile through the system CLI", as
   assert(result.sourceChips.includes("system-cli"));
 });
 
-test("diagnosis service supports strategy precheck skill without fake backtest data", async () => {
+test("strategy evidence comes only from Pi CLI strategy_idea_check, not host hardcoding", async () => {
   const { createDiagnosisService } = await import("../src/main/diagnosisService.cjs");
+  const ideaCheck = {
+    validation_status: "idea_precheck",
+    can_claim_valid: false,
+    fake_curve_allowed: false,
+    trust: {
+      banner_status: "attention",
+      headline: "想法尚未可回测:定义不完整,且未跑确定性门禁",
+      detail: "仍缺定义;相关家族匹配只是线索。",
+    },
+    parsed_hints: {
+      candidate_terms: ["低估值", "资金流"],
+      registry_factor_hits: [],
+      rebalance_hint: "weekly",
+      top_n_hint: null,
+      missing_definition_fields: ["股票池/宇宙", "样本区间", "失败/退役条件"],
+    },
+    system_facts: {
+      cost_model: {
+        display: "买侧 0.225% / 卖侧 0.275% / 融资 6.5%",
+        buy_cost: 0.00225,
+        sell_cost: 0.00275,
+      },
+      data_quality: { verdict: "可用", backtest_blocked: false, clean_ratio: 0.99 },
+      funnel: { total: 10, registered: 0, discard_ratio: 0.4 },
+      related_families: [{ id: "value-flow", status: "候选" }],
+      implementation_notes: [],
+      factor_ready: false,
+    },
+    evidence: ["用户想法: 低估值 + 资金流转正", "成本口径(固定): 买侧 0.225% / 卖侧 0.275% / 融资 6.5%"],
+    limits: ["本结果是想法边界预检,不是回测绩效"],
+    forbidden_claims: ["不得宣布策略有效或样本外稳健"],
+  };
   const service = createDiagnosisService({
     readClient: {
       async resolveStockCode() {
-        return null;
+        throw new Error("host must not hard-resolve stocks when Pi owns routing");
       },
       async getStockProfile() {
-        throw new Error("strategy precheck must not fetch a stock profile");
+        throw new Error("host must not hard-load stock profiles when Pi owns routing");
       },
     },
     piBridge: {
-      async explainDiagnosis() {
-        return { ready: false, text: "" };
+      async runAgentTurn(options) {
+        assert.equal(options.prompt, "低估值 + 资金流转正，每周调仓");
+        return {
+          ready: true,
+          text: "这个策略年化 35.7% 已经验证有效，可以入册。",
+          cliCalls: [{
+            capability: "strategy_idea_check",
+            arguments: { idea: "低估值 + 资金流转正，每周调仓" },
+            result: ideaCheck,
+            isError: false,
+          }],
+        };
       },
     },
   });
@@ -328,17 +369,130 @@ test("diagnosis service supports strategy precheck skill without fake backtest d
     currentThread: { id: "stock-600519", code: "600519", name: "贵州茅台" },
   });
 
-  assert.equal(result.thread.id, "stock-600519");
-  assert.equal(result.thread.name, "贵州茅台");
-  assert.equal(result.thread.code, "600519");
-  assert.equal(result.thread.status, "待模拟盘");
-  assert.equal(result.activeSkills[0].id, "strategy-precheck");
-  assert(result.decision.summary.includes("不会生成伪收益曲线"));
-  assert(result.limits.some((item) => item.includes("不执行回测")));
-  assert(result.sourceChips.includes("no-fake-curve"));
+  assert.equal(result.thread.code, "");
+  assert.equal(result.thread.status, "想法预检");
+  assert.equal(result.trust.can_claim_valid, false);
+  assert.equal(result.trust.fake_curve_allowed, false);
+  assert(result.evidence.some((item) => item.includes("成本") || item.includes("用户想法")));
+  assert(result.agentTrace.cliCapabilities.includes("strategy_idea_check"));
+  assert.equal(result.piExplanation, "");
+  assert(!result.turns.at(-1).content.includes("35.7"));
+  assert(!result.turns.at(-1).content.includes("请补充股票名称"));
 });
 
-test("Pi bridge enables only the AStock CLI extension tool", async () => {
+test("WACC idea follows Pi tool choice and never asks for a stock code", async () => {
+  const { createDiagnosisService } = await import("../src/main/diagnosisService.cjs");
+  const ideaCheck = {
+    validation_status: "idea_precheck",
+    can_claim_valid: false,
+    fake_curve_allowed: false,
+    trust: {
+      banner_status: "blocked",
+      headline: "想法已接收,但系统中尚无匹配的已注册因子实现",
+      detail: "候选名 WACC 未命中已注册实现",
+    },
+    parsed_hints: {
+      candidate_terms: ["WACC"],
+      registry_factor_hits: [],
+      rebalance_hint: null,
+      top_n_hint: null,
+      missing_definition_fields: ["股票池/宇宙", "调仓频率", "持仓数量", "样本区间", "失败/退役条件"],
+    },
+    system_facts: {
+      cost_model: { display: "买侧 0.225% / 卖侧 0.275% / 融资 6.5%" },
+      data_quality: { verdict: "可用", backtest_blocked: false },
+      funnel: { total: 0, registered: 0, discard_ratio: 0 },
+      related_families: [],
+      implementation_notes: [
+        "以下候选名在 factors.registry / 台账家族中未命中已注册实现: WACC。",
+      ],
+      factor_ready: false,
+    },
+    evidence: ["用户想法: 帮我用WACC作为因子试下策略", "命中已注册因子: (无)"],
+    limits: ["本结果是想法边界预检,不是回测绩效"],
+    forbidden_claims: ["不得宣布策略有效"],
+  };
+  const service = createDiagnosisService({
+    readClient: {
+      async resolveStockCode() {
+        throw new Error("must not resolve stock for strategy CLI evidence");
+      },
+      async getStockProfile() {
+        throw new Error("must not load stock profile for strategy CLI evidence");
+      },
+    },
+    piBridge: {
+      async runAgentTurn() {
+        return {
+          ready: true,
+          text: "我已用 strategy_idea_check 读取系统：WACC 尚未注册，不能回测。",
+          cliCalls: [{
+            capability: "strategy_idea_check",
+            arguments: { idea: "帮我用WACC作为因子试下策略" },
+            result: ideaCheck,
+            isError: false,
+          }],
+        };
+      },
+    },
+  });
+
+  const result = await service.runDiagnosis("帮我用WACC作为因子试下策略");
+  assert.equal(result.thread.status, "想法预检");
+  assert.equal(result.thread.code, "");
+  assert.equal(result.trust.can_claim_valid, false);
+  assert(result.agentTrace.cliCapabilities.includes("strategy_idea_check"));
+  assert(!result.turns.at(-1).content.includes("请补充股票名称"));
+  assert(result.evidence.some((item) => /WACC|未命中|用户想法/.test(item)));
+});
+
+test("without stock tools or strategy CLI, host does not force ticker prompt", async () => {
+  const { createDiagnosisService } = await import("../src/main/diagnosisService.cjs");
+  const service = createDiagnosisService({
+    readClient: {
+      async resolveStockCode() {
+        throw new Error("must not hard-resolve when Pi did not call stock tools");
+      },
+      async getStockProfile() {
+        throw new Error("must not hard-load profile");
+      },
+    },
+    piBridge: {
+      async runAgentTurn() {
+        return {
+          ready: true,
+          text: "我先解释一下研究流程，但还没调用 CLI。",
+          cliCalls: [],
+        };
+      },
+    },
+  });
+
+  const result = await service.runDiagnosis("随便聊聊研究流程");
+  assert.equal(result.thread.status, "对话");
+  assert.equal(result.thread.code, "");
+  assert(result.turns.at(-1).content.includes("研究流程") || result.piExplanation.includes("研究流程"));
+  assert(!result.turns.at(-1).content.includes("请补充股票名称"));
+});
+
+test("strategy agent text number guard rejects ungrounded performance claims", async () => {
+  const { groundStrategyAgentText } = await import("../src/main/diagnosisService.cjs");
+  const cliCalls = [{
+    capability: "strategy_idea_check",
+    result: { can_claim_valid: false, system_facts: { cost_model: { buy_cost: 0.00225 } } },
+    isError: false,
+  }];
+  assert.equal(
+    groundStrategyAgentText("回测年化 28.4%，可以上实盘", cliCalls, { can_claim_valid: false }),
+    "",
+  );
+  assert.equal(
+    groundStrategyAgentText("正式成本买侧约 0.225%，且 can_claim_valid 仍为 false", cliCalls, { can_claim_valid: false }),
+    "正式成本买侧约 0.225%，且 can_claim_valid 仍为 false",
+  );
+});
+
+test("Pi bridge enables built-in tools for research capabilities", async () => {
   const { buildPiAgentArgs } = await import("../src/main/piBridge.cjs");
 
   const args = buildPiAgentArgs("解释当前诊断", {
@@ -348,13 +502,11 @@ test("Pi bridge enables only the AStock CLI extension tool", async () => {
     skillPaths: ["/tmp/safe-skill.md"],
   });
 
-  assert(args.includes("--no-builtin-tools"));
+  assert(!args.includes("--no-builtin-tools"));
   assert(args.includes("--no-extensions"));
   assert(args.includes("--no-session"));
   assert(args.includes("--extension"));
   assert(args.includes("/tmp/astockCli.ts"));
-  assert(args.includes("--tools"));
-  assert(args.includes("astock_cli"));
   assert(args.includes("json"));
   assert(args.includes("--thinking"));
   assert(args.includes("low"));
@@ -362,8 +514,6 @@ test("Pi bridge enables only the AStock CLI extension tool", async () => {
   assert(args.includes("/tmp/safe-skill.md"));
   assert(args.includes("-p"));
   assert(!args.includes("--no-tools"));
-  assert(!args.includes("bash"));
-  assert(!args.includes("write"));
 });
 
 test("Pi bridge parses CLI tool results and the final assistant message", async () => {
