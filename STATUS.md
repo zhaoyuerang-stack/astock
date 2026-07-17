@@ -1,8 +1,13 @@
 # STATUS — 当前进度
 
-> 更新:2026-07-16。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
+> 更新:2026-07-17。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
+
+**2026-07-17(守卫绕过审计 + R-COST-001 hash-pin 机械化;Grok CLI 委托首单)**:
+  · **审计**:对守卫体系做绕过路径审计,9 项发现(共性根因=守卫查内容不查来源),报告 `factor_research/reports/governance/guard_bypass_audit_20260717.md`。最高危 = CostModel 费率无钉死(唯一未机械强制的 P0 成本红线);其余:holdout 守卫只认精确边界字面量、`register()` status 词表未校验(准入门只认「在册」精确匹配)、`check_lake_writers` 仅覆盖 4/30 目录、`version_returns` 无 provenance(排名输入可投毒,修复需 owner 拍板设计)、env-var 人工门对有 shell 的 agent 自助。
+  · **#1 已修复(commit da9cc4d6)**:`scripts/ci/check_cost_model_pin.py`(sha256 钉死三费率,照抄 ADR-021 boundary pin 范式,改动须 ADR+更新 pin)+ 对抗测试 9 例 + test_all.sh/CLAUDE §16 接线。实现由 **Grok CLI**(grok-4.5,独立 worktree)按任务书完成,Claude 独立复验(活体突变真红/还原复绿/相邻守卫绿)后 ff 合入 main;主仓全量 `test_all.sh` 全绿(13 守卫+枚举块+兜底 99 文件)。
+  · **待办**:审计 #2-#9 立项 TASKS(审计当日 TASKS.md 有他人在途编辑未写入);#5 需 owner 先定设计。
 
 **2026-07-16(ADR-037 实施主路径落地:Evidence Envelope + 协议注册 + data_gap/probe/HITL 门)**:
   · **契约**:`contracts/evidence.py` EvidenceEnvelope;`services/agent/evidence.py` 装配/红action;`can_claim_valid` 默认 false;narrative 禁绩效载荷。
