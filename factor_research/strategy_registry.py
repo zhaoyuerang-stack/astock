@@ -42,8 +42,11 @@ DIVERSIFIER_FAMILIES = {"large-cap-growth-hedged", "hq-momentum-hedged"}
 
 # 版本 status 词表(守卫审计 #3):机械冻结 strategy_versions.json 存量值 + 规范「在册」。
 # 枚举日 2026-07-17 存量:候选/参考/已证伪/退役;「在册」为双轨准入规范态(台账当日无在册版,
-# 但仍是 register 合法目标,必须收纳)。register_family 的 family status 是另一字段,不在此列。
-ALLOWED_VERSION_STATUS = frozenset({"候选", "参考", "已证伪", "退役", "在册"})
+# 但仍是 register 合法目标,必须收纳)。「条件假设/观察」= research_toolkit 观察轨默认态
+# (artifacts.py::registry_status,经 veto_filter_marginal 落台账;冻结时只枚举了台账存量、
+# 漏了"代码在用但台账暂无"的状态,主仓全量回归 test_veto_filter 揪出)。
+# register_family 的 family status 是另一字段,不在此列。
+ALLOWED_VERSION_STATUS = frozenset({"候选", "参考", "已证伪", "退役", "在册", "条件假设/观察"})
 # 英文同义词会让 status≠「在册」从而绕过 register 双轨准入门,同时被证据守卫 ACTIVE_STATUS
 # 宽认——两层网眼错位。一律拒绝并提示用「在册」(枚举日存量词表中无此四词,无需从 ALLOWED 剔除)。
 VERSION_STATUS_SYNONYMS_BLOCKED = frozenset({"active", "ACTIVE", "APPROVED", "registered"})
