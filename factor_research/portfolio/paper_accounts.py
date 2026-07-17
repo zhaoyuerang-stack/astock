@@ -187,7 +187,16 @@ def read_recompose_candidates(recompose_fp: Path | None = None, *, now: datetime
     if age_days > STALE_DAYS:
         return [], f"recompose 产物已过期(生成于 {generated_at},{age_days} 天前 > {STALE_DAYS} 天):拒绝 provision"
 
-    candidates = list(data.get("paper_candidates") or [])
+    raw = list(data.get("paper_candidates") or [])
+    # 兼容守卫审计 #5:paper_candidates 条目可为 str 或 {name, identity_tier}
+    candidates: list[str] = []
+    for item in raw:
+        if isinstance(item, dict):
+            name = str(item.get("name") or item.get("leg") or "").strip()
+            if name:
+                candidates.append(name)
+        else:
+            candidates.append(str(item))
     return candidates, ""  # 空列表是健康态(全灭空提案),非 block
 
 

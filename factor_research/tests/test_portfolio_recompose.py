@@ -123,7 +123,8 @@ def test_deterministic_and_weights_sum_to_one():
     assert out1["ranking_version"] == RANKING_VERSION
     assert out1["proposal"]["composite_metrics"]["sharpe"] is not None
     assert "decayed" in out1["proposal"]["composite_decay"], "组合自身必须过 decay_check(§5.4)"
-    assert out1["paper_candidates"] == list(w.keys()), "paper 名单=提案入选腿(R-PROD-001)"
+    assert [c["name"] for c in out1["paper_candidates"]] == list(w.keys()), \
+        "paper 名单=提案入选腿(R-PROD-001)"
 
 
 # ── 收件箱 recompose 源 ──────────────────────────────────────────────────────
@@ -243,3 +244,101 @@ def test_all_defensive_pool_no_cap_deadlock():
             for i in range(2)}
     w = recompose(rets, top_n=2)["proposal"]["weights"]
     assert abs(sum(w.values()) - 1.0) < 1e-6
+
+
+# ── 守卫审计 #5:version_returns provenance 选择路径 fail-closed ──────────
+
+def test_mixed_provenance_excludes_no_stamp_and_passes_tier():
+    """三腿混合(spec / config-only / 无戳):无戳排除并如实列出,tier 透传,RANKING_VERSION 不变。"""
+    from lake.version_returns import write_version_returns
+    from portfolio.recompose import RANKING_VERSION, recompose
+
+    # 纯 recompose 层:returns 只含已通过校验的腿;excluded 由编排层填入
+    returns = {
+        "spec-leg.v1": _healthy(21),
+        "cfg-leg.v1": _healthy(22),
+        # no-stamp 不进 returns
+    }
+    tiers = {"spec-leg.v1": "spec", "cfg-leg.v1": "config-only"}
+    excluded = [{"leg": "orphan.v1", "reason": "missing_provenance_sidecar: orphan__v1.provenance.json"}]
+    out = recompose(returns, identity_tiers=tiers, excluded_no_provenance=excluded)
+
+    assert out["ranking_version"] == RANKING_VERSION, "排名口径本身不得因 provenance 改动"
+    names_in_legs = {e["name"] for e in out["legs"]}
+    assert "orphan.v1" not in names_in_legs
+    assert "spec-leg.v1" in names_in_legs and "cfg-leg.v1" in names_in_legs
+    by_name = {e["name"]: e for e in out["legs"]}
+    assert by_name["spec-leg.v1"]["identity_tier"] == "spec"
+    assert by_name["cfg-leg.v1"]["identity_tier"] == "config-only"
+    assert out["excluded_no_provenance"] == excluded
+    # paper_candidates 条目透传 tier
+    for c in out["paper_candidates"]:
+        assert "identity_tier" in c and c["name"] in returns
+        assert c["identity_tier"] == tiers[c["name"]]
+
+
+def test_all_no_provenance_gives_empty_rank_with_full_exclusion_list():
+    """全无戳 → 空排名 + 全员列出(不硬凑)。"""
+    excluded = [
+        {"leg": "a.v1", "reason": "missing_provenance_sidecar: a__v1.provenance.json"},
+        {"leg": "b.v1", "reason": "series_hash_mismatch: ..."},
+    ]
+    out = recompose({}, excluded_no_provenance=excluded)
+    assert out["legs"] == []
+    assert out["paper_candidates"] == []
+    assert out["proposal"]["status"] == "no_eligible_legs"
+    assert out["excluded_no_provenance"] == excluded
+    assert out["ranking_version"] == RANKING_VERSION
+
+
+def test_load_registered_returns_mixed_provenance_hermetic(tmp_path, monkeypatch):
+    """编排层 load_registered_returns:三腿混合 → 无戳排除、tier 正确(hermetic root)。"""
+    import strategy_registry
+    from lake.version_returns import write_version_returns
+    from scripts.ops import scheduled_portfolio_recompose as spr
+
+    # 合成台账:三腿均 status=在册
+    reg = {
+        "families": [{
+            "id": "mix-fam",
+            "versions": [
+                {"version": "spec-v", "status": "在册"},
+                {"version": "cfg-v", "status": "在册"},
+                {"version": "bare-v", "status": "在册"},
+            ],
+        }]
+    }
+    reg_fp = tmp_path / "strategy_versions.json"
+    reg_fp.write_text(json.dumps(reg), encoding="utf-8")
+    monkeypatch.setattr(strategy_registry, "REGISTRY", reg_fp)
+
+    write_version_returns(
+        "mix-fam", "spec-v", _healthy(31),
+        source="t", spec_hash="spec-aaa",
+        data_fingerprint="fp", cost_hash="c", root=tmp_path,
+    )
+    write_version_returns(
+        "mix-fam", "cfg-v", _healthy(32),
+        source="t", config_hash="cfg" + "0" * 61,
+        data_fingerprint="fp", cost_hash="c", root=tmp_path,
+    )
+    # bare-v:只写 CSV 无 sidecar(存量硬切场景)
+    bare_dir = tmp_path / "data_lake" / "version_returns"
+    bare_dir.mkdir(parents=True, exist_ok=True)
+    _healthy(33).rename("ret").to_csv(bare_dir / "mix-fam__bare-v.csv", header=True)
+
+    returns, missing, excluded, tiers = spr.load_registered_returns(root=tmp_path)
+    assert "mix-fam.spec-v" in returns and tiers["mix-fam.spec-v"] == "spec"
+    assert "mix-fam.cfg-v" in returns and tiers["mix-fam.cfg-v"] == "config-only"
+    assert "mix-fam.bare-v" not in returns
+    assert missing == []
+    assert len(excluded) == 1
+    assert excluded[0]["leg"] == "mix-fam.bare-v"
+    assert "missing_provenance" in excluded[0]["reason"]
+
+    out = recompose(
+        returns, identity_tiers=tiers, excluded_no_provenance=excluded,
+    )
+    assert out["ranking_version"] == RANKING_VERSION
+    assert "mix-fam.bare-v" not in {e["name"] for e in out["legs"]}
+    assert out["excluded_no_provenance"][0]["leg"] == "mix-fam.bare-v"

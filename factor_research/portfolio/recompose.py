@@ -10,6 +10,18 @@
     编排(读 version_returns / 写 artifact)归 scripts/ops/scheduled_portfolio_recompose.py;
   - 提案是 **advisory**:权重生效 / 开 paper 账户 / 退役,全部归人经 canonical 入口
     (LOOP §6);组合(composite)本身按 §5.4 进 decay_check(组合也是策略,默认会失效)。
+
+执法边界(守卫审计 #5 / version_returns provenance):
+  · **只管选择路径**(recompose 排名 → paper provisioning 名单)。
+    编排层必须经 lake.version_returns.load_verified_version_returns 装腿;
+    校验失败的腿排除出排名,并在输出 JSON 显式记录 excluded_no_provenance
+    (沿用 missing 如实列出先例,绝不静默消失)。
+  · **不管监控路径**:decay_monitor / 看板 / services.read 可读全量 version_returns
+    且不 gate——同 holdout 守卫「监控合法用全样本」哲学。不要去改 decay_monitor。
+  · **存量硬切**(owner 拍板):存量 CSV 无 sidecar → load_verified 失败 → 被选择
+    路径排除。不做 grandfather 标签、不做批量补戳、不动存量文件。
+    在册池当前为 0,硬切实际代价为零。
+  · 排名口径本身(RANKING_VERSION)不变——本改动只绑输入身份,不改评分构成。
 """
 from __future__ import annotations
 
@@ -187,10 +199,27 @@ def recompose(
     *,
     top_n: int = 3,
     min_obs: int = _MIN_OBS,
+    identity_tiers: dict[str, str] | None = None,
+    excluded_no_provenance: list[dict] | None = None,
 ) -> dict:
-    """一步产出周度再构成结果(排名 + 提案 + paper 名单),供编排脚本持久化。"""
+    """一步产出周度再构成结果(排名 + 提案 + paper 名单),供编排脚本持久化。
+
+    identity_tiers: 腿名 → "spec"|"config-only"(由编排层 load_verified 透传)。
+    excluded_no_provenance: [{leg, reason}, ...] 无/坏 provenance 的腿,如实列出
+    不入 returns——不在此函数内二次过滤(调用方已排除);本字段只负责落盘透明。
+    """
+    tiers = identity_tiers or {}
     ranked = rank_strategies(returns, min_obs=min_obs)
+    for leg in ranked:
+        tier = tiers.get(leg["name"])
+        if tier is not None:
+            leg["identity_tier"] = tier
     proposal = propose_weights(ranked, returns, top_n=top_n)
+    # paper_candidates 条目透传 identity_tier,供展示层后续消费(web 不在本单)
+    paper_candidates = [
+        {"name": n, "identity_tier": tiers.get(n, "unknown")}
+        for n in proposal.get("weights", {}).keys()
+    ]
     return {
         "ranking_version": RANKING_VERSION,
         "criterion": RANKING_CRITERION,
@@ -198,7 +227,9 @@ def recompose(
         "legs": ranked,
         "proposal": proposal,
         # R-PROD-001:top-N paper 实测名单 = 提案入选腿(后端确定性产出,持久化由编排层落盘)
-        "paper_candidates": list(proposal.get("weights", {}).keys()),
+        "paper_candidates": paper_candidates,
+        # 守卫审计 #5:无 provenance 腿排除出排名,但必须如实列出(同 missing 先例)
+        "excluded_no_provenance": list(excluded_no_provenance or []),
         "honesty": "advisory 提案:权重生效/开 paper 账户/退役全部归人经 canonical 入口(LOOP §6);"
                    "排名口径由 RANKING_VERSION 锚定,改口径须 bump + 记 DECISIONS(R-OBJECTIVE-001)。",
     }

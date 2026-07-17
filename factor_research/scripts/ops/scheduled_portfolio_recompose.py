@@ -5,7 +5,8 @@
 组合层此前没有定时任务,「多策略组合」不会随台账/衰减状态自动重估。本脚本:
 
   读:strategy_registry 在册版本 + data_lake/version_returns/<family>__<version>.csv
-     (run_nine_gates_all.py --persist 产物,与 decay_monitor 同源同口径)
+     **经 lake.version_returns.load_verified_version_returns 校验 sidecar 身份**
+     (守卫审计 #5:选择路径 fail-closed;无/坏 provenance 排除并如实列出)
   算:portfolio.recompose(确定性内核:多目标排名 + 非冗余腿静态 inverse-vol 提案
      + 组合自身 decay_check;口径 RANKING_VERSION 锚定,R-OBJECTIVE-001)
   写:reports/research/portfolio_recompose.json(latest)+ 按日期归档(R-PROD-001:
@@ -13,6 +14,10 @@
 
 不写台账、不改部署、不自动开 paper 账户——纯 advisory,决策收件箱透出后由人裁决
 (LOOP §6)。挂载:scheduled_weekly_maintenance(研究旁路,失败不标 failed)。
+
+执法边界:本脚本是选择路径(→ paper provisioning)。监控路径(decay_monitor 等)
+不 gate,仍可直接读 CSV——同 holdout「监控合法用全样本」。
+存量 CSV 无 sidecar → load_verified 失败 → 排除(硬切;在册池当前 0,代价为零)。
 """
 from __future__ import annotations
 
@@ -28,39 +33,62 @@ if str(ROOT) not in sys.path:
 
 import pandas as pd
 
+from lake.version_returns import load_verified_version_returns
+
 VERSION_RETURNS = ROOT / "data_lake" / "version_returns"
 LATEST = ROOT / "reports" / "research" / "portfolio_recompose.json"
 ARCHIVE_DIR = ROOT / "reports" / "research" / "portfolio_recompose"
 CHINA_TZ = ZoneInfo("Asia/Shanghai")
 
 
-def load_registered_returns() -> tuple[dict, list[str]]:
-    """在册版本 → 日收益序列(与 decay_monitor 同源:9-Gate --persist 的 csv)。
+def load_registered_returns(
+    *,
+    root: Path | None = None,
+) -> tuple[dict[str, pd.Series], list[str], list[dict], dict[str, str]]:
+    """在册版本 → 经 provenance 校验的日收益序列。
 
-    返回 (returns, missing):缺收益序列的在册版本如实列出,不静默跳过。
+    返回 (returns, missing, excluded_no_provenance, identity_tiers):
+      · missing: 无 CSV 文件的在册版本(需先 9-Gate --persist)
+      · excluded_no_provenance: 有 CSV 但 sidecar 缺失/校验失败 → 排除出排名
+        (存量硬切;不做 grandfather)。[{leg, reason}, ...]
+      · identity_tiers: 通过校验的腿 → identity_tier(spec|config-only)
+
+    缺收益 / 无戳一律如实列出,不静默跳过。
     """
     import strategy_registry
 
+    base = root if root is not None else ROOT
     data = strategy_registry._load()
     returns: dict[str, pd.Series] = {}
     missing: list[str] = []
+    excluded: list[dict] = []
+    identity_tiers: dict[str, str] = {}
+
     for fam in data.get("families", []):
         for v in fam.get("versions", []):
             if v.get("status") != "在册":
                 continue
-            name = f"{fam['id']}.{v['version']}"
-            fp = VERSION_RETURNS / f"{fam['id']}__{v['version']}.csv"
-            if not fp.exists():
-                missing.append(name)
+            fam_id = fam["id"]
+            ver = v["version"]
+            name = f"{fam_id}.{ver}"
+            series, prov, reason = load_verified_version_returns(
+                fam_id, ver, root=base,
+            )
+            if series is None:
+                # 区分「从未 persist」vs「有文件但 provenance 失败」(审计 #5 硬切)
+                csv_fp = (
+                    Path(base) / "data_lake" / "version_returns"
+                    / f"{fam_id}__{ver}.csv"
+                )
+                if not csv_fp.exists():
+                    missing.append(name)
+                else:
+                    excluded.append({"leg": name, "reason": reason})
                 continue
-            ret = pd.read_csv(fp, index_col=0)["ret"]
-            ret.index = pd.to_datetime(ret.index)
-            ret = ret.dropna()
-            if len(ret):
-                returns[name] = ret
-            else:
-                missing.append(name)
-    return returns, missing
+            returns[name] = series
+            identity_tiers[name] = str(prov.get("identity_tier", "unknown"))
+
+    return returns, missing, excluded, identity_tiers
 
 
 def main() -> int:
@@ -70,12 +98,21 @@ def main() -> int:
 
     from portfolio.recompose import recompose
 
-    returns, missing = load_registered_returns()
-    print(f"  在册腿收益序列:{len(returns)} 条可用,{len(missing)} 条缺失")
+    returns, missing, excluded, identity_tiers = load_registered_returns()
+    print(
+        f"  在册腿收益序列:{len(returns)} 条可用,"
+        f"{len(missing)} 条缺失,{len(excluded)} 条无 provenance 排除"
+    )
     for name in missing:
         print(f"  [missing] {name}: 无 version_returns 序列,需先跑一次 9-Gate --persist")
+    for item in excluded:
+        print(f"  [excluded_no_provenance] {item['leg']}: {item['reason']}")
 
-    result = recompose(returns)
+    result = recompose(
+        returns,
+        identity_tiers=identity_tiers,
+        excluded_no_provenance=excluded,
+    )
     result["generated_at"] = datetime.now(CHINA_TZ).isoformat(timespec="seconds")
     result["universe"] = "strategy_registry status=在册(SHADOW/候选不入池,加入是人决策)"
     result["missing_returns"] = missing
