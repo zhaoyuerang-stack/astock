@@ -32,6 +32,10 @@ PENDING_REMEDIATION: dict[str, str] = {
     # scripts/research/promote_fundamental_momentum.py:54 调用含 run_marginal=False
     "scripts/research/promote_fundamental_momentum.py:run_marginal=False":
         "研究脚本跳过边际残差去冗余;应改 run_marginal=True 或删 force 式捷径",
+    # 主仓预演(2026-07-17)发现:untracked scratch 遗留(06-28 另类流冠军注册会话),
+    # worktree 只物化跟踪文件故批量修补时不可见。建议 owner 删除或归档后移除本条。
+    "scratch/register_and_promote_champion.py:force=True":
+        "untracked scratch 遗留脚本含 force=True;应删除/归档,勿再执行",
 }
 
 
