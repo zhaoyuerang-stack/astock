@@ -97,6 +97,7 @@ _MODULES = (
     "factors.microstructure",
     "factors.shareholder",
     "factors.capital_flow",
+    "factors.fundamental",
 )
 _discovered = False
 

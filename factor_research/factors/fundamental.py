@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 
 from factors.utils import mad_clip, safe_zscore
+from factors.registry import register_factor
 
 
 @lru_cache(maxsize=1)
@@ -68,6 +69,10 @@ def roe(close, **_):
     return safe_zscore(mad_clip(aligned))
 
 
+@register_factor("gross_margin",
+                 definition="毛利率(gross_margin,已按 avail_date/ann_date PIT ffill 对齐交易日)MAD截尾+截面z;正=毛利率高(盈利质量/护城河代理)",
+                 data=("fundamental/gross_margin",), input="close",
+                 searchable=False)
 def gross_margin(close, **_):
     """毛利率 — 质量信号."""
     panel = _load_fundamental_cache()
