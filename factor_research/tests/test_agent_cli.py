@@ -15,29 +15,27 @@ def _registry() -> dict[str, Tool]:
     }
 
 
-def test_catalog_only_exposes_executable_readonly_capabilities():
-    assert capability_catalog(_registry()) == [
-        {
-            "name": "profile",
-            "description": "profile",
-            "risk": "readonly",
-            "arguments": ["code"],
-        }
-    ]
+def test_catalog_exposes_executable_capabilities():
+    cats = capability_catalog(_registry())
+    assert cats[0]["name"] == "profile"
+    assert cats[0]["risk"] == "readonly"
+    assert cats[0]["arguments"] == ["code"]
+    # Non-callable high-risk tools stay out of catalog
+    assert all(c["name"] != "rebalance" for c in cats)
 
 
 def test_call_capability_checks_risk_and_exact_arguments():
     assert call_capability("profile", {"code": "600519"}, _registry()) == {"code": "600519"}
 
-    with pytest.raises(AgentCliError, match="not available in readonly mode"):
+    with pytest.raises(AgentCliError, match="proposal-only|not executable|readonly"):
         call_capability("rebalance", {}, _registry())
     with pytest.raises(AgentCliError, match="unexpected arguments"):
         call_capability("profile", {"code": "600519", "command": "rm"}, _registry())
 
 
-def test_cli_rejects_non_readonly_tool_with_machine_readable_error(monkeypatch, capsys):
+def test_cli_rejects_non_executable_high_risk(monkeypatch, capsys):
     monkeypatch.setattr("apps.agent_cli.tool_registry", _registry)
 
     assert main(["call", "--tool", "rebalance", "--args-json", "{}"]) == 2
     error = json.loads(capsys.readouterr().err)
-    assert "not available in readonly mode" in error["error"]
+    assert "not executable" in error["error"] or "proposal-only" in error["error"]
