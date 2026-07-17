@@ -5,13 +5,14 @@
   - 任意调用的 `force=True`(跳过 phase1/2 防未来 + 图谱门)
   - `run_marginal=False`(跳过边际残差去冗余)
 
-扫描集 = **默认扫描**(2026-07-11 加固):`scripts/ops/**` 与 `services/actions/**` 中所有
-AST 判定 import 了 workflow.promote / workflow.from_factory 的文件——新增自动 promoter
-自动纳入,不再靠人工维护枚举名单(deny-list 会默认逃逸)。
+扫描集 = **仓库级**(守卫审计 #8,2026-07-17):所有 import 了 workflow.promote /
+workflow.from_factory 的 .py——新增自动 promoter 自动纳入,不再靠人工目录名单。
+排除:`workflow/` 自身(library 层,`--force` 是人工 CLI 逃生口)、`tests/`、`__pycache__`。
 注意:library 层 `workflow/promote.py` 的 `--force` 是**人工逃生口**(CLI,带警告),不在扫描集——
 自动脚本绝不能用,人工单次可用。
 
 只读 AST,违规则 exit 1。检测函数吃源码字符串/可注入 root,便于 fixture 测试。
+存量命中进 PENDING_REMEDIATION(响而不阻),新增即红。
 """
 from __future__ import annotations
 
@@ -21,10 +22,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 
-# 自动晋级脚本所在目录(相对 root);其中 import 了晋级通道的文件全部自动纳入扫描
-AUTO_PROMOTE_DIRS = ["scripts/ops", "services/actions"]
 # 判定"这是个自动晋级脚本"的 import 目标前缀
 PROMOTE_IMPORT_PREFIXES = ("workflow.promote", "workflow.from_factory")
+# 排除:library 层 workflow/、tests/、缓存
+EXCLUDE_TOP_DIRS = frozenset({"workflow", "tests", "__pycache__", ".pytest_cache", "data_lake"})
+
+# 存量欠债(守卫审计 #8 扩面后扫出)。响而不阻;修复后须从此处移除。
+PENDING_REMEDIATION: dict[str, str] = {
+    # scripts/research/promote_fundamental_momentum.py:54 调用含 run_marginal=False
+    "scripts/research/promote_fundamental_momentum.py:run_marginal=False":
+        "研究脚本跳过边际残差去冗余;应改 run_marginal=True 或删 force 式捷径",
+}
 
 
 def _imports_promote_channel(tree: ast.AST) -> bool:
@@ -45,23 +53,35 @@ def _imports_promote_channel(tree: ast.AST) -> bool:
     return False
 
 
+def _should_scan(rel: Path) -> bool:
+    """仓库级扫描,排除 workflow/ tests/ 缓存与数据湖。"""
+    parts = rel.parts
+    if not parts:
+        return False
+    if parts[0] in EXCLUDE_TOP_DIRS:
+        return False
+    if any(p in ("__pycache__", ".pytest_cache", "tests") for p in parts):
+        return False
+    return True
+
+
 def discover_auto_promote_files(root: Path | None = None) -> list[Path]:
-    """默认扫描:AUTO_PROMOTE_DIRS 下所有 import 了晋级通道的 .py 文件(递归)。"""
+    """仓库级扫描:所有 import 了晋级通道的 .py(排除 workflow/ library、tests/)。"""
     base = root or ROOT
     out: list[Path] = []
-    for rel in AUTO_PROMOTE_DIRS:
-        d = base / rel
-        if not d.is_dir():
+    for p in sorted(base.rglob("*.py")):
+        try:
+            rel = p.relative_to(base)
+        except ValueError:
             continue
-        for p in sorted(d.rglob("*.py")):
-            if "__pycache__" in p.parts:
-                continue
-            try:
-                tree = ast.parse(p.read_text(encoding="utf-8"))
-            except (SyntaxError, UnicodeDecodeError):
-                continue
-            if _imports_promote_channel(tree):
-                out.append(p)
+        if not _should_scan(rel):
+            continue
+        try:
+            tree = ast.parse(p.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError):
+            continue
+        if _imports_promote_channel(tree):
+            out.append(p)
     return out
 
 
@@ -83,19 +103,50 @@ def scan_source(src: str, label: str = "") -> list[str]:
     return out
 
 
+def _violation_key(msg: str) -> str:
+    """从扫描消息提取 PENDING 键: relpath:force=True|run_marginal=False。"""
+    # msg 形如 "[rel:L54] 调用含 force=True —— ..."
+    if not msg.startswith("["):
+        return msg
+    bracket = msg.split("]", 1)[0][1:]  # rel:L54
+    rel = bracket.rsplit(":L", 1)[0]
+    if "force=True" in msg:
+        return f"{rel}:force=True"
+    if "run_marginal=False" in msg:
+        return f"{rel}:run_marginal=False"
+    return msg
+
+
 def check(root: Path | None = None) -> int:
     base = root or ROOT
     files = discover_auto_promote_files(base)
-    violations = []
+    raw: list[str] = []
     for p in files:
         rel = str(p.relative_to(base))
-        violations += scan_source(p.read_text(encoding="utf-8"), label=rel)
-    if violations:
+        raw += scan_source(p.read_text(encoding="utf-8"), label=rel)
+
+    new_v = []
+    pending = []
+    for msg in raw:
+        key = _violation_key(msg)
+        if key in PENDING_REMEDIATION:
+            pending.append((key, msg))
+        else:
+            new_v.append(msg)
+
+    for key, msg in pending:
+        print(f"  ⚠️ 待处置(基线): {msg} — {PENDING_REMEDIATION[key]}")
+
+    if new_v:
         print("发现 force-promote 橡皮图章违规:")
-        for v in violations:
+        for v in new_v:
             print(f"  {v}")
         return 1
-    print(f"force-promote 守卫通过:{len(files)} 个自动晋级脚本(默认扫描)无 force=True / run_marginal=False。")
+    print(
+        f"force-promote 守卫通过:{len(files)} 个自动晋级脚本(仓库级扫描)"
+        f"无新增 force=True / run_marginal=False"
+        f"({len(pending)} 项待处置已基线)。"
+    )
     return 0
 
 
