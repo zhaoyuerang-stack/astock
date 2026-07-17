@@ -8,6 +8,14 @@ boundary() / assert_search_clean / validate_on_holdout 之一。
 新增自动选择路径(load 全样本 + 排序/择优/边际定级)时:① 把择优数据截到 <boundary;
 ② 把文件加进 REQUIRED。纯监控/报表/实盘信号(decay_monitor/tradability/dashboard/
 paper_trade/live_readiness)合法使用全/近期数据,**不是选择**,不在此列。
+
+**扫描边界(守卫审计 #2,刻意保留)**:
+  - `scan_direct_holdout_access` 扫 `scripts/research/` + `factory/` + `workflow/`
+    + `services/actions/`
+  - **不加** `scripts/ops/` / `portfolio/`——监控/生产路径合法用全样本
+  - 金库字面量:任意 ISO 日期常量 `YYYY-MM-DD` 且 `>= EXPECTED_BOUNDARY` 均视为
+    金库引用(不只精确 "2025-01-01");仅用于既有三类判定(>= 比较、从边界起切片、
+    传入评估调用),不新增判定类别;`< boundary` 截断语义不变
 """
 import ast
 import hashlib
@@ -27,6 +35,21 @@ REQUIRED = {
 }
 BOUND = re.compile(r"boundary\(|assert_search_clean|validate_on_holdout")
 
+# 直接金库访问扫描目录(研究/工厂/工作流/动作;不含 ops/portfolio 监控生产路径)
+DIRECT_HOLDOUT_SCAN_DIRS = (
+    "scripts/research",
+    "factory",
+    "workflow",
+    "services/actions",
+)
+
+# 存量欠债(审计 #2 字面量泛化 + 扩面后扫出)。响而不阻;修复后须从此处移除。
+PENDING_REMEDIATION: dict[str, str] = {
+    "scripts/research/paper_forward_smallcap.py":
+        "纸面前向实验 ret[ret.index >= EXPERIMENT_START] 且 EXPERIMENT_START 在金库内"
+        "(2026-06-22);故意读金库前向段——应迁 validate_on_holdout 或移出选择路径",
+}
+
 # ── P0-B(ADR-021):锁定 holdout.start 配置值 ──
 # boundary 是软配置(settings.yaml::holdout.start),改它 = 改金库范围:原受保护的金库段
 # 突然变「可搜索」,所有基于旧 boundary 的 validate_on_holdout 记录失去唯一性意义。
@@ -34,6 +57,8 @@ BOUND = re.compile(r"boundary\(|assert_search_clean|validate_on_holdout")
 SETTINGS_YAML = ROOT / "app_config" / "settings.yaml"
 EXPECTED_BOUNDARY = "2025-01-01"
 EXPECTED_BOUNDARY_HASH = "14973c591b26d5116b3ce3508c60adfe345a1201723a45f18dacc0293da2ec7a"
+# ISO 日期常量且 >= EXPECTED_BOUNDARY → 金库字面量(审计 #2 泛化)
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _assigned_names(node: ast.Assign | ast.AnnAssign) -> set[str]:
@@ -62,18 +87,28 @@ def _call_name(node: ast.Call) -> str:
     return ""
 
 
+def _is_vault_date_constant(value: object) -> bool:
+    """ISO 日期字符串常量且 >= EXPECTED_BOUNDARY → 视为金库字面量(审计 #2)。
+
+    仅用于既有三类违规判定,不新增类别。起始日如 "2018-01-01"(< boundary)不命中。
+    """
+    if not isinstance(value, str) or not _ISO_DATE_RE.match(value):
+        return False
+    return value >= EXPECTED_BOUNDARY  # ISO YYYY-MM-DD 字典序 = 时间序
+
+
 def _contains_boundary_ref(node: ast.AST | None, names: set[str]) -> bool:
     if node is None:
         return False
     return any(
         (isinstance(child, ast.Name) and child.id in names)
-        or (isinstance(child, ast.Constant) and child.value == EXPECTED_BOUNDARY)
+        or (isinstance(child, ast.Constant) and _is_vault_date_constant(child.value))
         for child in ast.walk(node)
     )
 
 
 def _is_boundary_scalar(node: ast.AST | None, names: set[str]) -> bool:
-    """仅传播边界标量别名，不把 ``frame[frame.index < b]`` 的结果污染为边界。"""
+    """仅传播边界/金库标量别名，不把 ``frame[frame.index < b]`` 的结果污染为边界。"""
     if node is None:
         return False
     if _is_boundary_call(node):
@@ -81,7 +116,7 @@ def _is_boundary_scalar(node: ast.AST | None, names: set[str]) -> bool:
     if isinstance(node, ast.Name):
         return node.id in names
     if isinstance(node, ast.Constant):
-        return node.value == EXPECTED_BOUNDARY
+        return _is_vault_date_constant(node.value)
     return (
         isinstance(node, ast.Call)
         and _call_name(node) in {"Timestamp", "to_datetime"}
@@ -249,37 +284,64 @@ def check_boundary_monotonic() -> list[tuple[str, str]]:
     return out
 
 
-def main() -> int:
-    violations = []
-    violations.extend(check_boundary_lock())  # P0-B:金库边界配置锁
-    violations.extend(check_boundary_monotonic())  # ADR-023:边界只进不退 + 账本一致
-    research_root = ROOT / "scripts" / "research"
-    if research_root.exists():
-        for path in sorted(research_root.rglob("*.py")):
+def scan_direct_holdout_dirs(root: Path | None = None) -> list[tuple[str, str]]:
+    """扫 DIRECT_HOLDOUT_SCAN_DIRS 下直接金库访问(可注入 root 供 fixture)。
+
+    不含 scripts/ops、portfolio——监控/生产合法全样本(见模块 docstring)。
+    """
+    base = root or ROOT
+    out: list[tuple[str, str]] = []
+    for rel_dir in DIRECT_HOLDOUT_SCAN_DIRS:
+        d = base / rel_dir
+        if not d.is_dir():
+            continue
+        for path in sorted(d.rglob("*.py")):
             if "archive" in path.parts or "__pycache__" in path.parts:
                 continue
-            rel = str(path.relative_to(ROOT))
-            for message in scan_direct_holdout_access(path.read_text(encoding="utf-8"), rel):
-                violations.append((rel, message))
+            rel = str(path.relative_to(base)).replace("\\", "/")
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            for message in scan_direct_holdout_access(text, rel):
+                out.append((rel, message))
+    return out
+
+
+def main(root: Path | None = None) -> int:
+    base = root or ROOT
+    violations: list[tuple[str, str]] = []
+    # 配置锁/账本只对真实 ROOT 有意义(fixture root 无 settings 时跳过)
+    if base == ROOT:
+        violations.extend(check_boundary_lock())  # P0-B:金库边界配置锁
+        violations.extend(check_boundary_monotonic())  # ADR-023:边界只进不退 + 账本一致
+    violations.extend(scan_direct_holdout_dirs(base))
     for rel, why in REQUIRED.items():
-        p = ROOT / rel
+        p = base / rel
+        if base != ROOT and not p.exists():
+            continue  # fixture 不必带齐 REQUIRED
         if not p.exists():
             violations.append((rel, "文件不存在(REQUIRED 名单过期?)"))
             continue
         if not BOUND.search(p.read_text(encoding="utf-8")):
             violations.append((rel, f"自动选择路径({why})未引用 holdout 截断 → §5.2 缝③ 泄露"))
-    scheduled = (ROOT / "scripts/ops/scheduled_factor_search.py").read_text(encoding="utf-8")
-    if "review_queue.all()" in scheduled:
-        violations.append((
-            "scripts/ops/scheduled_factor_search.py",
-            "自动审计不得遍历 ReviewQueue.all();只能处理本轮新增 pending",
-        ))
-    for path in ROOT.rglob("*.py"):
+    scheduled_path = base / "scripts/ops/scheduled_factor_search.py"
+    if scheduled_path.exists():
+        scheduled = scheduled_path.read_text(encoding="utf-8")
+        if "review_queue.all()" in scheduled:
+            violations.append((
+                "scripts/ops/scheduled_factor_search.py",
+                "自动审计不得遍历 ReviewQueue.all();只能处理本轮新增 pending",
+            ))
+    for path in base.rglob("*.py"):
         if any(part in {"data_lake", "scratch", "__pycache__"} for part in path.parts):
             continue
         if "tests" in path.parts or path.name.startswith("test_"):
             continue
-        text = path.read_text(encoding="utf-8")
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
         if "validate_on_holdout(" not in text or path.name in {"holdout.py", "check_holdout_compliance.py"}:
             continue
         try:
@@ -301,17 +363,33 @@ def main() -> int:
             keywords = {kw.arg for kw in node.keywords}
             if "spec_hash" not in keywords or "data_fingerprint" not in keywords:
                 violations.append((
-                    str(path.relative_to(ROOT)),
+                    str(path.relative_to(base)).replace("\\", "/"),
                     "validate_on_holdout 调用缺 spec_hash/data_fingerprint 身份",
                 ))
                 break
-    if violations:
+
+    new_v: list[tuple[str, str]] = []
+    pending: list[tuple[str, str]] = []
+    for rel, msg in violations:
+        if rel in PENDING_REMEDIATION:
+            pending.append((rel, msg))
+        else:
+            new_v.append((rel, msg))
+
+    for rel, msg in pending:
+        print(f"  ⚠️ 待处置(基线): {rel}: {msg} — {PENDING_REMEDIATION[rel]}")
+
+    if new_v:
         print("🚨 Holdout 合规违规(自动选择路径必须截到 <boundary,见 LOOP_ENGINEERING §5.2):")
-        for rel, msg in violations:
+        for rel, msg in new_v:
             print(f"  - {rel}: {msg}")
         return 1
-    print(f"Holdout 合规检查通过({len(REQUIRED)} 个自动选择路径均已 holdout 截断)。")
+    print(
+        f"Holdout 合规检查通过({len(REQUIRED)} 个自动选择路径均已 holdout 截断;"
+        f"{len(pending)} 项待处置已基线)。"
+    )
     return 0
+
 
 
 if __name__ == "__main__":
