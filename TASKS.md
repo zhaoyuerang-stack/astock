@@ -5,6 +5,72 @@
 
 ## 🔴 进行中 / 优先
 
+### 【ADR-037】自然语言验证编排器 — 实施任务清单(方案 E)
+
+> **目标**:用户 NL 验证策略想法;LLM 翻译并**选既有协议推进**;Strict tool/CLI 为唯一产品证据;Lab 默认非证据;永不宣布 alpha;不改核心约束代码。  
+> **来源**:`DECISIONS.md` ADR-037 + owner 2026-07-16 产品真意。  
+> **非目标**:自动入册/下单;裸 shell 当正式回测;桌面第二套验证口径;取消 CLI。  
+> **依赖序**:P0 文档✅ → P1 Envelope 契约 → P2 协议注册/可达性 → P3 L0 probe 包装 → P4 确认回测 → P5 Lab 隔离 → P6 统一 Agent Service(可与 P4/P5 部分并行,但勿先于 P1)。  
+> **验收总闸**(ADR-037 最低对抗集):① lab→formal 必拒 ② 无 Strict payload 绩效不得上屏为已验证 ③ mid 回测无确认不可跑 ④ Agent 路径禁写台账旁路 ⑤ `can_claim_valid` 默认 false 变异必红。
+
+#### 现状基线(已完成,勿重做)
+- [x] **P0.1 ADR-037 + CLAUDE 指针 + STATUS** — ✅ 2026-07-16 `c3c6400c`
+- [x] **P0.2 idea_precheck 能力** — ✅ `strategy_idea_check` + 桌面 CLI 证据路径(`96193c1b`)
+
+#### P1 — Evidence Envelope 契约 + 上屏拦截
+- [x] **P1.1 契约模型** — ✅ `contracts/evidence.py` EvidenceEnvelope + 对抗测试
+- [x] **P1.2 统一装配入口** — ✅ `services/agent/evidence.py` wrap/public_view;tools 挂 envelope
+- [x] **P1.3 桌面展示拦截** — ✅ diagnosisService allowsPerformanceDisplay + 屏蔽年化/夏普;信任条 tier/protocol
+- [x] **P1.4 API 透传** — ✅ envelope 在 tool JSON 内,agent_cli 原样透出(Web 大改后置)
+
+#### P2 — Protocol 注册表 + data_gap_audit
+- [x] **P2.1 Protocol 注册表** — ✅ `services/agent/protocols.py` + list_protocols tool
+- [x] **P2.2 data_gap_audit** — ✅ `services/read/data_gap.py` + tool;WACC 类 missing 诚实
+- [x] **P2.3 协议 skill** — ✅ Pi system prompt / strategy-precheck 走 catalog+CLI
+- [ ] **P2.4 structured idea DTO** — 后置可选
+
+#### P3 — proxy_or_signal_probe
+- [x] **P3.1 受控 probe 回执** — ✅ `run_signal_probe` → reports/research/ 回执+envelope(非全量 IC 重型机,重型仍 signal_source_probe.py)
+- [x] **P3.2 holdout 截断** — ✅ end/cutoff ≥ boundary 必拒
+- [x] **P3.3 桌面可调** — ✅ 工具 risk=readonly,Pi catalog 可见
+- [ ] **P3.4 阴性回写 direction_registry** — 仍须人确认(不自动)
+
+#### P4 — engine_backtest HITL
+- [x] **P4.1 mid confirm-token** — ✅ agent_cli `--confirm-token` + `ASTOCK_MID_CONFIRM_TOKEN`;无 token 拒
+- [x] **P4.2 回测 envelope** — ✅ run_backtest 包 engine tier
+- [ ] **P4.3 桌面确认 UX** — 后置(CLI 门已立;桌面 Pi 默认 --readonly-only 不调 mid)
+
+#### P5 — Lab 隔离
+- [x] **P5.1 formal 路径对抗** — ✅ scratch/results/logs 非正式证据(测试钉死)
+- [ ] **P5.2 OS 级 lab 目录沙箱** — 后置(策略层已禁 formal 洗白)
+- [x] **P5.3 展示降级** — ✅ precheck 禁 perf display
+- [x] **P5.4 文档** — ✅ desktop README + ADR-037
+
+#### P6 — Protocol runner
+- [x] **P6.1/P6.2 protocol_runner** — ✅ `run_protocol_step` 校验协议×tool
+- [ ] **P6.3 Web 对齐** — 后置
+- [ ] **P6.4 session 审计日志** — 后置
+
+#### P7 — high 仅提案
+- [x] **P7.1 propose_high_risk_action** — ✅ 永不 executed=True
+- [x] **P7.2 工具描述** — ✅ 提案语义写入 tool desc
+
+#### 里程碑建议(可按人天裁)
+| 里程碑 | 包含 | 可演示 |
+| --- | --- | --- |
+| M1 | P1 全完成 | 无 CLI 的假年化上不了「系统事实」 |
+| M2 | P1+P2 | 「WACC」类想法 → 缺字段诚实 + 协议进度 |
+| M3 | +P3 | 对**已有**因子一键 L0 probe 报告(非 alpha) |
+| M4 | +P4 | 确认后正式回测证据卡 |
+| M5 | +P5 | Lab 与 Strict 同屏不洗白 |
+| M6 | +P6/P7 | 单服务编排 + 高风险仅提案 |
+
+#### 本清单不做(明确排除)
+- 为过演示改成本/样本/holdout/shift
+- 自动入册或 `force=True` promote
+- 真 WACC 数据全量 onboarding(另立项,走 data_source_onboarding;本清单只保证「缺数据时诚实」)
+- Web 九页大改
+
 - [x] **【WS-D】组合再构成周度 job + top-N paper 排名持久化(ADR-034 后续)** — ✅ 2026-07-02 落地:`portfolio/recompose.py`(确定性内核:多目标排名 mean-rank(sharpe/calmar/边际残差夏普)+衰减腿强制垫底+非冗余贪心选腿+静态 inverse-vol 提案+组合自身 decay_check;口径 RANKING_VERSION 锚定,改口径须 bump+记 DECISIONS)+ `scripts/ops/scheduled_portfolio_recompose.py`(周度,读在册 version_returns → 持久化 `reports/research/portfolio_recompose.json` latest+归档,R-PROD-001)+ 决策收件箱第八源(info 级提案,过期>14天不入箱)。对抗测试 8/8(高夏普衰减腿必垫底/冗余双胞胎只留一/样本不足诚实拒判/全灭空提案/确定性)。**留白**:paper 多账户并行实测的执行侧(见下一条)。
 - [x] **【WS-E】文献扫描剧本(枯竭触发的外探之二,ADR-034 后续)** — ✅ 2026-07-02 落成 `factor_research/docs/agent_skills/literature_scan.md`(人批准触发;先读方向登记簿再扫描防重发现死路;产出带出处 Hypothesis 草案走 `factory_cli queue` canonical 通道;阴性结论也落报告;不判有效不写台账);已接进收件箱枯竭事项 actions + CLAUDE.md §2 剧本路由。
 - [x] **【probe 结论回写纪律】** — ✅ 2026-07-02 固化为 probe-signal-source skill 步骤 8(必做):阴性→DEPRIORITIZE/SKIP 条目(带 revival_condition+180 天 expires)、阳性→BOOST,均须证据指针(证据门控拒无证据条目);种子置顶指引同步改为登记簿 BOOST(不再硬编码 _SEEDS 顺序)。

@@ -4,11 +4,16 @@
 
 ## 一句话
 
+**2026-07-16(ADR-037 实施主路径落地:Evidence Envelope + 协议注册 + data_gap/probe/HITL 门)**:
+  · **契约**:`contracts/evidence.py` EvidenceEnvelope;`services/agent/evidence.py` 装配/红action;`can_claim_valid` 默认 false;narrative 禁绩效载荷。
+  · **协议**:`services/agent/protocols.py` + `protocol_runner.run_protocol_step`;未知协议/协议外 tool 必拒。
+  · **能力**:`data_gap_audit`/`list_protocols`/`run_signal_probe`(回执+holdout 截断)/`propose_high_risk_action`(永不执行);`run_backtest` mid 须 `ASTOCK_MID_CONFIRM_TOKEN`+`--confirm-token`。
+  · **桌面**:Pi 默认 `--readonly-only`;信任条展示 tier/protocol;precheck 禁年化/夏普当系统事实。
+  · **验证**:`pytest tests/test_evidence_envelope_adr037.py`+agent_cli/strategy_idea 全绿;desktop npm test 23/23。
+  · **留白**:桌面 mid 确认 UX、OS 级 lab 沙箱、Web 对齐、direction_registry 自动回写、全量 signal_source_probe 重型接线(回执层已立)。任务勾选见 TASKS「ADR-037」。
+
 **2026-07-16(ADR-037:产品 Agent 边界冻结为「自然语言验证编排器」)**:
-  · **决策**:`DECISIONS.md` ADR-037——桌面/产品 Agent = Workflow-as-Protocol 编排器(非 Codex);双轨 Strict CLI/tool(正式证据) + Lab sandbox(默认非证据);上屏强制 Evidence Envelope(`evidence_tier` / `can_claim_valid` 默认 false);验证只能走既有协议(precheck / data_gap / probe / BacktestEngine 确认 / 9-Gate·promote 人批 / onboarding);**不改**核心约束代码;CI 守卫与 runtime 证据轨互补。
-  · **否决**:裸 shell 自由探索、取消 CLI 只靠守卫、LLM 判 alpha、桌面第二套验证口径。
-  · **本轮**:纯文档 ADR + STATUS 同步;未扩 capability 代码。后续实现序见 ADR-037「实现顺序」。
-  · **背景**:owner 明确产品真意(NL 验证想法 + 走验证流程 + 永不骗人)+ 架构调研选定方案 E。
+  · **决策**:见 DECISIONS ADR-037;方案 E 文档冻结。
 
 **2026-07-13(daily-round-6:研究总监审视,实证一次真实重复算力浪费 + 修复 main 登记簿测试红灯)**:
   · **核心发现(不是假设,已实证)**:round3(07-05)警告的"多分支互相看不到对方成果"风险,8 天内真实发生——round4(07-06,分支 `claude/daily-round-4`,从未合并 main)对资产负债表运营质量三因子(bargaining_power/receivable_intensity_chg/inventory_intensity_chg)做的 probe-signal-source 体检,因分支孤立对 main 不可见;07-12 另一次独立研究在 `main` 上对**同样三个因子**重新跑了几乎相同的 probe,产出几乎相同的阴性结论(现已作为 `balancesheet-operational-quality-weak` 条目存在于登记簿)。一次可精确定位日期/文件名的重复浪费。
