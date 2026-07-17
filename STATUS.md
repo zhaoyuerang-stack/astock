@@ -10,7 +10,8 @@
   · **能力**:`data_gap_audit`/`list_protocols`/`run_signal_probe`(回执+holdout 截断)/`propose_high_risk_action`(永不执行);`run_backtest` mid 须 `ASTOCK_MID_CONFIRM_TOKEN`+`--confirm-token`。
   · **桌面**:Pi 默认 `--readonly-only`;信任条展示 tier/protocol;precheck 禁年化/夏普当系统事实。
   · **验证**:`pytest tests/test_evidence_envelope_adr037.py`+agent_cli/strategy_idea 全绿;desktop npm test 23/23。
-  · **留白**:桌面 mid 确认 UX、OS 级 lab 沙箱、Web 对齐、direction_registry 自动回写、全量 signal_source_probe 重型接线(回执层已立)。任务勾选见 TASKS「ADR-037」。
+  · **续做**:P4.3 桌面 mid 确认 UX + 全量 L0 probe 接线(见后续 commit)。
+  · **留白**:OS 级 lab 沙箱、Web 对齐、direction_registry 自动回写。任务勾选见 TASKS「ADR-037」。
 
 **2026-07-16(ADR-037:产品 Agent 边界冻结为「自然语言验证编排器」)**:
   · **决策**:见 DECISIONS ADR-037;方案 E 文档冻结。

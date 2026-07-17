@@ -3,11 +3,13 @@ const { app, BrowserWindow, ipcMain } = require("electron");
 const { createReadServiceClient } = require("./readServiceClient.cjs");
 const { createDiagnosisService } = require("./diagnosisService.cjs");
 const { createPiBridge } = require("./piBridge.cjs");
+const { createCapabilityService } = require("./capabilityService.cjs");
 
 const readClient = createReadServiceClient();
 const piBridge = createPiBridge();
 const diagnosisService = createDiagnosisService({ readClient, piBridge });
-const IPC_API_VERSION = 2;
+const capabilityService = createCapabilityService();
+const IPC_API_VERSION = 3;
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -50,7 +52,15 @@ ipcMain.handle("runtime:status", async () => {
     readServiceUrl: readClient.baseUrl,
     readService,
     pi,
+    capabilities: {
+      midConfirm: true,
+      tools: ["run_backtest", "run_signal_probe", "data_gap_audit", "strategy_idea_check"],
+    },
   };
+});
+
+ipcMain.handle("capability:run", async (_event, request) => {
+  return capabilityService.runCapability(request && typeof request === "object" ? request : {});
 });
 
 app.whenReady().then(() => {

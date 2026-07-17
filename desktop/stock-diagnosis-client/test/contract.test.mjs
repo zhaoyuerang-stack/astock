@@ -37,17 +37,20 @@ assert(pkg.scripts.test.includes("node --test"), "test script must use node:test
 
 const preload = readFileSync(join(root, "src/main/preload.cjs"), "utf8");
 assert(preload.includes("contextBridge.exposeInMainWorld"), "preload must expose a narrow API through contextBridge");
-assert(preload.includes("apiVersion: 2"), "preload must expose the structured IPC API version");
+assert(preload.includes("apiVersion: 3"), "preload must expose the structured IPC API version");
 assert(preload.includes("runDiagnosis"), "preload must expose runDiagnosis");
+assert(preload.includes("runCapability"), "preload must expose runCapability for mid-confirm path");
 assert(!preload.includes("ipcRenderer.send("), "preload must avoid unbounded fire-and-forget IPC");
 
 const main = readFileSync(join(root, "src/main/main.cjs"), "utf8");
 assert(main.includes("contextIsolation: true"), "Electron window must enable contextIsolation");
 assert(main.includes("nodeIntegration: false"), "Electron window must disable nodeIntegration");
 assert(main.includes("diagnosis:run"), "main process must register diagnosis IPC");
+assert(main.includes("capability:run"), "main process must register capability IPC");
 assert(main.includes("runtime:status"), "main process must expose runtime status IPC");
 assert(main.includes("apiVersion"), "runtime status must include IPC API version");
 assert(main.includes("readService"), "runtime status must include read service health");
+assert(existsSync(join(root, "src/main/capabilityService.cjs")), "capabilityService must exist");
 
 const piBridge = readFileSync(join(root, "src/main/piBridge.cjs"), "utf8");
 const piExtension = readFileSync(join(root, "src/main/piExtensions/astockCli.ts"), "utf8");
@@ -98,6 +101,9 @@ const requiredUiMarkers = [
   "trust-banner",
   "honesty-boundary-panel",
   "can_claim_valid",
+  "request-formal-backtest",
+  "mid-confirm-modal",
+  "正式回测（需确认）",
 ];
 
 for (const marker of requiredUiMarkers) {

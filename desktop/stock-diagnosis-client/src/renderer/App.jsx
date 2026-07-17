@@ -357,6 +357,32 @@ function ConversationWorkspace({ diagnosis }) {
   );
 }
 
+function ConfirmModal({ open, title, body, onConfirm, onCancel, busy }) {
+  if (!open) return null;
+  return (
+    <div className="confirm-modal-backdrop" data-testid="mid-confirm-modal" role="dialog" aria-modal="true">
+      <div className="confirm-modal">
+        <div className="confirm-modal-title">{title}</div>
+        <div className="confirm-modal-body">{body}</div>
+        <div className="confirm-modal-actions">
+          <button type="button" className="secondary-button" onClick={onCancel} disabled={busy}>
+            取消
+          </button>
+          <button
+            type="button"
+            className="send-button"
+            data-testid="mid-confirm-accept"
+            onClick={onConfirm}
+            disabled={busy}
+          >
+            {busy ? "执行中…" : "确认执行"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Workspace({
   diagnosis,
   prompt,
@@ -372,6 +398,11 @@ function Workspace({
   selectedSkillId,
   onSelectSkill,
   onClearSkill,
+  onRequestFormalBacktest,
+  capabilityBusy,
+  confirmState,
+  onConfirmAccept,
+  onConfirmCancel,
 }) {
   const [skillMenuOpen, setSkillMenuOpen] = useState(false);
   const piCliReady = runtime?.pi?.available === true
@@ -432,6 +463,8 @@ function Workspace({
             diagnosis={diagnosis}
             runtime={runtime}
             onBackToConversation={() => setViewMode("conversation")}
+            onRequestFormalBacktest={onRequestFormalBacktest}
+            capabilityBusy={capabilityBusy}
           />
         ) : (
           <div className="conversation-layout">
@@ -439,6 +472,14 @@ function Workspace({
           </div>
         )}
       </section>
+      <ConfirmModal
+        open={Boolean(confirmState?.open)}
+        title="确认正式回测"
+        body={confirmState?.prompt || ""}
+        busy={capabilityBusy}
+        onConfirm={onConfirmAccept}
+        onCancel={onConfirmCancel}
+      />
       <footer className="composer-shell" data-testid="bottom-composer">
         <div className="composer-stack">
           {skillMenuOpen && (
@@ -491,6 +532,37 @@ function Workspace({
   );
 }
 
+function appendCapabilityTurns(diagnosis, userLine, assistantLine) {
+  return {
+    ...diagnosis,
+    turns: [
+      ...(diagnosis.turns || []),
+      { role: "user", content: userLine },
+      { role: "assistant", content: assistantLine },
+    ],
+  };
+}
+
+function formatBacktestAssistantMessage(result) {
+  const envelope = result?.evidence_envelope || result?.result?.evidence_envelope;
+  const payload = result?.result || {};
+  const tier = envelope?.evidence_tier || "engine";
+  if (!result?.ok) {
+    return `正式回测未执行或失败：${result?.error || "未知错误"}。can_claim_valid=false。`;
+  }
+  const annual = payload.annual;
+  const sharpe = payload.sharpe;
+  const maxdd = payload.maxdd;
+  const lines = [
+    `正式回测完成（evidence_tier=${tier}，can_claim_valid=false，非入册裁决）。`,
+    typeof annual === "number" ? `年化(引擎): ${(annual * 100).toFixed(2)}%` : null,
+    typeof sharpe === "number" ? `夏普(引擎): ${sharpe.toFixed(3)}` : null,
+    typeof maxdd === "number" ? `最大回撤(引擎): ${(maxdd * 100).toFixed(2)}%` : null,
+    "成本口径为引擎固定 CostModel，不可调低。",
+  ].filter(Boolean);
+  return lines.join("\n");
+}
+
 export default function App() {
   const [diagnoses, setDiagnoses] = useState([initialDiagnosis]);
   const [threads, setThreads] = useState([]);
@@ -500,6 +572,8 @@ export default function App() {
   const [runtime, setRuntime] = useState(null);
   const [viewMode, setViewMode] = useState("conversation");
   const [selectedSkillId, setSelectedSkillId] = useState("");
+  const [capabilityBusy, setCapabilityBusy] = useState(false);
+  const [confirmState, setConfirmState] = useState(null);
   const inputRef = useRef(null);
 
   const activeDiagnosis = diagnoses.find((item) => item.thread.id === activeId) || initialDiagnosis;
@@ -509,6 +583,69 @@ export default function App() {
   useEffect(() => {
     window.astock?.getRuntimeStatus?.().then(setRuntime).catch(() => undefined);
   }, []);
+
+  async function requestFormalBacktest() {
+    if (!window.astock?.runCapability || capabilityBusy || loading) return;
+    setCapabilityBusy(true);
+    try {
+      const preview = await window.astock.runCapability({
+        tool: "run_backtest",
+        args: {},
+        confirmed: false,
+      });
+      if (preview?.needs_confirmation) {
+        setConfirmState({
+          open: true,
+          tool: "run_backtest",
+          args: preview.args || {},
+          prompt: preview.confirm_prompt || "确认执行正式回测？",
+        });
+        return;
+      }
+      if (!preview?.ok) {
+        const updated = appendCapabilityTurns(
+          activeDiagnosis,
+          "请求正式回测",
+          `无法启动正式回测：${preview?.error || "能力不可用"}`,
+        );
+        setDiagnoses((prev) => upsertDiagnosisList(prev, updated));
+        setViewMode("conversation");
+      }
+    } finally {
+      setCapabilityBusy(false);
+    }
+  }
+
+  async function acceptFormalBacktest() {
+    if (!confirmState?.open || !window.astock?.runCapability) return;
+    setCapabilityBusy(true);
+    try {
+      const result = await window.astock.runCapability({
+        tool: confirmState.tool || "run_backtest",
+        args: confirmState.args || {},
+        confirmed: true,
+      });
+      setConfirmState(null);
+      const message = formatBacktestAssistantMessage(result);
+      const updated = appendCapabilityTurns(activeDiagnosis, "确认正式回测", message);
+      if (result?.ok && result.evidence_envelope) {
+        updated.trust = {
+          ...(updated.trust || {}),
+          can_claim_valid: false,
+          fake_curve_allowed: false,
+          evidence_tier: result.evidence_envelope.evidence_tier || "engine",
+          protocol_id: result.evidence_envelope.protocol_id || "engine_backtest",
+          sources: result.evidence_envelope.sources || ["tool:run_backtest"],
+          allows_performance_display: true,
+        };
+        updated.evidenceEnvelope = result.evidence_envelope;
+      }
+      setDiagnoses((prev) => upsertDiagnosisList(prev, updated));
+      setViewMode("conversation");
+    } finally {
+      setCapabilityBusy(false);
+    }
+  }
 
   async function submit(event) {
     event.preventDefault();
@@ -607,6 +744,11 @@ export default function App() {
         selectedSkillId={selectedSkillId}
         onSelectSkill={setSelectedSkillId}
         onClearSkill={() => setSelectedSkillId("")}
+        onRequestFormalBacktest={requestFormalBacktest}
+        capabilityBusy={capabilityBusy}
+        confirmState={confirmState}
+        onConfirmAccept={acceptFormalBacktest}
+        onConfirmCancel={() => setConfirmState(null)}
       />
     </div>
   );

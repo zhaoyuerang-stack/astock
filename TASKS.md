@@ -30,7 +30,7 @@
 - [ ] **P2.4 structured idea DTO** — 后置可选
 
 #### P3 — proxy_or_signal_probe
-- [x] **P3.1 受控 probe 回执** — ✅ `run_signal_probe` → reports/research/ 回执+envelope(非全量 IC 重型机,重型仍 signal_source_probe.py)
+- [x] **P3.1 受控 probe 回执 + 全量接线** — ✅ `run_signal_probe`：`full=true` 调 `signal_source_probe.probe`；`full=false` 仅回执；落 reports/research
 - [x] **P3.2 holdout 截断** — ✅ end/cutoff ≥ boundary 必拒
 - [x] **P3.3 桌面可调** — ✅ 工具 risk=readonly,Pi catalog 可见
 - [ ] **P3.4 阴性回写 direction_registry** — 仍须人确认(不自动)
@@ -38,7 +38,7 @@
 #### P4 — engine_backtest HITL
 - [x] **P4.1 mid confirm-token** — ✅ agent_cli `--confirm-token` + `ASTOCK_MID_CONFIRM_TOKEN`;无 token 拒
 - [x] **P4.2 回测 envelope** — ✅ run_backtest 包 engine tier
-- [ ] **P4.3 桌面确认 UX** — 后置(CLI 门已立;桌面 Pi 默认 --readonly-only 不调 mid)
+- [x] **P4.3 桌面确认 UX** — ✅ capabilityService + IPC `capability:run` + 确认弹窗 +「正式回测（需确认）」按钮；未确认不调 CLI
 
 #### P5 — Lab 隔离
 - [x] **P5.1 formal 路径对抗** — ✅ scratch/results/logs 非正式证据(测试钉死)

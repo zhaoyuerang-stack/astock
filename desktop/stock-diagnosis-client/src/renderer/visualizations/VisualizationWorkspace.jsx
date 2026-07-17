@@ -16,7 +16,13 @@ function asList(value) {
   return Array.isArray(value) ? value : [];
 }
 
-export default function VisualizationWorkspace({ diagnosis, runtime, onBackToConversation }) {
+export default function VisualizationWorkspace({
+  diagnosis,
+  runtime,
+  onBackToConversation,
+  onRequestFormalBacktest,
+  capabilityBusy = false,
+}) {
   const evidence = asList(diagnosis.evidence);
   const risks = asList(diagnosis.risks);
   const steps = asList(diagnosis.taskSteps);
@@ -29,6 +35,7 @@ export default function VisualizationWorkspace({ diagnosis, runtime, onBackToCon
     || diagnosis.activeSkills?.some((skill) => skill?.mode === "strategy_precheck")
     || chips.includes("strategy-precheck")
   );
+  const canRequestBacktest = Boolean(isStrategy && typeof onRequestFormalBacktest === "function");
   const readServiceAvailable = runtime?.readService?.available;
   const readServiceTone = readServiceAvailable === false ? "blocked" : readServiceAvailable === true ? "ready" : "pending";
   const readServiceLabel = readServiceAvailable === false
@@ -51,9 +58,22 @@ export default function VisualizationWorkspace({ diagnosis, runtime, onBackToCon
           <div className="workspace-title">{hasStock ? `${diagnosis.thread.name} ${diagnosis.thread.code}` : (diagnosis.thread?.name || "等待诊断对象")}</div>
           <div className="workspace-subtitle">这里只展示本地后端已经确认的诊断证据和任务状态，不展示伪造曲线。</div>
         </div>
-        <button className="secondary-button" type="button" onClick={onBackToConversation}>
-          回到对话
-        </button>
+        <div className="visual-header-actions">
+          {canRequestBacktest && (
+            <button
+              className="secondary-button"
+              type="button"
+              data-testid="request-formal-backtest"
+              disabled={capabilityBusy}
+              onClick={onRequestFormalBacktest}
+            >
+              {capabilityBusy ? "执行中…" : "正式回测（需确认）"}
+            </button>
+          )}
+          <button className="secondary-button" type="button" onClick={onBackToConversation}>
+            回到对话
+          </button>
+        </div>
       </div>
 
       <div className={`trust-banner ${trustTone(bannerStatus)}`} data-testid="trust-banner">
