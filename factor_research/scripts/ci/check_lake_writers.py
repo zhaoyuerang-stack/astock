@@ -30,13 +30,10 @@ WRITE_VERBS = re.compile(r"\b(to_parquet|to_csv|to_pickle|write_table)\b")
 LAKE_REF = re.compile(r"""data_lake/\w+|['\"]data_lake['\"]""")
 
 # 存量欠债(审计 #4 扩面后扫出)。响而不阻;真写湖者应改走 lake/ canonical writer。
+# 审计 #5:promote_composite / run_nine_gates_all 已迁 write_version_returns,从 PENDING 销账;
+# 此后任何直写 version_returns 即硬红(新违规不在基线)。
 PENDING_REMEDIATION: dict[str, str] = {
     # ── 真写湖(迁移欠债:应改走 lake/ canonical writer)──
-    "workflow/promote_composite.py":
-        "迁移欠债:直写 data_lake/version_returns CSV(L346 to_csv);"
-        "应改走 lake/ canonical writer(审计已知,勿改本文件业务逻辑)",
-    "scripts/research/run_nine_gates_all.py":
-        "迁移欠债:直写 data_lake/version_returns CSV;应改走 lake/ canonical writer",
     "factor_store/store.py":
         "迁移欠债:to_parquet 写 data_lake/factor_store;应改走 lake/ 或登记为 canonical 区",
     "factors/autoresearch_dsl.py":

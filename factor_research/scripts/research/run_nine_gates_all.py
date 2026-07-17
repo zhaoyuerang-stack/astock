@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 import warnings
@@ -489,12 +490,52 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
             print(f"  [persist] Nine-Gate 摘要已写入台账 {family_id}/{config.version}："
                   f"DSR_p={summary.get('dsr_p')}, PSR={summary.get('psr')}, n_trials={summary.get('n_trials')}")
             # 留存 gate5 日收益序列 → lineage 相关性 / PBO(2B/2C)复用,避免二次回测
+            # 守卫审计 #5:必须走 lake.version_returns.write_version_returns(身份信封)
             rets = getattr(evaluator, "gate5_returns", None)
             if rets is not None and len(rets) > 0:
-                store = Path(__file__).resolve().parents[2] / "data_lake" / "version_returns"
-                store.mkdir(parents=True, exist_ok=True)
-                rets.rename("ret").to_csv(store / f"{family_id}__{config.version}.csv", header=True)
-                print(f"  [persist] 收益序列已留存 ({len(rets)} 日) → version_returns/{family_id}__{config.version}.csv")
+                from lake.version_returns import config_hash as _vr_config_hash
+                from lake.version_returns import write_version_returns
+
+                spec_hash = None
+                cfg_hash = None
+                try:
+                    import strategy_registry as _sr
+                    for fam in _sr._load().get("families", []):
+                        if fam.get("id") != family_id:
+                            continue
+                        for v in fam.get("versions", []):
+                            if v.get("version") != config.version:
+                                continue
+                            spec_hash = (v.get("executable_spec") or {}).get("spec_hash")
+                            if not spec_hash:
+                                cfg_hash = _vr_config_hash(v.get("config") or {})
+                            break
+                        break
+                except Exception as exc:  # noqa: BLE001 — 台账读失败时降级 config-only
+                    print(f"  [persist] 台账身份读取失败({exc}),尝试 config 降级")
+                if not spec_hash and not cfg_hash:
+                    # 无台账 config 时用运行时 config 快照(若可 dict 化)
+                    raw_cfg = getattr(config, "__dict__", None) or {}
+                    if not isinstance(raw_cfg, dict):
+                        raw_cfg = {}
+                    # dataclass / namespace:过滤不可 JSON 的值
+                    safe = {}
+                    for k, val in raw_cfg.items():
+                        try:
+                            json.dumps(val, ensure_ascii=False)
+                            safe[k] = val
+                        except (TypeError, ValueError):
+                            safe[k] = str(val)
+                    cfg_hash = _vr_config_hash(safe)
+                write_version_returns(
+                    family_id,
+                    config.version,
+                    rets,
+                    source="run_nine_gates_all --persist",
+                    spec_hash=spec_hash,
+                    config_hash=cfg_hash,
+                )
+                print(f"  [persist] 收益序列已留存 ({len(rets)} 日) → version_returns/{family_id}__{config.version}.csv(+provenance)")
     try:
         record_nine_gate_research_run(
             strategy_name=strategy_name,

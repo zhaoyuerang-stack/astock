@@ -338,13 +338,24 @@ This gate checks the strategy performance degradation under a T-1 execution lag 
         attach_nine_gate("composite-portfolio", version, summary)
         print(f"Successfully registered composite portfolio with status: {status_registry}!")
         
-        # Save returns sequence
+        # Save returns sequence(守卫审计 #5:走 lake.version_returns 身份信封,禁直写 CSV)
         rets = res_t1.returns
         if rets is not None and len(rets) > 0:
-            store = ROOT / "data_lake" / "version_returns"
-            store.mkdir(parents=True, exist_ok=True)
-            rets.rename("ret").to_csv(store / f"composite-portfolio__{version}.csv", header=True)
-            print(f"Returns sequence saved to version_returns/composite-portfolio__{version}.csv")
+            from lake.version_returns import config_hash as _vr_config_hash
+            from lake.version_returns import write_version_returns
+
+            # composite 通常无 executable_spec → config-only 降级身份
+            write_version_returns(
+                "composite-portfolio",
+                version,
+                rets,
+                source="promote_composite",
+                config_hash=_vr_config_hash(config_dict),
+            )
+            print(
+                f"Returns sequence saved to version_returns/"
+                f"composite-portfolio__{version}.csv(+provenance)"
+            )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Composite Strategy Promotion Pipeline")
