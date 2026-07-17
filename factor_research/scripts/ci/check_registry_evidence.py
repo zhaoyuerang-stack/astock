@@ -45,7 +45,12 @@ PENDING_REMEDIATION: dict[str, str] = {
 
 
 def extract_versions(ledger: dict) -> list[dict]:
-    """展平为 [{family, version, status, track, nine_gate, evidence}]。"""
+    """展平为 [{family, version, status, version_status, track, nine_gate, evidence}]。
+
+    status: version 自带,缺省回退家族 status(历史 G2/G3 行为保持)。
+    version_status: **仅** version 自带 status,无家族回退——供 G2-no-track 使用
+      (家族 status=active 是家族生命周期标记,非版本准入声明;审计 #3)。
+    """
     fams: list[dict] = []
 
     def walk(o):
@@ -70,12 +75,36 @@ def extract_versions(ledger: dict) -> list[dict]:
                 "family": fam["id"],
                 "version": v.get("version"),
                 "status": v.get("status") or fam.get("status"),
+                "version_status": v.get("status"),  # 无家族回退
                 "track": adm.get("track"),
                 "nine_gate": ng,
                 "evidence": v.get("evidence") or {},
                 "config": v.get("config") or {},
             })
     return rows
+
+
+def find_active_without_track(rows: list[dict]) -> list[tuple[str, str]]:
+    """G2-no-track:version **自身** status ∈ ACTIVE_STATUS 但 admission.track 缺失。
+
+    只认 version_status(自带),不认家族 status 回退——家族 status=active 是
+    家族生命周期标记,不是版本准入声明(审计 #3 网眼对齐)。
+    """
+    out = []
+    for r in rows:
+        vs = r.get("version_status")
+        if vs not in ACTIVE_STATUS:
+            continue
+        if r.get("track"):
+            continue
+        tag = f"{r['family']}/{r['version']}"
+        out.append((
+            f"G2-no-track:{tag}",
+            f"[G2 无 admission.track] {tag} version status={vs!r} ∈ ACTIVE "
+            f"但 admission.track 缺失 — 绕过双轨准入门(审计 #3);"
+            f"须补 track 或改 status 非在册态",
+        ))
+    return out
 
 
 def find_understated_trials(rows: list[dict]) -> list[tuple[str, str]]:
@@ -166,7 +195,8 @@ def check(ledger: dict | None = None) -> int:
     rows = extract_versions(ledger)
     all_v = (find_cross_family_ic_copies(rows)
              + find_standalone_evidence_gaps(rows)
-             + find_understated_trials(rows))
+             + find_understated_trials(rows)
+             + find_active_without_track(rows))
     keys = {k for k, _ in all_v}
 
     new_v = [(k, m) for k, m in all_v if k not in PENDING_REMEDIATION]

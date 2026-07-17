@@ -40,6 +40,14 @@ DSR_ALPHA = 0.05
 # 仅这两族的对冲假设里显式写了「等额做空…对冲 Beta」并实测负相关，故迁移时自动归类为 diversifier。
 DIVERSIFIER_FAMILIES = {"large-cap-growth-hedged", "hq-momentum-hedged"}
 
+# 版本 status 词表(守卫审计 #3):机械冻结 strategy_versions.json 存量值 + 规范「在册」。
+# 枚举日 2026-07-17 存量:候选/参考/已证伪/退役;「在册」为双轨准入规范态(台账当日无在册版,
+# 但仍是 register 合法目标,必须收纳)。register_family 的 family status 是另一字段,不在此列。
+ALLOWED_VERSION_STATUS = frozenset({"候选", "参考", "已证伪", "退役", "在册"})
+# 英文同义词会让 status≠「在册」从而绕过 register 双轨准入门,同时被证据守卫 ACTIVE_STATUS
+# 宽认——两层网眼错位。一律拒绝并提示用「在册」(枚举日存量词表中无此四词,无需从 ALLOWED 剔除)。
+VERSION_STATUS_SYNONYMS_BLOCKED = frozenset({"active", "ACTIVE", "APPROVED", "registered"})
+
 
 def _load():
     if not REGISTRY.exists():
@@ -111,6 +119,19 @@ def register(family, version, desc, config, data_scope, metrics, status="候选"
     fam = next((f for f in data["families"] if f["id"] == family), None)
     if fam is None:
         raise ValueError(f"母策略 '{family}' 未登记，请先 register_family('{family}', ...)")
+
+    # 0a) 版本 status 词表(审计 #3):禁英文同义词绕过「在册」双轨门;禁任意自造 status。
+    #     不碰 register_family 的 family status(那是家族生命周期标记)。
+    if status in VERSION_STATUS_SYNONYMS_BLOCKED:
+        raise ValueError(
+            f"{family}/{version} 版本在册状态必须用「在册」——英文同义词 {status!r} "
+            f"会绕过双轨准入门(审计 #3)"
+        )
+    if status not in ALLOWED_VERSION_STATUS:
+        raise ValueError(
+            f"{family}/{version} 未知 version status={status!r}；"
+            f"允许 {sorted(ALLOWED_VERSION_STATUS)}"
+        )
 
     # 0) ExecutableStrategySpec 校验(Task 5)：提供 spec 则身份必须自洽——
     #    spec_hash 与重算一致、family/version 与登记参数一致。不提供则向后兼容(历史/手动登记)。

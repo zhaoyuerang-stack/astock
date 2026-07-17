@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.ci.check_registry_evidence import (
     extract_versions, find_cross_family_ic_copies, find_standalone_evidence_gaps,
-    find_understated_trials, check,
+    find_understated_trials, find_active_without_track, check,
 )
 
 IC_A = {"ic_mean": 0.078, "nw_icir": 0.126, "ic_decay": {"1": 0.02}}
@@ -146,6 +146,43 @@ def test_new_violation_returns_nonzero():
     assert check(led) == 1
 
 
+def test_version_active_without_track_flagged():
+    """审计 #3 对抗:fixture 台账「在册+无 admission」必被 G2-no-track 抓。"""
+    led = _ledger([
+        {"id": "famZ", "status": "active", "versions": [
+            {"version": "v1.0", "status": "在册", "admission": {}, "nine_gate": {}, "evidence": {}}]},
+    ])
+    v = find_active_without_track(extract_versions(led))
+    assert len(v) == 1 and v[0][0].startswith("G2-no-track:")
+    assert check(led) == 1
+
+
+def test_family_active_without_version_status_not_no_track():
+    """家族 status=active 回退不算 version 准入声明 → 不触发 G2-no-track。"""
+    led = _ledger([
+        {"id": "famY", "status": "active", "versions": [
+            # version 无 status 字段 → version_status=None
+            {"version": "v1.0", "admission": {}, "nine_gate": {}, "evidence": {}}]},
+    ])
+    assert find_active_without_track(extract_versions(led)) == []
+
+
+def test_active_english_status_without_track_flagged():
+    """英文 active 同义词作 version status 且无 track → 亦抓(台账污染向量)。"""
+    led = _ledger([
+        {"id": "famE", "status": "候选", "versions": [
+            {"version": "v1.0", "status": "active", "admission": {}, "nine_gate": {}}]},
+    ])
+    v = find_active_without_track(extract_versions(led))
+    assert len(v) == 1 and "G2-no-track" in v[0][0]
+
+
+def test_live_ledger_passes():
+    """真实台账守卫必须绿(或存量全在 PENDING)。"""
+    assert check() == 0
+
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-q"]))
+
