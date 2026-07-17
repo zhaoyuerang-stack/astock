@@ -64,23 +64,39 @@
     },
     {
       "id": "frontier-fundamental-family",
-      "direction": "信息地图空白区:基本面族(距价格族最远邻)",
-      "status": "frontier",
-      "action": "BOOST",
+      "direction": "信息地图空白区:基本面原始比率族(距价格族最远邻)——roe 单独 probe 结果",
+      "status": "falsified",
+      "action": "DEPRIORITIZE",
       "scope_factors": [
-        "net_profit_yoy",
-        "roe",
-        "bp_proxy",
-        "revenue_yoy",
-        "ep_proxy"
+        "roe"
       ],
       "evidence": [
-        "reports/research/metasearch_findings_20260623.md(information_map:基本面族 net_profit_yoy/roe/bp_proxy 距价格族 MI 距离 2.8-2.9,为现有池最独立空白区之一)"
+        "reports/research/metasearch_findings_20260623.md(information_map:基本面族 net_profit_yoy/roe/bp_proxy 距价格族 MI 距离 2.8-2.9,为现有池最独立空白区之一——本条目原 BOOST 依据)",
+        "reports/research/metasearch_findings_20260713.md(round6 重跑确认 roe/net_profit_yoy/bp_proxy/gross_margin 从未被单独 probe,只测过其衍生运营质量比率)",
+        "reports/research/probe_round7_fundamental_roe.json(daily-round-7 单独 probe:原始 IC IS=-0.0053/OOS=-0.0190 全负但极弱;残差 IC IS=+0.0116→OOS=-0.0133 符号反转,不泛化)"
       ],
-      "revival_condition": "",
+      "revival_condition": "换非线性/分组(十分位而非线性 IC)或与估值/规模交互后重测;线性截面 IC 已两次(IS/OOS)方向不一致,纯线性单因子不要再提",
       "created": "2026-07-02",
-      "expires": "2026-12-29",
-      "prompt_note": "信息地图显示基本面族(净利增速/ROE/账面市值比)距现有价格类因子池 MI 距离 2.8-2.9,是最独立的空白区;优先提基本面 × 价格量能的跨信息源组合,而非价格族内部换皮。"
+      "expires": "2027-01-13",
+      "prompt_note": "2026-07-17 daily-round-7 更新:本条目原 BOOST『基本面族距价格池最远,应优先探』的判断已被 round7 单独 probe 部分推翻——roe 作为全市场月频 long-only 线性标准化因子,IS/OOS 残差 IC 符号反转(+0.0116→-0.0133),不是可用的独立线性信号,不要再提『roe 直接标准化』类候选。gross_margin(未接入搜索白名单,searchable=False)同批 probe 显示同样弱/符号不稳定模式(IS 残差 IC≈0.0031→OOS -0.0138),但因未过白名单证据门,不在本条目 scope_factors 内。net_profit_yoy 与 bp_proxy 结果不同(前者稳定负向且正交,后者 IS/OOS 不对称但量级不弱),不适合与 roe 同归为 DEPRIORITIZE,已拆到 fundamental-raw-ratio-mixed-signals 条目单独记录;revenue_yoy/ep_proxy 本轮未测,不在本条目内,状态仍为未知(不作 BOOST 也不作 DEPRIORITIZE)。"
+    },
+    {
+      "id": "fundamental-raw-ratio-mixed-signals",
+      "direction": "基本面原始比率族:net_profit_yoy(稳定负向)与 bp_proxy(IS/OOS 不对称)单独 probe——不落入 falsified 或 boost 任一简单结论",
+      "status": "mixed",
+      "action": "NOTE",
+      "scope_factors": [
+        "net_profit_yoy",
+        "bp_proxy"
+      ],
+      "evidence": [
+        "reports/research/probe_round7_fundamental_net_profit_yoy.json(全市场 long-only 月频:原始 IC IS=-0.0115/OOS=-0.0182/full=-0.0134,符号稳定负向,ICIR 0.22-0.25;残差 IC IS=-0.0085/OOS=-0.0154,正交保留率 78%,风格相关低 size=0.084/liquidity=0.003/momentum=-0.033)",
+        "reports/research/probe_round7_fundamental_bp_proxy.json(原始 IC IS=0.0501,ICIR=0.29/OOS=0.0928,ICIR=0.99;残差 IC IS=0.0136,ICIR=0.08 极弱→OOS=0.0592,ICIR=0.59 很强,IS 弱 OOS 强不对称;liquidity 相关 -0.339 偏高)"
+      ],
+      "revival_condition": "net_profit_yoy:核对 size_earnings.py 现有『净利增速正向贡献』假设与本 probe『标准化线性负向』是否指向同一现象,需人工判读符号约定后再决定是否值得作反向(负权重)候选;bp_proxy:把 OOS 窗口从 23 月拉长到覆盖不同价值/成长风格切换的多个周期,排除 2023-2024 单一价值反弹窗口造成的运气好看,若跨窗口仍强才值得考虑接工厂",
+      "created": "2026-07-17",
+      "expires": "2027-01-17",
+      "prompt_note": "daily-round-7:net_profit_yoy 作为全市场月频 long-only 标准化线性因子,原始与残差 IC 全程稳定为负(非正)、且低风格相关(真正交,非 size/流动性伪装)——这与 factors/fundamental.py 文档标注的『size_earnings v1.0 LIVE 实证基本面动量』(隐含正向贡献假设)方向相反,需要人核对两者口径/组合权重是否一致,不要在未核对前直接假定任一方向正确。bp_proxy(1/PB)是本轮四因子里信号最强的,但 IS 残差 ICIR 仅 0.08、OOS 残差 ICIR 猛增到 0.59,这种『IS 弱、OOS 强』的不对称更像 23 个月 OOS 窗口(2023-2024)恰好覆盖一段 A 股价值风格占优期,而非稳定结构性正交 alpha——不要仅凭这次 OOS 数字就提『bp_proxy 已验证』类候选,需要更长/跨周期 walk-forward 才能下结论。两者均只是 L0 证据,均未接入搜索白名单变更(net_profit_yoy/bp_proxy 本就在 ALLOWED_FACTORS,本条目不改变其可搜索状态,只记录 standalone 体检发现)。"
     },
     {
       "id": "earnings-event-sue-weak-size-exposed",
