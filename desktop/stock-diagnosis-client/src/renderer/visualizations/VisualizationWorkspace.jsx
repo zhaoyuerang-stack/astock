@@ -66,6 +66,9 @@ export default function VisualizationWorkspace({ diagnosis, runtime, onBackToCon
         <div className="trust-flags">
           <span className="source-token">can_claim_valid={String(trust?.can_claim_valid ?? false)}</span>
           <span className="source-token">fake_curve={String(trust?.fake_curve_allowed ?? false)}</span>
+          {trust?.evidence_tier ? <span className="source-token">tier={trust.evidence_tier}</span> : null}
+          {trust?.protocol_id ? <span className="source-token">protocol={trust.protocol_id}</span> : null}
+          <span className="source-token">perf_display={String(Boolean(trust?.allows_performance_display))}</span>
           {trust?.cost_display ? <span className="source-token">成本 {trust.cost_display}</span> : null}
           {trust?.validation_status ? <span className="source-token">{trust.validation_status}</span> : null}
         </div>

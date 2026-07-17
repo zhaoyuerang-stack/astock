@@ -492,6 +492,21 @@ test("strategy agent text number guard rejects ungrounded performance claims", a
   );
 });
 
+test("precheck envelope forbids performance display as system fact", async () => {
+  const { allowsPerformanceDisplay, stripPerformanceClaimsFromText } = await import("../src/main/diagnosisService.cjs");
+  assert.equal(allowsPerformanceDisplay({
+    evidence_tier: "precheck",
+    sources: ["tool:strategy_idea_check"],
+    can_claim_valid: false,
+  }), false);
+  assert.equal(allowsPerformanceDisplay({
+    evidence_tier: "engine",
+    sources: ["tool:run_backtest"],
+    allows_performance_display: true,
+  }), true);
+  assert.match(stripPerformanceClaimsFromText("年化 40% 夏普 2.1"), /已按证据策略屏蔽/);
+});
+
 test("Pi bridge enables built-in tools for research capabilities", async () => {
   const { buildPiAgentArgs } = await import("../src/main/piBridge.cjs");
 

@@ -146,6 +146,31 @@ function agentTextClaimsValidity(text) {
   return /策略有效|已经验证|回测证明|年化\s*\d|夏普\s*\d|最大回撤\s*[-+]?\d|可入册|可实盘|伪造|稳赚/.test(String(text || ""));
 }
 
+function envelopeFromIdeaCheck(ideaCheck) {
+  if (!ideaCheck || typeof ideaCheck !== "object") return null;
+  return ideaCheck.evidence_envelope && typeof ideaCheck.evidence_envelope === "object"
+    ? ideaCheck.evidence_envelope
+    : null;
+}
+
+function allowsPerformanceDisplay(envelope) {
+  if (!envelope || typeof envelope !== "object") return false;
+  if (envelope.allows_performance_display === true) return true;
+  const tier = envelope.evidence_tier;
+  return (tier === "engine" || tier === "gated")
+    && Array.isArray(envelope.sources)
+    && envelope.sources.length > 0
+    && envelope.fake_curve_allowed !== true;
+}
+
+function stripPerformanceClaimsFromText(text) {
+  // Remove common performance claim patterns when envelope forbids display.
+  return String(text || "")
+    .replace(/年化\s*[-+]?\d+(?:\.\d+)?%?/g, "年化[已按证据策略屏蔽]")
+    .replace(/夏普\s*[-+]?\d+(?:\.\d+)?/g, "夏普[已按证据策略屏蔽]")
+    .replace(/最大回撤\s*[-+]?\d+(?:\.\d+)?%?/g, "最大回撤[已按证据策略屏蔽]");
+}
+
 function groundStrategyAgentText(text, cliCalls = [], ideaCheck = null) {
   const raw = String(text || "").trim();
   if (!raw) return "";
@@ -153,14 +178,24 @@ function groundStrategyAgentText(text, cliCalls = [], ideaCheck = null) {
   if (ideaCheck && ideaCheck.can_claim_valid !== false && ideaCheck.can_claim_valid !== undefined) {
     return "";
   }
+  const envelope = envelopeFromIdeaCheck(ideaCheck);
+  if (envelope && envelope.can_claim_valid === true && envelope.evidence_tier !== "gated") {
+    return "";
+  }
+  let candidate = raw;
+  if (!allowsPerformanceDisplay(envelope)) {
+    // Without engine/gated envelope, strip performance numbers from model prose.
+    if (/(年化|夏普|最大回撤|calmar|sharpe)/i.test(candidate) && floatsFromText(candidate).some(isSalientNumber)) {
+      candidate = stripPerformanceClaimsFromText(candidate);
+    }
+  }
   const reals = collectCliFactNumbers(cliCalls);
   if (!reals.length) {
-    // No CLI facts: allow short qualitative coaching without digits.
-    return floatsFromText(raw).some(isSalientNumber) ? "" : raw;
+    return floatsFromText(candidate).some(isSalientNumber) ? "" : candidate;
   }
-  const salient = floatsFromText(raw).filter(isSalientNumber);
+  const salient = floatsFromText(candidate).filter(isSalientNumber);
   if (salient.some((n) => !numberGrounded(n, reals))) return "";
-  return raw;
+  return candidate;
 }
 
 function ideaCheckFromAgentTurn(agentTurn) {
@@ -601,11 +636,17 @@ function buildStrategyDiagnosisFromPi(prompt, context, selectedSkill, agentTurn,
     fallbackUsed: false,
   });
   diagnosis.piExplanation = grounded || "";
+  const envelope = envelopeFromIdeaCheck(ideaCheck);
   diagnosis.trust = {
     ...(diagnosis.trust || {}),
     can_claim_valid: false,
     fake_curve_allowed: false,
+    evidence_tier: envelope?.evidence_tier || diagnosis.trust?.validation_status || "precheck",
+    protocol_id: envelope?.protocol_id || "idea_precheck",
+    sources: envelope?.sources || [],
+    allows_performance_display: allowsPerformanceDisplay(envelope),
   };
+  diagnosis.evidenceEnvelope = envelope;
   diagnosis.turns = appendTurns(strategyContext, prompt, diagnosis);
   return diagnosis;
 }
@@ -781,4 +822,7 @@ module.exports = {
   strategyPrecheckDiagnosis,
   promptIntent,
   piCalledStockTools,
+  allowsPerformanceDisplay,
+  stripPerformanceClaimsFromText,
+  envelopeFromIdeaCheck,
 };

@@ -45,6 +45,7 @@ async function loadCatalog(): Promise<Capability[]> {
   if (!Array.isArray(payload.capabilities)) {
     throw new Error("AStock CLI returned an invalid capability catalog");
   }
+  // Product surface: only readonly capabilities are auto-exposed to Pi.
   return payload.capabilities.filter((item: Capability) => item?.risk === "readonly");
 }
 
@@ -86,12 +87,14 @@ export default function (pi: ExtensionAPI) {
       if (!argumentsValue || typeof argumentsValue !== "object" || Array.isArray(argumentsValue)) {
         throw new Error("Capability arguments must decode to a JSON object");
       }
+      // Desktop Pi stays on readonly Strict rail by default (mid needs host confirm token).
       const payload = await runCli([
         "call",
         "--tool",
         params.capability,
         "--args-json",
         JSON.stringify(argumentsValue),
+        "--readonly-only",
       ]);
       return {
         content: [{ type: "text", text: JSON.stringify(payload) }],
