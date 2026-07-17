@@ -333,6 +333,63 @@
 - **结果(v0.3 探针,n_trials=3 真账本)**: 年化 +9.9% / 回撤 -22.0% / 夏普 0.77 / dsr_p=0.27;终窗构成 债 35.0% + small-cap v2.1 44.5% + roc-yc 20.5%。三探针(v0.1/0.2/0.3)连成效率前沿:**现有腿池上限 ≈ 年化 10-12% / 回撤 -20~22% / 夏普 0.8-1.0;15%/20% 双线用现原料不可达**——提年化的唯一真路径是补强腿池(基本面族 probe),不是继续调组合参数。
 - **验证**: `tests/test_portfolio_recompose.py` 11/11(3 新对抗:波动悬殊池防守腿必 ≤35%(v1 行为必挂)/全股票池行为与 v1 一致/全防守池不死锁);`test_portfolio_promotion.py` 6/6 无回归。
 
+### ADR-037 桌面/产品 Agent = 自然语言验证编排器(Workflow-as-Protocol + 双轨证据 + Evidence Tier)
+- **上下文**:
+  1. Owner 产品真意(2026-07-16):用户用自然语言验证策略想法;LLM 将模糊语言翻译为可验证定义并**推进验证**,但必须走本仓既有验证流程;底线**永不欺骗用户**;这是**产品**不是改核心约束代码的 Codex;接口倾向**双轨**(严格证据轨 + 实验室 sandbox);近期优先把 Agent 边界写成宪法级 ADR。
+  2. 桌面 Pi 曾出现:关键词硬路由、主机旁路直调 CLI、只读预检后「会分析不会收尾」、用户误以为有守卫即可裸 shell 自由探索。
+  3. 业界 2025–2026 收敛:副作用分级 + sandbox + tool guardrails + thin model/skills-as-protocol + 研究系统按 verification regime 分层证据——与本仓 `R-LLM-001` / ADR-030 / Implement Phase 5 同向,缺口在产品化接线而非换哲学。
+  4. 备选已否决:① 裸 Codex(改引擎+假绩效上屏);② 取消 CLI 仅靠 CI 守卫(守卫是入库时,挡不住会话时假结论);③ 纯表单 workflow 无 LLM(无法消化模糊想法);④ 一上来多 Agent 研究工厂(单人 shop 过重)。
+- **决策**(方案 E — Workflow-as-Protocol + Agent Orchestrator + Dual-Rail Evidence):
+  1. **产品身份**:自然语言**验证编排器**。Agent 只做意图翻译、协议选择、进度解释、缺口澄清;**不**做 alpha 有效性裁决、**不**自动入册、**不**自动真金下单、**不**修改核心约束代码(成本模型 / `shift(1)` / holdout / `register` 写入口 / 防未来口径)。
+  2. **Workflow-as-Protocol**:验证路径 = 仓库已有确定性剧本与入口的机械化组合,Agent **只能选协议并填参**,不得临场发明验证口径。规范协议族(实现可增量接线,名称可映射到现有 skill/工具):
+     - `idea_precheck` → `strategy_idea_check` 等只读预检
+     - `data_gap_audit` → 湖 schema / 注册表可达性(缺字段诚实 blocked)
+     - `proxy_or_signal_probe` → `probe-signal-source` / L0 IC 类便宜体检(非 alpha)
+     - `engine_backtest` → 仅 `BacktestEngine` + 固定 `CostModel`(中风险,须人确认)
+     - `nine_gate_or_promote` → 既有 9-Gate / `workflow.promote`(高风险,须人批)
+     - `data_source_onboarding` → 固定 S0–S7 剧本(写湖须人批 + canonical writer)
+     禁止:scratch 私跑结果、旁路 SQL/Polars 重算、口头「已验证有效」。
+  3. **双轨(Dual-Rail)**:
+     - **Strict 轨**:`services.agent.tools` / `agent_cli`(及未来统一 Agent Service 的 tool registry)= **产品证据唯一来源**;只读默认可自动;mid/high 沿既有 `RISK_*` + 人确认。
+     - **Lab 轨**:隔离 sandbox(`scratch/`、临时进程/可选 worktree);默认可探索草稿与一次性实验;**默认非正式证据**;路径不得进入 `artifact_inventory.formal_evidence_allowed`(承 ADR-030)。
+     - Lab 结果上屏必须带降级标签;UI **不得**把 lab 渲染成「已验证 / 可入册 / 可实盘」。
+  4. **Evidence Envelope(证据信封,上屏强制)**:凡进入产品对话/卡片的结构化结论须可追溯,至少含:
+     - `evidence_tier` ∈ {`narrative`, `precheck`, `l0_probe`, `engine`, `gated`}
+     - `can_claim_valid`(**默认 false**;仅 `gated` 层可展示门禁字段原文,LLM 仍不得升级话术)
+     - `protocol_id` / `sources[]`(tool 名或报告路径) / `fake_curve_allowed=false`
+     - 绩效数字若无 Strict 轨 payload 绑定 → 展示层剥离或降为 narrative
+  5. **副作用与 HITL**(与 Implement Phase 5 / tools 风险分级对齐):
+     | 档 | 例 | 默认 |
+     | --- | --- | --- |
+     | readonly | 预检/台账/质量/schema 探查 | 自动 |
+     | low | L0 probe 报告落 `reports/research/` | 自动或轻确认 |
+     | mid | 正式 `BacktestEngine` | **人确认** |
+     | high | 入册/部署/写湖 onboarding 执行 | **人批准**;Agent 仅提案 |
+  6. **与守卫/控制平面关系**:
+     - CI 守卫 + `register` 唯一写入口 = **入库/台账强制**(不变)。
+     - Strict tool 出口 + Evidence Envelope = **会话/产品 runtime 证据强制**(本 ADR 新增产品语义;实现须逐步把 advisory 变成会话路径上的硬拦截)。
+     - ADR-030 `action_policy` 仍为读侧建议层;本 ADR **不**宣称仅靠 `can_agent_do` 已挡 shell。
+  7. **客户端与服务**:桌面 Pi 与 Web Agent 长期共用同一 Agent Service / tool 面(Implement Phase 5);禁止桌面再实现第二套验证口径。Pi 可选模型编排,但**证据只认 tool/CLI 返回**。
+  8. **成功标准**:
+     - 用户能从模糊想法走到「当前协议进度 + evidence_tier + 明确缺口/下一步」;
+     - 任一上屏绩效数字可追溯到 Strict 轨一次调用;
+     - Lab 结果无法被洗白为 formal evidence;
+     - 核心约束代码零被 Agent 产品路径修改。
+- **理由**:
+  - 匹配 owner 真意:产品验证闭环,而非编码 Agent。
+  - 永不骗人 = 证据分级 + Strict 唯一真相,比「有 CI 就自由」更贴会话时序。
+  - 不新造并行研究哲学:复用 probe / onboarding / BacktestEngine / 9-Gate / promote。
+  - 业界收敛(沙箱、tool guardrails、protocol/skills、verification regime)与本仓铁律同构,降低长期维护分叉。
+- **非目标**:自动入册;自动真金下单;Agent 修改 CostModel/holdout/分层依赖;取消 CLI/tool registry;把 lab shell 当正式回测。
+- **实现顺序(建议,本 ADR 不强制一次做完)**:
+  1. 本文档生效(边界冻结);
+  2. Evidence Envelope 契约 + 桌面/API 展示拦截;
+  3. 扩 Strict capability:data_gap / probe 包装(人可复现);
+  4. Lab sandbox 路径与 formal_evidence 隔离对抗测试;
+  5. 桌面与 Agent Service 收敛为单 tool 面。
+- **验证**:本条为纯架构决策(文档)。落地时最低对抗集:① lab 路径进 formal 证据必拒;② 无 Strict payload 的绩效数字不得上屏为「已验证」;③ mid 回测无确认不可执行;④ Agent 路径 AST/集成测试不得 import 写台账旁路;⑤ `can_claim_valid` 默认 false 的变异测试。
+- **复审信号**:owner 改产品身份为「编码 Codex」;或机构合规要求更强 runtime 强制(须把 tool 出口从纪律升为强制沙箱/策略引擎);或 Evidence Tier 被证明无法审计复现。
+
 ---
 
 ## ③ 投资/交易决策记录

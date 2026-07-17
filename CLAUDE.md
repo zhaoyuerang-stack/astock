@@ -84,6 +84,7 @@
 * **读事实**：`services.read.module_inventory`（模块状态/角色/边界，源 各模块 `MODULE_STATUS.md`）、`services.read.artifact_inventory`（各产物区读/写/是否可作正式证据）、`services.read.strategy_lifecycle`（family/version 生命周期与允许/禁止动作）、及既有 `services.read.*`。
 * **选动作**：写台账 / 写数据湖 / 晋级 / 部署 / 用某路径作正式证据**前，先问** `services.read.action_policy.can_agent_do(action, target)` —— 它判允/拒并指向 canonical 入口（`strategy_registry.register`、`workflow.promote`、`run_daily.py`、受控 lake writer）。任务剧本见 [`docs/agent_skills/`](factor_research/docs/agent_skills/)（data-health / data-source-onboarding / factor-audit / candidate-promote / production-readiness / module-cleanup / literature-scan）。
 * **边界(重要)**：该层是**建议(advisory)不是强制** —— `can_agent_do` 只答"该不该"，**挡不住**绕过它直接 `open()` 写文件。真正的强制仍是 §16 的确定性 CI 守卫 + `strategy_registry.register` 唯一写入口。故：走入口是纪律，不是护栏；守卫全绿前不得报"完成"。参见 `DECISIONS.md` ADR-030。
+* **产品 Agent 身份(ADR-037)**：自然语言**验证编排器**(Workflow-as-Protocol)，不是改核心代码的 Codex。验证只能走既有协议;正式证据只认 Strict tool/CLI;Lab sandbox 默认非证据;上屏须 Evidence Envelope(`evidence_tier` / `can_claim_valid` 默认 false)。永不由 LLM 宣布 alpha 有效。详见 `DECISIONS.md` ADR-037。
 
 ---
 
