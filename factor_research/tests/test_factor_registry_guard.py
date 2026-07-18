@@ -68,9 +68,13 @@ def test_c1_new_handwired_entry_fails():
 
 
 def test_c1_stale_legacy_entry_fails():
-    keys = set(guard.LEGACY_HANDWIRED["whitelist"]) - {"momentum"}
+    # 从仍在冻结清单的名字里挑一个,模拟「清单有但字面量已删」
+    sample = next(iter(guard.LEGACY_HANDWIRED["whitelist"]), None)
+    if sample is None:
+        pytest.skip("whitelist LEGACY 已清空")
+    keys = set(guard.LEGACY_HANDWIRED["whitelist"]) - {sample}
     errors = guard.check_handwired_frozen(_surfaces_with("whitelist", keys))
-    assert any("momentum" in e and "LEGACY" in e for e in errors)
+    assert any(sample in e and "LEGACY" in e for e in errors)
 
 
 # ── C2:注册表完整性 ─────────────────────────────────────────────────────
@@ -241,6 +245,22 @@ def test_fundamental_specs_unchanged_after_migration():
             {},
             ("price/close", "fundamental/eps_ttm"),
             ("factors.fundamental", "ep_proxy", {}),
+        ),
+    })
+
+
+def test_price_specs_unchanged_after_migration():
+    """momentum/illiquidity 迁 @register_factor 后三面 spec 逐位不变。"""
+    _assert_migrated_specs({
+        "momentum": (
+            {"window": (3, 252)},
+            ("price/close",),
+            ("factors.momentum", "mom_n", {"window": "n"}),
+        ),
+        "illiquidity": (
+            {"window": (5, 120)},
+            ("price/close", "price/volume", "price/amount"),
+            ("factors.momentum", "illiquidity", {"window": "n"}),
         ),
     })
 

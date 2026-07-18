@@ -99,6 +99,7 @@ _MODULES = (
     "factors.capital_flow",
     "factors.northbound",
     "factors.fundamental",
+    "factors.momentum",
 )
 _discovered = False
 

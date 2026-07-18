@@ -13,11 +13,10 @@ class FactorSpec:
 
 
 ALLOWED_FACTORS: dict[str, FactorSpec] = {
-    "momentum": FactorSpec("momentum", {"window": (3, 252)}, ("price/close",)),
+    # momentum/illiquidity 已迁 @register_factor;volume_ratio/volatility 仍手工
+    # (搜索白名单无 probe 证据指针,fail-closed 不迁)。
     "volume_ratio": FactorSpec("volume_ratio", {"window": (3, 120)}, ("price/volume",)),
     "volatility": FactorSpec("volatility", {"window": (5, 252)}, ("price/close",)),
-    # amount 口径(Amihud);DSL 以 volume×close 代理 amount,与 alpha.builtins.AmihudIlliq 对齐
-    "illiquidity": FactorSpec("illiquidity", {"window": (5, 120)}, ("price/close", "price/volume", "price/amount")),
     # roe/net_profit_yoy/revenue_yoy/bp_proxy/ep_proxy 已迁 @register_factor
     # searchable=True,经下方自动接线进入,不再手工列。
     # alpha101 白名单已剔除机械退化/近重复项(见 tests/test_alpha101_degeneracy.py):

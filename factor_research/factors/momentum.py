@@ -4,7 +4,24 @@
 import pandas as pd
 import numpy as np
 
+from factors.registry import register_factor
 
+
+@register_factor(
+    "momentum",
+    definition=(
+        "N 日价格动量 = close/close.shift(n)-1(可选 skip 近端规避短反转);"
+        "正=近窗涨幅大"
+    ),
+    params={"window": (3, 252)},
+    data=("price/close",),
+    input="close",
+    arg_map={"window": "n"},
+    searchable=True,
+    evidence=(
+        "knowledge/direction_registry:momentum-fullmarket-standalone-null"
+    ),
+)
 def mom_n(close: pd.DataFrame, n: int, skip: int = 0) -> pd.DataFrame:
     """N日动量，可跳过最近skip日（规避短反转）"""
     if skip > 0:
@@ -34,6 +51,23 @@ def volatility(close: pd.DataFrame, n: int = 20) -> pd.DataFrame:
     return ret.rolling(n).std() * np.sqrt(252)
 
 
+@register_factor(
+    "illiquidity",
+    definition=(
+        "Amihud 非流动性 = rolling mean(|ret|/(volume×close+1)),amount 代理;"
+        "正=单位成交额推动价格幅度大(低流动性)。DSL 执行面喂 (close,volume)"
+    ),
+    params={"window": (5, 120)},
+    data=("price/close", "price/volume", "price/amount"),
+    input="close",
+    arg_map={"window": "n"},
+    searchable=True,
+    evidence=(
+        "reports/research/illiquidity_strategy_report.md;"
+        "reports/research/amihud_rotation_strategy_report.md;"
+        "knowledge/direction_registry:size-illiquidity-same-information"
+    ),
+)
 def illiquidity(close: pd.DataFrame, volume: pd.DataFrame, n: int = 20) -> pd.DataFrame:
     """Amihud 非流动性 = mean(|ret| / amount)，与 `factors.alpha.builtins.illiq.AmihudIlliq` 对齐。
 

@@ -19,10 +19,10 @@ from factors.utils import mad_clip, safe_zscore
 
 
 _FACTOR_CALLS = {
-    "momentum": ("factors.momentum", "mom_n", {"window": "n"}),
+    # momentum/illiquidity 已迁 @register_factor;volume_ratio/volatility 仍手工
+    # (搜索白名单无 probe 证据指针,fail-closed 不迁)。
     "volume_ratio": ("factors.momentum", "vol_ratio", {"window": "short"}),
     "volatility": ("factors.momentum", "volatility", {"window": "n"}),
-    "illiquidity": ("factors.momentum", "illiquidity", {"window": "n"}),
     # roe/net_profit_yoy/revenue_yoy/bp_proxy/ep_proxy 与隔离岛/北向已迁
     # @register_factor,经文件末自动接线进入,不再手工列。
     # 与 factory.autoresearch.registry.ALLOWED_FACTORS 同步;退化/近重复项不进 DSL
