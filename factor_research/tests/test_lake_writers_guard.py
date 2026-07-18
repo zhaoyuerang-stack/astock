@@ -1,4 +1,4 @@
-"""check_lake_writers 守卫对抗测试(审计 #4)。"""
+"""check_lake_writers 守卫对抗测试(审计 #4 + ADR-038 AST 级)。"""
 import sys
 from pathlib import Path
 
@@ -8,6 +8,18 @@ from scripts.ci.check_lake_writers import (
     file_is_violation,
     main,
     scan,
+    source_has_lake_write,
+    PENDING_REMEDIATION,
+)
+
+# ADR-038 决策一:文件级共现误报 6 件,AST 后真实扫描不得再命中
+AST_FALSE_POSITIVE_FILES = (
+    "scripts/research/archive/hmm_exit_smallcap.py",
+    "scripts/research/archive/hmm_stress_guard_smallcap.py",
+    "scripts/research/build_largecap_value_quality.py",
+    "scripts/research/build_quality_growth.py",
+    "scripts/research/fundamental_midcap.py",
+    "scripts/research/northbound_factor.py",
 )
 
 
@@ -62,6 +74,37 @@ def test_rogue_writer_outside_allowed_fails(tmp_path):
     )
     assert main(tmp_path) == 1
     assert "apps/evil.py" in scan(tmp_path)
+
+
+def test_indirect_var_path_true_write_flagged():
+    """ADR-038 对抗①:真写湖(变量间接路径)必红。"""
+    src = (
+        "from pathlib import Path\n"
+        "base = Path('data_lake') / 'capital'\n"
+        "out = base / 'flow.parquet'\n"
+        "df.to_parquet(out)\n"
+    )
+    assert source_has_lake_write(src)
+    assert file_is_violation(src)
+
+
+def test_read_lake_write_report_not_flagged():
+    """ADR-038 对抗①:读湖 + to_csv 到 reports/ 必绿(非写湖)。"""
+    src = (
+        "import pandas as pd\n"
+        "df = pd.read_parquet('data_lake/price/daily_all.parquet')\n"
+        "df.to_csv('reports/summary.csv')\n"
+    )
+    assert not source_has_lake_write(src)
+    assert not file_is_violation(src)
+
+
+def test_six_cooccurrence_false_positives_not_in_live_scan():
+    """ADR-038 对抗:6 件共现误报在真实扫描下不再命中(非靠基线掩盖)。"""
+    hits = set(scan())
+    for rel in AST_FALSE_POSITIVE_FILES:
+        assert rel not in hits, f"AST 升级后不应再命中: {rel}"
+        assert rel not in PENDING_REMEDIATION, f"误报应已从 PENDING 移除: {rel}"
 
 
 def test_live_repo_clean_with_pending():
@@ -147,8 +190,6 @@ def test_migrated_writers_produce_valid_sidecar(tmp_path):
 
 def test_pending_no_longer_lists_migrated_version_returns_writers():
     """销账:PENDING 不得再庇护 promote_composite / run_nine_gates_all。"""
-    from scripts.ci.check_lake_writers import PENDING_REMEDIATION
-
     assert "workflow/promote_composite.py" not in PENDING_REMEDIATION
     assert "scripts/research/run_nine_gates_all.py" not in PENDING_REMEDIATION
 
