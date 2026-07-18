@@ -1010,3 +1010,55 @@ class DailyBriefView(BaseModel):
     world_state: dict = Field(default_factory=dict)
     truth_sources: dict = Field(default_factory=dict)
     honesty: str = ""
+
+
+# ── 语义卡片只读门面(services.read.semantics) ────────────────────────────────
+# 零新存储、零第二真相源:字段一律从 factors.registry / manifest / 台账 PULL。
+# 源头缺字段 → 空值 + 显式 missing 标记,绝不填充默认口径文本。
+
+class FactorSemanticsView(BaseModel):
+    """因子语义卡片 —— PULL 自 factors.registry.FactorRecord。"""
+    name: str
+    definition: str = ""
+    params: dict = Field(default_factory=dict)
+    data: list = Field(default_factory=list)   # 数据依赖(源为 tuple,视图侧 list)
+    input: str = ""
+    searchable: bool = False
+    evidence: str = ""
+    source_hash: str = ""
+
+
+class DatasetSemanticsView(BaseModel):
+    """数据集语义卡片 —— PULL 自 data_lake/_manifest.json 与 tushare_manifest.json。
+
+    contract_missing=True 表示 manifest 条目无 contract 键;此时 contract 恒为 {}。
+    不得编造口径文本。
+    """
+    name: str
+    source_manifest: str = ""   # "core" | "tushare"
+    last_check: str = ""
+    fields: list = Field(default_factory=list)
+    path: str = ""
+    contract: dict = Field(default_factory=dict)
+    contract_missing: bool = True
+
+
+class StrategySemanticsView(BaseModel):
+    """策略语义卡片 —— PULL 自 services.read.registry.list_strategies()。"""
+    family: str
+    version: str = ""
+    hypothesis: str = ""
+    regime: str = ""
+    decay_signal: str = ""
+    status: str = ""
+    nine_gate_present: bool = False  # nine_gate 非空 dict
+
+
+class SemanticInventoryView(BaseModel):
+    """三类语义实体清单(名字 + 计数),供 Agent/Web 一跳枚举。"""
+    factors: list[str] = Field(default_factory=list)
+    datasets: list[str] = Field(default_factory=list)
+    strategies: list[str] = Field(default_factory=list)  # "family/version"
+    n_factors: int = 0
+    n_datasets: int = 0
+    n_strategies: int = 0
