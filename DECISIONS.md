@@ -390,9 +390,15 @@
 - **验证**:本条为纯架构决策(文档)。落地时最低对抗集:① lab 路径进 formal 证据必拒;② 无 Strict payload 的绩效数字不得上屏为「已验证」;③ mid 回测无确认不可执行;④ Agent 路径 AST/集成测试不得 import 写台账旁路;⑤ `can_claim_valid` 默认 false 的变异测试。
 - **复审信号**:owner 改产品身份为「编码 Codex」;或机构合规要求更强 runtime 强制(须把 tool 出口从纪律升为强制沙箱/策略引擎);或 Evidence Tier 被证明无法审计复现。
 
----
+### ADR-038 守卫基线清零三决策(lake AST 精度 / holdout 显式豁免 / factor_store scoped 区)+ 证据缺口冻结
 
-## ③ 投资/交易决策记录
+- **日期**:2026-07-18。**背景**:守卫绕过审计(见 `factor_research/reports/governance/guard_bypass_audit_20260717.md` 与 STATUS 07-17/07-18)扩面后,各守卫 PENDING 基线残留存量欠债与误报;owner 授权直接决策处置口径。
+- **决策一(lake 守卫升 AST 级)**:`check_lake_writers` 从"文件级文本共现"(to_csv 与 data_lake 字面量同文件即判)升为 **AST 级**——仅当写调用(`to_parquet/to_csv/to_pickle/write_table`)的**实参路径表达式**可追溯到 data_lake 引用才判违规。销 6 条"读湖+写报告"共现误报基线。守卫哲学不变:防的是写湖,不是提及湖。
+- **决策二(holdout 守卫显式豁免机制)**:`check_holdout_compliance` 新增 `MONITORED_EXEMPT` 显式豁免表,**每条必须带 ADR 引用 + rationale**(照 `check_layer_deps.ALLOWED_IMPORT_EXCEPTIONS` 留痕范式),缺 ADR 引用的条目守卫自身判失败。首条 = `scripts/research/paper_forward_smallcap.py`(ADR-024 批准的纸面前向**观察旁路**,读金库前向段是其存在目的,非选择路径——PENDING「待处置」语义不适用,永久豁免须显式留痕而非赖在基线里)。
+- **决策三(factor_store scoped canonical 区)**:`data_lake/factor_store/` 登记为 **factor_store/ 模块专属写区**(scoped:该模块仅可写此子树,其他湖区照禁;其他模块写此子树照禁)。`factors/autoresearch_dsl.py` 的 panels 缓存写改走 factor_store API,单一 writer 收归。理由:它是可重建的衍生缓存(源码 hash 已入缓存 key,c31ff5f5),迁 lake/ 无完整性收益;scoped 登记优于全局白名单前缀。
+- **决策四(28 条证据缺口保持冻结,不派机械修补)**:26 条白名单 alpha + volume_ratio/volatility 无 probe 证据 → **保持 LEGACY_HANDWIRED 冻结**。补 probe 是研究算力活(数据湖依赖/research_ledger 记账/n_trials 诚实申报),归研究环排期,不归委托 agent;降级出搜索宇宙是研究行为变更,证据不足时不动。
+- **验证(落地时最低对抗集)**:① AST 升级后"真写湖"fixture 必红、"读湖+to_csv 到报告"必绿;② MONITORED_EXEMPT 缺 ADR 引用的条目守卫必红;③ factor_store 之外模块写 `data_lake/factor_store` 必红,factor_store 写其他湖区必红;④ 全部改动后守卫 PENDING 基线清零(registry 2 条 composite n_trials 除外,须走人工 workflow)。
+- **复审信号**:AST 级出现漏报实例(真写湖未被抓);豁免表条目 >3(豁免机制被滥用即回收);factor_store 区出现非缓存类数据。
 
 > 实盘/模拟盘的逐日决策**已自动落盘**:`factor_research/signals/<date>.json`(信号)+ Obsidian `30.output/A股v2.0模拟盘/`(操作卡)。本节只记**需人工复盘的关键决策**(regime 切换、风控动作、异常),不重复日常信号。
 
