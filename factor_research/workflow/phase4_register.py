@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -28,6 +29,7 @@ from typing import Optional
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
+logger = logging.getLogger(__name__)
 LESSONS_DIR = ROOT / "workflow" / "pending_lessons"
 LESSONS_DIR.mkdir(parents=True, exist_ok=True)
 _HOLDOUT_VALIDATIONS = ROOT / "data_lake" / "governance" / "holdout_validations.jsonl"
@@ -68,7 +70,9 @@ def _holdout_gate(holdout_id: str, *, min_sharpe: float = 0.6) -> tuple[Optional
                 continue
             try:
                 d = json.loads(line)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as exc:
+                # 坏行跳过继续扫(不把整文件当失败),但必须留痕
+                logger.warning("skip bad holdout_validations.jsonl line: %s", exc)
                 continue
             if d.get("candidate_id") == holdout_id:
                 rec = d  # 取最后一条 = 最新

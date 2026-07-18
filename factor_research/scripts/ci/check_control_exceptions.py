@@ -45,9 +45,6 @@ CONTROL_PATH_GLOBS = [
 
 # 存量欠债(审计 #7 扩面/形态扩展后扫出)。响而不阻;修复后须从此处移除。
 PENDING_REMEDIATION: dict[str, str] = {
-    "runtime/production_readiness.py:L99": "except 体仅为 continue(形态扩展命中)",
-    "workflow/phase4_register.py:L71": "except 体仅为 continue(形态扩展命中)",
-    "services/agent/llm_adapter.py:L249": "except: pass(ADR-037 控制面新纳入)",
     "services/agent/planner.py:L85": "except: pass(ADR-037 控制面新纳入)",
     "services/agent/sessions.py:L78": "except: continue(ADR-037 控制面新纳入)",
     "services/agent/skills.py:L39": "except: pass(ADR-037 控制面新纳入)",

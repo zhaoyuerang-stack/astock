@@ -11,11 +11,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+logger = logging.getLogger(__name__)
 
 
 def _ai_cfg() -> dict:
@@ -246,8 +248,9 @@ def save_runtime_config(provider: str, model: str, base_url: str, api_key: str |
     _RUNTIME.write_text(json.dumps(cfg, ensure_ascii=False), encoding="utf-8")
     try:
         os.chmod(_RUNTIME, 0o600)
-    except OSError:
-        pass
+    except OSError as exc:
+        # 配置已落盘;chmod 失败不阻断返回(调用方仍拿脱敏后的 cfg),但必须留痕
+        logger.warning("chmod llm_config.json 600 failed: %s", exc)
     return cfg
 
 

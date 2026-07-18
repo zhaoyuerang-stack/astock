@@ -6,6 +6,7 @@ the same production gate without violating layer dependency rules.
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -15,6 +16,7 @@ import pandas as pd
 from contracts.views import ProductionReadinessView
 
 ROOT = Path(__file__).resolve().parents[1]
+logger = logging.getLogger(__name__)
 CHINA_TZ = ZoneInfo("Asia/Shanghai")
 
 GOVERNANCE_ALLOWED = {"approved", "audit_passed", "passed", "ok"}
@@ -96,7 +98,9 @@ def actual_latest_price_date(root: Path = ROOT) -> str:
     for fp in sorted((root / "data_lake/price/daily").glob("*.parquet"))[:10]:
         try:
             df = pd.read_parquet(fp, columns=["date"])
-        except Exception:
+        except Exception as exc:
+            # 单文件不可读则跳过该项(保留 best-effort 取最新日),但必须留痕
+            logger.warning("skip unreadable price parquet %s: %s", fp.name, exc)
             continue
         if len(df):
             dates.append(pd.to_datetime(df["date"]).max())
