@@ -43,11 +43,19 @@ DIRECT_HOLDOUT_SCAN_DIRS = (
     "services/actions",
 )
 
-# 存量欠债(审计 #2 字面量泛化 + 扩面后扫出)。响而不阻;修复后须从此处移除。
-PENDING_REMEDIATION: dict[str, str] = {
-    "scripts/research/paper_forward_smallcap.py":
-        "纸面前向实验 ret[ret.index >= EXPERIMENT_START] 且 EXPERIMENT_START 在金库内"
-        "(2026-06-22);故意读金库前向段——应迁 validate_on_holdout 或移出选择路径",
+# 存量欠债。响而不阻;修复后须从此处移除。
+# ADR-038 决策二:paper_forward 改走 MONITORED_EXEMPT 显式豁免 → holdout PENDING 清零。
+PENDING_REMEDIATION: dict[str, str] = {}
+
+# 显式豁免(ADR-038 决策二):非「待处置」语义,须带 ADR + rationale 留痕。
+# 照 check_layer_deps.ALLOWED_IMPORT_EXCEPTIONS 范式;缺键 → 守卫自身 exit 1。
+MONITORED_EXEMPT: dict[str, dict] = {
+    "scripts/research/paper_forward_smallcap.py": {
+        "adr": "ADR-024",
+        "rationale": (
+            "纸面前向观察旁路:读金库前向段是实验目的,非自动选择/择优路径"
+        ),
+    },
 }
 
 # ── P0-B(ADR-021):锁定 holdout.start 配置值 ──
@@ -284,12 +292,34 @@ def check_boundary_monotonic() -> list[tuple[str, str]]:
     return out
 
 
-def scan_direct_holdout_dirs(root: Path | None = None) -> list[tuple[str, str]]:
+def validate_monitored_exempt(exempt: dict[str, dict] | None = None) -> list[str]:
+    """MONITORED_EXEMPT 自检:每条必须含非空 adr 与 rationale,否则守卫自身失败。"""
+    table = MONITORED_EXEMPT if exempt is None else exempt
+    errors: list[str] = []
+    for rel, meta in table.items():
+        if not isinstance(meta, dict):
+            errors.append(f"MONITORED_EXEMPT[{rel!r}] 必须为 dict,含 adr/rationale")
+            continue
+        if not meta.get("adr"):
+            errors.append(f"MONITORED_EXEMPT[{rel!r}] 缺必填键 adr(须引用 ADR)")
+        if not meta.get("rationale"):
+            errors.append(f"MONITORED_EXEMPT[{rel!r}] 缺必填键 rationale")
+    return errors
+
+
+def scan_direct_holdout_dirs(
+    root: Path | None = None,
+    *,
+    exempt_rels: set[str] | None = None,
+    note_exempt: bool = False,
+) -> list[tuple[str, str]]:
     """扫 DIRECT_HOLDOUT_SCAN_DIRS 下直接金库访问(可注入 root 供 fixture)。
 
     不含 scripts/ops、portfolio——监控/生产合法全样本(见模块 docstring)。
+    exempt_rels 中的相对路径跳过 scan_direct_holdout_access(ADR-038 显式豁免)。
     """
     base = root or ROOT
+    skip = exempt_rels if exempt_rels is not None else set(MONITORED_EXEMPT)
     out: list[tuple[str, str]] = []
     for rel_dir in DIRECT_HOLDOUT_SCAN_DIRS:
         d = base / rel_dir
@@ -299,6 +329,12 @@ def scan_direct_holdout_dirs(root: Path | None = None) -> list[tuple[str, str]]:
             if "archive" in path.parts or "__pycache__" in path.parts:
                 continue
             rel = str(path.relative_to(base)).replace("\\", "/")
+            if rel in skip:
+                if note_exempt:
+                    meta = MONITORED_EXEMPT.get(rel) or {}
+                    adr = meta.get("adr", "?")
+                    print(f"  ℹ️ 豁免({adr}): {rel}")
+                continue
             try:
                 text = path.read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError):
@@ -310,12 +346,20 @@ def scan_direct_holdout_dirs(root: Path | None = None) -> list[tuple[str, str]]:
 
 def main(root: Path | None = None) -> int:
     base = root or ROOT
+    # ADR-038:豁免表缺 adr/rationale → 守卫自身 exit 1(不依赖业务扫描)
+    exempt_errors = validate_monitored_exempt()
+    if exempt_errors:
+        print("🚨 MONITORED_EXEMPT 配置非法(ADR-038 决策二自检):")
+        for msg in exempt_errors:
+            print(f"  - {msg}")
+        return 1
+
     violations: list[tuple[str, str]] = []
     # 配置锁/账本只对真实 ROOT 有意义(fixture root 无 settings 时跳过)
     if base == ROOT:
         violations.extend(check_boundary_lock())  # P0-B:金库边界配置锁
         violations.extend(check_boundary_monotonic())  # ADR-023:边界只进不退 + 账本一致
-    violations.extend(scan_direct_holdout_dirs(base))
+    violations.extend(scan_direct_holdout_dirs(base, note_exempt=(base == ROOT)))
     for rel, why in REQUIRED.items():
         p = base / rel
         if base != ROOT and not p.exists():
@@ -386,6 +430,7 @@ def main(root: Path | None = None) -> int:
         return 1
     print(
         f"Holdout 合规检查通过({len(REQUIRED)} 个自动选择路径均已 holdout 截断;"
+        f"{len(MONITORED_EXEMPT)} 项显式豁免;"
         f"{len(pending)} 项待处置已基线)。"
     )
     return 0

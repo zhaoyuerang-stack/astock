@@ -1,14 +1,19 @@
 """Holdout 守卫必须识别无论函数如何命名的直接金库访问。
 
 守卫审计 #2:ISO 日期字面量泛化 + factory/workflow/services/actions 扫描面。
+ADR-038 决策二:MONITORED_EXEMPT 显式豁免 + 自检。
 """
 import pytest
 
+from scripts.ci import check_holdout_compliance as holdout_guard
 from scripts.ci.check_holdout_compliance import (
     scan_direct_holdout_access,
     scan_direct_holdout_dirs,
     main,
+    validate_monitored_exempt,
     EXPECTED_BOUNDARY,
+    MONITORED_EXEMPT,
+    PENDING_REMEDIATION,
 )
 
 
@@ -130,8 +135,54 @@ def test_factory_dir_is_scanned(tmp_path):
 
 
 def test_live_repo_clean_with_pending():
-    """真实仓库:存量 PENDING + 配置锁 → 无新增即绿。"""
+    """真实仓库:配置锁 + 显式豁免 → 无新增即绿;holdout PENDING 清零。"""
     assert main() == 0
+    assert PENDING_REMEDIATION == {}
+
+
+def test_monitored_exempt_missing_adr_fails_guard():
+    """ADR-038 对抗②:缺 adr 键的豁免条目守卫必红。"""
+    bad = {
+        "scripts/research/foo.py": {
+            "rationale": "有理由但无 ADR",
+        },
+    }
+    errs = validate_monitored_exempt(bad)
+    assert errs, "缺 adr 必须自检失败"
+    assert any("adr" in e for e in errs)
+
+    orig = dict(holdout_guard.MONITORED_EXEMPT)
+    try:
+        holdout_guard.MONITORED_EXEMPT.clear()
+        holdout_guard.MONITORED_EXEMPT.update(bad)
+        assert main() == 1
+    finally:
+        holdout_guard.MONITORED_EXEMPT.clear()
+        holdout_guard.MONITORED_EXEMPT.update(orig)
+
+
+def test_monitored_exempt_paper_forward_not_reported():
+    """ADR-038 对抗②:豁免文件 paper_forward 不再报金库访问。"""
+    rel = "scripts/research/paper_forward_smallcap.py"
+    assert rel in MONITORED_EXEMPT
+    assert MONITORED_EXEMPT[rel].get("adr") == "ADR-024"
+    assert MONITORED_EXEMPT[rel].get("rationale")
+    hits = scan_direct_holdout_dirs()  # 默认跳过 MONITORED_EXEMPT
+    assert rel not in {r for r, _ in hits}
+    assert rel not in PENDING_REMEDIATION
+
+
+def test_non_exempt_vault_access_still_flagged(tmp_path):
+    """ADR-038 对抗②:非豁免文件金库访问仍必红。"""
+    research = tmp_path / "scripts" / "research"
+    research.mkdir(parents=True)
+    (research / "rogue_peek.py").write_text(
+        'def peek(df):\n    return df[df.index >= "2025-06-01"]\n',
+        encoding="utf-8",
+    )
+    hits = scan_direct_holdout_dirs(tmp_path)
+    assert "scripts/research/rogue_peek.py" in {r for r, _ in hits}
+    assert main(tmp_path) == 1
 
 
 if __name__ == "__main__":
