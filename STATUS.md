@@ -1,8 +1,15 @@
 # STATUS — 当前进度
 
-> 更新:2026-07-17。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
+> 更新:2026-07-18。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
+
+**2026-07-18(Grok 委托第四、五单:legacy 因子迁移 26 条 + PENDING 债务销账;派单验证拦下三单重复劳动)**:
+  · **派单前验证立功(round6 教训的正确姿势)**:原计划四单里三单(alpha101 退化扫描/factor_store 缓存 source_hash/illiquidity 口径分叉)经 git log 验证**已被 07-12 的 `c31ff5f5`+`6970429b` 做完**(TASKS 文本未更新导致清单过期),撤单避免重复算力;实做两单。
+  · **第四单 legacy 迁移(commit 1c052b48..623ae48c,4 commit)**:LEGACY_HANDWIRED 82→56——隔离岛/北向 5 条、基本面 5 条、momentum/illiquidity 价量 4 条、catalog 2 条迁 `@register_factor`(definition 全部公式可推导,evidence 带 ledger/报告指针,pin 测试钉死参数逐位不变);**搜索宇宙运行时逐名相同(41=41)**。**证据缺口 28 条如实冻结不迁**(26 条白名单 alpha + volume_ratio/volatility:全库无 probe/ledger 证据指针)——**待 owner 三选一**:补 probe 后迁 / ADR 降级出搜索宇宙 / 保持 LEGACY 冻结。副发现:catalog amihud 与 DSL illiquidity 同名不同义(前者含 ADV 缩放),迁移时已在 definition 写明区别。
+  · **第五单 PENDING 销账(commit 7958f173/e1394f27,2 commit)**:`promote_fundamental_momentum` 恢复 `run_marginal=True`(销 force 守卫基线,该守卫存量清零至仅剩 scratch untracked 遗留);`llm_adapter` chmod 吞异常/`production_readiness` 单文件 continue/`phase4_register` 坏行 continue 三处改"log.warning 留痕、控制流不变"(control 守卫基线 7→4,余 4 条 agent 面存量:planner/sessions/skills/agent_cli)。
+  · **验证**:两单各自 13 守卫绿 + 相关测试(迁移 20 例 pin 测试/债务 40 例);Claude 独立复验含搜索集合运行时对比、definition 抽查公式核对、主仓预演;合并两次撞上并行 session 推进 main(Lab 渲染层/语义门面),零文件交集 rebase 干净追上;合并后主仓全量 `test_all.sh` RC=0。
+  · **本轮委托流水线总账**:五单派发、两单实做、三单撤单,Grok 侧累计 20 commit;三次真问题全部被流程性检查抓住(哨兵/主仓预演/全量回归),详见 07-17 方法论条目。
 
 **2026-07-17(守卫绕过审计 + R-COST-001 hash-pin 机械化;Grok CLI 委托首单)**:
   · **审计**:对守卫体系做绕过路径审计,9 项发现(共性根因=守卫查内容不查来源),报告 `factor_research/reports/governance/guard_bypass_audit_20260717.md`。最高危 = CostModel 费率无钉死(唯一未机械强制的 P0 成本红线);其余:holdout 守卫只认精确边界字面量、`register()` status 词表未校验(准入门只认「在册」精确匹配)、`check_lake_writers` 仅覆盖 4/30 目录、`version_returns` 无 provenance(排名输入可投毒,修复需 owner 拍板设计)、env-var 人工门对有 shell 的 agent 自助。
