@@ -18,8 +18,18 @@ ROOT = Path(__file__).resolve().parents[2]
 # 不参与分层检查的目录(测试/脚本工具自身)
 EXCLUDE_DIRS = {"__pycache__", ".git", "data_lake", "signals", "reports", "logs", "scratch"}
 
+# 架构评审(scripts/ 去库化)发现 scripts/ 目录事实上藏了两条 canonical→scripts
+# 反向依赖边:lake.version_returns 反向 import scripts/ci/check_cost_model_pin
+# 取 cost_hash;run_daily.py(生产层)反向 import scripts.data.update_lake。两条
+# 已分别迁至 governance/cost_pin.py 与 lake/update.py。为防止同类边复发,对
+# run_daily / lake. / core.engine / core.analysis / engine. 这五个 src 前缀把
+# 原本只挡 scripts.research. 的黑名单扩为挡整个 scripts.(含 scripts.data /
+# scripts.ops / scripts.ci 等) —— 这五者是生产/回测/湖三层最底层,不该依赖
+# scripts/ 下任何子目录。其余 src 前缀(strategies./factors./policy./
+# scripts.data./scripts.ops. 等)未改动,含 workflow/promote.py 对
+# scripts.research.run_nine_gates_all 的已知遗留依赖(另案处理,本单不动)。
 FORBIDDEN_EDGES = [
-    ("run_daily", ["factory.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
+    ("run_daily", ["factory.", "scripts.", "workflow.", "knowledge.", "api.", "services."]),
     ("strategies.", ["factory.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
     ("factors.", ["factory.", "strategies.", "scripts.research.", "workflow.", "core.", "knowledge.", "api.", "services."]),
     # policy 是候选/持仓硬约束的底层叶子(candidate_filters/constraints),被 factors.veto
@@ -28,14 +38,14 @@ FORBIDDEN_EDGES = [
     # strategies/factory/workflow/scripts.research 等上层。只可依赖 stdlib/pandas/lake/contracts。
     ("policy.", ["factors.", "engine.", "core.", "factory.", "strategies.",
                  "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
-    ("lake.", ["factors.", "strategies.", "core.", "factory.", "scripts.research.", "knowledge.", "api.", "services."]),
-    ("core.engine", ["factory.", "strategies.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
-    ("core.analysis", ["factory.", "strategies.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
+    ("lake.", ["factors.", "strategies.", "core.", "factory.", "scripts.", "knowledge.", "api.", "services."]),
+    ("core.engine", ["factory.", "strategies.", "scripts.", "workflow.", "knowledge.", "api.", "services."]),
+    ("core.analysis", ["factory.", "strategies.", "scripts.", "workflow.", "knowledge.", "api.", "services."]),
     # engine/ 是 core.engine 的底层引擎叶子(metrics/composer/portfolio/factor_analysis),
     # 必须停在最底层:不得反向依赖 factors(状态/因子层)、组合构建层(strategies)或探索层
     # (factory/scripts.research/workflow)。黑名单原先漏了这个与 core/ 平级的顶层目录,
     # 导致 regime.py/strategy_composer.py 倒灌未被发现;两者已迁出至 factory/。
-    ("engine.", ["factors.", "factory.", "strategies.", "scripts.research.", "workflow."]),
+    ("engine.", ["factors.", "factory.", "strategies.", "scripts.", "workflow."]),
     ("scripts.data.", ["factory.", "strategies.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
     # ops 默认按生产运维入口处理:不得随手倒灌研究/服务/台账层。
     # 少数已审定的研究编排脚本在 ALLOWED_IMPORT_EXCEPTIONS 中放行;新增例外必须显式留痕。
