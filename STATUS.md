@@ -4,6 +4,11 @@
 
 ## 一句话
 
+**2026-07-18(第七单:ADR-037 P6.4 Agent 工具调用审计日志)**:
+  · **交付(commit 5592aea7,Grok 第七单)**:`services/agent/audit.py` append-only JSONL 审计(落 `reports/agent_audit/agent_audit_YYYYMM.jsonl`,有意不落 data_lake 不新增湖写入面;只记 args sha256 摘要+键名,confirm token 只记布尔存在性,envelope 只提 `evidence_tier` 绝不落绩效载荷);Strict 轨唯一咽喉 `call_capability` 七条拒绝路径(unknown/proposal-only/readonly 拒绝/rebalance 拦截/confirm 缺失/参数缺失/参数多余)全部先留痕再 raise,工具异常留痕后裸 raise 保留原栈;`protocol_runner` 传 protocol_id/tier/HITL 上下文,单咽喉不双记。既有调用方零改动(新参数可选)。
+  · **验证**:test_agent_audit 10 例对抗(泄密注入读原始文件文本断言/绩效数字不入日志/审计盘失败不阻断工具/protocol 单行不双记);Claude 独立复验=diff 逐行+13 守卫亲跑+活体突变(挖空 `audit_event` 4 例真红→还原复绿);rebase 追上 ADR-038 增量(agent_cli 双线同文件不同函数,自动合并后守卫+41 例相邻测试重验绿);合并前 worktree 挂湖全量 `test_all.sh` RC=0。
+  · **边界如实**:`session_id` 字段已支持但调用方未自动注入(桌面侧接线留待 Web/桌面轮);工具异常 error_msg 若自带密钥仅截断入日志(args/token 主通道已防);**TASKS.md P6.4 勾账未做**——主仓 TASKS.md 有他人在途未提交编辑,本轮不动,留待下轮销账。
+
 **2026-07-18(Grok 委托第四、五单:legacy 因子迁移 26 条 + PENDING 债务销账;派单验证拦下三单重复劳动)**:
   · **派单前验证立功(round6 教训的正确姿势)**:原计划四单里三单(alpha101 退化扫描/factor_store 缓存 source_hash/illiquidity 口径分叉)经 git log 验证**已被 07-12 的 `c31ff5f5`+`6970429b` 做完**(TASKS 文本未更新导致清单过期),撤单避免重复算力;实做两单。
   · **第四单 legacy 迁移(commit 1c052b48..623ae48c,4 commit)**:LEGACY_HANDWIRED 82→56——隔离岛/北向 5 条、基本面 5 条、momentum/illiquidity 价量 4 条、catalog 2 条迁 `@register_factor`(definition 全部公式可推导,evidence 带 ledger/报告指针,pin 测试钉死参数逐位不变);**搜索宇宙运行时逐名相同(41=41)**。**证据缺口 28 条如实冻结不迁**(26 条白名单 alpha + volume_ratio/volatility:全库无 probe/ledger 证据指针)——**待 owner 三选一**:补 probe 后迁 / ADR 降级出搜索宇宙 / 保持 LEGACY 冻结。副发现:catalog amihud 与 DSL illiquidity 同名不同义(前者含 ADV 缩放),迁移时已在 definition 写明区别。
