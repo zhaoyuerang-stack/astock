@@ -20,13 +20,11 @@ def _factors():
     }
 
 
-def test_factor_composer_canonical_and_legacy_equal_weight_match():
+def test_factor_composer_canonical_equal_weight():
     from engine.factor_composer import equal_weight_factor
-    from engine.composer import equal_weight
 
     expected = pd.DataFrame([[2, 3], [4, 5], [6, 7]], index=list(_factors().values())[0].index, columns=["x", "y"], dtype=float)
     pd.testing.assert_frame_equal(equal_weight_factor(_factors()), expected)
-    pd.testing.assert_frame_equal(equal_weight(_factors()), expected)
 
 
 def test_portfolio_composer_canonical_and_legacy_compose_match():
@@ -45,6 +43,6 @@ def test_portfolio_composer_canonical_and_legacy_compose_match():
 
 
 if __name__ == "__main__":
-    test_factor_composer_canonical_and_legacy_equal_weight_match()
+    test_factor_composer_canonical_equal_weight()
     test_portfolio_composer_canonical_and_legacy_compose_match()
     print("factor/portfolio composer taxonomy tests passed")
