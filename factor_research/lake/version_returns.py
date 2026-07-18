@@ -13,7 +13,7 @@ data_lake/version_returns/*.csv;此前任何代码可直写,无身份绑定—�
   · 两者皆无 → raise(fail-closed 写)
 
 series_hash = sha256(落盘 CSV 字节),防「换 CSV 留旧 sidecar」投毒。
-cost_hash 复用 scripts/ci/check_cost_model_pin 的 cost_hash(cost_snapshot())。
+cost_hash 复用 governance.cost_pin 的 cost_hash(cost_snapshot())。
 data_fingerprint 复用 governance.holdout.current_data_fingerprint(manifest 口径)。
 
 root 可注入(测试 hermetic,照 paper_engine/meta 参数化先例)。
@@ -59,12 +59,12 @@ def _sha256_bytes(data: bytes) -> str:
 
 
 def _current_cost_hash() -> str:
-    """复用 cost pin 守卫的 cost_hash(cost_snapshot()) 口径。"""
+    """复用 governance.cost_pin 的 cost_hash(cost_snapshot()) 口径。"""
     fr = str(_DEFAULT_ROOT)
     if fr not in sys.path:
         sys.path.insert(0, fr)
-    from scripts.ci.check_cost_model_pin import cost_hash as _cost_hash  # noqa: WPS433
-    from scripts.ci.check_cost_model_pin import cost_snapshot  # noqa: WPS433
+    from governance.cost_pin import cost_hash as _cost_hash  # noqa: WPS433
+    from governance.cost_pin import cost_snapshot  # noqa: WPS433
 
     return _cost_hash(cost_snapshot())
 
