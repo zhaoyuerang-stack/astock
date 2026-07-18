@@ -9,6 +9,7 @@ from scripts.ci.check_lake_writers import (
     main,
     scan,
     source_has_lake_write,
+    source_is_violation_for_module,
     PENDING_REMEDIATION,
 )
 
@@ -192,6 +193,88 @@ def test_pending_no_longer_lists_migrated_version_returns_writers():
     """销账:PENDING 不得再庇护 promote_composite / run_nine_gates_all。"""
     assert "workflow/promote_composite.py" not in PENDING_REMEDIATION
     assert "scripts/research/run_nine_gates_all.py" not in PENDING_REMEDIATION
+
+
+def test_external_module_write_factor_store_flagged(tmp_path):
+    """ADR-038 对抗③:外部模块写 data_lake/factor_store/ 必红。"""
+    apps = tmp_path / "apps"
+    apps.mkdir()
+    (apps / "rogue_fs.py").write_text(
+        "df.to_parquet('data_lake/factor_store/panels/x.parquet')\n",
+        encoding="utf-8",
+    )
+    assert main(tmp_path) == 1
+    assert "apps/rogue_fs.py" in scan(tmp_path)
+    src = "df.to_parquet('data_lake/factor_store/panels/x.parquet')\n"
+    assert source_is_violation_for_module(src, "factors/autoresearch_dsl.py")
+    assert source_is_violation_for_module(src, "apps/rogue_fs.py")
+
+
+def test_factor_store_write_price_flagged(tmp_path):
+    """ADR-038 对抗③:factor_store 模块写 data_lake/price/ 必红。"""
+    fs = tmp_path / "factor_store"
+    fs.mkdir()
+    (fs / "evil.py").write_text(
+        "df.to_parquet('data_lake/price/daily_all.parquet')\n",
+        encoding="utf-8",
+    )
+    assert main(tmp_path) == 1
+    assert "factor_store/evil.py" in scan(tmp_path)
+    src = "df.to_parquet('data_lake/price/x.parquet')\n"
+    assert source_is_violation_for_module(src, "factor_store/store.py")
+
+
+def test_factor_store_write_own_zone_allowed(tmp_path):
+    """factor_store 模块写 data_lake/factor_store/ 子树必绿。"""
+    fs = tmp_path / "factor_store"
+    fs.mkdir()
+    (fs / "ok.py").write_text(
+        "df.to_parquet('data_lake/factor_store/panels/cache.parquet')\n",
+        encoding="utf-8",
+    )
+    assert main(tmp_path) == 0
+    assert scan(tmp_path) == []
+
+
+def test_lake_pending_cleared():
+    """ADR-038:lake PENDING 清零。"""
+    assert PENDING_REMEDIATION == {}
+    assert "factor_store/store.py" not in PENDING_REMEDIATION
+    assert "factors/autoresearch_dsl.py" not in PENDING_REMEDIATION
+
+
+def test_write_panel_cache_path_key_equivalence(tmp_path):
+    """ADR-038 对抗③:write_panel_cache 与 to_parquet 路径/内容逐位等价。"""
+    import pandas as pd
+    from factor_store.store import write_panel_cache
+    from factors.autoresearch_dsl import _get_cache_path
+
+    idx = pd.bdate_range("2020-01-02", periods=3)
+    panel = pd.DataFrame(
+        [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]],
+        index=idx,
+        columns=["000001.SZ", "000002.SZ"],
+    )
+    # 模拟 DSL 缓存 key 命名(路径公式不变)
+    name, params = "volatility", {"window": 20}
+    # _get_cache_path 依赖 data mtime;用显式 path 验证 writer 本身
+    cache_path = tmp_path / "data_lake" / "factor_store" / "panels" / "vol_w20_srcabc_mt1.parquet"
+    direct = tmp_path / "direct.parquet"
+
+    panel.to_parquet(direct)
+    out = write_panel_cache(panel, cache_path)
+    assert out == cache_path
+    assert cache_path.exists()
+    loaded_direct = pd.read_parquet(direct)
+    loaded_api = pd.read_parquet(cache_path)
+    pd.testing.assert_frame_equal(loaded_direct, loaded_api)
+
+    # _get_cache_path 仍指向 data_lake/factor_store/panels(契约未变)
+    p = _get_cache_path(name, params, data_signature=None, source_hash="deadbeef")
+    assert "data_lake" in p.parts
+    assert "factor_store" in p.parts
+    assert "panels" in p.parts
+    assert name in p.name
 
 
 if __name__ == "__main__":

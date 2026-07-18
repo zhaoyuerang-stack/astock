@@ -13,6 +13,7 @@ from .store import (
     load_factor_manifest,
     load_factor_panel,
     save_factor_panel,
+    write_panel_cache,
 )
 
 __all__ = [
@@ -27,4 +28,5 @@ __all__ = [
     "load_factor_score",
     "save_factor_panel",
     "save_factor_score",
+    "write_panel_cache",
 ]

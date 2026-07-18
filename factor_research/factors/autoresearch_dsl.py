@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from factor_store.store import write_panel_cache
 from factors.utils import mad_clip, safe_zscore
 
 
@@ -208,12 +209,12 @@ def _call_factor(name: str, close: pd.DataFrame, volume: pd.DataFrame | None, pa
     else:
         out = fn(close, **mapped)
 
-    # 4. Save to parquet cache (cache 区;改源码后 source_hash 变,旧文件可 GC)
+    # 4. Save to parquet cache via factor_store scoped writer (ADR-038 决策三)
+    # cache 区;改源码后 source_hash 变,旧文件可 GC。路径/key 仍由 _get_cache_path 决定。
     if cache_mode != "memory":
         try:
             cache_path = _get_cache_path(name, params, data_signature=data_sig, source_hash=src_hash)
-            cache_path.parent.mkdir(parents=True, exist_ok=True)
-            out.to_parquet(cache_path)
+            write_panel_cache(out, cache_path)
         except Exception:
             pass
 

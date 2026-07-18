@@ -85,6 +85,19 @@ def build_factor_id(
     return f"{slug}__{digest}"
 
 
+def write_panel_cache(panel: pd.DataFrame, cache_path: str | Path) -> Path:
+    """Thin canonical write for AutoResearch DSL panel cache (ADR-038 决策三).
+
+    Caller owns cache key / path / schema; this only centralizes the parquet write
+    under the factor_store scoped lake zone. Bit-equivalent to
+    ``panel.to_parquet(cache_path)`` after ensuring parent dirs exist.
+    """
+    path = Path(cache_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    panel.to_parquet(path)
+    return path
+
+
 def save_factor_panel(
     panel: pd.DataFrame,
     *,
@@ -102,11 +115,10 @@ def save_factor_panel(
     root = Path(store_root)
     panels_dir = root / "panels"
     manifests_dir = root / "manifests"
-    panels_dir.mkdir(parents=True, exist_ok=True)
     manifests_dir.mkdir(parents=True, exist_ok=True)
 
     panel_path = panels_dir / f"{factor_id}.parquet"
-    clean.to_parquet(panel_path)
+    write_panel_cache(clean, panel_path)
 
     manifest = FactorManifest(
         factor_id=factor_id,
