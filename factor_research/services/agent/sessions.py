@@ -7,6 +7,7 @@ the API contract.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import uuid
 from datetime import datetime, timezone
@@ -14,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+logger = logging.getLogger(__name__)
 DEFAULT_STORE_DIR = ROOT / "data_lake" / "agent" / "sessions"
 _SESSION_RE = re.compile(r"^s-[a-f0-9]{12}$")
 
@@ -75,7 +77,9 @@ def list_sessions(*, user_id: str = "local", limit: int = 20, store_dir: str | P
     for p in root.glob("s-*.json"):
         try:
             s = json.loads(p.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+        except (OSError, ValueError) as exc:
+            # 单条会话文件坏则跳过(列表 best-effort),但必须留痕
+            logger.warning("skip unreadable agent session %s: %s", p.name, exc)
             continue
         if s.get("user_id", "local") == user_id:
             s = dict(s)

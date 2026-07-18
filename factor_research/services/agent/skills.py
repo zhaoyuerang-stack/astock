@@ -6,6 +6,7 @@ class. This prevents runtime facts, stock data, and manual docs from blending.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass
 from typing import Protocol
@@ -14,6 +15,8 @@ from contracts.models import AgentCitation, AgentOutput
 from services.agent.knowledge import citation_from_hit, retrieve_knowledge
 from services.agent.llm_adapter import get_adapter, llm_ready
 from services.agent.tools import requires_confirmation, tool_registry
+
+logger = logging.getLogger(__name__)
 
 
 class AgentSkill(Protocol):
@@ -36,8 +39,9 @@ def _floats(text: str) -> list[float]:
     for t in _NUM_RE.findall(text or ""):
         try:
             out.append(float(t))
-        except ValueError:
-            pass
+        except ValueError as exc:
+            # 非数字 token 跳过(正则已收窄,极端 token 仍可能失败),但必须留痕
+            logger.warning("skip non-float token %r: %s", t, exc)
     return out
 
 

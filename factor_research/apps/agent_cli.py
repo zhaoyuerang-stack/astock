@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import sys
 from dataclasses import asdict, is_dataclass
@@ -18,6 +19,8 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
+
+logger = logging.getLogger(__name__)
 
 from services.agent.tools import (  # noqa: E402
     RISK_HIGH,
@@ -56,8 +59,9 @@ def _jsonable(value: Any) -> Any:
     if hasattr(value, "item"):
         try:
             return _jsonable(value.item())
-        except (TypeError, ValueError):
-            pass
+        except (TypeError, ValueError) as exc:
+            # numpy scalar 转换失败则回退 str(value) 路径,不阻断 CLI 序列化
+            logger.warning("agent_cli _jsonable item() failed: %s", exc)
     if isinstance(value, dict):
         return {str(key): _jsonable(item) for key, item in value.items()}
     if isinstance(value, (list, tuple, set)):

@@ -43,13 +43,9 @@ CONTROL_PATH_GLOBS = [
     "services/agent/*.py",  # ADR-037 Agent 控制面(目录级,新增自动纳入)
 ]
 
-# 存量欠债(审计 #7 扩面/形态扩展后扫出)。响而不阻;修复后须从此处移除。
-PENDING_REMEDIATION: dict[str, str] = {
-    "services/agent/planner.py:L85": "except: pass(ADR-037 控制面新纳入)",
-    "services/agent/sessions.py:L78": "except: continue(ADR-037 控制面新纳入)",
-    "services/agent/skills.py:L39": "except: pass(ADR-037 控制面新纳入)",
-    "apps/agent_cli.py:L59": "except: pass(ADR-037 控制面新纳入)",
-}
+# 存量欠债。响而不阻;修复后须从此处移除。
+# ADR-038:agent 面四处已改 log.warning 留痕 → control PENDING 清零。
+PENDING_REMEDIATION: dict[str, str] = {}
 
 
 def resolve_control_paths(root: Path | None = None) -> list[str]:

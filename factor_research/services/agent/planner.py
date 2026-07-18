@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from services.agent.llm_adapter import get_adapter
 from services.agent.skills import route_skill
 
 ROOT = Path(__file__).resolve().parents[2]
+logger = logging.getLogger(__name__)
 _TASK_LOG = ROOT / "data_lake" / "agent" / "agent_tasks.jsonl"
 
 _KEYWORD_TOOL = [
@@ -82,8 +84,9 @@ def _log_task(task: AgentTask) -> None:
         _TASK_LOG.parent.mkdir(parents=True, exist_ok=True)
         with _TASK_LOG.open("a", encoding="utf-8") as f:
             f.write(json.dumps(task.model_dump(), ensure_ascii=False, default=str) + "\n")
-    except OSError:
-        pass
+    except OSError as exc:
+        # 审计落盘失败不阻断主路径(调用方仍拿 AgentOutput),但必须留痕
+        logger.warning("agent task audit log write failed: %s", exc)
 
 
 # ── 各工具结果 → 结构化解读 ────────────────────────────────────────────────────
