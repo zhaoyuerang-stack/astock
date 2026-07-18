@@ -21,6 +21,7 @@ import numpy as np
 import pandas as pd
 
 from factors.utils import mad_clip, safe_zscore
+from factors.registry import register_factor
 
 
 @lru_cache(maxsize=1)
@@ -47,6 +48,23 @@ def _align_to_close(panel_field: pd.DataFrame, close: pd.DataFrame) -> pd.DataFr
     return out[common_cols].reindex(columns=close.columns)
 
 
+_FUND_EVIDENCE = (
+    "knowledge/direction_registry:frontier-fundamental-family;"
+    "reports/research/metasearch_findings_20260623.md"
+)
+
+
+@register_factor(
+    "net_profit_yoy",
+    definition=(
+        "净利润同比(net_profit_yoy,avail_date/ann_date PIT ffill 对齐交易日)"
+        "MAD截尾+截面z;正=盈利增速高"
+    ),
+    data=("fundamental/net_profit_yoy",),
+    input="close",
+    searchable=True,
+    evidence=_FUND_EVIDENCE,
+)
 def net_profit_yoy(close, **_):
     """净利润同比增长 — size_earnings v1.0 LIVE 实证基本面动量."""
     panel = _load_fundamental_cache()
@@ -54,6 +72,16 @@ def net_profit_yoy(close, **_):
     return safe_zscore(mad_clip(aligned))
 
 
+@register_factor(
+    "revenue_yoy",
+    definition=(
+        "营收同比(revenue_yoy,PIT ffill 对齐交易日)MAD截尾+截面z;正=营收增速高"
+    ),
+    data=("fundamental/revenue_yoy",),
+    input="close",
+    searchable=True,
+    evidence=_FUND_EVIDENCE,
+)
 def revenue_yoy(close, **_):
     """营收同比增长 — 顶层成长信号."""
     panel = _load_fundamental_cache()
@@ -61,6 +89,16 @@ def revenue_yoy(close, **_):
     return safe_zscore(mad_clip(aligned))
 
 
+@register_factor(
+    "roe",
+    definition=(
+        "净资产收益率 ROE(PIT ffill 对齐交易日)MAD截尾+截面z;正=ROE 高"
+    ),
+    data=("fundamental/roe",),
+    input="close",
+    searchable=True,
+    evidence=_FUND_EVIDENCE,
+)
 def roe(close, **_):
     """ROE — 经典质量因子."""
     panel = _load_fundamental_cache()
@@ -81,6 +119,17 @@ def _load_raw_close_cache():
     return load_raw_close(start="2010-01-01")
 
 
+@register_factor(
+    "bp_proxy",
+    definition=(
+        "BP 代理 = bps / raw_close(不复权价),PIT ffill 对齐后 MAD截尾+截面z;"
+        "正=账面市值比高(价值)"
+    ),
+    data=("price/close", "fundamental/bps"),
+    input="close",
+    searchable=True,
+    evidence=_FUND_EVIDENCE,
+)
 def bp_proxy(close, **_):
     """BP = bps / raw_close. 价值因子 (contrarian, 选股范围多大盘金融/周期)."""
     panel = _load_fundamental_cache()
@@ -90,6 +139,17 @@ def bp_proxy(close, **_):
     return safe_zscore(mad_clip(bp))
 
 
+@register_factor(
+    "ep_proxy",
+    definition=(
+        "EP 代理 = eps_ttm / raw_close(不复权价),PIT ffill 对齐后 MAD截尾+截面z;"
+        "正=盈利收益率高(价值)"
+    ),
+    data=("price/close", "fundamental/eps_ttm"),
+    input="close",
+    searchable=True,
+    evidence=_FUND_EVIDENCE,
+)
 def ep_proxy(close, **_):
     """EP = eps_ttm / raw_close. 价值因子."""
     panel = _load_fundamental_cache()

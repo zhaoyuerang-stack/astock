@@ -23,12 +23,7 @@ _FACTOR_CALLS = {
     "volume_ratio": ("factors.momentum", "vol_ratio", {"window": "short"}),
     "volatility": ("factors.momentum", "volatility", {"window": "n"}),
     "illiquidity": ("factors.momentum", "illiquidity", {"window": "n"}),
-    "roe": ("factors.fundamental", "roe", {}),
-    "net_profit_yoy": ("factors.fundamental", "net_profit_yoy", {}),
-    "revenue_yoy": ("factors.fundamental", "revenue_yoy", {}),
-    "bp_proxy": ("factors.fundamental", "bp_proxy", {}),
-    "ep_proxy": ("factors.fundamental", "ep_proxy", {}),
-    # 隔离岛/北向(holdertrade_net/large_order_net_ratio/northbound_*)已迁
+    # roe/net_profit_yoy/revenue_yoy/bp_proxy/ep_proxy 与隔离岛/北向已迁
     # @register_factor,经文件末自动接线进入,不再手工列。
     # 与 factory.autoresearch.registry.ALLOWED_FACTORS 同步;退化/近重复项不进 DSL
     # (alpha_005/020/022/024/033/049 已移出,实现仍保留在 alpha101.py 供对照)。

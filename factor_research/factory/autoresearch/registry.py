@@ -18,11 +18,8 @@ ALLOWED_FACTORS: dict[str, FactorSpec] = {
     "volatility": FactorSpec("volatility", {"window": (5, 252)}, ("price/close",)),
     # amount 口径(Amihud);DSL 以 volume×close 代理 amount,与 alpha.builtins.AmihudIlliq 对齐
     "illiquidity": FactorSpec("illiquidity", {"window": (5, 120)}, ("price/close", "price/volume", "price/amount")),
-    "roe": FactorSpec("roe", {}, ("fundamental/roe",)),
-    "net_profit_yoy": FactorSpec("net_profit_yoy", {}, ("fundamental/net_profit_yoy",)),
-    "revenue_yoy": FactorSpec("revenue_yoy", {}, ("fundamental/revenue_yoy",)),
-    "bp_proxy": FactorSpec("bp_proxy", {}, ("price/close", "fundamental/bps")),
-    "ep_proxy": FactorSpec("ep_proxy", {}, ("price/close", "fundamental/eps_ttm")),
+    # roe/net_profit_yoy/revenue_yoy/bp_proxy/ep_proxy 已迁 @register_factor
+    # searchable=True,经下方自动接线进入,不再手工列。
     # alpha101 白名单已剔除机械退化/近重复项(见 tests/test_alpha101_degeneracy.py):
     # · alpha_005: close-close 常数子项,退化为 price_to_ma 同信息
     # · alpha_020/022/024/033/049: 与 alpha_009 短收益簇 |秩相关|≥0.98,虚增 n_trials

@@ -35,9 +35,9 @@ _LEGACY_ALPHA101 = frozenset(
         1, 2, 3, 6, 8, 9, 12, 13, 14, 15, 17, 18, 19, 21, 23, 25, 28, 30,
         32, 34, 37, 38, 40, 44, 50, 55))
 
+# 基本面 5 条(roe/yoy/bp/ep)已迁;价量 4 条仍手工(证据分流中)
 _LEGACY_PRICE_FUND = frozenset({
     "momentum", "volume_ratio", "volatility", "illiquidity",
-    "roe", "net_profit_yoy", "revenue_yoy", "bp_proxy", "ep_proxy",
 })
 
 # 隔离岛/北向 5 条已迁 @register_factor(searchable=True + direction_registry 证据)

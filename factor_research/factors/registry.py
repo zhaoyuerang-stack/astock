@@ -98,6 +98,7 @@ _MODULES = (
     "factors.shareholder",
     "factors.capital_flow",
     "factors.northbound",
+    "factors.fundamental",
 )
 _discovered = False
 

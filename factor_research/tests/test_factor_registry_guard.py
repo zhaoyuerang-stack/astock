@@ -168,13 +168,28 @@ def test_holder_count_chg_spec_unchanged_after_migration():
     assert resolve_factor_builder("holder_count_chg") is not None
 
 
-def test_isolated_island_specs_unchanged_after_migration():
-    """holdertrade/large_order/northbound 迁 @register_factor 后三面 spec 逐位不变。"""
+def _assert_migrated_specs(expected: dict) -> None:
+    """三面(whitelist params/data、DSL call、catalog builder)逐位钉死。"""
     from factory.autoresearch.registry import ALLOWED_FACTORS
     from factors.autoresearch_dsl import _FACTOR_CALLS
+    from factors.registry import discover
     from strategies.catalog import resolve_factor_builder
 
-    expected = {
+    reg = discover()
+    for name, (params, data, call) in expected.items():
+        spec = ALLOWED_FACTORS[name]
+        assert dict(spec.params) == params, name
+        assert tuple(spec.data_dependencies) == data, name
+        assert _FACTOR_CALLS[name] == call, name
+        assert resolve_factor_builder(name) is not None
+        rec = reg[name]
+        assert rec.searchable is True
+        assert rec.evidence.strip()
+
+
+def test_isolated_island_specs_unchanged_after_migration():
+    """holdertrade/large_order/northbound 迁 @register_factor 后三面 spec 逐位不变。"""
+    _assert_migrated_specs({
         "holdertrade_net": (
             {"window": (40, 250)},
             ("holder/holdertrade",),
@@ -200,17 +215,34 @@ def test_isolated_island_specs_unchanged_after_migration():
             ("capital/northbound",),
             ("factors.northbound", "northbound_flow_strength", {"window": "window"}),
         ),
-    }
-    for name, (params, data, call) in expected.items():
-        spec = ALLOWED_FACTORS[name]
-        assert dict(spec.params) == params, name
-        assert tuple(spec.data_dependencies) == data, name
-        assert _FACTOR_CALLS[name] == call, name
-        assert resolve_factor_builder(name) is not None
-        from factors.registry import discover
-        rec = discover()[name]
-        assert rec.searchable is True
-        assert rec.evidence.strip()
+    })
+
+
+def test_fundamental_specs_unchanged_after_migration():
+    """基本面 5 因子迁 @register_factor 后三面 spec 逐位不变。"""
+    _assert_migrated_specs({
+        "roe": ({}, ("fundamental/roe",), ("factors.fundamental", "roe", {})),
+        "net_profit_yoy": (
+            {},
+            ("fundamental/net_profit_yoy",),
+            ("factors.fundamental", "net_profit_yoy", {}),
+        ),
+        "revenue_yoy": (
+            {},
+            ("fundamental/revenue_yoy",),
+            ("factors.fundamental", "revenue_yoy", {}),
+        ),
+        "bp_proxy": (
+            {},
+            ("price/close", "fundamental/bps"),
+            ("factors.fundamental", "bp_proxy", {}),
+        ),
+        "ep_proxy": (
+            {},
+            ("price/close", "fundamental/eps_ttm"),
+            ("factors.fundamental", "ep_proxy", {}),
+        ),
+    })
 
 
 # ── 真实仓库集成:守卫全绿 ───────────────────────────────────────────────
