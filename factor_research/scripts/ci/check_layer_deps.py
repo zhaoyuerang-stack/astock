@@ -60,16 +60,14 @@ FORBIDDEN_EDGES = [
 # 唯一回测路径是 core.engine.BacktestEngine;新代码绝不能再 import core.backtest。
 GLOBAL_FORBIDDEN_IMPORTS = ["core.backtest"]
 
-# 已知例外:factors/alpha/ 提供了 to_signal()/default_*_builder() 等便利方法,
-# 把Factor直接桥接成core.engine可用的Signal/BacktestEngine。这些import全部
-# 是函数体内的延迟导入(避免模块级循环依赖),属于有意为之的人体工学API,
-# 不在本次解耦范围内重构,先白名单放行并留痕。
+# 已知例外:factors/alpha/search.py 的 walk_forward 评估在函数体内延迟导入
+# core.analysis(避免模块级循环依赖),属于有意为之,白名单放行并留痕。
+# 历史教训:原 5 条豁免中 4 条指向随 Phase1 框架搬入的死桥接(to_signal()/
+# default_*_builder(),其 import 目标 core.signals/EngineConfig/core.interfaces
+# 在本仓从未存在),零调用零测试,借行号白名单隐身;已在 P0-1 清理中随死代码
+# 一并删除。新增例外必须先验证 import 目标真实存在、且有调用方。
 ALLOWED_EXCEPTIONS = {
-    ("factors/alpha/base.py", 173),
     ("factors/alpha/search.py", 275),
-    ("factors/alpha/search.py", 531),
-    ("factors/alpha/search.py", 532),
-    ("factors/alpha/search.py", 542),
 }
 
 # 文件 + import 目标级例外:比行号稳定,但仍要求新增桥接显式登记。

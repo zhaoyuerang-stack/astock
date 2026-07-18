@@ -165,20 +165,6 @@ class Factor(ABC):
     def __ne__(self, other) -> Filter:
         return Filter(self, '!=', float(other))
 
-    # -- convenience: convert to signal --
-    def to_signal(self, top_n: int = 25, rebalance: str = "20D",
-                  timing: Optional[pd.Series] = None,
-                  exposure_cap: float = 1.0) -> "FactorSignal":
-        """Convert this factor into a BaseSignal for BacktestEngine."""
-        from core.signals.factor_signal import FactorSignal
-        return FactorSignal(
-            factor=self,
-            top_n=top_n,
-            rebalance_freq=rebalance,
-            timing=timing,
-            exposure_cap=exposure_cap,
-        )
-
 
 # ---------------------------------------------------------------------------
 # TransformedFactor — chain of lazy transforms

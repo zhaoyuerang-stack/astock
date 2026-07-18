@@ -520,34 +520,3 @@ class FactorSpace:
             factor = factor.neutralize(data.market_cap)
 
         return factor
-
-
-# ---------------------------------------------------------------------------
-# Convenience: default builders for quick start
-# ---------------------------------------------------------------------------
-
-def default_engine_builder(leverage=1.0):
-    """Factory for default BacktestEngine."""
-    from core.engine import BacktestEngine, EngineConfig
-    from core.interfaces import PricePanel
-
-    def _build(close, volume, amount):
-        prices = PricePanel(close=close, volume=volume, amount=amount)
-        return BacktestEngine(prices=prices, config=EngineConfig(leverage=leverage))
-    return _build
-
-
-def default_signal_builder(top_n=25, rebalance="20D", exposure_cap=1.5):
-    """Factory for default FactorSignal."""
-    from core.signals.factor_signal import FactorSignal
-
-    def _build(values, timing, params):
-        return FactorSignal(
-            factor=values,
-            top_n=top_n,
-            direction=1,
-            rebalance_freq=rebalance,
-            timing=timing,
-            exposure_cap=exposure_cap,
-        )
-    return _build
