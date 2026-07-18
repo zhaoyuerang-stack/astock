@@ -52,15 +52,8 @@ ALLOWED_FACTORS: dict[str, FactorSpec] = {
     "alpha_044": FactorSpec("alpha_044", {}, ("price/close", "price/volume")),
     "alpha_050": FactorSpec("alpha_050", {}, ("price/close", "price/volume")),
     "alpha_055": FactorSpec("alpha_055", {}, ("price/close", "price/volume")),
-    # 独立数据族隔离岛(LOOP_ENGINEERING.md #5):股东行为 + 资金流,与价量簇正交
-    # (holder_count_chg 已迁 @register_factor searchable=True,经下方自动接线进入,不再手工列)
-    "holdertrade_net": FactorSpec("holdertrade_net", {"window": (40, 250)}, ("holder/holdertrade",)),
-    "large_order_net_ratio": FactorSpec("large_order_net_ratio", {"window": (3, 60)}, ("moneyflow",)),
-    # 北向资金(沪深股通持仓):L0 验证与 size/流动性正交(残差 IC 不塌、与小盘 corr≈0),
-    # 给搜索空间加上跳出小盘簇的正交维度。
-    "northbound_accumulation": FactorSpec("northbound_accumulation", {"window": (5, 120)}, ("capital/northbound",)),
-    "northbound_hold_level": FactorSpec("northbound_hold_level", {}, ("capital/northbound",)),
-    "northbound_flow_strength": FactorSpec("northbound_flow_strength", {"window": (3, 20)}, ("capital/northbound",)),
+    # 隔离岛/北向(holdertrade_net/large_order_net_ratio/northbound_*)已迁
+    # @register_factor searchable=True,经下方自动接线进入,不再手工列。
 }
 
 # ── @register_factor 自动接线: 只有显式 searchable=True 的因子才进搜索白名单 ──

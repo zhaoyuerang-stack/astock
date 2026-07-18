@@ -75,6 +75,22 @@ def _snap_to_next_trading_day(df: pd.DataFrame, trade_idx: pd.DatetimeIndex) -> 
     return out.groupby(level=0).sum()
 
 
+@register_factor(
+    "holdertrade_net",
+    definition=(
+        "高管/重要股东增减持 signed change_ratio 按公告日 snap 到下一交易日,"
+        "window 内 rolling sum 后截面 rank(pct);正=窗口内净增持(事件流,不可 ffill)"
+    ),
+    params={"window": (40, 250)},
+    data=("holder/holdertrade",),
+    input="close",
+    arg_map={"window": "window"},
+    searchable=True,
+    evidence=(
+        "research_ledger:e6e655401623899d;"
+        "knowledge/direction_registry:northbound-holder-flow-weak-longonly"
+    ),
+)
 def holdertrade_net(close, window: int = 120, **_):
     """高管/重要股东滚动净增减持比例(窗口内事件求和;净增持 → 因子值升高)。
 

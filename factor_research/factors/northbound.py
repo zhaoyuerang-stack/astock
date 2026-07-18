@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 
 from factors.utils import mad_clip, safe_zscore
+from factors.registry import register_factor
 
 # 取北向子集字段(load_capital_panel 默认含 margin+northbound,这里只要北向持仓口径)
 _NB_FIELDS = (
@@ -45,6 +46,22 @@ def _align_to_close(panel: pd.DataFrame, close: pd.DataFrame) -> pd.DataFrame:
     return out[common].reindex(columns=close.columns)
 
 
+@register_factor(
+    "northbound_accumulation",
+    definition=(
+        "北向持股占流通比(loader 已 PIT shift(1))的 window 日差分,"
+        "MAD截尾+截面z;正=外资近窗净增持"
+    ),
+    params={"window": (5, 120)},
+    data=("capital/northbound",),
+    input="close",
+    arg_map={"window": "window"},
+    searchable=True,
+    evidence=(
+        "research_ledger:e6e655401623899d;"
+        "knowledge/direction_registry:northbound-holder-flow-weak-longonly"
+    ),
+)
 def northbound_accumulation(close, window: int = 20, **_):
     """北向持股比例的 ``window`` 日变化(累积/流入)。高值 = 外资近期净增持。
 
@@ -55,12 +72,41 @@ def northbound_accumulation(close, window: int = 20, **_):
     return safe_zscore(mad_clip(acc.replace([np.inf, -np.inf], np.nan)))
 
 
+@register_factor(
+    "northbound_hold_level",
+    definition=(
+        "北向持股占流通比水平(loader 已 PIT shift(1)),MAD截尾+截面z;正=外资重仓"
+    ),
+    data=("capital/northbound",),
+    input="close",
+    searchable=True,
+    evidence=(
+        "research_ledger:e6e655401623899d;"
+        "knowledge/direction_registry:northbound-holder-flow-weak-longonly"
+    ),
+)
 def northbound_hold_level(close, **_):
     """北向持股比例**水平**(外资青睐度)。高值 = 外资重仓。"""
     hold_pct = _align_to_close(_load_nb_cache()["northbound_hold_pct"], close)
     return safe_zscore(mad_clip(hold_pct.replace([np.inf, -np.inf], np.nan)))
 
 
+@register_factor(
+    "northbound_flow_strength",
+    definition=(
+        "北向持股占流通比短窗 window 日差分(默认5,同源 accumulation 不同默认窗),"
+        "MAD截尾+截面z;正=近端外资净流入强"
+    ),
+    params={"window": (3, 20)},
+    data=("capital/northbound",),
+    input="close",
+    arg_map={"window": "window"},
+    searchable=True,
+    evidence=(
+        "research_ledger:e6e655401623899d;"
+        "knowledge/direction_registry:northbound-holder-flow-weak-longonly"
+    ),
+)
 def northbound_flow_strength(close, window: int = 5, **_):
     """短窗北向流入强度:持股比例 ``window`` 日变化(默认 5d,近端动量)。
 

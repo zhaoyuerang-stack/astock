@@ -40,10 +40,8 @@ _LEGACY_PRICE_FUND = frozenset({
     "roe", "net_profit_yoy", "revenue_yoy", "bp_proxy", "ep_proxy",
 })
 
-_LEGACY_ISOLATED = frozenset({
-    "holdertrade_net", "large_order_net_ratio",
-    "northbound_accumulation", "northbound_hold_level", "northbound_flow_strength",
-})
+# 隔离岛/北向 5 条已迁 @register_factor(searchable=True + direction_registry 证据)
+_LEGACY_ISOLATED: frozenset[str] = frozenset()
 
 LEGACY_HANDWIRED = {
     "dsl": _LEGACY_PRICE_FUND | _LEGACY_ALPHA101 | _LEGACY_ISOLATED,

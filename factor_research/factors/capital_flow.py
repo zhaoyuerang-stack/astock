@@ -32,6 +32,22 @@ def _align_to_close(panel: pd.DataFrame, close: pd.DataFrame) -> pd.DataFrame:
     return out[common].reindex(columns=close.columns)
 
 
+@register_factor(
+    "large_order_net_ratio",
+    definition=(
+        "(大单+特大单净买入额)/(全部档位买卖总额) 的 window 滚动均值,"
+        "MAD截尾+截面z;正=主力资金净流入占比高"
+    ),
+    params={"window": (3, 60)},
+    data=("moneyflow",),
+    input="close",
+    arg_map={"window": "window"},
+    searchable=True,
+    evidence=(
+        "research_ledger:e6e655401623899d;"
+        "knowledge/direction_registry:northbound-holder-flow-weak-longonly"
+    ),
+)
 def large_order_net_ratio(close, window: int = 5, **_):
     """(大单+特大单净买入) / 全部单子总成交额,滚动平滑;高值=主力资金净流入。"""
     panels = _load_moneyflow_cache()
