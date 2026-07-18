@@ -18,6 +18,9 @@ const requiredFiles = [
   "src/renderer/styles.css",
   "src/renderer/index.html",
   "src/renderer/visualizations/VisualizationWorkspace.jsx",
+  "src/renderer/lab/labLogic.mjs",
+  "src/main/lab/labBridge.cjs",
+  "src/main/lab/lab.sb",
   "src/shared/skills.json",
   "src/main/piSkills/single-stock-diagnosis.md",
   "src/main/piSkills/valuation-snapshot.md",
@@ -40,6 +43,7 @@ assert(preload.includes("contextBridge.exposeInMainWorld"), "preload must expose
 assert(preload.includes("apiVersion: 3"), "preload must expose the structured IPC API version");
 assert(preload.includes("runDiagnosis"), "preload must expose runDiagnosis");
 assert(preload.includes("runCapability"), "preload must expose runCapability for mid-confirm path");
+assert(preload.includes("runLabTurn"), "preload must expose runLabTurn for the Lab rail");
 assert(!preload.includes("ipcRenderer.send("), "preload must avoid unbounded fire-and-forget IPC");
 
 const main = readFileSync(join(root, "src/main/main.cjs"), "utf8");
@@ -48,6 +52,8 @@ assert(main.includes("nodeIntegration: false"), "Electron window must disable no
 assert(main.includes("diagnosis:run"), "main process must register diagnosis IPC");
 assert(main.includes("capability:run"), "main process must register capability IPC");
 assert(main.includes("runtime:status"), "main process must expose runtime status IPC");
+assert(main.includes("lab:run"), "main process must register the Lab rail IPC");
+assert(main.includes("createLabBridge"), "Lab IPC must go through the sandboxed labBridge");
 assert(main.includes("apiVersion"), "runtime status must include IPC API version");
 assert(main.includes("readService"), "runtime status must include read service health");
 assert(existsSync(join(root, "src/main/capabilityService.cjs")), "capabilityService must exist");
@@ -104,6 +110,14 @@ const requiredUiMarkers = [
   "request-formal-backtest",
   "mid-confirm-modal",
   "正式回测（需确认）",
+  'data-testid="lab-entry"',
+  'data-testid="lab-workspace"',
+  'data-testid="lab-watermark"',
+  'data-testid="lab-promote"',
+  "非证据",
+  "用 Strict 轨复现",
+  "strictEnvelopeDisplayable",
+  "buildPromotionPrompt",
 ];
 
 for (const marker of requiredUiMarkers) {

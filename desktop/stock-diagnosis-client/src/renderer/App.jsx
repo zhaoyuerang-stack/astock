@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import skillDefinitions from "../shared/skills.json";
 import VisualizationWorkspace from "./visualizations/VisualizationWorkspace.jsx";
+import {
+  appendLabTurn,
+  buildPromotionPrompt,
+  labTurnFromResult,
+  newLabSessionId,
+  strictEnvelopeDisplayable,
+} from "./lab/labLogic.mjs";
 
 const initialDiagnosis = {
   thread: { id: "empty", name: "等待输入", code: "", status: "等待输入" },
@@ -357,6 +364,60 @@ function ConversationWorkspace({ diagnosis }) {
   );
 }
 
+function LabWorkspace({ turns, loading, onPromote }) {
+  const endRef = useRef(null);
+  const hasUserTurn = turns.some((turn) => turn.role === "user");
+
+  useEffect(() => {
+    if (turns.length) endRef.current?.scrollIntoView({ block: "end" });
+  }, [turns.length]);
+
+  return (
+    <section className="lab-workspace" data-testid="lab-workspace">
+      <div className="lab-watermark" data-testid="lab-watermark">
+        <div className="lab-watermark-text">
+          <span className="lab-watermark-tag">Lab 草稿沙箱</span>
+          <span className="lab-watermark-copy">
+            非证据 · 输出不得视为「已验证 / 可入册 / 可实盘」；写盘被 OS 沙箱限制在 scratch/lab。
+          </span>
+        </div>
+        <button
+          type="button"
+          className="lab-promote"
+          data-testid="lab-promote"
+          title="仅把你的假设文本带回 Strict 轨输入框，由你确认发送；Lab 产物不跨轨"
+          onClick={onPromote}
+          disabled={!hasUserTurn}
+        >
+          用 Strict 轨复现
+        </button>
+      </div>
+      <div className="conversation-flow lab-flow" data-testid="lab-history">
+        {turns.length ? (
+          turns.map((turn, index) => (
+            <div
+              className={`turn ${turn.role} lab-turn ${turn.isError ? "lab-error" : ""}`}
+              key={`lab-${turn.role}-${index}-${turn.content.slice(0, 24)}`}
+            >
+              <div className="turn-role">
+                {turn.role === "user" ? "你" : "Lab 沙箱"}
+                <span className="lab-badge">非证据</span>
+              </div>
+              <div className="turn-content">{turn.content}</div>
+            </div>
+          ))
+        ) : (
+          <div className="empty-chat-line">
+            这里是隔离草稿区：自由探索想法、跑一次性实验；结论要走 Strict 轨复现后才算数。
+          </div>
+        )}
+        {loading && <div className="empty-chat-line">Lab 沙箱执行中…</div>}
+        <div ref={endRef} />
+      </div>
+    </section>
+  );
+}
+
 function ConfirmModal({ open, title, body, onConfirm, onCancel, busy }) {
   if (!open) return null;
   return (
@@ -403,8 +464,13 @@ function Workspace({
   confirmState,
   onConfirmAccept,
   onConfirmCancel,
+  labTurns,
+  labLoading,
+  onPromoteLab,
 }) {
   const [skillMenuOpen, setSkillMenuOpen] = useState(false);
+  const labMode = viewMode === "lab";
+  const composerBusy = labMode ? labLoading : loading;
   const piCliReady = runtime?.pi?.available === true
     && runtime.pi.cliAvailable === true
     && runtime.pi.modelAvailable === true;
@@ -450,6 +516,15 @@ function Workspace({
             >
               图形化展示
             </button>
+            <button
+              className={`lab-switch ${labMode ? "active" : ""}`}
+              data-testid="lab-entry"
+              type="button"
+              aria-pressed={labMode}
+              onClick={() => setViewMode("lab")}
+            >
+              Lab 草稿
+            </button>
           </div>
           <div className="top-meta">
             <span className={`status-dot ${runtimeOffline ? "offline" : ""}`} aria-hidden="true"></span>
@@ -466,6 +541,8 @@ function Workspace({
             onRequestFormalBacktest={onRequestFormalBacktest}
             capabilityBusy={capabilityBusy}
           />
+        ) : labMode ? (
+          <LabWorkspace turns={labTurns} loading={labLoading} onPromote={onPromoteLab} />
         ) : (
           <div className="conversation-layout">
             <ConversationWorkspace diagnosis={diagnosis} />
@@ -519,11 +596,13 @@ function Workspace({
               ref={inputRef}
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
-              placeholder={selectedSkill ? `${selectedSkill.name}: ${selectedSkill.promptHint}` : "问股票，或直接说策略想法（如：用 WACC 做因子试策略）…"}
-              aria-label="诊断输入"
+              placeholder={labMode
+                ? "Lab 草稿：自由探索想法或实验（输出永远是非证据）…"
+                : selectedSkill ? `${selectedSkill.name}: ${selectedSkill.promptHint}` : "问股票，或直接说策略想法（如：用 WACC 做因子试策略）…"}
+              aria-label={labMode ? "Lab 草稿输入" : "诊断输入"}
             />
-            <button className="send-button" type="submit" disabled={loading}>
-              {loading ? "诊断中" : "发送"}
+            <button className="send-button" type="submit" disabled={composerBusy}>
+              {composerBusy ? (labMode ? "探索中" : "诊断中") : "发送"}
             </button>
           </form>
         </div>
@@ -574,6 +653,9 @@ export default function App() {
   const [selectedSkillId, setSelectedSkillId] = useState("");
   const [capabilityBusy, setCapabilityBusy] = useState(false);
   const [confirmState, setConfirmState] = useState(null);
+  const [labTurns, setLabTurns] = useState([]);
+  const [labSessionId, setLabSessionId] = useState("");
+  const [labLoading, setLabLoading] = useState(false);
   const inputRef = useRef(null);
 
   const activeDiagnosis = diagnoses.find((item) => item.thread.id === activeId) || initialDiagnosis;
@@ -628,7 +710,7 @@ export default function App() {
       setConfirmState(null);
       const message = formatBacktestAssistantMessage(result);
       const updated = appendCapabilityTurns(activeDiagnosis, "确认正式回测", message);
-      if (result?.ok && result.evidence_envelope) {
+      if (result?.ok && result.evidence_envelope && strictEnvelopeDisplayable(result.evidence_envelope)) {
         updated.trust = {
           ...(updated.trust || {}),
           can_claim_valid: false,
@@ -647,10 +729,45 @@ export default function App() {
     }
   }
 
+  async function submitLab(text) {
+    const sessionId = labSessionId || newLabSessionId();
+    if (!labSessionId) setLabSessionId(sessionId);
+    setLabLoading(true);
+    setLabTurns((prev) => appendLabTurn(prev, "user", text));
+    try {
+      const result = window.astock?.runLabTurn
+        ? await window.astock.runLabTurn({ prompt: text, sessionId })
+        : { ready: false, error: "未连接 Electron preload，请通过 AStock Lens.app 打开。" };
+      setLabTurns((prev) => [...prev, labTurnFromResult(result)]);
+    } catch (error) {
+      setLabTurns((prev) => [
+        ...prev,
+        labTurnFromResult({ ready: false, error: error?.message || String(error) }),
+      ]);
+    } finally {
+      setLabLoading(false);
+    }
+  }
+
+  function promoteLabToStrict() {
+    const promoted = buildPromotionPrompt(labTurns);
+    if (!promoted) return;
+    setViewMode("conversation");
+    setPrompt(promoted);
+    inputRef.current?.focus();
+  }
+
   async function submit(event) {
     event.preventDefault();
     const text = prompt.trim();
-    if (!text || loading) return;
+    if (!text) return;
+    if (viewMode === "lab") {
+      if (labLoading) return;
+      setPrompt("");
+      await submitLab(text);
+      return;
+    }
+    if (loading) return;
     let pending = null;
     setLoading(true);
     try {
@@ -749,6 +866,9 @@ export default function App() {
         confirmState={confirmState}
         onConfirmAccept={acceptFormalBacktest}
         onConfirmCancel={() => setConfirmState(null)}
+        labTurns={labTurns}
+        labLoading={labLoading}
+        onPromoteLab={promoteLabToStrict}
       />
     </div>
   );

@@ -11,4 +11,7 @@ contextBridge.exposeInMainWorld("astock", {
   runCapability(request) {
     return ipcRenderer.invoke("capability:run", request);
   },
+  runLabTurn(request) {
+    return ipcRenderer.invoke("lab:run", request);
+  },
 });

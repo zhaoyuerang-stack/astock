@@ -4,11 +4,13 @@ const { createReadServiceClient } = require("./readServiceClient.cjs");
 const { createDiagnosisService } = require("./diagnosisService.cjs");
 const { createPiBridge } = require("./piBridge.cjs");
 const { createCapabilityService } = require("./capabilityService.cjs");
+const { createLabBridge } = require("./lab/labBridge.cjs");
 
 const readClient = createReadServiceClient();
 const piBridge = createPiBridge();
 const diagnosisService = createDiagnosisService({ readClient, piBridge });
 const capabilityService = createCapabilityService();
+const labBridge = createLabBridge();
 const IPC_API_VERSION = 3;
 
 function createWindow() {
@@ -55,8 +57,17 @@ ipcMain.handle("runtime:status", async () => {
     capabilities: {
       midConfirm: true,
       tools: ["run_backtest", "run_signal_probe", "data_gap_audit", "strategy_idea_check"],
+      lab: { rail: "lab", sandbox: "seatbelt", nonEvidence: true },
     },
   };
+});
+
+ipcMain.handle("lab:run", async (_event, payload) => {
+  const request = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
+  return labBridge.runLabTurn({
+    prompt: String(request.prompt || ""),
+    sessionId: String(request.sessionId || ""),
+  });
 });
 
 ipcMain.handle("capability:run", async (_event, request) => {
