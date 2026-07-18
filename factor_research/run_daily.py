@@ -171,7 +171,7 @@ def main():
     if not args.no_update:
         print("\n[1/6] 增量更新价量数据...")
         try:
-            from scripts.data import update_lake
+            from lake import update as update_lake
             update_lake.update_prices()
         except Exception as e:
             print(f"  ⚠️ 更新失败({str(e)[:50]})，用现有数据继续")
