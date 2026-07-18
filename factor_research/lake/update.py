@@ -1,7 +1,7 @@
 """
 数据湖增量更新——canonical 逻辑唯一权威(此前藏身 scripts/data/update_lake.py)。
 
-架构评审发现 run_daily.py(生产层)原先 `from scripts.data import update_lake`
+架构评审发现 run_daily.py(生产层)原先经 scripts.data.update_lake 模块
 调 update_prices() —— 生产层依赖 scripts 目录,是一条 canonical→scripts 反向边
 (违反 R-ARCH-002)。本模块把可复用的增量更新函数迁到 lake/ 层(与其它 canonical
 writer 同层);scripts/data/update_lake.py 保留为薄 CLI 壳(re-export + argparse
