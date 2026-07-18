@@ -266,8 +266,9 @@ def load_tushare_panel(dataset, trade_dates, fields=None, codes=None):
     """统一加载任一 tushare 扩展维度 → {field: date×code}。
 
     口径自动按数据集选择(见 TUSHARE_DATASETS):
-      by_date  价格/资金/市场当日量 → pivot 对齐,不 shift
-      anndate  财务/事件公告 → ann_date 公告日 ffill(防未来)
+      by_date         价格/市场当日量 → pivot 对齐,不 shift
+      by_date_shift1  盘后披露次日可用 → pivot 后按交易日 shift(1)
+      anndate         财务/事件公告 → ann_date 公告日 ffill(防未来)
     """
     if dataset not in TUSHARE_DATASETS:
         raise KeyError(f"未知 dataset {dataset};可选 {list(TUSHARE_DATASETS)}")
@@ -280,6 +281,10 @@ def load_tushare_panel(dataset, trade_dates, fields=None, codes=None):
     df = pd.read_parquet(fp)
     if mode == "by_date":
         return pivot_daily_basic(df, trade_idx, fields, codes)
+    if mode == "by_date_shift1":
+        # 复用 by_date 对齐后按交易日滞后一日(与 load_capital_panel shift(1) 同语义)
+        panels = pivot_daily_basic(df, trade_idx, fields, codes)
+        return {f: p.shift(1) for f, p in panels.items()}
     return ffill_by_anndate(df, fields, trade_idx, codes)
 
 

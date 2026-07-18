@@ -3,7 +3,7 @@
 覆盖:
 1. 未知实体 KeyError(fail-closed)
 2. PULL 活引用(临时注入 FactorRecord)
-3. 不编造(manifest 无 contract → contract_missing + contract=={})
+3. 30 个数据集 contract PULL 自声明表(contract_missing 全 False + timeline 合法)
 4. 只读(manifest sha256 前后不变)
 5. 与 list_strategies() 字段一致
 6. 真实数据冒烟(三类计数 > 0)
@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from factors.registry import FACTOR_REGISTRY, FactorRecord, discover  # noqa: E402
+from lake.schema import TIMELINE_MODES_WITH_NA  # noqa: E402
 from services.read import semantics  # noqa: E402
 from services.read.registry import list_strategies  # noqa: E402
 
@@ -66,29 +67,24 @@ def test_factor_card_pulls_live_registry_not_snapshot():
         semantics.factor_card(fake_name)
 
 
-def test_dataset_card_does_not_invent_contract():
-    """挑 manifest 里无 contract 键的真实数据集:contract_missing 且 contract=={}。"""
-    manifest_path = ROOT / "data_lake" / "_manifest.json"
-    data = json.loads(manifest_path.read_text(encoding="utf-8"))
-    target = None
-    for name, entry in data.items():
-        if str(name).startswith("_"):
-            continue
-        if isinstance(entry, dict) and "contract" not in entry:
-            target = str(name)
-            break
-    assert target is not None, "fixture needs at least one core dataset without contract"
-    card = semantics.dataset_card(target)
-    assert card.contract_missing is True
-    assert card.contract == {}
-    # 卡片任何字段不含编造口径文本:contract 空,definition 类字段不存在
-    blob = card.model_dump()
-    assert blob["contract"] == {}
-    # 不编造:不得出现常见占位口径句(回归护栏)
+def test_dataset_card_contract_pulled_from_schema_for_all_30():
+    """30 个数据集 contract_missing 全 False,timeline ∈ 合法词表;契约来自声明表非编造。"""
+    inv = semantics.list_semantic_entities()
+    assert inv.n_datasets == 30, f"expected 30 datasets, got {inv.n_datasets}: {inv.datasets}"
     invented_markers = ("默认口径", "暂无说明", "TODO contract", "placeholder")
-    serialized = json.dumps(blob, ensure_ascii=False)
-    for marker in invented_markers:
-        assert marker not in serialized
+    for name in inv.datasets:
+        card = semantics.dataset_card(name)
+        assert card.contract_missing is False, f"{name} contract_missing"
+        assert isinstance(card.contract, dict)
+        assert card.contract.get("declared_in") == "lake/schema.py"
+        timeline = card.contract.get("timeline")
+        assert timeline in TIMELINE_MODES_WITH_NA, f"{name} bad timeline {timeline!r}"
+        assert "store" in card.contract
+        assert "fields" in card.contract
+        assert "kind" in card.contract
+        serialized = json.dumps(card.model_dump(), ensure_ascii=False)
+        for marker in invented_markers:
+            assert marker not in serialized
 
 
 def test_dataset_card_is_read_only_on_manifest():

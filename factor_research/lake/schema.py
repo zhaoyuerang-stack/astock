@@ -146,7 +146,44 @@ CASHFLOW_FIELDS = ["n_cashflow_act", "n_cashflow_inv_act", "n_cash_flows_fnc_act
                    "c_pay_acq_const_fiolta", "free_cashflow"]
 DIVIDEND_FIELDS = ["stk_div", "cash_div", "cash_div_tax"]                             # 分红(anndate)
 
-# dataset → (store 相对路径, 口径 by_date|anndate, 默认字段)
+# ---------------------------------------------------------------------------
+# 新增 tushare 维度字段(契约补齐 2026-07;存量 16 条字段表见上,本段只加新表)
+# ---------------------------------------------------------------------------
+SHARE_FLOAT_FIELDS = [  # 限售解禁(anndate):供给压力
+    "float_share", "float_ratio", "holder_name", "share_type",
+]
+INDEX_CLASSIFY_FIELDS = [  # 申万行业分类(once 静态表)
+    "industry_name", "level", "industry_code", "parent_code", "src",
+]
+BLOCK_TRADE_FIELDS = [  # 大宗交易
+    "price", "vol", "amount", "buyer", "seller",
+]
+# 契约默认研究字段(原始源列);状态衍生列由 load_pledge_stat_panel 生成
+PLEDGE_STAT_RAW_FIELDS = [
+    "pledge_count", "unrest_pledge", "rest_pledge", "total_share", "pledge_ratio",
+]
+TOP10_HOLDERS_FIELDS = [  # 十大股东
+    "holder_name", "hold_amount", "hold_ratio", "holder_type", "hold_float_ratio",
+]
+TOP_LIST_FIELDS = [  # 龙虎榜名单
+    "close", "pct_change", "turnover_rate", "amount",
+    "l_sell", "l_buy", "l_amount", "net_amount", "net_rate", "amount_rate",
+    "float_values", "reason",
+]
+TOP_INST_FIELDS = [  # 龙虎榜机构席位
+    "exalter", "side", "buy", "buy_rate", "sell", "sell_rate", "net_buy", "reason",
+]
+REPURCHASE_FIELDS = [  # 回购公告
+    "end_date", "proc", "exp_date", "vol", "amount", "high_limit", "low_limit",
+]
+
+# dataset → (store 相对路径, 口径 by_date|by_date_shift1|anndate, 默认字段)
+# 时间轴口径三选一(data_source_onboarding.md §S2 唯一真相):
+#   by_date         T 日盘后可知(价格衍生) → 不 shift
+#   by_date_shift1  T 日盘后发布、次日才可用 → shift(1)
+#   anndate         财务/公告/事件 → ann_date 公告日 ffill
+# 拿不准 = 最晚可见口径 + # UNCERTAIN-REVIEW 注释。
+# ⚠️ 存量 16 条的 (store, mode, fields) 冻结,禁止"顺手改口径"(见 test_dataset_contracts)。
 TUSHARE_DATASETS = {
     "daily_basic":   ("daily_basic/daily_basic_all.parquet", "by_date", DAILY_BASIC_FIELDS),
     "moneyflow":     ("moneyflow/moneyflow_all.parquet", "by_date", MONEYFLOW_FIELDS),
@@ -164,7 +201,128 @@ TUSHARE_DATASETS = {
     "balancesheet":  ("financials/balancesheet_all.parquet", "anndate", BALANCESHEET_FIELDS),
     "cashflow":      ("financials/cashflow_all.parquet", "anndate", CASHFLOW_FIELDS),
     "dividend":      ("corp_action/dividend_all.parquet", "anndate", DIVIDEND_FIELDS),
+    # ── 以下为契约补齐新增(不得改上面 16 条)──
+    # evidence: INTERFACES share_float by_stock + ann_date 字段;
+    # docs/data_infrastructure.md L117 口径 anndate
+    "share_float":   ("holder/share_float_all.parquet", "anndate", SHARE_FLOAT_FIELDS),
+    # evidence: INTERFACES index_classify mode=once; data_infrastructure.md L118 once
+    # 静态申万分类参考表,非交易日面板;声明 by_date=入库即可用(无盘后滞后语义)
+    # UNCERTAIN-REVIEW: 无申万历史重分类 PIT 序列,静态快照可能覆盖历史成分变化
+    "index_classify": ("index/sw_classify.parquet", "by_date", INDEX_CLASSIFY_FIELDS),
+    # evidence: INTERFACES block_trade mode=by_date(下载按 trade_date);
+    # 大宗交易交易所盘后披露 → 研究侧按次日可用(宁晚不泄,R-DATA-003)
+    # UNCERTAIN-REVIEW: 公开库是否 T 日 EOD 即可用于 T+0 信号无权威文档,取 shift1
+    "block_trade":   ("institutional/block_trade_all.parquet", "by_date_shift1", BLOCK_TRADE_FIELDS),
+    # evidence: load_lake.align_pledge_stat ~314-315: end_date < T 才可见;
+    # INTERFACES pledge_stat by_stock keys end_date(无 ann_date);
+    # 正式加载走 load_pledge_stat_panel(稀疏状态+stale),非本表统一路由
+    # UNCERTAIN-REVIEW: 专用 loader 用 end_date+1ns 与 stale 窗,非标准 shift1/anndate
+    "pledge_stat":   ("institutional/pledge_stat_all.parquet", "by_date_shift1", PLEDGE_STAT_RAW_FIELDS),
+    # evidence: manifest mode=by_stock + store holder/top10_holders_all.parquet;
+    # tushare top10_holders 含 ann_date(定期报告披露) → anndate ffill
+    # UNCERTAIN-REVIEW: INTERFACES 未注册该接口,字段表按 tushare 公开文档默认研究列
+    "top10_holders": ("holder/top10_holders_all.parquet", "anndate", TOP10_HOLDERS_FIELDS),
+    # evidence: 任务书/公开语义 龙虎榜盘后公布→次日可用; INTERFACES top_list by_date 仅为下载键
+    "top_list":      ("institutional/top_list_all.parquet", "by_date_shift1", TOP_LIST_FIELDS),
+    # evidence: 同 top_list(龙虎榜机构明细,同一披露节奏)
+    "top_inst":      ("institutional/top_inst_all.parquet", "by_date_shift1", TOP_INST_FIELDS),
+    # evidence: INTERFACES repurchase mode=by_window date_param=ann_date → anndate
+    "repurchase":    ("institutional/repurchase_all.parquet", "anndate", REPURCHASE_FIELDS),
 }
+
+# manifest 顶层键 → TUSHARE_DATASETS 声明表名(命名差异别名,不做重复声明)
+MANIFEST_ALIASES: dict[str, str] = {
+    "stk_holdernumber": "holdernumber",
+    "suspend_d": "suspend",
+    "stk_holdertrade": "holdertrade",
+}
+
+# core 数据集声明表: (store 或说明, 口径 mode, 字段列表, kind)
+# kind ∈ {"panel", "metadata"}; metadata 的 mode 用 "n/a"
+# 口径证据均指向 load_lake.py 实现(禁止凭感觉)
+CORE_DATASETS = {
+    # evidence: load_lake.load_prices ~17-54; close/amount 同 daily_basic 当日口径不 shift
+    # (对照 load_daily_basic_panel ~193-194 "与 close/amount 同口径,不 shift")
+    "price_daily": (
+        "price/daily_all.parquet|price/daily/*.parquet",
+        "by_date",
+        ["open", "high", "low", "close", "volume", "amount"],
+        "panel",
+    ),
+    # evidence: load_lake.load_raw_close ~95-131; core _manifest fields/path;
+    # 不复权原始价,估值专用,当日价无 shift
+    "price_daily_raw": (
+        "price/daily_raw_all.parquet|price/daily_raw/*.parquet",
+        "by_date",
+        list(RAW_PRICE_FIELDS),
+        "panel",
+    ),
+    # evidence: load_lake.load_fundamental_panel ~60-83: avail_date(公告日) ffill
+    # (同 anndate 语义; ~80-81 "公告日生效,ffill 到交易日")
+    "fundamental": (
+        "fundamental_batch.parquet",
+        "anndate",
+        list(FUNDAMENTAL_FIELDS),
+        "panel",
+    ),
+    # evidence: load_lake.load_capital_panel ~157-183: pivot 后统一 shift(1)
+    # (~161-162 "T 日盘后发布,只允许从 T+1 起被策略看到")
+    "capital_margin": (
+        "capital/margin_all.parquet",
+        "by_date_shift1",
+        ["margin_balance", "margin_buy", "short_balance", "short_vol"],
+        "panel",
+    ),
+    # evidence: 同上 load_capital_panel, northbound 与 margin 同一 shift(1) 路径
+    "capital_northbound": (
+        "capital/northbound_all.parquet",
+        "by_date_shift1",
+        [
+            "northbound_hold_shares", "northbound_hold_value", "northbound_hold_pct",
+            "northbound_value_chg_1d", "northbound_value_chg_5d", "northbound_value_chg_10d",
+            "northbound_hold_shares_chg_1d", "northbound_buy_value_1d",
+        ],
+        "panel",
+    ),
+    # 元数据记录,不是可加载 date×code 面板
+    "meta": ("meta/*", "n/a", [], "metadata"),
+    "data_vintage": ("_manifest / vintage stamps", "n/a", [], "metadata"),
+}
+
+# 合法时间轴口径词表(core metadata 另允许 n/a)
+TIMELINE_MODES = frozenset({"by_date", "by_date_shift1", "anndate"})
+TIMELINE_MODES_WITH_NA = TIMELINE_MODES | frozenset({"n/a"})
+
+
+def resolve_dataset_decl(name: str):
+    """经 MANIFEST_ALIASES 归一后查 TUSHARE_DATASETS ∪ CORE_DATASETS。
+
+    返回 (canonical_name, source, store, mode, fields, kind) 或 None。
+    source ∈ {"tushare", "core"}; kind 对 tushare 恒为 "panel"。
+    """
+    canon = MANIFEST_ALIASES.get(name, name)
+    if canon in TUSHARE_DATASETS:
+        store, mode, fields = TUSHARE_DATASETS[canon]
+        return (canon, "tushare", store, mode, list(fields), "panel")
+    if canon in CORE_DATASETS:
+        store, mode, fields, kind = CORE_DATASETS[canon]
+        return (canon, "core", store, mode, list(fields), kind)
+    return None
+
+
+def dataset_contract(name: str) -> dict | None:
+    """机器可读契约 dict;查无返回 None(供 semantics contract_missing)。"""
+    hit = resolve_dataset_decl(name)
+    if hit is None:
+        return None
+    _canon, _src, store, mode, fields, kind = hit
+    return {
+        "timeline": mode,
+        "store": store,
+        "fields": fields,
+        "kind": kind,
+        "declared_in": "lake/schema.py",
+    }
 
 # 沪深交易所两融明细字段统一
 MARGIN_RENAME = {

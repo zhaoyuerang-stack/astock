@@ -3,12 +3,15 @@
 零新存储、零新 schema、零第二真相源。字段一律从 canonical 源 PULL:
 
 * 因子 → ``factors.registry``(``discover()`` + ``FACTOR_REGISTRY``)
-* 数据集 → ``data_lake/_manifest.json`` + ``tushare_manifest.json``(json 只读;
-  tushare 文件缺失时该源贡献 0 个数据集,文件级 fail-soft)
+* 数据集 → 运行时字段(last_check/path/fields) PULL 自
+  ``data_lake/_manifest.json`` + ``tushare_manifest.json``(json 只读;
+  tushare 文件缺失时该源贡献 0 个数据集,文件级 fail-soft);
+  **时间轴契约** PULL 自 ``lake.schema.dataset_contract``(声明表唯一真相,
+  不透传 manifest.contract,契约不进 manifest)
 * 策略 → ``services.read.registry.list_strategies()``(不得绕过直读 json)
 
 未知实体 ``raise KeyError``(fail-closed)。源头缺字段给空值 + 显式 missing,
-绝不填充默认口径描述。
+绝不填充默认口径描述、不在本文件硬编码任何口径文本。
 """
 from __future__ import annotations
 
@@ -22,6 +25,7 @@ from contracts.views import (
     SemanticInventoryView,
     StrategySemanticsView,
 )
+from lake.schema import dataset_contract
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -66,26 +70,28 @@ def _dataset_entries() -> dict[str, tuple[str, dict]]:
 
 
 def _dataset_from_entry(name: str, source: str, entry: dict) -> DatasetSemanticsView:
-    """从单条 manifest entry 拼卡片;缺键不编造。"""
-    contract_missing = "contract" not in entry
-    raw_contract = entry.get("contract") if not contract_missing else {}
-    contract = raw_contract if isinstance(raw_contract, dict) else {}
+    """从 manifest 运行时字段 + schema 声明表契约拼卡片;缺键不编造。"""
+    # 契约 PULL 自 lake.schema 声明表(经 MANIFEST_ALIASES 归一);查无 = missing
+    pulled = dataset_contract(name)
+    contract_missing = pulled is None
+    contract = dict(pulled) if pulled is not None else {}
     raw_fields = entry.get("fields", [])
     if isinstance(raw_fields, list):
         fields = list(raw_fields)
     elif isinstance(raw_fields, dict):
-        # 少数源可能用 dict 描述字段;原样 keys 列表会丢信息,保留为 list of pairs 太重
-        # —— 只接受 list;非 list 不编造,退空 list(但 dict 也是真实键,透传为 list(keys)?)
-        # 规格字段类型为 list:非 list 给空,不发明字段名。
+        # 少数源可能用 dict 描述字段;规格字段类型为 list:非 list 给空,不发明字段名。
         fields = []
     else:
         fields = []
+    # last_check: core 用 last_check;tushare 常用 stamped_at/last 作运行时戳
     last_check = entry.get("last_check", "")
+    if not last_check:
+        last_check = entry.get("stamped_at") or entry.get("last") or ""
     if last_check is None:
         last_check = ""
     else:
         last_check = str(last_check)
-    path = entry.get("path", "")
+    path = entry.get("path") or entry.get("store") or ""
     if path is None:
         path = ""
     else:
@@ -96,7 +102,7 @@ def _dataset_from_entry(name: str, source: str, entry: dict) -> DatasetSemantics
         last_check=last_check,
         fields=fields,
         path=path,
-        contract=contract if isinstance(contract, dict) else {},
+        contract=contract,
         contract_missing=contract_missing,
     )
 
@@ -123,7 +129,11 @@ def factor_card(name: str) -> FactorSemanticsView:
 
 
 def dataset_card(name: str) -> DatasetSemanticsView:
-    """数据集语义卡片。PULL 自 core/tushare manifest(只读 json.load)。"""
+    """数据集语义卡片。
+
+    运行时字段(last_check/path/fields) PULL 自 core/tushare manifest;
+    契约(timeline/store/fields/kind) PULL 自 ``lake.schema.dataset_contract``。
+    """
     entries = _dataset_entries()
     hit = entries.get(name)
     if hit is None:
