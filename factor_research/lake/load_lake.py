@@ -47,6 +47,12 @@ def load_prices(codes=None, start="2010-01-01", fields=("close", "volume", "amou
         df = pd.read_parquet(fp, columns=["date"] + list(fields))
         df["code"] = fp.stem
         frames.append(df)
+    if not frames:
+        prices_dir = str(daily.resolve())
+        raise FileNotFoundError(
+            f"未找到任何价格 parquet（扫描目录: {prices_dir}）。"
+            "data_lake 未挂载：worktree 环境需将主仓 data_lake symlink 进来"
+        )
     long = pd.concat(frames, ignore_index=True)
     long = long[long["date"] >= pd.Timestamp(start)]
     long = repair_ohlc(apply_quarantine(long))   # 确定性清洗
