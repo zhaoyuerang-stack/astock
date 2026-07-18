@@ -19,11 +19,17 @@ def run_protocol_step(
 
     spec = get_protocol(protocol_id)
     assert_tool_allowed(protocol_id, tool_name)
+    # Single throat: audit only inside call_capability (no double-log).
     result = call_capability(
         tool_name,
         arguments or {},
         confirm_token=confirm_token,
         readonly_only=False,
+        audit_context={
+            "protocol_id": protocol_id,
+            "default_tier": spec.default_tier.value,
+            "requires_hitl": spec.requires_hitl,
+        },
     )
     return {
         "protocol_id": protocol_id,

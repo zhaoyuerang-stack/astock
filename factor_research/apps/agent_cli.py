@@ -111,35 +111,91 @@ def call_capability(
     *,
     confirm_token: str | None = None,
     readonly_only: bool = False,
+    audit_context: dict[str, Any] | None = None,
 ) -> Any:
+    """Execute one capability; append-only audit via services.agent.audit (ADR-037 P6.4)."""
+    from services.agent.audit import audit_event
+
     tools = registry if registry is not None else tool_registry()
     tool = tools.get(name)
-    if tool is None:
-        raise AgentCliError(f"unknown capability: {name}")
-    if not callable(tool.fn):
-        raise AgentCliError(f"capability is proposal-only / not executable: {name}")
-    if readonly_only and tool.risk != RISK_READONLY:
-        raise AgentCliError(f"capability is not available in readonly mode: {name}")
-    if tool.risk == RISK_HIGH and name == "rebalance":
-        raise AgentCliError(f"capability is not available in readonly mode: {name}")
 
-    _check_confirm(tool, confirm_token)
+    def _audit_ctx(risk: str | None) -> dict[str, Any]:
+        ctx: dict[str, Any] = {
+            "risk": risk,
+            "confirm_token_present": bool(confirm_token),
+            "readonly_only": bool(readonly_only),
+        }
+        if audit_context:
+            ctx.update(audit_context)
+        return ctx
+
+    def _audit_error(exc: BaseException, risk: str | None) -> None:
+        audit_event(
+            name,
+            arguments,
+            outcome="error",
+            error=exc,
+            context=_audit_ctx(risk),
+        )
+
+    if tool is None:
+        exc = AgentCliError(f"unknown capability: {name}")
+        _audit_error(exc, None)
+        raise exc
+    if not callable(tool.fn):
+        exc = AgentCliError(f"capability is proposal-only / not executable: {name}")
+        _audit_error(exc, tool.risk)
+        raise exc
+    if readonly_only and tool.risk != RISK_READONLY:
+        exc = AgentCliError(f"capability is not available in readonly mode: {name}")
+        _audit_error(exc, tool.risk)
+        raise exc
+    if tool.risk == RISK_HIGH and name == "rebalance":
+        exc = AgentCliError(f"capability is not available in readonly mode: {name}")
+        _audit_error(exc, tool.risk)
+        raise exc
+
+    try:
+        _check_confirm(tool, confirm_token)
+    except AgentCliError as exc:
+        _audit_error(exc, tool.risk)
+        raise
 
     supplied = arguments or {}
     if not isinstance(supplied, dict):
-        raise AgentCliError("arguments must be a JSON object")
+        exc = AgentCliError("arguments must be a JSON object")
+        _audit_error(exc, tool.risk)
+        raise exc
     required = set(tool.args)
     optional = _OPTIONAL_ARGS.get(name, set())
     provided = set(supplied)
     missing = sorted(required - provided)
     unexpected = sorted(provided - required - optional)
     if missing:
-        raise AgentCliError(f"missing arguments for {name}: {', '.join(missing)}")
+        exc = AgentCliError(f"missing arguments for {name}: {', '.join(missing)}")
+        _audit_error(exc, tool.risk)
+        raise exc
     if unexpected:
-        raise AgentCliError(f"unexpected arguments for {name}: {', '.join(unexpected)}")
+        exc = AgentCliError(f"unexpected arguments for {name}: {', '.join(unexpected)}")
+        _audit_error(exc, tool.risk)
+        raise exc
     # Only pass known keys
     kwargs = {k: v for k, v in supplied.items() if k in required or k in optional}
-    return tool.fn(**kwargs)
+
+    try:
+        result = tool.fn(**kwargs)
+    except Exception as exc:
+        _audit_error(exc, tool.risk)
+        raise
+
+    audit_event(
+        name,
+        arguments,
+        outcome="ok",
+        context=_audit_ctx(tool.risk),
+        result=result,
+    )
+    return result
 
 
 def _parse_arguments(raw: str) -> dict[str, Any]:
