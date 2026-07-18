@@ -4,6 +4,13 @@
 
 ## 一句话
 
+**2026-07-18(第八、九单:语义层落地——semantics 读门面 + 数据集契约 30/30 声明化)**:
+  · **定位**:语义层不新建平行系统,收敛为"canonical 注册点存语义 + `services.read` 聚合门面 PULL"。口径 canonical 家确认 = `lake/schema.py::TUSHARE_DATASETS`(加载层机械执行),契约**不进 manifest**(运行时产物,防第二真相源)。
+  · **第八单(commit 070122cf,Grok)**:`services/read/semantics.py` 只读聚合门面——`factor_card`(PULL factors.registry:definition/依赖/source_hash)/`dataset_card`/`strategy_card`(PULL 台账:hypothesis/regime/decay_signal)/`list_semantic_entities`;未知实体 KeyError fail-closed;contracts/views.py 加 4 视图。
+  · **第九单(commit b155db9f,Grok)**:TUSHARE_DATASETS 补 8 条声明(share_float/index_classify/block_trade/pledge_stat/top10_holders/top_list/top_inst/repurchase,每条带证据注释)+ `CORE_DATASETS` 7 条(口径从 load_lake 实现反推带行号)+ `MANIFEST_ALIASES` + `dataset_contract()`;load_lake 新增 `by_date_shift1` 分支(盘后披露次日可用,存量 by_date/anndate 路径不变);semantics contract 改 PULL 声明表。**存量 16 条口径有测试硬编码冻结**。
+  · **验证**:两单各自对抗测试(PULL 活引用/不编造 contract/只读 sha256/30 全覆盖/声明-实现合成 fixture 一致)+ Claude 独立复验=突变复验 3+3 全击杀(篡改存量口径/去 shift 滞后/删别名/硬编码 definition/编造空卡/伪造 contract 全被抓)+ worktree 挂湖真实冒烟(8 新声明真加载过)+ rebase 追平并行线(ADR-037 P6.4,零交集)后守卫重验绿 + 主仓合并后实测绿。
+  · **边界如实**:4 条 UNCERTAIN-REVIEW 待 owner 复核(index_classify 无 PIT 重分类史/block_trade T0 可用性无权威文档/pledge_stat 走专用 loader 非标准路由/top10_holders 字段表按公开文档),均已取最晚可见口径,复核只可能放宽;semantics 入口**未登记进 agent_operating_model 读事实清单**(owner 未拍板);TASKS.md 勾账仍搁置(他人在途编辑)。
+
 **2026-07-18(第七单:ADR-037 P6.4 Agent 工具调用审计日志)**:
   · **交付(commit 5592aea7,Grok 第七单)**:`services/agent/audit.py` append-only JSONL 审计(落 `reports/agent_audit/agent_audit_YYYYMM.jsonl`,有意不落 data_lake 不新增湖写入面;只记 args sha256 摘要+键名,confirm token 只记布尔存在性,envelope 只提 `evidence_tier` 绝不落绩效载荷);Strict 轨唯一咽喉 `call_capability` 七条拒绝路径(unknown/proposal-only/readonly 拒绝/rebalance 拦截/confirm 缺失/参数缺失/参数多余)全部先留痕再 raise,工具异常留痕后裸 raise 保留原栈;`protocol_runner` 传 protocol_id/tier/HITL 上下文,单咽喉不双记。既有调用方零改动(新参数可选)。
   · **验证**:test_agent_audit 10 例对抗(泄密注入读原始文件文本断言/绩效数字不入日志/审计盘失败不阻断工具/protocol 单行不双记);Claude 独立复验=diff 逐行+13 守卫亲跑+活体突变(挖空 `audit_event` 4 例真红→还原复绿);rebase 追上 ADR-038 增量(agent_cli 双线同文件不同函数,自动合并后守卫+41 例相邻测试重验绿);合并前 worktree 挂湖全量 `test_all.sh` RC=0。
