@@ -51,7 +51,7 @@ def main():
         version="v0.1",
         warmup_start="2010-01-01",
         force=False,  # 不强推,闸门诚实裁决
-        run_marginal=False,
+        run_marginal=True,  # 边际残差去冗余(守卫销账:禁跳过)
         regime="大盘/中盘成长有基本面主线时;月频(20d)选 top25,PureTrend MA16 截左尾。",
         decay_signal="与在册动量/成长母策略相关性转强正 / 营收增长因子系统性失效 / 长期无超额。",
         hyp=hyp,
