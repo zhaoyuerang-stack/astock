@@ -11,6 +11,12 @@
   · **验证**:两单各自 13 守卫绿 + 相关测试(迁移 20 例 pin 测试/债务 40 例);Claude 独立复验含搜索集合运行时对比、definition 抽查公式核对、主仓预演;合并两次撞上并行 session 推进 main(Lab 渲染层/语义门面),零文件交集 rebase 干净追上;合并后主仓全量 `test_all.sh` RC=0。
   · **本轮委托流水线总账**:五单派发、两单实做、三单撤单,Grok 侧累计 20 commit;三次真问题全部被流程性检查抓住(哨兵/主仓预演/全量回归),详见 07-17 方法论条目。
 
+**2026-07-18(第六单:ADR-038 落地,全守卫 PENDING 基线清零;审计 8/9 收官)**:
+  · **owner 授权直接决策 → ADR-038(d3eb7c0a)四项**:① lake 守卫升 AST 级(写调用实参可追溯 data_lake 才红);② holdout 建 `MONITORED_EXEMPT` 显式豁免机制(条目必须带 ADR 引用,缺则守卫自检红;首条=paper_forward_smallcap/ADR-024 观察旁路);③ `data_lake/factor_store/` 登记 factor_store/ 模块专属 scoped 写区,`autoresearch_dsl` 缓存写收归 factor_store API;④ 28 条证据缺口**保持冻结**归研究环(补 probe 是研究算力活,不派机械修补)。
+  · **落地(commit 17b69bf5..312ecc84,Grok 第六单 4 commit)+ 审计 #6 文档补记(5dd31707:env-var HITL 门仅桌面进程内成立)+ scratch force=True 遗留已删(人工)**。
+  · **终态账目(主仓实测)**:lake 0 / holdout 0(1 显式豁免带 ADR 留痕)/ control 0 / force 0;全库仅剩 registry 2 条(composite n_trials 人工 workflow)。**守卫审计 9 项:8 项关闭,#9 固有局限不修**。
+  · **验证**:Claude 独立复验四对抗样本(间接变量写湖必红/读湖写报告不误报/外部写 factor_store 必红/缺 ADR 豁免条目自检必红)+ 47 测试 + 主仓全量 `test_all.sh` RC=0。
+
 **2026-07-17(守卫绕过审计 + R-COST-001 hash-pin 机械化;Grok CLI 委托首单)**:
   · **审计**:对守卫体系做绕过路径审计,9 项发现(共性根因=守卫查内容不查来源),报告 `factor_research/reports/governance/guard_bypass_audit_20260717.md`。最高危 = CostModel 费率无钉死(唯一未机械强制的 P0 成本红线);其余:holdout 守卫只认精确边界字面量、`register()` status 词表未校验(准入门只认「在册」精确匹配)、`check_lake_writers` 仅覆盖 4/30 目录、`version_returns` 无 provenance(排名输入可投毒,修复需 owner 拍板设计)、env-var 人工门对有 shell 的 agent 自助。
   · **#1 已修复(commit da9cc4d6)**:`scripts/ci/check_cost_model_pin.py`(sha256 钉死三费率,照抄 ADR-021 boundary pin 范式,改动须 ADR+更新 pin)+ 对抗测试 9 例 + test_all.sh/CLAUDE §16 接线。实现由 **Grok CLI**(grok-4.5,独立 worktree)按任务书完成,Claude 独立复验(活体突变真红/还原复绿/相邻守卫绿)后 ff 合入 main;主仓全量 `test_all.sh` 全绿(13 守卫+枚举块+兜底 99 文件)。
