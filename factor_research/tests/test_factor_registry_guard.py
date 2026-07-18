@@ -265,6 +265,32 @@ def test_price_specs_unchanged_after_migration():
     })
 
 
+def test_catalog_specials_unchanged_after_migration():
+    """catalog 两特殊 builder 迁注册后仍用手写实现,且 searchable=False。"""
+    from factors.registry import discover
+    from strategies.catalog import (
+        FACTOR_BUILDERS,
+        build_amihud_illiquidity,
+        build_small_cap_amount,
+        resolve_factor_builder,
+    )
+
+    reg = discover()
+    for name in ("amihud_illiquidity", "small_cap_amount"):
+        assert name in reg
+        assert reg[name].searchable is False
+        assert reg[name].definition.strip()
+        assert resolve_factor_builder(name) is not None
+
+    # 行为钉死:仍是迁移前的手写 builder 身份(非 auto 单 input 桩)
+    assert FACTOR_BUILDERS["amihud_illiquidity"] is build_amihud_illiquidity
+    assert FACTOR_BUILDERS["small_cap_amount"] is build_small_cap_amount
+    # 不得进搜索白名单(catalog 纯登记,无 evidence 扩宇宙)
+    from factory.autoresearch.registry import ALLOWED_FACTORS
+    assert "amihud_illiquidity" not in ALLOWED_FACTORS
+    assert "small_cap_amount" not in ALLOWED_FACTORS
+
+
 # ── 真实仓库集成:守卫全绿 ───────────────────────────────────────────────
 
 def test_live_repo_factor_registry_guard_passes():

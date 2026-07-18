@@ -102,10 +102,9 @@ def apply_salience_veto(prices: PricePanel, params: dict):
 
 
 FACTOR_BUILDERS: dict[str, Callable] = {
-    # 特殊签名(input≠close 或非平凡构造)的 builder 手写;close-based 因子由
-    # @register_factor 自动补(见末尾 _autoregister_builders)。手工优先,自动补缺。
-    "amihud_illiquidity": build_amihud_illiquidity,
-    "small_cap_amount": build_small_cap_amount,
+    # amihud_illiquidity / small_cap_amount 已迁 @register_factor;字面量不再列
+    # (C1 手工接线冻结)。特殊 multi-input builder 在 _autoregister 后显式覆盖,
+    # 保证与迁移前逐位相同(不走单 input auto builder)。
 }
 
 TIMING_BUILDERS: dict[str, Callable] = {
@@ -162,3 +161,6 @@ def _autoregister_builders() -> None:
 
 
 _autoregister_builders()
+# 特殊签名 builder 覆盖 auto 桩(amihud 需 PricePanel 全字段;small_cap 保持原函数身份)
+FACTOR_BUILDERS["amihud_illiquidity"] = build_amihud_illiquidity
+FACTOR_BUILDERS["small_cap_amount"] = build_small_cap_amount

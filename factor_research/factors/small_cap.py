@@ -2,11 +2,29 @@
 import numpy as np
 import pandas as pd
 from factors.utils import safe_zscore, mad_clip
+from factors.registry import register_factor
 
 
 def small_cap_factor(amount, window=60):
     """Small-cap factor: low turnover proxy for market-cap (negative log of avg amount)."""
     return safe_zscore(mad_clip(-np.log(amount.rolling(window).mean() + 1)))
+
+
+@register_factor(
+    "small_cap_amount",
+    definition=(
+        "小盘规模代理 = -ln(amount 的 window 日均值+1),MAD截尾+截面z;"
+        "正=近窗成交额低(小盘/低流动性代理)"
+    ),
+    params={"window": (5, 252)},
+    data=("price/amount",),
+    input="amount",
+    arg_map={"window": "window"},
+    searchable=False,
+)
+def small_cap_amount(amount, window: int = 60, **_):
+    """Catalog 名 small_cap_amount → 与 small_cap_factor 同公式(注册通道入口)。"""
+    return small_cap_factor(amount, window=window)
 
 
 def small_cap_exposure_signal(close, amount, ma_window=16):

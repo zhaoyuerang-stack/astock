@@ -46,7 +46,8 @@ _LEGACY_ISOLATED: frozenset[str] = frozenset()
 LEGACY_HANDWIRED = {
     "dsl": _LEGACY_PRICE_FUND | _LEGACY_ALPHA101 | _LEGACY_ISOLATED,
     "whitelist": _LEGACY_PRICE_FUND | _LEGACY_ALPHA101 | _LEGACY_ISOLATED,
-    "catalog": frozenset({"amihud_illiquidity", "small_cap_amount"}),
+    # amihud_illiquidity / small_cap_amount 已迁 @register_factor(searchable=False)
+    "catalog": frozenset(),
 }
 
 SURFACE_FILES = {

@@ -100,6 +100,8 @@ _MODULES = (
     "factors.northbound",
     "factors.fundamental",
     "factors.momentum",
+    "factors.small_cap",
+    "factors.amihud_catalog",
 )
 _discovered = False
 
