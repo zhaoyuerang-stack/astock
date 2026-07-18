@@ -174,6 +174,124 @@
       "created": "2026-07-13",
       "expires": "2027-01-13",
       "prompt_note": "券商月度金股覆盖广度是规模代理(corr size 0.30-0.35)且 IS→OOS 翻负,不要再提『分析师覆盖广度/金股上榜数』类候选;真正有信息量的 report_rc 逐条盈利预测修正因积分墙不可得(见 TASKS.md)。"
+    },
+    {
+      "id": "alpha101-standalone-longonly-falsified",
+      "direction": "Alpha101 价量公式族作 standalone long-only 主腿 / 与 size 复合加权 / 排除式否决器",
+      "status": "falsified",
+      "action": "NOTE",
+      "scope_factors": [],
+      "evidence": [
+        "LESSONS.md:§Alpha101 全量审计:32 因子完整证伪记录(2026-06-27)——top9 完整 9-Gate:Gate2 IC 全过(NW-ICIR 0.12-0.30/Win 66-82%)但 Gate5 全灭(Sh 0.26-0.38/DD -47~-63%);反向买底部 DD>95%;size 复合任意权重 Sharpe 单调递减;否决器边际仅 +0.00~0.03",
+        "factory/autoresearch/registry.py 词表策展注释(退化子项/秩相关≥0.98 换皮变体已剔,存活项带 probe 证据)"
+      ],
+      "revival_condition": "多空引擎/做空通道落地后重测(alpha 在双尾价差,A股 long-only 只能取一头,两端各自都烂);候选作为 DSL 复合成分因子(regime 适应度筛过,如 alpha_055 超跌成长反弹模式)不受本条约束",
+      "created": "2026-07-18",
+      "expires": "",
+      "prompt_note": "alpha101 族『IC 强』与『能赚钱』完全脱钩:截面 ICIR 0.4-0.9 但 long-only top25 回测全灭——alpha 在双尾价差,不能做空就不可变现;且高 IC=高换手=成本负反馈(年换手>15x 在 0.5% 双边成本下基本不可能净赚)。不要再提 alpha101 作 standalone 主腿、买底部反转、size 复合或否决器;作 DSL 复合成分(走 regime 适应度)不受此限。"
+    },
+    {
+      "id": "continuation-factors-fullmarket-negative-ic",
+      "direction": "全市场截面『强者恒强/追涨延续』类因子(动量/price_to_ma/成交热度正向)",
+      "status": "falsified",
+      "action": "NOTE",
+      "scope_factors": [],
+      "evidence": [
+        "LESSONS.md:§全因子 IC/ICIR 全景审计(2026-06-27)——30+ 因子全市场 2010-2026 Rank IC 扫描,所有动量/趋势因子 IC 为负:momentum_60d ICIR=-0.445、price_to_ma60 -0.493、amount.rank -0.840;全部正向 IC 因子皆逆向类(size=买小/illiq=买冷门/short_reversal=买刚跌)"
+      ],
+      "revival_condition": "剔微盘的大中盘宇宙(top500-1500)进入可搜索宇宙后重开(动量随市值单调增强是大盘现象,见 momentum-fullmarket-standalone-null)",
+      "created": "2026-07-18",
+      "expires": "2027-01-18",
+      "prompt_note": "A股全市场截面是反转市场:任何『强者恒强』假设(追涨/趋势延续/热度正向)类截面因子 IC 稳定为负;正 IC 方向全是逆向(买跌/买小/买冷门)。别再提顺势延续类截面候选。注意本条只针对截面选股;指数层时序趋势择时是另一回事(见 tsmom-trend-timing-overlay-not-alpha)。"
+    },
+    {
+      "id": "margin-family-no-second-alpha",
+      "direction": "两融资金面族(margin_balance_chg/margin_buy_ratio/short_balance)作独立母策略",
+      "status": "weak",
+      "action": "NOTE",
+      "scope_factors": [],
+      "evidence": [
+        "LESSONS.md:§策略/回测·两融资金面也不是第 2 母策略(2026-06)——干净 amount+2010 预热验证:margin NSGA review_corr<0.5 下 review=0;include-all audit 22 候选 registry_precheck=0;确定性 168 网格 hit_single=0,最佳仅 10.3%/-31.4%/corr 0.76"
+      ],
+      "revival_condition": "多空结构支持后重测,或与非价量信息源(行业内相对/事件窗)交互建构;数据在湖随取(capital/margin_all.parquet,2010-2026,634 万行,T+1 对齐)",
+      "created": "2026-07-18",
+      "expires": "2027-01-18",
+      "prompt_note": "两融余额/融资买入类因子已系统性搜过(NSGA+168 确定性网格+include-all audit 三路):弱且高度贴小盘/市场状态(corr 0.76)。数据虽在湖里,别再把两融当第二母策略方向重挖;最多组合次要腿/孵化观察。"
+    },
+    {
+      "id": "raw-fundamental-direct-cross-section-weak",
+      "direction": "原始财报字段(roe/net_profit_yoy/gross_margin/BPS)全市场直接截面 standalone(含配独立择时救回撤)",
+      "status": "weak",
+      "action": "NOTE",
+      "scope_factors": [],
+      "evidence": [
+        "LESSONS.md:§基本面因子在 A 股集体失效(2026-06-27)——net_profit_yoy ICIR=-0.206/roe -0.077/gross_margin≈0;bp_proxy 0.311 唯一有信号但与 size 高度共线",
+        "LESSONS.md:§策略/回测·fundamental/defensive 的高回撤是因子层结构性病,择时救不了(2026-06)——13 择时基因×9 候选=117 组合 0 过三道闸;回撤与大盘 regime 不同步,mkt_dd_stop 底部割肉",
+        "LESSONS.md:§策略/回测·原始 fundamental 不够强(1.10 三岛长跑 registry_precheck=0,弱 alpha 主要来自 fund_bp_value 且 corr 0.7-0.8)"
+      ],
+      "revival_condition": "行业内相对/时间分位/财务改善/财报季事件窗形态重构(行业分类落湖后优先行业内中性化);与 frontier-fundamental-family 并读——那条 BOOST 的是跨信息源交互形态,不是 raw 直接截面",
+      "created": "2026-07-18",
+      "expires": "2027-01-18",
+      "prompt_note": "原始财报字段直接全市场截面已三路证弱(IC≈0 或负、岛搜 0 命中、配 117 种独立择时救回撤全灭——价值陷阱与大盘 regime 不同步,择时救不了)。frontier-fundamental-family 的 BOOST 指『基本面×价量跨信息源交互/行业内相对/事件窗』;不要提 raw ROE/增速直接截面 standalone,也不要给 fundamental 配择时凑达标(定位=组合分散件)。"
+    },
+    {
+      "id": "binary-timing-overlay-rescue-mathematically-dead",
+      "direction": "给收益核心(小盘/流动性族)叠二值择时/regime_gate/vol-scaling overlay 凑 standalone 达标",
+      "status": "falsified",
+      "action": "NOTE",
+      "scope_factors": [],
+      "evidence": [
+        "LESSONS.md:§因子评估·small-cap-size 换手是结构性的,降换手救不动 DSR(2026-06-22)——换手 31.8x 根因=二值 MA16 whipsaw 整仓进出,调仓频率(20→40 天)/持仓缓冲(keep50/75)两个对症假设全失败",
+        "auto-memory:project_registry_gate_reality(smallcap_timing_diag/vol_overlay 定论:timing-OFF 回撤 -62% 死 G5 ↔ 二值择时 cost_decay 98% 死 G6,双重死结;连续曝险缩放 Calmar 中性≈0.38 近恒等式;核心 overlay 上限 Calmar 0.49<达标 0.75,且 MA16 单点甜点=过拟合签名)",
+        "LESSONS.md:§策略/回测·regime_gate 门控算子的牛熊非对称效应(2026-06)——熊市保护但牛市重拖累(82.5%→54.2%),Re-entry Lag+Whipsaw,生产端默认 regime_gated=False"
+      ],
+      "revival_condition": "换低换手新因子族(选股端解决,非 overlay 端),或组合层跨资产防御腿(定位=风险偏好选项非达标手段);任何新 overlay 主张必须先对同仓位 constant-mix 基准证明 Calmar 非中性",
+      "created": "2026-07-18",
+      "expires": "",
+      "prompt_note": "『因子不变+换择时 overlay』类候选已数学证死:二值择时 whipsaw 吃光成本(G6 死)、关掉择时回撤 -62%(G5 死)、连续曝险缩放 Calmar 中性(收益回撤同比缩放,近恒等式)——收益核心靠 overlay 过完整门不可达。不要再提择时参数微调/vol-target/regime gate 变体来救既有核心;救回撤的正路=换因子族或组合层。"
+    },
+    {
+      "id": "loser-veto-exclusion-structurally-dead",
+      "direction": "全截面『死亡层』排除式否决器(低动量+低波输家端)挂 top-N 宿主",
+      "status": "falsified",
+      "action": "NOTE",
+      "scope_factors": [],
+      "evidence": [
+        "LESSONS.md:§策略/回测·否决器与宿主的 alpha 来源相克会自杀(2026-06-12)——canonical 宿主(small-cap v2.0)Δ年化 IS -1.24%/OOS -2.36%/压力 -0.97% 全负且自付换手;动量宿主正交性复测 -1.7%~-6.6% 三窗口全负=结构性死亡非宿主错配",
+        "strategy_versions.json:loser_veto_reversal/v0.1-observe(已证伪退役,机制五件套保留、因子不启用)"
+      ],
+      "revival_condition": "排除式规则的价值必须先在『宿主已选中』的条件分布上重新度量为正(全截面 D1 负超额只是必要条件远非充分);否决器唯一合法评估口径=边际贡献协议(同引擎同成本、带/不带、只报 Δ)",
+      "created": "2026-07-18",
+      "expires": "",
+      "prompt_note": "『低动量+低波=死亡层』类排除否决器结构性死亡:top-N∩死亡层≈刚回撤的强势股,在 20 日反转主导的 A股恰好要反弹,排除=杀宿主自己的 alpha 来源。条件分布(选股后)≠无条件分布(全截面),分位解剖结论不能直接迁移成排除规则。不要再提全截面死亡层否决器;任何否决器主张必须走边际贡献协议评估。"
+    },
+    {
+      "id": "hk-longonly-additive-drag",
+      "direction": "港股 long-only 选股腿加入 A股组合(以低相关分散化为由)",
+      "status": "falsified",
+      "action": "NOTE",
+      "scope_factors": [],
+      "evidence": [
+        "LESSONS.md:§多元化的数学下限——候选 Sharpe/组合 Sharpe 比例(2026-06-07)——HK 最佳腿 sh 0.51-0.53、corr 低至 0.18,加入后组合 sh 1.89→1.54/1.55 全拖累;数学约束:candidate Sharpe<组合 Sharpe×0.5 必拖累(分子 mean 降幅>分母 vol 降幅)"
+      ],
+      "revival_condition": "long-short HK(去 beta 后 vol 减半、Sharpe 可近翻倍)/HK ETF 轮动/港股通套利等新引擎;或候选单体 Sharpe ≥ 当前组合 Sharpe×0.5",
+      "created": "2026-07-18",
+      "expires": "",
+      "prompt_note": "低相关≠有用:HK long-only 腿 corr 仅 0.18 依然把组合 Sharpe 拖低 0.33+。任何新腿主张先过 Sharpe 地板(≥当前组合 Sharpe 的一半),别拿『相关性低』当加入理由——candidate Sharpe 不够时 corr=0 也救不了(数学约束非经验观察)。"
+    },
+    {
+      "id": "tsmom-trend-timing-overlay-not-alpha",
+      "direction": "A股指数趋势择时(TSMOM)/Barroso vol-scaling 作为超额收益(alpha)候选",
+      "status": "weak",
+      "action": "NOTE",
+      "scope_factors": [],
+      "evidence": [
+        "auto-memory:project_tsmom_trend_timing(tsmom_path2.py+overlay_validation.py,8 个 A股指数 2011-2026:L/flat 超额补分红后≈+0.4%/年,Ledoit-Wolf p=0.198;趋势择时=慢熊方向凸性(捕获不对称 p=0.04 但 DSR~50+有效 N≈1 下脆弱)非崩溃保护;Barroso vol-scaling=机制性崩溃保护(2015 股灾 -17.9%→-7.2%)非收益(ΔSharpe p=0.64);空头腿不加分 p=0.91)"
+      ],
+      "revival_condition": "接国债期货(T/TF)+商品抬有效 N 后重测统计显著性(8 个 A股指数相关 0.8-0.95,N≈1 是结构性的,加权益指数/拉长历史无用)",
+      "created": "2026-07-18",
+      "expires": "2027-01-18",
+      "prompt_note": "趋势/时序动量择时不要当 alpha 候选提:超额收益补分红后≈0(p=0.198)。它是风控 overlay,且两个工具不可互替:趋势择时给慢熊方向凸性(非崩溃保护,2015 满仓撞进去),vol-scaling 给崩溃尾部保护(不加方向收益)。评估任何 overlay 必须对同仓位 constant-mix 基准(非 buy&hold,否则『回撤砍半』大半只是少仓位),主裁判用捕获不对称+CVaR 而非年化/Calmar。"
     }
   ]
 }
