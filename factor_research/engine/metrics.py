@@ -28,6 +28,34 @@ def max_drawdown(ret):
     return float((cum / cum.cummax() - 1).min())
 
 
+# ── canonical 标量公式:全仓绩效口径的唯一权威 ──────────────────────────
+# BacktestResult(core.engine) 与本模块 metrics() 此前各自内联同一套公式,靠注释
+# 承诺一致(架构评审:口径静默分叉风险)。现两者均委托下面四个函数;改年化/夏普/
+# 卡玛口径只许改这里(并按 §17 走文档同步),禁止在出口处再写一遍公式。
+
+
+def annual_return(ret) -> float:
+    """年化收益 = 日均收益 × 252。"""
+    return float(ret.mean() * 252)
+
+
+def annual_vol(ret) -> float:
+    """年化波动 = 日波动 × √252(pandas std,ddof=1)。"""
+    return float(ret.std() * np.sqrt(252))
+
+
+def sharpe_ratio(ret) -> float:
+    """Sharpe = 年化收益 / 年化波动(rf=0 口径);波动非正返回 0.0。"""
+    vol = annual_vol(ret)
+    return annual_return(ret) / vol if vol > 0 else 0.0
+
+
+def calmar_ratio(ret) -> float:
+    """Calmar = 年化收益 / |最大回撤|;回撤非负(无回撤/空序列)返回 0.0。"""
+    dd = max_drawdown(ret)
+    return annual_return(ret) / abs(dd) if dd < 0 else 0.0
+
+
 def institutional_metrics(ret, bench=None) -> dict:
     """机构级风险/分布指标（Sortino/VaR/CVaR/偏度峰度/尾比；给基准则加 IR/TE/Alpha/Beta/捕获率）。
 
@@ -159,12 +187,11 @@ def metrics(ret, bench=None):
             "hit": False,
             "n": len(ret),
         }
-    annual = ret.mean() * 252
-    vol = ret.std() * np.sqrt(252)
-    sharpe = annual / vol if vol > 0 else 0
-    cum = (1 + ret).cumprod()
-    maxdd = (cum / cum.cummax() - 1).min()
-    calmar = annual / abs(maxdd) if maxdd < 0 else 0
+    annual = annual_return(ret)
+    vol = annual_vol(ret)
+    sharpe = sharpe_ratio(ret)
+    maxdd = max_drawdown(ret)
+    calmar = calmar_ratio(ret)
     out = {
         "annual": annual,
         "vol": vol,
