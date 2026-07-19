@@ -70,18 +70,19 @@ FORBIDDEN_EDGES = [
 # 唯一回测路径是 core.engine.BacktestEngine;新代码绝不能再 import core.backtest。
 GLOBAL_FORBIDDEN_IMPORTS = ["core.backtest"]
 
-# 已知例外:factors/alpha/search.py 的 walk_forward 评估在函数体内延迟导入
-# core.analysis(避免模块级循环依赖),属于有意为之,白名单放行并留痕。
+# 行号级例外集:已于 2026-07-18 清零并冻结——最后一条(search.py walk_forward)
+# 因上方插入 4 行代码就失配,实证行号钉脆弱;已迁至下方目标级白名单。
 # 历史教训:原 5 条豁免中 4 条指向随 Phase1 框架搬入的死桥接(to_signal()/
 # default_*_builder(),其 import 目标 core.signals/EngineConfig/core.interfaces
 # 在本仓从未存在),零调用零测试,借行号白名单隐身;已在 P0-1 清理中随死代码
-# 一并删除。新增例外必须先验证 import 目标真实存在、且有调用方。
-ALLOWED_EXCEPTIONS = {
-    ("factors/alpha/search.py", 275),
-}
+# 一并删除。**新增例外一律用 ALLOWED_IMPORT_EXCEPTIONS,不得再加行号钉。**
+ALLOWED_EXCEPTIONS: set[tuple[str, int]] = set()
 
 # 文件 + import 目标级例外:比行号稳定,但仍要求新增桥接显式登记。
 ALLOWED_IMPORT_EXCEPTIONS = {
+    # walk_forward 评估在 search.py 函数体内延迟导入 core.analysis(避免模块级
+    # 循环依赖),有意为之;原行号钉 (search.py, 275) 迁移至此(2026-07-18)。
+    ("factors/alpha/search.py", "core.analysis.walk_forward"),
     # 研究编排脚本:批量晋级/周度搜索需要桥接 factory → workflow。
     ("scripts/ops/bulk_promote.py", "factory.autoresearch"),
     ("scripts/ops/bulk_promote.py", "services.actions.autoresearch"),
