@@ -22,12 +22,13 @@ def test_all_top_level_directories_have_module_status():
     assert top_dirs == modules
 
 
-def test_core_and_execution_statuses_are_parsed():
+def test_core_status_parsed_and_execution_archived():
     core = get_module_status("core")
-    execution = get_module_status("execution")
     assert core.status == "ONLINE_CRITICAL"
     assert "BacktestEngine" in core.role
-    assert execution.status == "ARCHIVE_OR_REHOME"
+    # execution 已归档至 docs/archive/execution(2026-07-18);无 ADR 不得复活(R-ARCH-005)
+    modules = {item.module for item in get_module_inventory()}
+    assert "execution" not in modules
 
 
 def test_inventory_items_are_plain_dict_serializable():
@@ -38,6 +39,6 @@ def test_inventory_items_are_plain_dict_serializable():
 
 if __name__ == "__main__":
     test_all_top_level_directories_have_module_status()
-    test_core_and_execution_statuses_are_parsed()
+    test_core_status_parsed_and_execution_archived()
     test_inventory_items_are_plain_dict_serializable()
     print("module inventory tests passed")

@@ -133,31 +133,15 @@ class TestExecutionRealityGaps(unittest.TestCase):
         self.assertNotIn("OrderSimulator", src)
         self.assertNotIn("simulate_execution", src)
 
-    def test_order_simulator_rejects_but_does_not_defer(self):
-        """OrderSimulator 的真实契约：封板/停牌只"拒单"，不实现清单 B 的"顺延 + 累计顺延损失"。
-        断言仅锁定"拒单"语义，绝不暗示顺延已被覆盖。"""
-        from execution._deprecated_order_simulator import OrderSimulator
+    def test_execution_stack_archived_not_importable(self):
+        """execution 执行栈已归档至 docs/archive/execution(2026-07-18,R-ARCH-005)。
+        原"OrderSimulator 只拒单不顺延"的契约钉死随模块进档案(见归档文件内测试历史)；
+        活体树断言收紧为:该栈不可 import——防止孤儿模拟器被误当执行现实接回。
+        复活需 DECISIONS.md 新增 ADR 并恢复本组契约断言。"""
+        import importlib
 
-        # 实例化即发 DeprecationWarning(R-ARCH-005)：钉死它已被弃用、不得据 docstring 接入。
-        with self.assertWarns(DeprecationWarning):
-            sim = OrderSimulator(slip_bps=15.0)
-        orders = pd.Series({"UP": 1.0, "DN": -1.0, "SUSP": 1.0})
-        prices = pd.Series({"UP": 11.0, "DN": 9.0, "SUSP": 10.0})
-        limit_ups = pd.Series({"UP": 11.0, "DN": 11.0, "SUSP": 11.0})    # UP 已封涨停
-        limit_downs = pd.Series({"UP": 9.0, "DN": 9.0, "SUSP": 9.0})     # DN 已封跌停
-        suspended = pd.Series({"UP": False, "DN": False, "SUSP": True})
-
-        filled, slippage, rejections = sim.simulate_execution(
-            orders, prices, limit_ups, limit_downs, suspended
-        )
-        reasons = {r["asset"]: r["reason"] for r in rejections}
-        self.assertIn("UP", reasons)    # 涨停封板 → 禁买
-        self.assertIn("DN", reasons)    # 跌停封板 → 禁卖
-        self.assertIn("SUSP", reasons)  # 停牌 → 拒单
-        # 被拒标的 filled 恒为 0：单步拒单，无"顺延到下一可成交日"的状态承载。
-        self.assertEqual(filled.get("UP", 0.0), 0.0)
-        self.assertEqual(filled.get("DN", 0.0), 0.0)
-        self.assertEqual(filled.get("SUSP", 0.0), 0.0)
+        with self.assertRaises(ModuleNotFoundError):
+            importlib.import_module("execution._deprecated_order_simulator")
 
     @unittest.skip(
         "GAP 清单A/B/G：退市归零清算 / 一字板全天封板识别 / 封板顺延累计损失 / "
