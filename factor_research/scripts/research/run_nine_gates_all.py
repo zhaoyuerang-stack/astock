@@ -349,6 +349,52 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
                               + (";PureTrend MA16 " + ("Band" if spec["timing"] == "band" else "二值") + "择时")),
                 "citation": "Amihud (2002) illiquidity premium",
             }
+        elif strategy_name.startswith("small_cap_factor__window"):
+            # 窗口扫描家族:无 executable_spec,按台账 config 真实参数驱动(防假记分牌铁律:
+            # 审计变体必须用其真实配置,拒绝 fallback 默认参数)。factor 一律 .shift(1)(T+1)。
+            from types import SimpleNamespace
+            import importlib
+            import strategy_registry
+            from strategies.small_cap import load_price_panels, build_rebalance_weights
+            from app_config.settings import get_settings
+
+            ver = version or "v1.0"
+            cfg = None
+            fam_hypothesis = ""
+            for fam in strategy_registry._load().get("families", []):
+                if fam["id"] == strategy_name:
+                    fam_hypothesis = fam.get("hypothesis", "")
+                    for v in fam.get("versions", []):
+                        if v["version"] == ver:
+                            cfg = v.get("config") or {}
+            if not cfg:
+                raise ValueError(
+                    f"{strategy_name} 台账无 {ver} config;拒绝用默认参数产出假 DSR")
+            factor_fn_name = cfg.get("factor_fn_name")
+            if not factor_fn_name or "." not in factor_fn_name:
+                raise ValueError(f"{strategy_name}/{ver} config 缺 factor_fn_name,无法审计")
+            factor_params = dict(cfg.get("factor_params") or {})
+            top_n = int(cfg.get("top_n", 25))
+            rebalance_days = int(cfg.get("rebalance_days", 20))
+
+            ts = start or _taibook_start(strategy_name, ver) or "2018-01-01"
+            config = SimpleNamespace(version=ver, start=ts)
+            warmup = get_settings().data.warmup_start
+            ds = str(min(pd.Timestamp(ts), pd.Timestamp(warmup)).date())
+            close, volume, amount = load_price_panels(ds)
+            mod_name, fn_name = factor_fn_name.rsplit(".", 1)
+            factor_fn = getattr(importlib.import_module(mod_name), fn_name)
+            factor = factor_fn(amount, **factor_params).shift(1)
+            scheduled = build_rebalance_weights(
+                factor, close, top_n=top_n, rebalance_days=rebalance_days)
+            res = {
+                "close": close, "volume": volume, "amount": amount, "factor": factor,
+                "scheduled_weights": scheduled, "timing": None,
+            }
+            thesis = {
+                "mechanism": fam_hypothesis or f"{strategy_name} 窗口扫描变体(台账 config 驱动)",
+                "citation": strategy_name,
+            }
         else:
             raise ValueError(f"Unknown strategy name: {strategy_name}")
 
@@ -562,6 +608,8 @@ def _auditable(strategy_name, version) -> bool:
         return True
     if strategy_name == "illiquidity":
         return version in ILLIQ_SPECS
+    if strategy_name.startswith("small_cap_factor__window"):
+        return True  # 台账 config 驱动(run_evaluation 分支),真实参数可审
     if (strategy_name, version) in VERSION_OVERRIDES:
         return True
     return DEFAULT_VERSIONS.get(strategy_name) == version
