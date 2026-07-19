@@ -71,6 +71,43 @@
 - 真 WACC 数据全量 onboarding(另立项,走 data_source_onboarding;本清单只保证「缺数据时诚实」)
 - Web 九页大改
 
+### 【桌面延迟】对话发送后回复偏慢 — 优化 backlog
+
+> **问题**:每条消息等完整 Pi 回合 + 多次 `python3 agent_cli` 冷启动(本机粗测 catalog/call 冷启动 ~0.9s/次,业务 check 本身 ~75ms);体感 10–60s。  
+> **约束**(ADR-037 不可拆):正式证据仍走 Strict tool;禁为快让模型散文当证据;禁为快改成本/holdout/假回测。  
+> **来源**:2026-07-16/17 桌面体感 + 链路分析(冷 Pi / 模型时间 / ×N 冷 Python)。  
+> **推荐序**:观测 → A2+A4 → A3 流式 → A1 常驻 → B 快路径/会话;一意图一 commit + 对抗测试。
+
+#### 第 0 步 — 观测(先做,指导后续取舍)
+- [ ] **L0.1 回合计时日志** — 每轮诊断落: `pi_ms` / `tool_count` / `tool_ms_sum` / `model_est` / `path`(strategy|stock|agent_only);可写桌面 `.runtime/` 或 stderr(gitignore)。对抗:一次假诊断必产出完整字段。谁:桌面。  
+  **验收**:能回答「模型 vs CLI 谁占 70%+」,再决定先做 A1 还是 A2。
+
+#### A 类 — 高 ROI 优先
+- [ ] **A2 策略预检单 tool 纪律** — system prompt + `strategy-precheck` skill:策略类默认只调 1 次 `strategy_idea_check`(已含质量/漏斗/成本);禁止为凑证据再调 `data_quality`/`experiments`/`factors`;缺字段再 `data_gap_audit`。对抗:录一轮 tool 列表,冗余只读 ≤1(或 +data_gap)。谁:桌面。  
+- [ ] **A4 模型够用即可** — 预检路径更短输出上限;可选更小/更快 `ASTOCK_PI_MODEL`;thinking 保持 low。对抗:回复长度有上限配置;证据卡仍来自 CLI envelope。谁:桌面。  
+- [ ] **A3 分阶段回包(流式体感)** — Pi JSON 流已有 `tool_execution_*`/`message_end`:主进程边收边 IPC 推 UI(已调 CLI / precheck 到 / 最终叙述)。对抗:首条进度事件在终态前必达;终态仍可 envelope 校验。谁:桌面。  
+- [ ] **A1 Tool 常驻 RPC** — Electron 起长期 `agent_rpc`(HTTP/Unix socket)暴露同一 `tool_registry`;桌面/Pi extension 改调 RPC,保留 `agent_cli` 调试。对抗:冷路径 N 次 tool 总 import 时间不再线性 ×N;readonly/mid confirm 语义不变。谁:研究侧+桌面。
+
+#### B 类 — 中 ROI 第二波
+- [ ] **B1 协议快路径(按钮/Skill 绑定,非主机猜意图)** — Skill=策略预检或显式按钮 → 主机直接 Strict 调 `strategy_idea_check`(及已有正式回测 confirm 路径);LLM 仅润色 envelope,禁升 tier。对抗:快路径无 CLI payload 不得展示绩效;与自由对话路径可切换。谁:桌面。  
+- [ ] **B2 Pi 会话复用** — 同 thread 复用 session(弱化 `--no-session`);每条 user 消息仍强制至少一次 Strict tool(防空聊装证据)。对抗:跨 thread 不串 session;无 tool 的回合不得标 formal。谁:桌面。  
+- [ ] **B3 Catalog/读层短 TTL 缓存** — extension catalog 缓存 30–60s;`data_quality`/funnel 内存短 TTL。对抗:缓存失效后仍读到新报告;mid 路径不缓存错 token。谁:桌面+研究侧。
+
+#### C 类 — 明确不做(防快致腐)
+- 去掉 CLI/Strict,改裸 shell 或 Pi 直 import 当产品证据  
+- 为快跳过 Evidence Envelope / `can_claim_valid`  
+- 每条消息默认全量 probe 或正式回测  
+- 多线程硬冲易封接口  
+
+#### 建议里程碑
+| 里程碑 | 内容 | 体感目标 |
+| --- | --- | --- |
+| M0 | L0.1 计时 | 知道瓶颈在模型还是 CLI |
+| M1 | A2+A4 | 少 1 轮 tool + 更短生成 |
+| M2 | A3 流式 | 2–5s 内见进度/证据,不再干等终态 |
+| M3 | A1 常驻 | N 次 tool 亚秒级 |
+| M4 | B1 快路径 | 点「预检」约 1–3s(+可选润色) |
+
 - [x] **【WS-D】组合再构成周度 job + top-N paper 排名持久化(ADR-034 后续)** — ✅ 2026-07-02 落地:`portfolio/recompose.py`(确定性内核:多目标排名 mean-rank(sharpe/calmar/边际残差夏普)+衰减腿强制垫底+非冗余贪心选腿+静态 inverse-vol 提案+组合自身 decay_check;口径 RANKING_VERSION 锚定,改口径须 bump+记 DECISIONS)+ `scripts/ops/scheduled_portfolio_recompose.py`(周度,读在册 version_returns → 持久化 `reports/research/portfolio_recompose.json` latest+归档,R-PROD-001)+ 决策收件箱第八源(info 级提案,过期>14天不入箱)。对抗测试 8/8(高夏普衰减腿必垫底/冗余双胞胎只留一/样本不足诚实拒判/全灭空提案/确定性)。**留白**:paper 多账户并行实测的执行侧(见下一条)。
 - [x] **【WS-E】文献扫描剧本(枯竭触发的外探之二,ADR-034 后续)** — ✅ 2026-07-02 落成 `factor_research/docs/agent_skills/literature_scan.md`(人批准触发;先读方向登记簿再扫描防重发现死路;产出带出处 Hypothesis 草案走 `factory_cli queue` canonical 通道;阴性结论也落报告;不判有效不写台账);已接进收件箱枯竭事项 actions + CLAUDE.md §2 剧本路由。
 - [x] **【probe 结论回写纪律】** — ✅ 2026-07-02 固化为 probe-signal-source skill 步骤 8(必做):阴性→DEPRIORITIZE/SKIP 条目(带 revival_condition+180 天 expires)、阳性→BOOST,均须证据指针(证据门控拒无证据条目);种子置顶指引同步改为登记簿 BOOST(不再硬编码 _SEEDS 顺序)。
