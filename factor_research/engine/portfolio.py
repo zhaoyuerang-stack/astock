@@ -7,6 +7,8 @@ This module provides:
 import pandas as pd
 import numpy as np
 
+from engine.metrics import max_drawdown
+
 
 def performance_metrics(port_ret: pd.Series, rf: float = 0.02, fmt: bool = False) -> dict:
     """Performance summary.
@@ -25,8 +27,9 @@ def performance_metrics(port_ret: pd.Series, rf: float = 0.02, fmt: bool = False
     annual_ret = ret.mean() * 252
     annual_vol = ret.std() * np.sqrt(252)
     sharpe = (annual_ret - rf) / annual_vol if annual_vol > 0 else np.nan
-    cum = (1 + ret).cumprod()
-    maxdd = (cum / cum.cummax() - 1).min()
+    # 本函数与 canonical metrics() 契约不同(减 rf / nan 兜底 / fmt 模式),整体不收编;
+    # 但回撤公式与 engine.metrics.max_drawdown 逐字相同,委托之。
+    maxdd = max_drawdown(ret)
     calmar = annual_ret / abs(maxdd) if maxdd != 0 else np.nan
     if fmt:
         return {

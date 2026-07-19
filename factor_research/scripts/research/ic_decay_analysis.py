@@ -5,8 +5,12 @@
 import warnings
 warnings.filterwarnings("ignore")
 import os
+import sys
 from pathlib import Path
-os.chdir(Path(__file__).parent)
+
+ROOT = Path(__file__).resolve().parents[2]  # factor_research/
+sys.path.insert(0, str(ROOT))
+os.chdir(ROOT)  # data_lake 相对路径与脚本原先位于包根时一致
 
 import numpy as np
 import pandas as pd

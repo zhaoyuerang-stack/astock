@@ -26,7 +26,17 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 
-from engine.metrics import compute_hit, institutional_metrics, TARGET_ANNUAL, TARGET_MAXDD
+from engine.metrics import (
+    TARGET_ANNUAL,
+    TARGET_MAXDD,
+    annual_return,
+    annual_vol,
+    calmar_ratio,
+    compute_hit,
+    max_drawdown,
+    sharpe_ratio,
+)
+from engine.metrics import metrics as canonical_metrics
 
 
 # ---------------------------------------------------------------------------
@@ -209,7 +219,7 @@ class BacktestResult:
             index=self.returns.index,
         )
 
-    # ---- metrics (lazy properties, identical formula to core/backtest.metrics) ----
+    # ---- metrics(全部委托 engine.metrics 的 canonical 标量公式,禁止在此内联重写) ----
 
     @property
     def n(self) -> int:
@@ -217,24 +227,23 @@ class BacktestResult:
 
     @property
     def annual(self) -> float:
-        return float(self.returns.mean() * 252)
+        return annual_return(self.returns)
 
     @property
     def vol(self) -> float:
-        return float(self.returns.std() * np.sqrt(252))
+        return annual_vol(self.returns)
 
     @property
     def sharpe(self) -> float:
-        return self.annual / self.vol if self.vol > 0 else 0.0
+        return sharpe_ratio(self.returns)
 
     @property
     def maxdd(self) -> float:
-        cum = (1 + self.returns).cumprod()
-        return float((cum / cum.cummax() - 1).min())
+        return max_drawdown(self.returns)
 
     @property
     def calmar(self) -> float:
-        return self.annual / abs(self.maxdd) if self.maxdd < 0 else 0.0
+        return calmar_ratio(self.returns)
 
     @property
     def anomalies(self) -> list:
@@ -264,27 +273,15 @@ class BacktestResult:
 
     @property
     def metrics(self) -> dict:
-        """Dict compatible with ``core/backtest.metrics()`` output."""
-        if self.n < 100:
-            return {
-                "annual": -1.0,
-                "vol": 0.0,
-                "sharpe": -1.0,
-                "maxdd": -1.0,
-                "calmar": 0.0,
-                "hit": False,
-                "n": self.n,
-            }
-        return {
-            "annual": self.annual,
-            "vol": self.vol,
-            "sharpe": self.sharpe,
-            "maxdd": self.maxdd,
-            "calmar": self.calmar,
-            "hit": self.hit,
-            "n": self.n,
-            **institutional_metrics(self.returns),
-        }
+        """委托 ``engine.metrics.metrics()``(单一实现,含 n<100 哨兵与机构级指标)。
+
+        唯一差异:``hit`` 在 n≥100 时用 ``self.hit`` 覆盖——阈值可被本次回测
+        config 覆盖,而 canonical ``metrics()`` 只认默认门槛;n<100 哨兵 hit=False 不动。
+        """
+        m = canonical_metrics(self.returns)
+        if self.n >= 100:
+            m["hit"] = self.hit
+        return m
 
     @property
     def yearly_returns(self) -> pd.Series:
