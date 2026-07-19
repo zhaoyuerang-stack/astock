@@ -16,6 +16,10 @@ writer 同层);scripts/data/update_lake.py 保留为薄 CLI 壳(re-export + argp
 CLI 用法（薄壳入口）：python3 scripts/data/update_lake.py            # 全部增量更新
                       python3 scripts/data/update_lake.py --prices  # 仅价量
 """
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 import warnings; warnings.filterwarnings("ignore")
 import os, json
 from pathlib import Path
@@ -62,7 +66,7 @@ def stamp_data_vintage(prev=None):
     fp = panel_fingerprint(close)
     last = str(close.index[-1].date())
     if _is_drift(prev, last, fp):
-        print(f"  ⚠️ 数据漂移!末日 {last} 不变但指纹变 ({prev.get('fingerprint')}→{fp})"
+        logger.warning(f"  ⚠️ 数据漂移!末日 {last} 不变但指纹变 ({prev.get('fingerprint')}→{fp})"
               f"——同日数据被改写,需核查")
     return {"stamped_at": datetime.now().isoformat(timespec="seconds"),
             "last_date": last, "shape": list(close.shape), "fingerprint": fp}
@@ -106,7 +110,7 @@ def update_prices():
                     if fp.stem.isdigit() and len(fp.stem) == 6}
         missing = {c for c in all_codes - existing if not c.startswith("92")}
         if missing:
-            print(f"[价量] 缺失代码 {len(missing)} 只(新上市/退市)，Tencent 下载历史...", flush=True)
+            logger.info(f"[价量] 缺失代码 {len(missing)} 只(新上市/退市)，Tencent 下载历史...")
             f.start = "2010-01-01"
             for i, code in enumerate(sorted(missing)):
                 try:
@@ -117,9 +121,9 @@ def update_prices():
                 except Exception:
                     continue
                 if (i + 1) % 50 == 0:
-                    print(f"  缺失下载 {i+1}/{len(missing)} (新增{added})", flush=True)
+                    logger.info(f"  缺失下载 {i+1}/{len(missing)} (新增{added})")
             if added:
-                print(f"[价量] 新增 {added} 只", flush=True)
+                logger.info(f"[价量] 新增 {added} 只")
 
     # ── 找出需要补的交易日（日历 > 当前最新日期）──
     daily_all_fp = LAKE / "price/daily_all.parquet"
@@ -137,14 +141,14 @@ def update_prices():
 
     new_dates = cal[(cal > latest_ts) & (cal <= today)].tolist()
     if not new_dates:
-        print(f"[价量] 已最新({latest_ts.date()}), 无需增量", flush=True)
+        logger.info(f"[价量] 已最新({latest_ts.date()}), 无需增量")
         compact_status = "skipped"
         return {"price_daily": {"last_check": str(date.today()),
                                 "updated": 0, "added_delisted": added,
                                 "compact": compact_status}}
 
-    print(f"[价量] 需补 {len(new_dates)} 个交易日: "
-          f"{new_dates[0].date()} ~ {new_dates[-1].date()}", flush=True)
+    logger.info(f"[价量] 需补 {len(new_dates)} 个交易日: "
+          f"{new_dates[0].date()} ~ {new_dates[-1].date()}")
 
     # ── 逐日从 tushare 批量拉取（2 次 API/日，全市场）──
     all_new_rows: list[pd.DataFrame] = []
@@ -168,16 +172,16 @@ def update_prices():
         prev_closes = (prev_slice.set_index("code")["close"]
                        if not prev_slice.empty else pd.Series(dtype=float))
 
-        print(f"  [价量 {i+1}/{len(new_dates)}] {td.date()} prev={prev_td.date()} "
-              f"基准={len(prev_closes)}只", flush=True)
+        logger.info(f"  [价量 {i+1}/{len(new_dates)}] {td.date()} prev={prev_td.date()} "
+              f"基准={len(prev_closes)}只")
         try:
             new_df = fetch_new_day(td, prev_td, prev_closes)
         except Exception as exc:
-            print(f"  [价量] {td.date()} tushare 失败: {exc}", flush=True)
+            logger.warning(f"  [价量] {td.date()} tushare 失败: {exc}")
             continue
 
         if new_df.empty:
-            print(f"  [价量] {td.date()} 返回空(非交易日?)", flush=True)
+            logger.info(f"  [价量] {td.date()} 返回空(非交易日?)")
             continue
 
         all_new_rows.append(new_df)
@@ -188,7 +192,7 @@ def update_prices():
         )
 
     if not all_new_rows:
-        print("[价量] 无新数据写入", flush=True)
+        logger.info("[价量] 无新数据写入")
         return {"price_daily": {"last_check": str(date.today()),
                                 "updated": 0, "added_delisted": added,
                                 "compact": "skipped"}}
@@ -199,10 +203,10 @@ def update_prices():
     try:
         unit_report = validate_price_amount_units(combined)
     except PriceAmountInvariantError as exc:
-        print(f"  🚨 价量单位不变量拒绝写入: {exc}", flush=True)
+        logger.warning(f"  🚨 价量单位不变量拒绝写入: {exc}")
         raise
     _require_price_unit_report(unit_report)
-    print(
+    logger.info(
         "  [价量单位] canonical 股/元校验通过: "
         f"n={unit_report['n']}, median_ratio={unit_report['median_ratio']:.4f}",
         flush=True,
@@ -223,17 +227,17 @@ def update_prices():
         merged.to_parquet(fp, index=False)
         updated += 1
 
-    print(f"[价量] tushare 增量写入 {updated} 只 × {len(all_new_rows)} 日", flush=True)
+    logger.info(f"[价量] tushare 增量写入 {updated} 只 × {len(all_new_rows)} 日")
 
     # ── 重建大表 ──
     compact_status = "skipped"
-    print("重新合并 daily_all.parquet ...", flush=True)
+    logger.info("重新合并 daily_all.parquet ...")
     try:
         compact_prices(daily, daily_all_fp)
         compact_status = "ok"
     except LakeInvariantError as e:
         compact_status = f"REJECTED: {e}"
-        print(f"  🚨 大表合并被不变量拒绝(旧 daily_all 保留): {e}", flush=True)
+        logger.warning(f"  🚨 大表合并被不变量拒绝(旧 daily_all 保留): {e}")
 
     return {"price_daily": {"last_check": str(date.today()),
                             "updated": updated, "added_delisted": added,
@@ -253,7 +257,7 @@ def update_fundamental():
     cutoff = date.today().strftime("%Y%m%d")
     missing = [p for p in periods if p <= cutoff and p not in have]
     if not missing:
-        print("[财务] 已最新，无新报告期", flush=True)
+        logger.info("[财务] 已最新，无新报告期")
         return {"fundamental": {"last_check": str(date.today())}}
 
     from lake.schema import YJBB_RENAME
@@ -268,7 +272,7 @@ def update_fundamental():
             d = d.rename(columns=RENAME)
             d["report_date"] = pd.to_datetime(p)
             new_frames.append(d[[c for c in RENAME.values() if c in d.columns] + ["report_date"]])
-            print(f"  财务新报告期 {p}: {len(d)}只", flush=True)
+            logger.info(f"  财务新报告期 {p}: {len(d)}只")
         except Exception:
             continue
     if new_frames:
@@ -278,7 +282,7 @@ def update_fundamental():
         nf["avail_date"] = nf["ann_date"].fillna(nf["report_date"] + pd.Timedelta(days=45))
         merged = pd.concat([df, nf], ignore_index=True).drop_duplicates(["code","report_date"], keep="last")
         merged.to_parquet(fp, index=False)
-        print(f"[财务] 新增{len(missing)}个报告期", flush=True)
+        logger.info(f"[财务] 新增{len(missing)}个报告期")
     return {"fundamental": {"last_check": str(date.today()), "new_periods": missing}}
 
 
@@ -298,7 +302,7 @@ def update_capital_margin():
     else:
         keys = trade_dates.dt.strftime("%Y%m%d").tolist()
     if not keys:
-        print("[两融] 已最新，无新交易日", flush=True)
+        logger.info("[两融] 已最新，无新交易日")
         return {"capital_margin": {"last_check": str(date.today()), "updated_days": 0}}
     fetcher = resolve_source("margin", max_workers=3, timeout=30, retries=2)
     stats = fetcher.run(keys, skip_existing=True, progress_every=50)

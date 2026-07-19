@@ -12,6 +12,10 @@ hfq 重建（与 Tencent hfqday 口径兼容）：
 """
 from __future__ import annotations
 
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 import pandas as pd
 
 from lake.sources.tushare import call, to_code
@@ -97,7 +101,7 @@ def fetch_new_day(
         })
 
     if skipped_no_prev or skipped_bad_price:
-        print(f"  [tushare_price] {td} 跳过: 无前日基准={skipped_no_prev} 价格异常={skipped_bad_price}",
+        logger.warning(f"  [tushare_price] {td} 跳过: 无前日基准={skipped_no_prev} 价格异常={skipped_bad_price}",
               flush=True)
 
     return pd.DataFrame(rows) if rows else pd.DataFrame()

@@ -19,6 +19,10 @@ Usage:
 """
 from __future__ import annotations
 
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -148,7 +152,7 @@ class Phase2Runner:
 
     def run(self, warmup_start: str = "2010-01-01") -> dict:
         """Run all Phase 2 checks. Returns dict with segments + checks."""
-        print(f"Phase 2: {self.family}", flush=True)
+        logger.info(f"Phase 2: {self.family}")
 
         # Load data once with warmup, then 截到 < holdout boundary(§5.2 缝③):整个验证栈
         # (三段/成本/相关性/decay)都从这批被裁过的面板派生 → 金库 date>=boundary 永不进入
@@ -161,9 +165,9 @@ class Phase2Runner:
         amount = amount.loc[amount.index < b]
         trade_dates = close.index
         assert_search_clean(trade_dates, label="Phase 2 验证栈")  # 自查门:末日必须 < boundary
-        print(f"  Data: {close.shape[1]} stocks × {close.shape[0]} days "
+        logger.info(f"  Data: {close.shape[1]} stocks × {close.shape[0]} days "
               f"[{trade_dates[0].date()}~{trade_dates[-1].date()}] "
-              f"(已截金库 boundary={b.date()};原末日 {pre.date()})", flush=True)
+              f"(已截金库 boundary={b.date()};原末日 {pre.date()})")
 
         # OOS 终点 = 金库前一日(boundary 动态),金库段不属于 OOS,留给 validate_on_holdout。
         oos_end = min(pd.Timestamp("2026-12-31"), b - pd.Timedelta(days=1))
@@ -177,8 +181,8 @@ class Phase2Runner:
         factor = self.factor_builder(close, volume, amount, trade_dates)
         timing = self.timing_builder(close, amount)
         weights = build_rebalance_weights(factor, close, self.top_n, self.rebalance)
-        print(f"  Factor: {factor.dropna(how='all').shape[0]} valid days, "
-              f"weights: {len(weights)} rebalance events", flush=True)
+        logger.info(f"  Factor: {factor.dropna(how='all').shape[0]} valid days, "
+              f"weights: {len(weights)} rebalance events")
 
         # ── Three segments ──
         segments = {}
@@ -186,7 +190,7 @@ class Phase2Runner:
         for label, start, end in segment_defs:
             mask = (trade_dates >= pd.Timestamp(start)) & (trade_dates <= pd.Timestamp(end))
             if mask.sum() < 50:
-                print(f"  {label}: ⚠️ too few days ({mask.sum()})", flush=True)
+                logger.warning(f"  {label}: ⚠️ too few days ({mask.sum()})")
                 continue
 
             c = close.loc[mask]; v = volume.loc[mask]; a = amount.loc[mask]
@@ -198,8 +202,8 @@ class Phase2Runner:
             res = run_segment(c, v, a, w_seg, t, self.leverage, self.base_cost)
             segments[label] = res
             segments_by_role[seg_roles[label]] = res
-            print(f"  {label}: annual={res['annual']:+.1%} maxdd={res['maxdd']:+.1%} "
-                  f"sharpe={res['sharpe']:.2f} turn={res['turnover']:.1f}x", flush=True)
+            logger.info(f"  {label}: annual={res['annual']:+.1%} maxdd={res['maxdd']:+.1%} "
+                  f"sharpe={res['sharpe']:.2f} turn={res['turnover']:.1f}x")
 
         # ── Cost sensitivity ──
         cost_check = self._check_cost_sensitivity(close, volume, amount, weights, timing)
@@ -257,7 +261,7 @@ class Phase2Runner:
         # Convert non-serializable items
         serializable = _make_serializable(report)
         out_path.write_text(json.dumps(serializable, ensure_ascii=False, indent=2))
-        print(f"  Report → {out_path}", flush=True)
+        logger.info(f"  Report → {out_path}")
 
         return report
 
@@ -286,8 +290,8 @@ class Phase2Runner:
         decay_pct = annual_decay / base["annual"] if base["annual"] > 0 else float("inf")
 
         verdict = "PASS" if decay_pct < 0.5 else "FAIL"
-        print(f"  Cost +50%: annual {base['annual']:+.1%}→{stressed['annual']:+.1%} "
-              f"(decay={decay_pct:.0%}) → {verdict}", flush=True)
+        logger.info(f"  Cost +50%: annual {base['annual']:+.1%}→{stressed['annual']:+.1%} "
+              f"(decay={decay_pct:.0%}) → {verdict}")
 
         return {
             "verdict": verdict,
@@ -363,7 +367,7 @@ class Phase2Runner:
         else:
             verdict = "PASS"
 
-        print(f"  Correlation vs active: max|corr|={max_corr:.3f} → {verdict}", flush=True)
+        logger.info(f"  Correlation vs active: max|corr|={max_corr:.3f} → {verdict}")
 
         return {
             "verdict": verdict,
@@ -390,7 +394,7 @@ class Phase2Runner:
         ratio = oos_ann / is_ann
         verdict = "PASS" if ratio > 0.3 else "FAIL"
 
-        print(f"  OOS/IS decay: {oos_ann:+.1%} / {is_ann:+.1%} = {ratio:.2f} → {verdict}", flush=True)
+        logger.info(f"  OOS/IS decay: {oos_ann:+.1%} / {is_ann:+.1%} = {ratio:.2f} → {verdict}")
 
         return {
             "verdict": verdict,

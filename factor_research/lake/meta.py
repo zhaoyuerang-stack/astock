@@ -2,6 +2,10 @@
 元数据构建：股票列表 / 交易日历 / 上市日
 （交易日历和上市日依赖价量数据，下载完成后执行）
 """
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 import pandas as pd
 from pathlib import Path
 
@@ -17,7 +21,7 @@ def build_stock_list():
     df = ak.stock_info_a_code_name()
     df["code"] = df["code"].astype(str)
     df.to_parquet(META / "codes.parquet", index=False)
-    print(f"[meta] 股票列表: {len(df)} 只")
+    logger.info(f"[meta] 股票列表: {len(df)} 只")
     return df
 
 
@@ -34,7 +38,7 @@ def build_calendar():
             dates |= set(pd.read_parquet(fp, columns=["date"])["date"])
     cal = pd.DatetimeIndex(sorted(dates))
     pd.DataFrame({"date": cal}).to_parquet(META / "trade_calendar.parquet", index=False)
-    print(f"[meta] 交易日历: {len(cal)} 个交易日 {cal.min().date()}~{cal.max().date()}")
+    logger.info(f"[meta] 交易日历: {len(cal)} 个交易日 {cal.min().date()}~{cal.max().date()}")
     return cal
 
 
@@ -87,7 +91,7 @@ def update_trade_calendar(*, root: Path | str = Path(".")) -> dict:
 
     # 只在日历比今天旧时才更新
     if old_max >= today:
-        print(f"[calendar] 已最新({old_max.date()})", flush=True)
+        logger.info(f"[calendar] 已最新({old_max.date()})")
         return {"ok": True, "latest": str(old_max.date()), "updated": False}
 
     today_str = today.strftime("%Y%m%d")
@@ -107,7 +111,7 @@ def update_trade_calendar(*, root: Path | str = Path(".")) -> dict:
     new_cal.to_parquet(cal_fp, index=False)
     new_max = new_cal["date"].max()
     added = len(new_cal) - len(old_cal)
-    print(f"[calendar] 更新: {old_max.date()} → {new_max.date()} (+{added}个交易日)", flush=True)
+    logger.info(f"[calendar] 更新: {old_max.date()} → {new_max.date()} (+{added}个交易日)")
     return {"ok": True, "latest": str(new_max.date()), "updated": True, "added": added}
 
 
@@ -129,7 +133,7 @@ def build_list_dates():
             })
     out = pd.DataFrame(rows).sort_values("code").reset_index(drop=True)
     out.to_parquet(META / "list_date.parquet", index=False)
-    print(f"[meta] 上市日: {len(out)} 只 (其中{out['truncated'].sum()}只可能2010前上市)")
+    logger.info(f"[meta] 上市日: {len(out)} 只 (其中{out['truncated'].sum()}只可能2010前上市)")
     return out
 
 
@@ -137,7 +141,7 @@ def build_all():
     build_stock_list()
     build_calendar()
     build_list_dates()
-    print("[meta] 元数据构建完成")
+    logger.info("[meta] 元数据构建完成")
 
 
 if __name__ == "__main__":

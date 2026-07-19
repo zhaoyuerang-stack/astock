@@ -16,6 +16,10 @@ Usage:
 """
 from __future__ import annotations
 
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 import hashlib
 import json
 import logging
@@ -29,7 +33,7 @@ from typing import Optional
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 LESSONS_DIR = ROOT / "workflow" / "pending_lessons"
 LESSONS_DIR.mkdir(parents=True, exist_ok=True)
 _HOLDOUT_VALIDATIONS = ROOT / "data_lake" / "governance" / "holdout_validations.jsonl"
@@ -243,13 +247,13 @@ def save_lessons_from_phases(phase1: list, phase2: dict, phase3: dict, family: s
         try:
             from knowledge.graph import sync_pending_lessons_to_graph
             summary = sync_pending_lessons_to_graph()
-            print(
+            logger.info(
                 f"  Knowledge graph synced: findings={summary['findings_written']} "
                 f"gates={summary['gates_written']}",
                 flush=True,
             )
         except Exception as exc:
-            print(f"  Knowledge graph sync failed: {exc}", flush=True)
+            logger.info(f"  Knowledge graph sync failed: {exc}")
 
     return lessons_saved
 
@@ -338,7 +342,7 @@ class Phase4Register:
         n_lessons = save_lessons_from_phases(
             phase1_results, phase2_data, phase3_data, self.family
         )
-        print(f"  Lessons saved: {n_lessons}", flush=True)
+        logger.info(f"  Lessons saved: {n_lessons}")
 
         # Reproducibility metadata
         repro = reproducibility_meta()
@@ -346,8 +350,8 @@ class Phase4Register:
         # Check if registration is allowed
         blocked = self._check_blocked(phase1_results, phase2_data, phase3_data)
         if blocked and not force:
-            print(f"  Registration BLOCKED: {blocked}", flush=True)
-            print(f"  Use force=True to override.", flush=True)
+            logger.info(f"  Registration BLOCKED: {blocked}")
+            logger.info(f"  Use force=True to override.")
             return RegistrationReport(
                 family=self.family, version=self.version,
                 registered=False, repro_meta=repro, lessons_saved=n_lessons,
@@ -357,15 +361,15 @@ class Phase4Register:
         # §5.2 holdout 金库闸:holdout_id 提供时强制要求通过记录;缺省软告警(向后兼容)。
         ho_block, ho_summary = _holdout_gate(holdout_id)
         if holdout_id and ho_block and not force:
-            print(f"  Registration BLOCKED (holdout §5.2): {ho_block}", flush=True)
-            print(f"  Use force=True to override.", flush=True)
+            logger.info(f"  Registration BLOCKED (holdout §5.2): {ho_block}")
+            logger.info(f"  Use force=True to override.")
             return RegistrationReport(
                 family=self.family, version=self.version,
                 registered=False, repro_meta=repro, lessons_saved=n_lessons,
                 detail=f"Blocked: {ho_block}", status="blocked",
             )
         if not holdout_id:
-            print("  ⚠️ 无 holdout_id:跳过 §5.2 金库校验(手动/历史登记路径,不阻断)", flush=True)
+            logger.warning("  ⚠️ 无 holdout_id:跳过 §5.2 金库校验(手动/历史登记路径,不阻断)")
 
         # Build metrics from Phase 2+3
         metrics = self._build_metrics(phase2_data, phase3_data)
@@ -474,14 +478,14 @@ class Phase4Register:
                 spec=spec_dict,
                 spec_hash=spec_hash,
             )
-            print(f"  Registered: {self.family}/{self.version}", flush=True)
+            logger.info(f"  Registered: {self.family}/{self.version}")
             return RegistrationReport(
                 family=self.family, version=self.version,
                 registered=True, repro_meta=repro, lessons_saved=n_lessons,
                 detail="Registered successfully", status=reg_status,
             )
         except Exception as e:
-            print(f"  Registration error: {e}", flush=True)
+            logger.info(f"  Registration error: {e}")
             return RegistrationReport(
                 family=self.family, version=self.version,
                 registered=False, repro_meta=repro, lessons_saved=n_lessons,

@@ -6,6 +6,10 @@
 - 东财封禁阈值：秒>5/并发≥10/分钟≥200 → 默认并发≤6、间隔≥1s+抖动
 - 各源独立限流器（阈值不同）
 """
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 import time
 import random
 import threading
@@ -136,14 +140,14 @@ class Fetcher:
                 if (i + 1) % progress_every == 0:
                     el = time.time() - t0
                     eta = el / (i + 1) * (len(todo) - i - 1)
-                    print(f"  [{self.name}] {i+1}/{len(todo)} "
+                    logger.info(f"  [{self.name}] {i+1}/{len(todo)} "
                           f"ok={stats['ok']} empty={stats['empty']} err={stats['error']} "
-                          f"用时={el:.0f}s ETA={eta:.0f}s", flush=True)
+                          f"用时={el:.0f}s ETA={eta:.0f}s")
 
         stats["elapsed"] = round(time.time() - t0, 1)
         stats["failures"] = failures
-        print(f"[{self.name}] 完成 ok={stats['ok']} empty={stats['empty']} "
-              f"err={stats['error']} cached={cached} 用时={stats['elapsed']}s", flush=True)
+        logger.info(f"[{self.name}] 完成 ok={stats['ok']} empty={stats['empty']} "
+              f"err={stats['error']} cached={cached} 用时={stats['elapsed']}s")
         return stats
 
     def retry_failures(self, failures: list):
@@ -151,5 +155,5 @@ class Fetcher:
         if not failures:
             return {"ok": 0, "error": 0}
         keys = [f[0] for f in failures]
-        print(f"[{self.name}] 重试 {len(keys)} 个失败标的...")
+        logger.warning(f"[{self.name}] 重试 {len(keys)} 个失败标的...")
         return self.run(keys, skip_existing=False)

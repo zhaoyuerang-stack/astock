@@ -1,4 +1,8 @@
 """日线聚合 → 周线/月线"""
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 import pandas as pd
 from pathlib import Path
 
@@ -25,7 +29,7 @@ def build_periodic(daily_dir: str = "data_lake/price/daily"):
                 continue
             aggregate_one(df, freq).to_parquet(outdir / fp.name, index=False)
             n += 1
-        print(f"[{period}] {n}只", flush=True)
+        logger.info(f"[{period}] {n}只")
 
 
 if __name__ == "__main__":
@@ -35,5 +39,5 @@ if __name__ == "__main__":
     # 验证茅台
     for period in ["weekly", "monthly"]:
         df = pd.read_parquet(f"data_lake/price/{period}/600519.parquet")
-        print(f"\n茅台{period}: {len(df)}行 {df['date'].min().date()}~{df['date'].max().date()}")
-        print(df.tail(2)[["date", "open", "high", "low", "close"]].to_string(index=False))
+        logger.info(f"\n茅台{period}: {len(df)}行 {df['date'].min().date()}~{df['date'].max().date()}")
+        logger.info(df.tail(2)[["date", "open", "high", "low", "close"]].to_string(index=False))

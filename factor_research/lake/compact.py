@@ -1,4 +1,8 @@
 """逐只 parquet 合并为 date×code 大宽表，加速加载。"""
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 import pandas as pd
 from pathlib import Path
 
@@ -29,7 +33,7 @@ def _compact_dir(daily_dir, out_path, columns, code_col="code", close_col=None):
         # 违规抛 LakeInvariantError,旧大表保留(2026-06-12 假崩盘事故防复发)
         assert_price_panel_sane(long, close_col=close_col)
     long.to_parquet(out_path, index=False)
-    print(f"[compact] {out_path.name}: {len(files)} 只 → {len(long)} 行", flush=True)
+    logger.info(f"[compact] {out_path.name}: {len(files)} 只 → {len(long)} 行")
 
 
 def compact_prices(daily_dir, out_path):

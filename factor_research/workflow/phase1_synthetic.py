@@ -19,6 +19,10 @@ Usage:
 """
 from __future__ import annotations
 
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 import hashlib
 import json
 from dataclasses import dataclass, field
@@ -530,7 +534,7 @@ class Phase1Checker:
                 from knowledge.graph import sync_pending_lessons_to_graph
                 sync_pending_lessons_to_graph()
             except Exception as exc:
-                print(f"[knowledge] pending lessons sync failed: {exc}", flush=True)
+                logger.info(f"[knowledge] pending lessons sync failed: {exc}")
 
 
 def _suggest_fix(check_id: str) -> str:

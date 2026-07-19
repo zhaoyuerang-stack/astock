@@ -15,6 +15,10 @@ Usage::
 """
 from __future__ import annotations
 
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 from dataclasses import dataclass, field
 from itertools import product
 from typing import Callable, Optional
@@ -155,8 +159,8 @@ class FactorSpace:
             total *= len(v)
 
         if total > max_combinations:
-            print(f"  Warning: {total} combinations > {max_combinations} limit, "
-                  f"sampling {max_combinations}", flush=True)
+            logger.warning(f"  Warning: {total} combinations > {max_combinations} limit, "
+                  f"sampling {max_combinations}")
             # Simple random sampling
             import random
             all_combos = list(product(*axis_values))
@@ -165,7 +169,7 @@ class FactorSpace:
         else:
             combos = list(product(*axis_values))
 
-        print(f"  Evaluating {len(combos)} combinations...", flush=True)
+        logger.info(f"  Evaluating {len(combos)} combinations...")
         t0 = time.time()
         results = []
 
@@ -179,7 +183,7 @@ class FactorSpace:
             try:
                 values = factor.compute(data)
             except Exception as e:
-                print(f"    Skip {params}: {e}", flush=True)
+                logger.info(f"    Skip {params}: {e}")
                 continue
 
             # Build signal + engine
@@ -219,11 +223,11 @@ class FactorSpace:
 
             if (i + 1) % 10 == 0:
                 elapsed = time.time() - t0
-                print(f"    {i+1}/{len(combos)} ({elapsed:.0f}s)", flush=True)
+                logger.info(f"    {i+1}/{len(combos)} ({elapsed:.0f}s)")
 
         results.sort(key=lambda r: r.sharpe, reverse=True)
         elapsed = time.time() - t0
-        print(f"  Done: {len(results)} results in {elapsed:.0f}s", flush=True)
+        logger.info(f"  Done: {len(results)} results in {elapsed:.0f}s")
         return results
 
     # ------------------------------------------------------------------
@@ -298,8 +302,8 @@ class FactorSpace:
                 f"Need at least 2. Try reducing train_years or purge_days."
             )
 
-        print(f"\n  Purged WF: {len(windows)} windows, "
-              f"train={train_years}y, test={test_years}y, purge={purge}d", flush=True)
+        logger.info(f"\n  Purged WF: {len(windows)} windows, "
+              f"train={train_years}y, test={test_years}y, purge={purge}d")
         t0 = time.time()
 
         # Timing (shared across windows)
@@ -347,7 +351,7 @@ class FactorSpace:
                 if data.market_cap is not None else None,
             )
 
-            print(f"\n  Window {wi+1}/{len(windows)}: "
+            logger.info(f"\n  Window {wi+1}/{len(windows)}: "
                   f"train={str(t_train_start.date())[:7]}~{str(t_train_end.date())[:7]}  "
                   f"test={str(t_test_start.date())[:7]}~{str(t_test_end.date())[:7]}",
                   flush=True)
@@ -426,7 +430,7 @@ class FactorSpace:
 
         # ── Aggregate results ──
         wf = wf_metrics(oos_returns_all)
-        print(f"\n  WF aggregate: {wf.summary()}", flush=True)
+        logger.info(f"\n  WF aggregate: {wf.summary()}")
 
         # DSR
         dsr_report = None
@@ -445,9 +449,9 @@ class FactorSpace:
                     skew=skew if not np.isnan(skew) else 0.0,
                     kurt=kurt if not np.isnan(kurt) else 3.0,
                 )
-                print(f"  DSR: {dsr_report['dsr']:+.2f} "
+                logger.info(f"  DSR: {dsr_report['dsr']:+.2f} "
                       f"(p={dsr_report['p_value']:.3f}, "
-                      f"E[max SR]={dsr_report['e_max_sr']:.2f})", flush=True)
+                      f"E[max SR]={dsr_report['e_max_sr']:.2f})")
 
         # PBO
         pbo_report = None
@@ -459,12 +463,12 @@ class FactorSpace:
                     concat_returns[name] = pd.concat(rets).sort_index().dropna()
             if len(concat_returns) > 1:
                 pbo_report = pbo_cscv(concat_returns, n_splits=min(50, len(windows)*10))
-                print(f"  PBO: {pbo_report['pbo']:.2f} "
+                logger.info(f"  PBO: {pbo_report['pbo']:.2f} "
                       f"({pbo_report['risk_level']} risk, "
-                      f"mean OOS rank={pbo_report['mean_oos_rank']:.1f})", flush=True)
+                      f"mean OOS rank={pbo_report['mean_oos_rank']:.1f})")
 
         elapsed = time.time() - t0
-        print(f"  WF total: {elapsed:.0f}s", flush=True)
+        logger.info(f"  WF total: {elapsed:.0f}s")
 
         return {
             "wf_metrics": wf,

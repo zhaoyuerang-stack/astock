@@ -7,6 +7,10 @@ Usage:
 """
 from __future__ import annotations
 
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 import os
 import sys
 import argparse
@@ -51,16 +55,16 @@ def parse_allocation(alloc_str: str) -> dict[str, float]:
     return alloc
 
 def run_pipeline(version: str, allocation_str: str, persist: bool = False, start_date: str = "2023-01-01"):
-    print("=" * 95)
-    print(f"  Composite Strategy Promotion Pipeline (with Adversarial Guard) | Version: {version}")
-    print("=" * 95)
+    logger.info("=" * 95)
+    logger.info(f"  Composite Strategy Promotion Pipeline (with Adversarial Guard) | Version: {version}")
+    logger.info("=" * 95)
     
     alloc = parse_allocation(allocation_str)
-    print("Strategy Capital Allocations:")
+    logger.info("Strategy Capital Allocations:")
     for strat, w in alloc.items():
-        print(f"  - {strat:<20}: {w:.2%}")
+        logger.info(f"  - {strat:<20}: {w:.2%}")
         
-    print("\n[Step 1] Loading price and total_mv panels...")
+    logger.info("\n[Step 1] Loading price and total_mv panels...")
     close, volume, amount = load_price_panels("2010-01-01")
     prices = PricePanel(close=close, volume=volume, amount=amount)
     
@@ -73,7 +77,7 @@ def run_pipeline(version: str, allocation_str: str, persist: bool = False, start
     
     # Strategy A: illiq_sc
     if "illiq_sc" in alloc:
-        print("\n[Step 2.1] Generating weights for Strategy A (Illiquidity)...")
+        logger.info("\n[Step 2.1] Generating weights for Strategy A (Illiquidity)...")
         sc_universe = total_mv.rank(axis=1, ascending=True, pct=False) <= 800
         amihud = (close.pct_change().abs() / amount).rolling(20).mean()
         amihud_sc = amihud.where(sc_universe)
@@ -99,7 +103,7 @@ def run_pipeline(version: str, allocation_str: str, persist: bool = False, start
         
     # Strategy 2: lc_mom
     if "lc_mom" in alloc:
-        print("\n[Step 2.2] Generating weights for Strategy B (Large-Cap Momentum)...")
+        logger.info("\n[Step 2.2] Generating weights for Strategy B (Large-Cap Momentum)...")
         lc_universe = total_mv.rank(axis=1, ascending=False, pct=False) <= 200
         mom_raw = close.pct_change(120).where(lc_universe)
         
@@ -126,7 +130,7 @@ def run_pipeline(version: str, allocation_str: str, persist: bool = False, start
         
     # Strategy 3: reversal
     if "reversal" in alloc:
-        print("\n[Step 2.3] Generating weights for Strategy C (Reversal)...")
+        logger.info("\n[Step 2.3] Generating weights for Strategy C (Reversal)...")
         factor_rev = compute_dsl_factor(close, volume, ast=AST_REVERSAL, cache_mode="disk")
         sig_c_base = Signal(factor=factor_rev, top_n=25, direction=-1, rebalance_freq="20D", family="rev_base")
         engine_c = BacktestEngine(prices, config_a)
@@ -152,7 +156,7 @@ def run_pipeline(version: str, allocation_str: str, persist: bool = False, start
     # -----------------------------------------------------------------------
     # Reconstruct Combined Weights for Both Versions
     # -----------------------------------------------------------------------
-    print("\n[Step 3] Realigning and combining strategy weight columns...")
+    logger.info("\n[Step 3] Realigning and combining strategy weight columns...")
     all_cols = weight_dfs_t0[0].columns
     for wdf in weight_dfs_t0[1:]:
         all_cols = all_cols.union(wdf.columns)
@@ -165,13 +169,13 @@ def run_pipeline(version: str, allocation_str: str, persist: bool = False, start
     for wdf in weight_dfs_t1:
         w_composite_t1 += wdf.reindex(columns=all_cols, fill_value=0.0)
         
-    print(f"  Composite weight dimensions: {w_composite_t1.shape}")
-    print(f"  T-1 Max leverage observed: {w_composite_t1.sum(axis=1).max():.4f}")
+    logger.info(f"  Composite weight dimensions: {w_composite_t1.shape}")
+    logger.info(f"  T-1 Max leverage observed: {w_composite_t1.sum(axis=1).max():.4f}")
     
     # -----------------------------------------------------------------------
     # Gate 7B: Run Adversarial Execution Decay Backtests
     # -----------------------------------------------------------------------
-    print("\n[Step 4] Running Gate 7B: Adversarial Execution Decay Check...")
+    logger.info("\n[Step 4] Running Gate 7B: Adversarial Execution Decay Check...")
     engine_comp = BacktestEngine(prices, BacktestConfig(start=start_date, cost=CostModel(), leverage=1.0))
     res_t0 = engine_comp.run(Signal(weights=w_composite_t0, timing=None, family="comp_t0", version=version))
     res_t1 = engine_comp.run(Signal(weights=w_composite_t1, timing=None, family="comp_t1", version=version))
@@ -198,23 +202,23 @@ def run_pipeline(version: str, allocation_str: str, persist: bool = False, start
     adv_dd_pass = decay_dd <= dd_threshold
     adversarial_pass = adv_sharpe_pass and adv_dd_pass
     
-    print("\n" + "-" * 70)
-    print("  Gate 7B: Adversarial Timing Decay Summary")
-    print("-" * 70)
-    print(f"  {'Metric':<18} | {'Leaked (T-0)':<15} | {'Lagged (T-1)':<15} | {'Decay Delta':<15}")
-    print(f"  Annual Return  | {ann_t0:>13.2%} | {ann_t1:>13.2%} | {ann_t1 - ann_t0:>+13.2%}")
-    print(f"  Max Drawdown   | {dd_t0:>13.2%} | {dd_t1:>13.2%} | {decay_dd:>+13.2%}")
-    print(f"  Sharpe Ratio   | {sr_t0:>13.2f} | {sr_t1:>13.2f} | {decay_sharpe:>+13.2f}")
-    print("-" * 70)
-    print(f"  Adversarial Verdict: {'✅ PASS' if adversarial_pass else '❌ FAIL'}")
-    print(f"    - Sharpe Decay Check: {'PASS' if adv_sharpe_pass else 'FAIL (Threshold > 0.40)'}")
-    print(f"    - Drawdown Decay Check: {'PASS' if adv_dd_pass else 'FAIL (Threshold > 10.0%)'}")
-    print("-" * 70)
+    logger.info("\n" + "-" * 70)
+    logger.info("  Gate 7B: Adversarial Timing Decay Summary")
+    logger.info("-" * 70)
+    logger.info(f"  {'Metric':<18} | {'Leaked (T-0)':<15} | {'Lagged (T-1)':<15} | {'Decay Delta':<15}")
+    logger.info(f"  Annual Return  | {ann_t0:>13.2%} | {ann_t1:>13.2%} | {ann_t1 - ann_t0:>+13.2%}")
+    logger.info(f"  Max Drawdown   | {dd_t0:>13.2%} | {dd_t1:>13.2%} | {decay_dd:>+13.2%}")
+    logger.info(f"  Sharpe Ratio   | {sr_t0:>13.2f} | {sr_t1:>13.2f} | {decay_sharpe:>+13.2f}")
+    logger.info("-" * 70)
+    logger.warning(f"  Adversarial Verdict: {'✅ PASS' if adversarial_pass else '❌ FAIL'}")
+    logger.info(f"    - Sharpe Decay Check: {'PASS' if adv_sharpe_pass else 'FAIL (Threshold > 0.40)'}")
+    logger.info(f"    - Drawdown Decay Check: {'PASS' if adv_dd_pass else 'FAIL (Threshold > 10.0%)'}")
+    logger.info("-" * 70)
     
     # -----------------------------------------------------------------------
     # Run standard 9-Gate Audit on the Lagged T-1 weights
     # -----------------------------------------------------------------------
-    print("\n[Step 5] Initializing NineGatesEvaluator and running standard audits on Lagged weights...")
+    logger.info("\n[Step 5] Initializing NineGatesEvaluator and running standard audits on Lagged weights...")
     signal_composite = Signal(
         weights=w_composite_t1,
         timing=None,
@@ -263,15 +267,15 @@ This gate checks the strategy performance degradation under a T-1 execution lag 
     report_path = report_dir / f"composite_portfolio_9_gates_report_{version}.md"
     report_path.write_text(markdown_content, encoding="utf-8")
     
-    print("\n" + "=" * 95)
-    print(f"9-Gate Evaluation (with Gate 7B) Completed! Report saved to:\n{report_path}")
-    print("=" * 95)
+    logger.info("\n" + "=" * 95)
+    logger.info(f"9-Gate Evaluation (with Gate 7B) Completed! Report saved to:\n{report_path}")
+    logger.info("=" * 95)
     
     # -----------------------------------------------------------------------
     # Persist back to Strategy Registry
     # -----------------------------------------------------------------------
     if persist:
-        print("\n[Step 6] Persisting composite metrics to Strategy Registry...")
+        logger.info("\n[Step 6] Persisting composite metrics to Strategy Registry...")
         summary = report.summarize()
         summary["adversarial_execution_decay"] = {
             "passed": adversarial_pass,
@@ -336,7 +340,7 @@ This gate checks the strategy performance degradation under a T-1 execution lag 
         )
         
         attach_nine_gate("composite-portfolio", version, summary)
-        print(f"Successfully registered composite portfolio with status: {status_registry}!")
+        logger.info(f"Successfully registered composite portfolio with status: {status_registry}!")
         
         # Save returns sequence(守卫审计 #5:走 lake.version_returns 身份信封,禁直写 CSV)
         rets = res_t1.returns
@@ -352,7 +356,7 @@ This gate checks the strategy performance degradation under a T-1 execution lag 
                 source="promote_composite",
                 config_hash=_vr_config_hash(config_dict),
             )
-            print(
+            logger.info(
                 f"Returns sequence saved to version_returns/"
                 f"composite-portfolio__{version}.csv(+provenance)"
             )
