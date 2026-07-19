@@ -400,6 +400,14 @@
 - **验证(落地时最低对抗集)**:① AST 升级后"真写湖"fixture 必红、"读湖+to_csv 到报告"必绿;② MONITORED_EXEMPT 缺 ADR 引用的条目守卫必红;③ factor_store 之外模块写 `data_lake/factor_store` 必红,factor_store 写其他湖区必红;④ 全部改动后守卫 PENDING 基线清零(registry 2 条 composite n_trials 除外,须走人工 workflow)。
 - **复审信号**:AST 级出现漏报实例(真写湖未被抓);豁免表条目 >3(豁免机制被滥用即回收);factor_store 区出现非缓存类数据。
 
+### ADR-039 daily round 方向④:量化策略专项扫描常备授权(外探门局部预授权)
+
+- **日期**:2026-07-19。**背景**:生成端活方向清零——`knowledge/direction_registry.json` 11 条 = 6 falsified / 4 weak / 1 mixed,0 active;自动环最近一轮 83 候选 0 过 L3、0 过 holdout;round7/8 连续两轮在同一空白区(基本面比率族)取证——内部空白区清单趋于耗尽,假设进水管成为瓶颈。既有外探通道 literature-scan 被"枯竭形式判定(窗口 4 次非生产)+ 逐次人批"锁死,判定器因窗口样本不足(1/4)迟迟不触发,事实枯竭先于形式枯竭。
+- **决策**:daily-research-round 新增**方向④「量化策略专项扫描」**(剧本 `factor_research/docs/agent_skills/quant_strategy_scan.md`),owner **常备授权**执行,不再逐次批准;轮换 ①→②→③→④,且方向①/②无可做目标时当轮 fallback 到④。ADR-034/WS-E"外探启动须人批"仅此一处局部放宽;literature-scan(机制文献扫描)维持枯竭触发 + 人批不变。
+- **边界(不变的红线)**:④只产 Hypothesis 草案(factory queue)/ direction_registry NOTE / data_source_backlog 条目 / 扫描报告;五判存活候选必过确定性 `strategy_idea_check` 预检(ADR-037,precheck 级 Envelope);业界/社区回测数字一律视为待证伪假设,不得作为有效性证据(R-LLM-001);不复制实现,因子走 canonical 层 + PIT(R-DATA-003);进搜索即记 n_trials(R-EVIDENCE-001 ④);不碰台账/晋级/部署(R-REG-001/R-WF-001)。
+- **验证**:文档级决策。落地一致性检查:剧本 / daily-research-round §2 / 定时任务 SKILL.md 三处方向枚举一致;方向④产物路径均为草案/报告区,无台账写入面。
+- **复审信号**:④连续 4 轮零存活候选(检索源枯竭,回收轮换位);或④产物出现绕过 L0-L3 直接进搜索宇宙/台账的路径(立即收回常备授权,退回逐次人批)。
+
 > 实盘/模拟盘的逐日决策**已自动落盘**:`factor_research/signals/<date>.json`(信号)+ Obsidian `30.output/A股v2.0模拟盘/`(操作卡)。本节只记**需人工复盘的关键决策**(regime 切换、风控动作、异常),不重复日常信号。
 
 | 日期 | regime | 决策 | 依据 | 复盘 |

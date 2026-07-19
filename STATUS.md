@@ -1,8 +1,13 @@
 # STATUS — 当前进度
 
-> 更新:2026-07-18。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
+> 更新:2026-07-19。任何 AI 进来先读 本文件 + [CLAUDE.md](CLAUDE.md)。
 
 ## 一句话
+
+**2026-07-19(daily round 方向④:量化策略专项扫描接入定时任务,ADR-039)**:
+  · **背景**:生成端活方向清零(`direction_registry` 11 条 = 6 falsified / 4 weak / 1 mixed,0 active);自动环最近一轮 83 候选 0 过 L3;round7/8 连续在同一空白区打转——内部空白区趋于耗尽,假设进水管成为瓶颈;literature-scan 被"枯竭形式判定+逐次人批"锁死(判定器窗口样本 1/4 不足),事实枯竭先于形式枯竭。
+  · **交付**:新剧本 [`quant_strategy_scan.md`](factor_research/docs/agent_skills/quant_strategy_scan.md)——检索源四类(卖方金工公开/策略社区/开源实现/英文可迁移)、**可行性五判**(long-only 可投/T+1 涨跌停/日频 PIT 可得/审慎成本后有肉/非证伪路换皮)、**三路分流**(信号层 Hypothesis 入 factory queue / 构造层 direction_registry NOTE / 数据需求 data_source_backlog),五判存活候选必过 `strategy_idea_check` 确定性预检(ADR-037);daily-research-round §2 扩**四方向轮换** + ①/②无目标时 fallback ④;定时任务 SKILL.md(~/.claude/scheduled-tasks/daily-research-round)同步方向枚举;ADR-039 常备授权(外探门仅此局部放宽,literature-scan 维持枯竭触发+人批不变)。
+  · **红线不变**:业界/社区回测数字一律待证伪不作证据(R-LLM-001);只产草案/报告不碰台账(R-WF-001);进搜索即记 n_trials;不复制实现、PIT 对齐(R-DATA-003)。
 
 **2026-07-18(第八、九单:语义层落地——semantics 读门面 + 数据集契约 30/30 声明化)**:
   · **定位**:语义层不新建平行系统,收敛为"canonical 注册点存语义 + `services.read` 聚合门面 PULL"。口径 canonical 家确认 = `lake/schema.py::TUSHARE_DATASETS`(加载层机械执行),契约**不进 manifest**(运行时产物,防第二真相源)。
