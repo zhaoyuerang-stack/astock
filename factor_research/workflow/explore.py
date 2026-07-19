@@ -9,6 +9,10 @@ Usage:
 """
 from __future__ import annotations
 
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 import json
 import os
 import sys
@@ -322,67 +326,67 @@ class Explorer:
 
     def run(self):
         t0 = time.time()
-        print(f"Explorer: {len(self.candidates)} candidates, {self.max_workers} workers\n")
+        logger.info(f"Explorer: {len(self.candidates)} candidates, {self.max_workers} workers\n")
 
         # ── Phase 1: parallel synthetic audit ──
-        print(f"{'='*60}\nPhase 1 (synthetic audit)\n{'='*60}")
+        logger.info(f"{'='*60}\nPhase 1 (synthetic audit)\n{'='*60}")
         t1 = time.time()
         with ProcessPoolExecutor(max_workers=self.max_workers) as ex:
             futs = {ex.submit(_run_phase1, c): c for c in self.candidates}
             for fut in as_completed(futs):
                 r = fut.result(); self.p1.append(r)
                 icon = "✅" if r["phase1_pass"] else "❌"
-                print(f"  {icon} {r['name']:<28} {r['phase1_fails']}{' '+str(r['phase1_warns']) if r['phase1_warns'] else ''}")
+                logger.info(f"  {icon} {r['name']:<28} {r['phase1_fails']}{' '+str(r['phase1_warns']) if r['phase1_warns'] else ''}")
         passed = [r for r in self.p1 if r["phase1_pass"]]
-        print(f"  → {len(passed)}/{len(self.candidates)} passed ({time.time()-t1:.0f}s)\n")
+        logger.info(f"  → {len(passed)}/{len(self.candidates)} passed ({time.time()-t1:.0f}s)\n")
         if not passed: return self._report()
 
         # ── Phase 2: parallel backtest ──
         p2_candidates = [c for c in self.candidates if c.name in {r['name'] for r in passed}]
-        print(f"{'='*60}\nPhase 2 (3-segment backtest)\n{'='*60}")
+        logger.info(f"{'='*60}\nPhase 2 (3-segment backtest)\n{'='*60}")
         t2 = time.time()
         with ProcessPoolExecutor(max_workers=min(self.max_workers, 4)) as ex:
             futs = {ex.submit(_run_phase2, c): c for c in p2_candidates}
             for fut in as_completed(futs):
                 r = fut.result(); self.p2.append(r)
                 icon = "✅" if r["phase2_pass"] else "❌"
-                print(f"  {icon} {r['name']:<28} IS={r['is_annual']:+.1%} "
+                logger.info(f"  {icon} {r['name']:<28} IS={r['is_annual']:+.1%} "
                       f"OOS={r['oos_annual']:+.1%} stress={r['stress_annual']:+.1%} "
                       f"cost={r['cost_decay']:.0%} corr={r['corr_max']:.2f}")
         passed2 = [r for r in self.p2 if r["phase2_pass"]]
-        print(f"  → {len(passed2)}/{len(p2_candidates)} passed ({(time.time()-t2)/60:.0f}m)\n")
+        logger.info(f"  → {len(passed2)}/{len(p2_candidates)} passed ({(time.time()-t2)/60:.0f}m)\n")
         if not passed2: return self._report()
 
         # ── Phase 3: sequential WF ──
         p3_candidates = [c for c in p2_candidates if c.name in {r['name'] for r in passed2}]
-        print(f"{'='*60}\nPhase 3 (Walk-Forward, sequential)\n{'='*60}")
+        logger.info(f"{'='*60}\nPhase 3 (Walk-Forward, sequential)\n{'='*60}")
         t3 = time.time()
         for i, c in enumerate(p3_candidates):
-            print(f"  [{i+1}/{len(p3_candidates)}] {c.name}...", end=" ", flush=True)
+            logger.info(f"  [{i+1}/{len(p3_candidates)}] {c.name}...", end=" ")
             r = _run_phase3(c); self.p3.append(r)
             icon = "✅" if r["phase3_pass"] else "❌"
-            print(f"{icon} WF={r['wf_annual']:+.1%} DD={r['wf_maxdd']:+.1%} "
+            logger.info(f"{icon} WF={r['wf_annual']:+.1%} DD={r['wf_maxdd']:+.1%} "
                   f"S={r['wf_sharpe']:.2f} +{r['wf_pos']}/{r['wf_tot']}")
         passed3 = [r for r in self.p3 if r["phase3_pass"]]
-        print(f"  → {len(passed3)}/{len(p3_candidates)} passed ({(time.time()-t3)/60:.0f}m)\n")
+        logger.info(f"  → {len(passed3)}/{len(p3_candidates)} passed ({(time.time()-t3)/60:.0f}m)\n")
 
-        print(f"Total: {(time.time()-t0)/60:.0f}m")
+        logger.info(f"Total: {(time.time()-t0)/60:.0f}m")
         return self._report()
 
     def _report(self):
         all_r = self.p3 if self.p3 else self.p2 if self.p2 else self.p1
         ranked = sorted(all_r, key=lambda r: r.get("wf_annual", r.get("is_annual", r.get("oos_annual", -999))), reverse=True)
 
-        print(f"\n{'='*90}")
-        print(f"FINAL RANKINGS")
-        print(f"{'='*90}")
+        logger.info(f"\n{'='*90}")
+        logger.info(f"FINAL RANKINGS")
+        logger.info(f"{'='*90}")
         hdr = f"{'#':<4} {'Name':<30} {'P1':<5} {'P2':<5} {'P3':<5} {'IS':>7} {'OOS':>7} {'WF':>7} {'WF_DD':>7} {'Shpe':>6}"
-        print(hdr); print("-" * 90)
+        logger.info(hdr); print("-" * 90)
         for i, r in enumerate(ranked, 1):
             p1 = "✅" if r.get("phase1_pass", True) else "❌"
             p2 = "✅" if r.get("phase2_pass", True) else "❌"
             p3 = "✅" if r.get("phase3_pass", True) else "❌"
-            print(f"{i:<4} {r['name']:<30} {p1:<5} {p2:<5} {p3:<5} "
+            logger.info(f"{i:<4} {r['name']:<30} {p1:<5} {p2:<5} {p3:<5} "
                   f"{r.get('is_annual',0):>+6.1%} {r.get('oos_annual',0):>+6.1%} "
                   f"{r.get('wf_annual',0):>+6.1%} {r.get('wf_maxdd',0):>+6.1%} "
                   f"{r.get('wf_sharpe',0):>+5.2f}")
@@ -397,7 +401,7 @@ class Explorer:
             "p3_survivors": len([r for r in self.p3 if r.get("phase3_pass")]),
             "results": _json_safe(ranked),
         }, ensure_ascii=False, indent=2))
-        print(f"\nReport → {rp}")
+        logger.info(f"\nReport → {rp}")
         return ranked
 
 
@@ -413,5 +417,5 @@ def _json_safe(obj):
 if __name__ == "__main__":
     candidates = make_candidates()
     niches = set(c.niche for c in candidates)
-    print(f"Generated {len(candidates)} candidates across {len(niches)} niches: {sorted(niches)}\n")
+    logger.info(f"Generated {len(candidates)} candidates across {len(niches)} niches: {sorted(niches)}\n")
     Explorer(candidates, max_workers=8).run()

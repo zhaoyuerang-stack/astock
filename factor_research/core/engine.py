@@ -19,6 +19,10 @@ Usage
 """
 from __future__ import annotations
 
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
@@ -476,7 +480,7 @@ class BacktestEngine:
             config=config,
         )
         for msg in result.anomalies:
-            print(f"🚨 [结果哨兵] {msg} —— 采信前先检查数据湖末几日截面分布", flush=True)
+            logger.warning(f"🚨 [结果哨兵] {msg} —— 采信前先检查数据湖末几日截面分布")
         return result
 
 

@@ -3,6 +3,10 @@
 两融按交易日下载沪深个股明细。北向持股来自东财每日个股统计；
 若本机代理拦截 eastmoney，会记录失败，等待网络直连规则恢复后断点续传。
 """
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 import akshare as ak
 import pandas as pd
 from lake.base import Fetcher, RateLimiter
@@ -142,7 +146,7 @@ def merge_margin(margin_dir: str = "data_lake/capital/margin",
         return None
     df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
     df.to_parquet(out, index=False)
-    print(f"[margin] 合并 {len(files)}个交易日 → {len(df)}行")
+    logger.info(f"[margin] 合并 {len(files)}个交易日 → {len(df)}行")
     return df
 
 
@@ -155,7 +159,7 @@ def merge_northbound(northbound_dir: str = "data_lake/capital/northbound",
         return None
     df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
     df.to_parquet(out, index=False)
-    print(f"[northbound] 合并 {len(files)}个交易日 → {len(df)}行")
+    logger.info(f"[northbound] 合并 {len(files)}个交易日 → {len(df)}行")
     return df
 
 
@@ -169,5 +173,5 @@ def merge_northbound_stock(northbound_dir: str = "data_lake/capital/northbound_s
     df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
     df = df.drop_duplicates(["date", "code"], keep="last").sort_values(["date", "code"])
     df.to_parquet(out, index=False)
-    print(f"[northbound_stock] 合并 {len(files)}只 → {len(df)}行")
+    logger.info(f"[northbound_stock] 合并 {len(files)}只 → {len(df)}行")
     return df

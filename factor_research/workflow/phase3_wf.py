@@ -21,6 +21,10 @@ Usage:
 """
 from __future__ import annotations
 
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -104,7 +108,7 @@ class WF3Runner:
 
     def run(self, warmup_start: str = "2010-01-01") -> dict:
         """Run Walk-Forward and return results dict."""
-        print(f"Phase 3 WF: {self.family}", flush=True)
+        logger.info(f"Phase 3 WF: {self.family}")
 
         # Load all data, then 截到 < holdout boundary(§5.2 缝③):walk-forward 的训练/测试窗口
         # 与每窗因子计算都从被裁面板派生 → 金库年(date>=boundary)不进入任何窗口或选择判定。
@@ -117,9 +121,9 @@ class WF3Runner:
         amount = amount.loc[amount.index < b]
         trade_dates = close.index
         assert_search_clean(trade_dates, label="Phase 3 walk-forward")  # 自查门
-        print(f"  Data: {close.shape[1]} stocks, "
+        logger.info(f"  Data: {close.shape[1]} stocks, "
               f"{trade_dates[0].date()}~{trade_dates[-1].date()} "
-              f"(已截金库 boundary={b.date()};原末日 {pre.date()})", flush=True)
+              f"(已截金库 boundary={b.date()};原末日 {pre.date()})")
 
         # Build windows
         all_years = sorted(set(d.year for d in trade_dates))
@@ -144,12 +148,12 @@ class WF3Runner:
             })
 
         if len(windows) < MIN_WINDOWS:
-            print(f"  ⚠️ Only {len(windows)} WF windows (need ≥{MIN_WINDOWS}). "
-                  f"Need more data history.", flush=True)
+            logger.warning(f"  ⚠️ Only {len(windows)} WF windows (need ≥{MIN_WINDOWS}). "
+                  f"Need more data history.")
             return {"family": self.family, "error": "insufficient_windows",
                     "n_windows": len(windows)}
 
-        print(f"  Windows: {len(windows)}", flush=True)
+        logger.info(f"  Windows: {len(windows)}")
 
         # ── Run WF ──
         oos_returns = []
@@ -198,9 +202,9 @@ class WF3Runner:
             })
             oos_returns.append(res_te["returns"])
 
-            print(f"    {win['test_start_year']}: train_ann={train_annual:+.1%} → "
+            logger.info(f"    {win['test_start_year']}: train_ann={train_annual:+.1%} → "
                   f"oos_ann={res_te['annual']:+.1%} oos_dd={res_te['maxdd']:+.1%} "
-                  f"oos_sharpe={res_te['sharpe']:+.2f}", flush=True)
+                  f"oos_sharpe={res_te['sharpe']:+.2f}")
 
         # ── Aggregate OOS ──
         if not oos_returns:
@@ -221,9 +225,9 @@ class WF3Runner:
 
         verdict = "PASS" if wf_annual > 0 and pos_windows >= n_windows * 2 / 3 else "FAIL"
 
-        print(f"\n  WF Aggregate OOS: annual={wf_annual:+.1%} sharpe={wf_sharpe:.2f} "
-              f"maxdd={wf_maxdd:+.1%} calmar={wf_calmar:.2f}", flush=True)
-        print(f"  Positive windows: {pos_windows}/{n_windows} → {verdict}", flush=True)
+        logger.info(f"\n  WF Aggregate OOS: annual={wf_annual:+.1%} sharpe={wf_sharpe:.2f} "
+              f"maxdd={wf_maxdd:+.1%} calmar={wf_calmar:.2f}")
+        logger.info(f"  Positive windows: {pos_windows}/{n_windows} → {verdict}")
 
         report = {
             "family": self.family,
@@ -247,7 +251,7 @@ class WF3Runner:
         out_path = OUT_DIR / f"{safe_name}_phase3_wf.json"
         out_path.write_text(json.dumps(_make_serializable(report),
                                         ensure_ascii=False, indent=2))
-        print(f"  Report → {out_path}", flush=True)
+        logger.info(f"  Report → {out_path}")
 
         return report
 
