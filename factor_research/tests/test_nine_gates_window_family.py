@@ -73,8 +73,8 @@ def test_window_family_uses_registry_config():
                side_effect=lambda amt, window=60: amt.rank(axis=1, pct=True)) as mock_fn, \
          patch("strategies.small_cap.build_rebalance_weights",
                return_value=fake_weights) as mock_build, \
-         patch("scripts.research.run_nine_gates_all._family_n_trials", return_value=7), \
-         patch("scripts.research.run_nine_gates_all.record_nine_gate_research_run"):
+         patch("workflow.nine_gate_runner._family_n_trials", return_value=7), \
+         patch("workflow.nine_gate_runner.record_nine_gate_research_run"):
         summary = run_evaluation(FAMILY, n_trials=7, persist=False, version="v1.0")
 
     # 因子函数必须按台账 factor_params 调用(window=20,非默认 60)

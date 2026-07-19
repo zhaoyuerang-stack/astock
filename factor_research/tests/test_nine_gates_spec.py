@@ -102,7 +102,7 @@ def test_run_evaluation_with_spec():
     with patch("strategy_registry._load", return_value=mock_registry_data), \
          patch("strategies.small_cap.load_price_panels", return_value=mock_prices), \
          patch("strategy_registry.attach_nine_gate") as mock_attach, \
-         patch("scripts.research.run_nine_gates_all._family_n_trials", return_value=5):
+         patch("workflow.nine_gate_runner._family_n_trials", return_value=5):
          
         summary = run_evaluation("mock-family", version="v1.0", persist=True)
         assert summary is not None

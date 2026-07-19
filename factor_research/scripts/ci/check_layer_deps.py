@@ -26,10 +26,16 @@ EXCLUDE_DIRS = {"__pycache__", ".git", "data_lake", "signals", "reports", "logs"
 # 原本只挡 scripts.research. 的黑名单扩为挡整个 scripts.(含 scripts.data /
 # scripts.ops / scripts.ci 等) —— 这五者是生产/回测/湖三层最底层,不该依赖
 # scripts/ 下任何子目录。其余 src 前缀(strategies./factors./policy./
-# scripts.data./scripts.ops. 等)未改动,含 workflow/promote.py 对
-# scripts.research.run_nine_gates_all 的已知遗留依赖(另案处理,本单不动)。
+# scripts.data./scripts.ops. 等)未改动。
+#
+# 第三条边(2026-07-19 补齐):workflow/promote.py 的 R-WF-001 唯一 9-Gate
+# 执行点原反向 import scripts.research.run_nine_gates_all——run_evaluation
+# 及其依赖已迁至 workflow/nine_gate_runner.py,scripts/research/run_nine_gates_all.py
+# 现在只是薄 CLI 壳。同五前缀范式,workflow. 直接挡整个 scripts.(而非只挡
+# scripts.research.),防止同类倒灌边复发。
 FORBIDDEN_EDGES = [
     ("run_daily", ["factory.", "scripts.", "workflow.", "knowledge.", "api.", "services."]),
+    ("workflow.", ["scripts."]),
     ("strategies.", ["factory.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
     ("factors.", ["factory.", "strategies.", "scripts.research.", "workflow.", "core.", "knowledge.", "api.", "services."]),
     # policy 是候选/持仓硬约束的底层叶子(candidate_filters/constraints),被 factors.veto

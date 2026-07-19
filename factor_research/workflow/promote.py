@@ -178,7 +178,7 @@ def _infer_nine_gate_strategy(family: str) -> str | None:
 
 def _default_nine_gate_runner(strategy_name, n_trials=15, persist=False, version=None, start=None):
     """Lazy adapter so importing promote.py stays light."""
-    from scripts.research.run_nine_gates_all import run_evaluation
+    from workflow.nine_gate_runner import run_evaluation
     return run_evaluation(
         strategy_name,
         n_trials=n_trials,
