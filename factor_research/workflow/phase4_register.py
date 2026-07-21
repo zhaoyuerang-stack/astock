@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from strategy_registry import AdmissionDict, EvidenceDict
     from workflow.phase1_synthetic import CheckResult
 
 import pandas as pd
@@ -441,9 +442,10 @@ class Phase4Register:
             dsr_ok = isinstance(_dsr_p, (int, float)) and not isinstance(_dsr_p, bool) and _dsr_p < 0.05
             reg_status = "候选" if shadow_target else (
                 "在册" if (not blocked and auto_hit and dsr_ok) else "候选")
-            reg_admission = ({"track": "standalone",
-                              "rationale": "Workflow Phase1-3 验证 + 单体达标 + DSR 显著"}
-                             if reg_status == "在册" else {})
+            reg_admission: AdmissionDict = (
+                {"track": "standalone",
+                 "rationale": "Workflow Phase1-3 验证 + 单体达标 + DSR 显著"}
+                if reg_status == "在册" else {})
 
             register_family(
                 self.family,
@@ -498,13 +500,13 @@ class Phase4Register:
 
     @staticmethod
     def _build_evidence(hypothesis_id: str, evidence_experiment_ids: list[str] | None,
-                        seed_provenance: dict[str, Any] | None) -> dict[str, Any]:
+                        seed_provenance: dict[str, Any] | None) -> EvidenceDict:
         """组装 evidence 块,把种子溯源(ADR-022)落进台账。
 
         LLM 种子起源(origin==llm_seed,或 derived 的 ancestor_origins 含 llm_seed)→ LLM 先验
         可能含金库期(2025+)行情认知,不可机械证否 → 打 semantic_seed_review 标记供人工额外审视。
         """
-        evidence = {
+        evidence: EvidenceDict = {
             "hypothesis_id": hypothesis_id,
             "experiment_ids": list(evidence_experiment_ids or []),
         }
@@ -553,7 +555,7 @@ class Phase4Register:
             return "Phase 2 offset sensitivity FAIL (调仓偏移过拟合)"
 
         # Physical Half-Life Constraint
-        config = self._build_config(p2)
+        config = self._build_config(p2 or {})
         ast = config.get("ast", {})
         execution = ast.get("execution", {})
         rebalance_days = config.get("rebalance_days", 20)

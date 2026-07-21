@@ -12,9 +12,11 @@ from __future__ import annotations
 import json
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 if TYPE_CHECKING:
+    from _typeshed import DataclassInstance as DataclassInstance
+
     from research_ledger.ledger import ResearchLedger
 
 warnings.filterwarnings("ignore")
@@ -103,7 +105,7 @@ def record_nine_gate_research_run(
     )
 
 
-def _taibook_start(family: str, version: str) -> str | None:
+def _taibook_start(family: str, version: str | None) -> str | None:
     """从台账 data_scope.period 取该版本声明的起始（'2023-2026' → '2023-01-01'）。
 
     让 DSR/回测窗口与台账声明的 OOS/全历史区间逐版精确对齐，杜绝「证据测的区间≠版本声称区间」。
@@ -113,7 +115,8 @@ def _taibook_start(family: str, version: str) -> str | None:
         data = strategy_registry._load()
         fam = next((f for f in data.get("families", []) if f["id"] == family), None)
         v = next((x for x in fam.get("versions", []) if x["version"] == version), None) if fam else None
-        period = ((v or {}).get("data_scope") or {}).get("period", "") if v else ""
+        ds = (v or {}).get("data_scope") if v else None
+        period = ds.get("period", "") if isinstance(ds, dict) else ""
         if period and "-" in period:
             yr = period.split("-")[0].strip()
             if yr.isdigit() and len(yr) == 4:
@@ -138,7 +141,7 @@ def _family_n_trials(family: str, *, path: Path | None = None) -> int:
 
 
 # 各策略的 StrategyConfig 是各自的 frozen dataclass,这里只要求"可 dataclasses.replace"。
-_ConfigT = TypeVar("_ConfigT")
+_ConfigT = TypeVar("_ConfigT", bound="DataclassInstance")
 
 
 def _apply_version_overrides(config: _ConfigT, strategy_name: str,
@@ -149,7 +152,7 @@ def _apply_version_overrides(config: _ConfigT, strategy_name: str,
     StrategyConfig 多为 frozen dataclass，用 dataclasses.replace 构造新实例（不可 setattr）。
     """
     import dataclasses
-    eff_version = version or getattr(config, "version", "")
+    eff_version = cast(str, version or getattr(config, "version", ""))
     overrides = dict(VERSION_OVERRIDES.get((strategy_name, eff_version), {}))
     if version:
         overrides["version"] = version

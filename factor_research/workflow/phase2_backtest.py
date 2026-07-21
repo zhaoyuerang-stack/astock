@@ -388,8 +388,8 @@ class Phase2Runner:
 
     def _check_decay(self, segments: dict[str, Any]) -> dict[str, Any]:
         """Check OOS/IS annual return decay。按前缀取段(OOS 标签的终点年随 boundary 变)。"""
-        is_seg = next((v for k, v in segments.items() if k.startswith("IS")), {})
-        oos_seg = next((v for k, v in segments.items() if k.startswith("OOS")), {})
+        is_seg: dict[str, Any] = next((v for k, v in segments.items() if k.startswith("IS")), {})
+        oos_seg: dict[str, Any] = next((v for k, v in segments.items() if k.startswith("OOS")), {})
 
         if not is_seg or not oos_seg:
             return {"verdict": "SKIP", "detail": "Missing IS or OOS segment."}

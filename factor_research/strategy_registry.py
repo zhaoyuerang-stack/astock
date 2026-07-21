@@ -24,7 +24,7 @@ import re
 from collections.abc import Iterable
 from datetime import UTC, date
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict, cast
 
 from engine.metrics import compute_hit
 
@@ -87,12 +87,18 @@ class EvidenceDict(TypedDict, total=False):
     production_blocked: bool
     retirement: dict[str, Any]       # retire_version 写入:reason/evidence_refs/retired_at/actor
     spec_migration: dict[str, Any]   # attach_executable_spec 写入:spec_hash/requires_revalidation
+    seed_provenance: dict[str, Any]      # phase4_register._build_evidence 写入(ADR-022 种子溯源)
+    semantic_seed_review: dict[str, Any] # 同上:LLM 种子需人工审视标记
 
 
 class DataScopeDict(TypedDict, total=False):
     source: str
     period: str
     survivorship_bias: bool
+    wf_validated: bool               # phase4_register 写入:Phase3 WF 聚合 verdict==PASS
+    phase1_audited: bool             # 同上:Phase1 检查无 FAIL
+    reproducibility: dict[str, Any]  # 同上:reproducibility_meta() 元信息
+    holdout: dict[str, Any]          # 同上:§5.2 holdout 闸摘要
 
 
 class _VersionRequired(TypedDict):
@@ -176,7 +182,7 @@ def register_family(id: str, name: str, hypothesis: str = "", regime: str = "",
         fam = {"id": id, "versions": []}
         data["families"].append(fam)
 
-    update_dict: FamilyRecord = {
+    fam.update({
         "name": name,
         "hypothesis": hypothesis,
         "regime": regime,
@@ -185,8 +191,7 @@ def register_family(id: str, name: str, hypothesis: str = "", regime: str = "",
         "style_betas": style_betas or {},
         "capacity_m": float(capacity_m),
         "failure_boundaries": failure_boundaries or {}
-    }
-    fam.update(update_dict)
+    })
     _save(data)
     return id
 
@@ -249,7 +254,7 @@ def register(family: str, version: str, desc: str, config: dict[str, Any],
     hit = bool(metrics.get("hit", False))
 
     # 2) 「在册」必须通过双轨准入
-    adm = dict(admission or {})
+    adm = cast(AdmissionDict, dict(admission or {}))
     if status == "在册":
         track = adm.get("track")
         if track is None and hit:
@@ -288,15 +293,17 @@ def register(family: str, version: str, desc: str, config: dict[str, Any],
     existing = next((v for v in fam["versions"] if v["version"] == version), None)
     reg_date = date_str or (existing.get("date") if existing else None) or str(date.today())
     fam["versions"] = [v for v in fam["versions"] if v["version"] != version]   # 同号覆盖
-    fam["versions"].append({
+    rec: VersionRecord = {
         "version": version, "date": reg_date, "desc": desc,
         "config": config, "data_scope": data_scope, "metrics": metrics,
         "status": status, "notes": notes,
         "evidence": evidence or {},
         "admission": adm,
         "nine_gate": nine_gate or {},
-        **({"executable_spec": spec_record} if spec_record else {}),
-    })
+    }
+    if spec_record:
+        rec["executable_spec"] = spec_record
+    fam["versions"].append(rec)
     fam["versions"].sort(key=lambda v: _version_key(v["version"]))
     _save(data)
     return f"{family}/{version}"
@@ -419,7 +426,7 @@ def attach_nine_gate(family: str, version: str, summary: dict[str, Any] | None,
         raise ValueError(f"版本 '{family}/{version}' 不存在")
     v["nine_gate"] = dict(summary or {})
     if evidence:
-        ev = dict(v.get("evidence") or {})
+        ev = cast(EvidenceDict, dict(v.get("evidence") or {}))
         ev.update(evidence)
         v["evidence"] = ev
     _save(data)
@@ -435,7 +442,7 @@ def attach_data_incident(family: str, version: str, incident: dict[str, Any] | N
     item = next((v for v in fam["versions"] if v["version"] == version), None)
     if item is None:
         raise ValueError(f"版本 '{family}/{version}' 不存在")
-    evidence = dict(item.get("evidence") or {})
+    evidence = cast(EvidenceDict, dict(item.get("evidence") or {}))
     incidents = list(evidence.get("data_incidents") or [])
     incident = dict(incident or {})
     incident_id = incident.get("incident_id")
@@ -528,7 +535,7 @@ def attach_executable_spec(family: str, version: str, spec: dict[str, Any],
     if item is None:
         raise ValueError(f"版本 '{family}/{version}' 不存在")
     item["executable_spec"] = {"spec": parsed.to_dict(), "spec_hash": parsed.spec_hash}
-    evidence = dict(item.get("evidence") or {})
+    evidence = cast(EvidenceDict, dict(item.get("evidence") or {}))
     evidence["spec_migration"] = {
         "spec_hash": parsed.spec_hash,
         "requires_revalidation": bool(require_revalidation),
@@ -574,7 +581,7 @@ def retire_version(family: str, version: str, *, reason: str,
         path=control_event_path or CE_DEFAULT_LOG,
     )  # 非法转换在此抛 IllegalTransition,不落盘注册表
 
-    evidence = dict(item.get("evidence") or {})
+    evidence = cast(EvidenceDict, dict(item.get("evidence") or {}))
     evidence["retirement"] = {
         "reason": reason,
         "evidence_refs": list(evidence_refs),
@@ -594,7 +601,9 @@ def show() -> None:
         print("暂无登记母策略"); return
     for fam in data["families"]:
         print(f"\n■ 母策略 {fam['id']}（{fam.get('name','')}）  status={fam.get('status','')}")
-        for k, label in (("hypothesis", "假设"), ("regime", "适用"), ("decay_signal", "失效信号")):
+        text_fields: tuple[tuple[Literal["hypothesis", "regime", "decay_signal"], str], ...] = (
+            ("hypothesis", "假设"), ("regime", "适用"), ("decay_signal", "失效信号"))
+        for k, label in text_fields:
             if fam.get(k):
                 print(f"    {label}：{fam[k]}")
 
@@ -611,7 +620,8 @@ def show() -> None:
         print(f"  {'版本':<6}{'数据口径':<26}{'年化':>8}{'回撤':>8}{'夏普':>6}{'达标':>5}{'状态':>6}  备注")
         print("  " + "-" * 100)
         for v in fam["versions"]:
-            m, ds = v.get("metrics", {}), v.get("data_scope", {})
+            m: dict[str, Any] = v.get("metrics", {})
+            ds = cast(DataScopeDict | str, v.get("data_scope", {}))
             if isinstance(ds, str):
                 scope = ds
             else:
