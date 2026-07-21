@@ -21,7 +21,7 @@ from factors.small_cap import small_cap_factor
 from strategies.small_cap import load_price_panels
 
 
-def calc_ic_decay(factor, close, forward_days_list=[1, 2, 3, 5, 10, 20, 40, 60]):
+def calc_ic_decay(factor, close, forward_days_list=(1, 2, 3, 5, 10, 20, 40, 60)):
     """计算因子与不同预测周期收益的 IC 序列和统计量。"""
     results = {}
 

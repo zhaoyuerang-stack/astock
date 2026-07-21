@@ -150,7 +150,7 @@ def build_factors(panels, universe_size=300):
     return comp, univ, value, quality
 
 
-def ic_analysis(factor, forward_ret, horizons=[5, 20, 40, 60]):
+def ic_analysis(factor, forward_ret, horizons=(5, 20, 40, 60)):
     """IC by horizon. forward_ret must be pre-computed."""
     results = {}
     for h in horizons:

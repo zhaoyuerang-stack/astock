@@ -107,7 +107,7 @@ def build_factor(panels, amount, raw_close, n_univ=300):
 # ======================================================================
 # 2. IC Analysis
 # ======================================================================
-def ic_analysis(factor, close, horizons=[5,20,40,60]):
+def ic_analysis(factor, close, horizons=(5, 20, 40, 60)):
     results = {}
     for h in horizons:
         fwd = close.pct_change(h).shift(-h)

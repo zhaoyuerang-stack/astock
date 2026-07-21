@@ -19,7 +19,7 @@ from factors.small_cap import small_cap_factor
 from strategies.small_cap import load_price_panels
 
 
-def calc_ic_decay(factor, close, forward_days_list=[1, 2, 3, 5, 10, 20, 40, 60]):
+def calc_ic_decay(factor, close, forward_days_list=(1, 2, 3, 5, 10, 20, 40, 60)):
     results = {}
     for fwd in forward_days_list:
         forward_ret = close.pct_change(fwd).shift(-fwd)
