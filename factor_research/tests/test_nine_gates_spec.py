@@ -3,16 +3,15 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from core.engine import PricePanel
-from scripts.research.run_nine_gates_all import _load_spec_from_registry, run_evaluation
+from workflow.nine_gate_runner import _load_spec_from_registry, run_evaluation
 
 
 def test_load_spec_from_registry():

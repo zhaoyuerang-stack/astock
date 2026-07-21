@@ -57,7 +57,12 @@ def test_record_research_run_appends_hash_chain_and_index():
 
 
 def test_research_run_index_classifies_decision_states():
-    from research_ledger.ledger import ResearchLedger, ResearchRunRecord, load_research_run_index, record_research_run
+    from research_ledger.ledger import (
+        ResearchLedger,
+        ResearchRunRecord,
+        load_research_run_index,
+        record_research_run,
+    )
 
     ledger = ResearchLedger(path=_tmp_path("research_ledger.jsonl"))
     index_path = _tmp_path("index.json")
@@ -97,9 +102,9 @@ def test_research_run_index_classifies_decision_states():
 
 def test_priority_research_entrypoints_record_runs():
     from research_ledger.ledger import ResearchLedger, load_research_run_index
-    from scripts.research.run_nine_gates_all import record_nine_gate_research_run
-    from scripts.research.report_nlp_pipeline import record_report_nlp_research_run
     from scripts.research.incubation_policy import record_incubation_policy_research_run
+    from scripts.research.report_nlp_pipeline import record_report_nlp_research_run
+    from workflow.nine_gate_runner import record_nine_gate_research_run
 
     ledger = ResearchLedger(path=_tmp_path("research_ledger.jsonl"))
     index_path = _tmp_path("index.json")

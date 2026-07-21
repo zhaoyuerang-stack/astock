@@ -1,7 +1,7 @@
 import pytest
 
 from governance.trial_ledger import honest_n_trials, record_trials
-from scripts.research.run_nine_gates_all import TrialCountUnknown, _family_n_trials
+from workflow.nine_gate_runner import TrialCountUnknown, _family_n_trials
 
 
 def test_honest_trial_count_includes_failed_and_parameter_attempts(tmp_path):

@@ -17,7 +17,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.research.run_nine_gates_all import _auditable, run_evaluation  # noqa: E402
+from workflow.nine_gate_runner import _auditable, run_evaluation  # noqa: E402
 
 FAMILY = "small_cap_factor__window20"
 
