@@ -27,17 +27,22 @@ import sys
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from workflow.phase1_synthetic import CheckResult
 
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT: Path = Path(__file__).resolve().parent.parent
 logger = get_logger(__name__)
-LESSONS_DIR = ROOT / "workflow" / "pending_lessons"
+LESSONS_DIR: Path = ROOT / "workflow" / "pending_lessons"
 LESSONS_DIR.mkdir(parents=True, exist_ok=True)
-_HOLDOUT_VALIDATIONS = ROOT / "data_lake" / "governance" / "holdout_validations.jsonl"
+_HOLDOUT_VALIDATIONS: Path = ROOT / "data_lake" / "governance" / "holdout_validations.jsonl"
 
 
-def _extract_nine_gate_summary(phase2_data, phase3_data) -> dict:
+def _extract_nine_gate_summary(phase2_data: dict[str, Any] | None,
+                               phase3_data: dict[str, Any] | None) -> dict[str, Any]:
     """从 workflow phase2/phase3 产出抽取可得的审计摘要写入台账（缺键安全跳过）。
 
     注意：完整 DSR/PSR/PBO 来自独立的 9-Gate 审计（run_nine_gates_all），工厂通道只产
@@ -55,7 +60,7 @@ def _extract_nine_gate_summary(phase2_data, phase3_data) -> dict:
     return {k: v for k, v in out.items() if v is not None}
 
 
-def _holdout_gate(holdout_id: str, *, min_sharpe: float = 0.6) -> tuple[str | None, dict]:
+def _holdout_gate(holdout_id: str, *, min_sharpe: float = 0.6) -> tuple[str | None, dict[str, Any]]:
     """§5.2 登记前金库闸:holdout_id 提供时,要求存在一条**通过**的 holdout 校验记录。
 
     读 data_lake/governance/holdout_validations.jsonl(由 governance.holdout.validate_on_holdout
@@ -126,7 +131,7 @@ def _python_version() -> str:
     return f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 
 
-def _dependency_versions() -> dict:
+def _dependency_versions() -> dict[str, str]:
     deps = {}
     for lib in ["pandas", "numpy", "scipy"]:
         try:
@@ -137,7 +142,7 @@ def _dependency_versions() -> dict:
     return deps
 
 
-def reproducibility_meta() -> dict:
+def reproducibility_meta() -> dict[str, Any]:
     return {
         "date": str(date.today()),
         "git_commit": _git_commit(),
@@ -200,7 +205,8 @@ def _suggest_fix(check_id: str) -> str:
     }.get(check_id, "Manual review needed.")
 
 
-def save_lessons_from_phases(phase1: list, phase2: dict, phase3: dict, family: str):
+def save_lessons_from_phases(phase1: list[CheckResult] | None, phase2: dict[str, Any] | None,
+                             phase3: dict[str, Any] | None, family: str) -> int:
     """Extract FAIL/WARN results from all phases and save as lesson drafts."""
     lessons_saved = 0
 
@@ -256,7 +262,7 @@ def save_lessons_from_phases(phase1: list, phase2: dict, phase3: dict, family: s
     return lessons_saved
 
 
-def _upsert_lesson(check_id: str, name: str, detail: str, family: str):
+def _upsert_lesson(check_id: str, name: str, detail: str, family: str) -> None:
     """Create or merge a lesson draft."""
     fp = _fingerprint(check_id, name)
     lf = LESSONS_DIR / f"{check_id}_{fp}.json"
@@ -291,11 +297,11 @@ class RegistrationReport:
     family: str
     version: str
     registered: bool
-    repro_meta: dict
+    repro_meta: dict[str, Any]
     lessons_saved: int
     detail: str = ""
     status: str = ""
-    phase_summary: dict = field(default_factory=dict)
+    phase_summary: dict[str, Any] = field(default_factory=dict)
 
     def summary(self) -> str:
         icon = "✅" if self.registered else "❌"
@@ -315,24 +321,24 @@ class RegistrationReport:
 class Phase4Register:
     """Strategy registration with reproducibility tracking."""
 
-    def __init__(self, family: str, version: str = "v1.0"):
+    def __init__(self, family: str, version: str = "v1.0") -> None:
         self.family = family
         self.version = version
 
     def register(
         self,
-        phase1_results: list,
-        phase2_data: dict,
-        phase3_data: dict,
+        phase1_results: list[CheckResult] | None,
+        phase2_data: dict[str, Any],
+        phase3_data: dict[str, Any],
         hypothesis: str = "",
         regime: str = "",
         decay_signal: str = "",
         force: bool = False,
         hypothesis_id: str = "",
-        evidence_experiment_ids: list | None = None,
+        evidence_experiment_ids: list[str] | None = None,
         target_status: str = "",
         holdout_id: str = "",
-        seed_provenance: dict | None = None,
+        seed_provenance: dict[str, Any] | None = None,
     ) -> RegistrationReport:
         """Register strategy. Saves lessons regardless; registers only if all clear or forced."""
 
@@ -491,7 +497,8 @@ class Phase4Register:
             )
 
     @staticmethod
-    def _build_evidence(hypothesis_id, evidence_experiment_ids, seed_provenance) -> dict:
+    def _build_evidence(hypothesis_id: str, evidence_experiment_ids: list[str] | None,
+                        seed_provenance: dict[str, Any] | None) -> dict[str, Any]:
         """组装 evidence 块,把种子溯源(ADR-022)落进台账。
 
         LLM 种子起源(origin==llm_seed,或 derived 的 ancestor_origins 含 llm_seed)→ LLM 先验
@@ -516,7 +523,8 @@ class Phase4Register:
                 }
         return evidence
 
-    def _check_blocked(self, p1, p2, p3) -> str | None:
+    def _check_blocked(self, p1: list[CheckResult] | None, p2: dict[str, Any] | None,
+                       p3: dict[str, Any] | None) -> str | None:
         """Return reason if registration should be blocked, or None."""
         # Phase 1: any FAIL?
         for r in (p1 or []):
@@ -567,7 +575,7 @@ class Phase4Register:
         return None
 
     @staticmethod
-    def _segments_by_role(p2) -> dict:
+    def _segments_by_role(p2: dict[str, Any] | None) -> dict[str, Any]:
         """取结构化段字典;旧报告无 segments_by_role 时按显示标签前缀归类回退。
 
         禁止精确匹配完整标签字符串:OOS 标签终点年随 holdout boundary 变
@@ -586,7 +594,7 @@ class Phase4Register:
                 roles["stress"] = seg
         return roles
 
-    def _build_metrics(self, p2, p3) -> dict:
+    def _build_metrics(self, p2: dict[str, Any], p3: dict[str, Any]) -> dict[str, Any]:
         """Build metrics dict from Phase 2+3 data."""
         m = {}
         roles = self._segments_by_role(p2)
@@ -619,7 +627,7 @@ class Phase4Register:
         return {k: round(float(v), 4) if isinstance(v, (int, float)) else v
                 for k, v in m.items()}
 
-    def _build_config(self, p2) -> dict:
+    def _build_config(self, p2: dict[str, Any]) -> dict[str, Any]:
         """Build config dict."""
         cfg = dict(p2.get("config", {}))
         from core.engine import CostModel
