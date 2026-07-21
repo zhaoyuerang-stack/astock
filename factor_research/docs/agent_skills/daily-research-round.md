@@ -11,6 +11,11 @@
 2. 读本轮账本 `factor_research/reports/research/strong_ai_rounds.jsonl` **最后一行**,确定:
    - 本轮编号 = 上轮 +1(无文件则本轮 =1);
    - 本轮方向 = 四方向轮换的下一个(见 §2);上轮若标注 `carry_over`,优先续完再轮换。
+   - **账本分叉核查(round6/7/8 三次复现的教训,必做)**:main 的账本可能落后于孤立轮分支。
+     `git branch --list 'claude/daily-round-*'` 逐个 `git log main..<branch> --oneline`,任一分支
+     持有未合并的 `strong_ai_rounds.jsonl` / `direction_registry.json` 更新时:以**各分支并集**
+     确定本轮编号与已耗尽方向(防重复 probe 烧算力),并把未合并清单写进本轮 `needs_human`
+     上报;**不擅自合并共享分支**(授权边界不变)。
 3. 环境自检(首轮尤其):工作区必须是**独立 worktree + 独立分支**(命名 `claude/daily-round-N`);
    worktree 的 `data_lake/` 无价格数据时,对只读数据建符号链接指向主仓
    `/Users/kiki/astcok/factor_research/data_lake` 的相应子目录(只读用途;湖写入仍归日更 canonical writer,本轮禁写湖核心区)。
