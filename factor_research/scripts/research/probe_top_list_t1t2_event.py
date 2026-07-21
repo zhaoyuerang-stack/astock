@@ -118,7 +118,7 @@ def attach_forward_rets(events: pd.DataFrame, close: pd.DataFrame) -> pd.DataFra
         if not np.isfinite(c0) or c0 <= 0:
             continue
 
-        def px(k):
+        def px(k, j=j):
             if k < 0 or k >= len(dates):
                 return np.nan
             v = arr[k, j]

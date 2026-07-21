@@ -336,7 +336,7 @@ def main():
             # (ast["execution"]), not a hardcoded 25/20 — otherwise the searched size is discarded.
             veto = salience_covariance_veto(close).shift(1)
             # Wrap factor_builder to match NineGatesEvaluator expectations (takes PricePanel)
-            def wrapped_builder(prices_obj):
+            def wrapped_builder(prices_obj, spec=spec):
                 return spec.factor_builder(
                     prices_obj.close, 
                     prices_obj.volume, 

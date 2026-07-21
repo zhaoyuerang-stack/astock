@@ -46,7 +46,7 @@ def test_latest_signal_delegates_to_latest_decision():
         sentinel = object()
         captured = {}
 
-        def recorder(config):
+        def recorder(config, captured=captured, sentinel=sentinel):
             captured["config"] = config
             return sentinel
 
@@ -67,7 +67,7 @@ def test_wrapper_default_arg_passes_through():
         mod = importlib.import_module(name)
         captured = {}
 
-        def recorder(config):
+        def recorder(config, captured=captured):
             captured["config"] = config
             return None
 

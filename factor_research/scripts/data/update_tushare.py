@@ -366,7 +366,8 @@ def incremental_update(names=None, lookback_days=5, end=None):
                 date_param = spec["date_param"]
                 done = set(existing[date_param].astype(str)) if len(existing) else set()
                 units = [d for d in _trade_dates(start, end) if d not in done]
-                fetch = lambda u: call(name, {date_param: u, **spec.get("params", {})}, fields)
+                fetch = lambda u, name=name, date_param=date_param, spec=spec, fields=fields: \
+                    call(name, {date_param: u, **spec.get("params", {})}, fields)
             elif mode == "by_index":
                 # 指数日线：按 ts_code+trade_date 检查缺口
                 done_pairs = set(
@@ -377,7 +378,7 @@ def incremental_update(names=None, lookback_days=5, end=None):
                     (idx, d) for idx in spec["index_codes"] for d in new_dates
                     if (idx, d) not in done_pairs
                 ]
-                fetch = lambda u: call(
+                fetch = lambda u, name=name, fields=fields: call(
                     name, {"ts_code": u[0], "start_date": u[1], "end_date": u[1]}, fields
                 )
 

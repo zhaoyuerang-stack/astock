@@ -81,7 +81,7 @@ class Fetcher:
             try:
                 self.limiter.wait()
                 box = {}
-                def _target():
+                def _target(box=box):
                     try:
                         box["df"] = self.fetch_one(key)
                     except Exception as e:

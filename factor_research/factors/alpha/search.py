@@ -359,7 +359,7 @@ class FactorSpace:
                   flush=True)
 
             # Run IS evaluation
-            is_timing_builder = (lambda c, a: timing_train) if timing_train is not None else None
+            is_timing_builder = (lambda c, a, t=timing_train: t) if timing_train is not None else None
             saved_timing = self._timing_builder
             saved_signal = self._signal_builder
             saved_engine = self._engine_builder

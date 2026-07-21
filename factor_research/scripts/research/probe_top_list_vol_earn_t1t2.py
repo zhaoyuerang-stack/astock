@@ -154,7 +154,7 @@ def attach_features(events: pd.DataFrame, close: pd.DataFrame, amount: pd.DataFr
         if not np.isfinite(c0) or c0 <= 0:
             continue
 
-        def px(k):
+        def px(k, j=j):
             if k < 0 or k >= len(dates):
                 return np.nan
             v = c_arr[k, j]
