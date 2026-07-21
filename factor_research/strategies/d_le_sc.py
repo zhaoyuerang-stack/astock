@@ -34,6 +34,10 @@ class StrategyConfig:
         return asdict(self)
 
 
+# B008 修复:frozen dataclass 不可变,模块级单例做缺省,与旧内联缺省语义等价。
+_DEFAULT_CONFIG = StrategyConfig()
+
+
 def build_d_le_sc_weights(factor: pd.DataFrame, close: pd.DataFrame, top_n: int) -> dict:
     """Converts the d-LE-SC factor panel into target weights.
 
@@ -55,7 +59,7 @@ def build_d_le_sc_weights(factor: pd.DataFrame, close: pd.DataFrame, top_n: int)
     return weights
 
 
-def run_d_le_sc_strategy(config=StrategyConfig()):
+def run_d_le_sc_strategy(config=_DEFAULT_CONFIG):
     """Runs the complete d-LE-SC Hedged strategy."""
     # Compute start date for loading data to allow warm-up lookback
     start_dt = pd.Timestamp(config.start)
@@ -149,12 +153,12 @@ def run_d_le_sc_strategy(config=StrategyConfig()):
     }
 
 
-def latest_signal(config=StrategyConfig()):
+def latest_signal(config=_DEFAULT_CONFIG):
     """Backward-compatible wrapper for :func:`latest_decision`."""
     return latest_decision(config)
 
 
-def latest_decision(config=StrategyConfig()):
+def latest_decision(config=_DEFAULT_CONFIG):
     """Returns the latest signal and holdings for live trading."""
     result = run_d_le_sc_strategy(config)
     close = result["close"]

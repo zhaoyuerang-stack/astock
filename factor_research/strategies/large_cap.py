@@ -34,7 +34,12 @@ class StrategyConfig:
     def to_dict(self):
         return asdict(self)
 
-def run_large_cap_strategy(config=StrategyConfig()):
+
+# B008 修复:frozen dataclass 不可变,模块级单例做缺省,与旧内联缺省语义等价。
+_DEFAULT_CONFIG = StrategyConfig()
+
+
+def run_large_cap_strategy(config=_DEFAULT_CONFIG):
     """Runs the complete Large-cap Growth Hedged strategy.
     
     1. Runs unified engine on growth premium long portfolio.
@@ -116,12 +121,12 @@ def run_large_cap_strategy(config=StrategyConfig()):
         "engine_result": res_long,
     }
 
-def latest_signal(config=StrategyConfig()):
+def latest_signal(config=_DEFAULT_CONFIG):
     """Backward-compatible wrapper for :func:`latest_decision`."""
     return latest_decision(config)
 
 
-def latest_decision(config=StrategyConfig()):
+def latest_decision(config=_DEFAULT_CONFIG):
     """Returns the latest signal and holdings for live trading."""
     # Run strategy
     result = run_large_cap_strategy(config)

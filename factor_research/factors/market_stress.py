@@ -20,6 +20,10 @@ class HMMStressConfig:
     filter_days: int = 60
 
 
+# B008 修复:frozen dataclass 不可变,模块级单例做缺省,与旧内联缺省语义等价。
+_DEFAULT_CFG = HMMStressConfig()
+
+
 def logsumexp(a, axis=None):
     a = np.asarray(a, dtype="float64")
     m = np.max(a, axis=axis, keepdims=True)
@@ -204,7 +208,7 @@ def identify_stress_state(model, train_features):
     return int(original_means["risk_appetite"].idxmin())
 
 
-def hmm_stress_probability(features, cfg=HMMStressConfig()):
+def hmm_stress_probability(features, cfg=_DEFAULT_CFG):
     """Return shifted stress probability, state trace, and stress-state trace.
 
     This is the backtest-safe vector path: features observed at T are shifted
@@ -247,7 +251,7 @@ def hmm_stress_probability(features, cfg=HMMStressConfig()):
     return prob.shift(1), state_trace.shift(1), stress_state_trace.shift(1)
 
 
-def latest_hmm_stress(features, target_date=None, cfg=HMMStressConfig(), model_cache=None):
+def latest_hmm_stress(features, target_date=None, cfg=_DEFAULT_CFG, model_cache=None):
     """Calculate latest same-day stress probability with a 60-day filter window."""
     model_cache = model_cache if model_cache is not None else {}
     features = features[FEATURE_COLUMNS].replace([np.inf, -np.inf], np.nan).dropna()

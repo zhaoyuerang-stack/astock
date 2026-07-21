@@ -51,13 +51,14 @@ python3 scripts/ci/check_amount_units.py
 echo ""
 echo "=== ruff 语义门禁 (F 正确性 + B bugbear + I 排序 + UP 现代化) ==="
 # 门禁口径:F/B/I/UP 全仓零违规。E 风格项(E501 超长行/E402 scripts sys.path 等)不门禁;
-# F841 B006 B007 B008 B023 B905 UP031 UP042 为存量基线(2026-07-21 评审在案,
-# 另立任务清零),清零前豁免;结构性豁免见 pyproject per-file-ignores(归档已 exclude)。
+# F841 B006 B007 B023 B905 UP031 UP042 为存量基线(2026-07-21 评审在案,
+# 分批清零中:B008 已 2026-07-21 清零并解禁,余类清零前豁免);
+# 结构性豁免见 pyproject per-file-ignores(归档已 exclude)。
 if ! python3 -m ruff --version >/dev/null 2>&1; then
   echo "❌ 当前 python3 无 ruff 模块,请用项目解释器运行或安装 ruff(≥0.15)"
   exit 1
 fi
-python3 -m ruff check --select F,B,I,UP --ignore F841,B006,B007,B008,B023,B905,UP031,UP042 .
+python3 -m ruff check --select F,B,I,UP --ignore F841,B006,B007,B023,B905,UP031,UP042 .
 
 echo ""
 echo "=== test_loop_foundations.py (防自欺地基:trial账本 + holdout金库) ==="

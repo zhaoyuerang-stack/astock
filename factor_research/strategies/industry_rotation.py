@@ -28,6 +28,11 @@ class StrategyConfig:
     def to_dict(self):
         return asdict(self)
 
+
+# B008 修复:frozen dataclass 不可变,模块级单例做缺省,与旧内联缺省语义等价。
+_DEFAULT_CONFIG = StrategyConfig()
+
+
 def vectorized_rolling_corr(df1, df2, window=20):
     mean1 = df1.rolling(window).mean()
     mean2 = df2.rolling(window).mean()
@@ -236,7 +241,7 @@ def aggregate_industry_data(close, amount, stock_to_ind):
         
     return ind_returns, ind_amounts, ind_groups
 
-def run_industry_rotation_strategy(config=StrategyConfig()):
+def run_industry_rotation_strategy(config=_DEFAULT_CONFIG):
     """Runs the complete SW L2 Industry Rotation strategy (supports v1.0 - v1.4)."""
     # 1. Load data
     if config.version in ["v1.3", "v1.4"]:
@@ -408,12 +413,12 @@ def run_industry_rotation_strategy(config=StrategyConfig()):
         "timing": timing_signal
     }
 
-def latest_signal(config=StrategyConfig()):
+def latest_signal(config=_DEFAULT_CONFIG):
     """Backward-compatible wrapper for :func:`latest_decision`."""
     return latest_decision(config)
 
 
-def latest_decision(config=StrategyConfig()):
+def latest_decision(config=_DEFAULT_CONFIG):
     """Returns the latest signal and holdings for live trading."""
     result = run_industry_rotation_strategy(config)
     close = result["close"]

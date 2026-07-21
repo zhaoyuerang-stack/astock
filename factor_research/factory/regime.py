@@ -34,6 +34,10 @@ class RegimeConfig:
     breadth_ma: int = 20        # MA 扩散度 MA 窗口
 
 
+# B008 修复:frozen dataclass 不可变,模块级单例做缺省,与旧内联缺省语义等价。
+_DEFAULT_CFG = RegimeConfig()
+
+
 class RegimeEngine:
     """多维市场环境分类器."""
 
@@ -41,7 +45,7 @@ class RegimeEngine:
         self,
         close: pd.DataFrame,
         amount: pd.DataFrame,
-        cfg: RegimeConfig = RegimeConfig(),
+        cfg: RegimeConfig = _DEFAULT_CFG,
     ):
         self.close = close
         self.amount = amount

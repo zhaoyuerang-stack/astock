@@ -28,7 +28,12 @@ class StrategyConfig:
     def to_dict(self):
         return asdict(self)
 
-def run_hq_momentum_strategy(config=StrategyConfig()):
+
+# B008 修复:frozen dataclass 不可变,模块级单例做缺省,与旧内联缺省语义等价。
+_DEFAULT_CONFIG = StrategyConfig()
+
+
+def run_hq_momentum_strategy(config=_DEFAULT_CONFIG):
     """Runs the complete High-Quality Momentum Hedged strategy."""
     from factors.large_cap import load_clean_panels_with_growth
     
@@ -94,12 +99,12 @@ def run_hq_momentum_strategy(config=StrategyConfig()):
         "engine_result": res_long,
     }
 
-def latest_signal(config=StrategyConfig()):
+def latest_signal(config=_DEFAULT_CONFIG):
     """Backward-compatible wrapper for :func:`latest_decision`."""
     return latest_decision(config)
 
 
-def latest_decision(config=StrategyConfig()):
+def latest_decision(config=_DEFAULT_CONFIG):
     """Returns the latest signal and holdings for live trading."""
     result = run_hq_momentum_strategy(config)
     

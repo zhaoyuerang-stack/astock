@@ -39,6 +39,11 @@ class StrategyConfig:
         return asdict(self)
 
 
+# B008 修复:frozen dataclass 实例不可变,模块级单例做缺省与
+# 原来的默认 StrategyConfig() 语义逐字等价(本就共享同一实例)。
+_DEFAULT_CONFIG = StrategyConfig()
+
+
 def _drop_star(*panels):
     """从价量面板剔除科创板(688)列 —— 显式 universe 策略,不依赖数据 bug 隐式排除。"""
     out = []
@@ -113,7 +118,7 @@ def build_rebalance_weights(factor, close, top_n, rebalance_days, *, veto_factor
 # Strategy execution via unified engine
 # ---------------------------------------------------------------------------
 
-def run_small_cap_strategy(config=StrategyConfig()):
+def run_small_cap_strategy(config=_DEFAULT_CONFIG):
     """Run small-cap-size strategy via BacktestEngine."""
     close, volume, amount = load_price_panels(config.start)
     if config.exclude_star:
@@ -159,12 +164,12 @@ def run_small_cap_strategy(config=StrategyConfig()):
     }
 
 
-def latest_signal(config=StrategyConfig()):
+def latest_signal(config=_DEFAULT_CONFIG):
     """Backward-compatible wrapper for :func:`latest_decision`."""
     return latest_decision(config)
 
 
-def latest_decision(config=StrategyConfig()):
+def latest_decision(config=_DEFAULT_CONFIG):
     """Latest signal for live trading."""
     result = run_small_cap_strategy(config)
     close = result["close"]
@@ -188,7 +193,7 @@ def latest_decision(config=StrategyConfig()):
 # Legacy compat: delegate to engine
 # ---------------------------------------------------------------------------
 
-def backtest_weights(close, scheduled_weights, timing_signal=None, config=StrategyConfig()):
+def backtest_weights(close, scheduled_weights, timing_signal=None, config=_DEFAULT_CONFIG):
     """.. deprecated:: Use core.engine.BacktestEngine.run() instead.
 
     Kept as a thin compatibility wrapper for research scripts that have not

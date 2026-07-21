@@ -57,6 +57,10 @@ class StrategyConfig:
         return f"cfg(top={self.top_n},reb={self.rebalance_freq},t={self.timing_kind})"
 
 
+# B008 修复:frozen dataclass 不可变,模块级单例做缺省,与旧内联缺省语义等价。
+_DEFAULT_CONFIG = StrategyConfig()
+
+
 # 默认 grid — 与现有 LIVE 配置故意拉开差距
 DEFAULT_CONFIG_GRID: list[StrategyConfig] = [
     StrategyConfig(top_n=25, rebalance_freq="20D", timing_kind="small_cap_ma16"),
@@ -119,7 +123,7 @@ def run_candidate_returns(
     volume: pd.DataFrame,
     amount: pd.DataFrame,
     start: str = "2018-01-01",
-    config: StrategyConfig = StrategyConfig(),
+    config: StrategyConfig = _DEFAULT_CONFIG,
 ) -> pd.Series:
     """跑候选 hypothesis 的 daily returns，按 config 决定 top_n/timing/rebal。"""
     fn = _resolve_factor_fn(hyp.factor_fn_name)
