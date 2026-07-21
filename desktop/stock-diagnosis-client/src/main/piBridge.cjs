@@ -12,6 +12,31 @@ const DEFAULT_AGENT_CLI_PATH = path.join(DEFAULT_RESEARCH_ROOT, "apps", "agent_c
 const DEFAULT_EXTENSION_PATH = path.join(__dirname, "piExtensions", "astockCli.ts");
 const DEFAULT_TIMEOUT_MS = 60000;
 
+/** Side-channel only — never mutates enumerable fields of agent-turn results. */
+const agentTurnTiming = new WeakMap();
+
+function setAgentTurnTiming(result, timing) {
+  if (!result || typeof result !== "object") return;
+  try {
+    agentTurnTiming.set(result, {
+      pi_ms: Math.max(0, Math.round(Number(timing?.pi_ms) || 0)),
+      tool_count: Math.max(0, Math.round(Number(timing?.tool_count) || 0)),
+      tool_ms_sum: Math.max(0, Math.round(Number(timing?.tool_ms_sum) || 0)),
+    });
+  } catch (_error) {
+    // WeakMap set must never break Pi path.
+  }
+}
+
+function getAgentTurnTiming(result) {
+  if (!result || typeof result !== "object") return null;
+  return agentTurnTiming.get(result) || null;
+}
+
+function hrtimeMsSince(startNs) {
+  return Number(process.hrtime.bigint() - startNs) / 1e6;
+}
+
 const SYSTEM_PROMPT = [
   "你是 AStock Lens 的本地量化研究 Agent。你像 Codex 一样用工具读系统，而不是靠猜。",
   `唯一可信的系统事实入口是工具 ${PI_CLI_TOOL}。先按需 catalog/调用能力，再回答。`,
@@ -218,6 +243,11 @@ function runPiJsonProcess(command, args, options = {}) {
   ]);
 
   return new Promise((resolve) => {
+    const processStartNs = process.hrtime.bigint();
+    const toolStarts = new Map();
+    let toolCount = 0;
+    let toolMsSum = 0;
+
     const child = spawn(command, args, {
       cwd: options.cwd,
       env: options.env,
@@ -229,15 +259,42 @@ function runPiJsonProcess(command, args, options = {}) {
     let timedOut = false;
     let settled = false;
 
+    function noteToolTiming(event) {
+      if (!event || typeof event !== "object") return;
+      if (event.type === "tool_execution_start" && event.toolCallId) {
+        toolStarts.set(event.toolCallId, process.hrtime.bigint());
+        return;
+      }
+      if (event.type === "tool_execution_end") {
+        toolCount += 1;
+        if (event.toolCallId && toolStarts.has(event.toolCallId)) {
+          toolMsSum += hrtimeMsSince(toolStarts.get(event.toolCallId));
+          toolStarts.delete(event.toolCallId);
+        }
+      }
+    }
+
     function retainLine(line) {
       const trimmed = line.trim();
       if (!trimmed) return;
       try {
         const event = JSON.parse(trimmed);
-        if (retainedTypes.has(event.type)) retainedEvents.push(event);
+        if (retainedTypes.has(event.type)) {
+          retainedEvents.push(event);
+          noteToolTiming(event);
+        }
       } catch (_error) {
         // Ignore non-JSON startup output; it is never evidence.
       }
+    }
+
+    function settle(result) {
+      setAgentTurnTiming(result, {
+        pi_ms: hrtimeMsSince(processStartNs),
+        tool_count: toolCount,
+        tool_ms_sum: toolMsSum,
+      });
+      resolve(result);
     }
 
     child.stdout.setEncoding("utf8");
@@ -260,7 +317,7 @@ function runPiJsonProcess(command, args, options = {}) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve({
+      settle({
         ...parsePiJsonEventStream(retainedEvents.map((event) => JSON.stringify(event)).join("\n")),
         ready: false,
         error: error.message,
@@ -274,14 +331,14 @@ function runPiJsonProcess(command, args, options = {}) {
       retainLine(stdoutRemainder);
       const result = parsePiJsonEventStream(retainedEvents.map((event) => JSON.stringify(event)).join("\n"));
       if (timedOut) {
-        resolve({ ...result, ready: false, error: `Pi agent timed out after ${options.timeout || DEFAULT_TIMEOUT_MS}ms` });
+        settle({ ...result, ready: false, error: `Pi agent timed out after ${options.timeout || DEFAULT_TIMEOUT_MS}ms` });
         return;
       }
       if (code !== 0) {
-        resolve({ ...result, ready: false, error: stderr.trim() || `Pi exited with code ${code}` });
+        settle({ ...result, ready: false, error: stderr.trim() || `Pi exited with code ${code}` });
         return;
       }
-      resolve(result);
+      settle(result);
     });
   });
 }
@@ -339,9 +396,16 @@ function createPiBridge(options = {}) {
     },
 
     async runAgentTurn({ prompt, context = {}, skills = [], selectedSkill = null } = {}) {
+      const turnStartNs = process.hrtime.bigint();
       const status = await detectPi(command);
       if (!status.available) {
-        return { ready: false, text: "", cliCalls: [], error: status.error };
+        const result = { ready: false, text: "", cliCalls: [], error: status.error };
+        setAgentTurnTiming(result, {
+          pi_ms: hrtimeMsSince(turnStartNs),
+          tool_count: 0,
+          tool_ms_sum: 0,
+        });
+        return result;
       }
 
       const agentPrompt = buildAgentTurnPrompt({ prompt, context, skills, selectedSkill });
@@ -367,7 +431,7 @@ function createPiBridge(options = {}) {
           env: piEnv,
         });
       } catch (error) {
-        return {
+        const result = {
           ready: false,
           text: "",
           cliCalls: [],
@@ -375,6 +439,12 @@ function createPiBridge(options = {}) {
             ? `Pi agent timed out after ${timeout}ms`
             : error.stderr?.trim() || error.message,
         };
+        setAgentTurnTiming(result, {
+          pi_ms: hrtimeMsSince(turnStartNs),
+          tool_count: 0,
+          tool_ms_sum: 0,
+        });
+        return result;
       }
     },
   };
@@ -390,8 +460,10 @@ module.exports = {
   compactTurns,
   createPiBridge,
   detectPi,
+  getAgentTurnTiming,
   parseCatalog,
   parseConfiguredModels,
   parsePiJsonEventStream,
   runPiJsonProcess,
+  setAgentTurnTiming,
 };

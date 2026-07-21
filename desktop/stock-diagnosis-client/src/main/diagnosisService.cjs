@@ -1,5 +1,6 @@
 const { extractStockCode } = require("./readServiceClient.cjs");
-const { PI_CLI_TOOL } = require("./piBridge.cjs");
+const { PI_CLI_TOOL, getAgentTurnTiming } = require("./piBridge.cjs");
+const { recordDiagnosisRoundTiming } = require("./roundTiming.cjs");
 const skillDefinitions = require("../shared/skills.json");
 
 const TASK_STEPS = [
@@ -704,6 +705,20 @@ function buildAgentOnlyDiagnosis(prompt, context, selectedSkill, agentTurn) {
   return attachPiAgentTurn(diagnosis, agentTurn, { useText: hasText });
 }
 
+function emitRoundTiming(pathLabel, agentTurn) {
+  try {
+    const timing = getAgentTurnTiming(agentTurn) || {};
+    recordDiagnosisRoundTiming({
+      path: pathLabel,
+      piMs: timing.pi_ms,
+      toolCount: timing.tool_count,
+      toolMsSum: timing.tool_ms_sum,
+    });
+  } catch (_error) {
+    // Pure observation: never surface timing failures to callers.
+  }
+}
+
 function createDiagnosisService({ readClient, piBridge } = {}) {
   if (!readClient) throw new Error("readClient is required");
 
@@ -717,7 +732,9 @@ function createDiagnosisService({ readClient, piBridge } = {}) {
 
       // Product shape follows what Pi actually called — not keyword hardcoding.
       if (ideaCheck || selectedSkill?.mode === "strategy_precheck") {
-        return buildStrategyDiagnosisFromPi(prompt, context, selectedSkill, agentTurn, ideaCheck);
+        const diagnosis = buildStrategyDiagnosisFromPi(prompt, context, selectedSkill, agentTurn, ideaCheck);
+        emitRoundTiming("strategy", agentTurn);
+        return diagnosis;
       }
 
       const cliProfile = profileFromAgentTurn(agentTurn);
@@ -757,6 +774,7 @@ function createDiagnosisService({ readClient, piBridge } = {}) {
         if (!selectedSkill?.requiresStock && !piCalledStockTools(agentTurn)) {
           const diagnosis = buildAgentOnlyDiagnosis(prompt, context, selectedSkill, agentTurn);
           diagnosis.turns = appendTurns(context, prompt, diagnosis);
+          emitRoundTiming("agent_only", agentTurn);
           return diagnosis;
         }
         let diagnosis = unresolvedDiagnosis(prompt, selectedSkill, context);
@@ -765,6 +783,8 @@ function createDiagnosisService({ readClient, piBridge } = {}) {
           useText: true,
         });
         diagnosis.turns = appendTurns(context, prompt, diagnosis);
+        // Stock-intent path without a resolved code (skill/tools asked for ticker).
+        emitRoundTiming("stock", agentTurn);
         return diagnosis;
       }
 
@@ -803,6 +823,7 @@ function createDiagnosisService({ readClient, piBridge } = {}) {
         useText: true,
       });
       diagnosis.turns = appendTurns(context, prompt, diagnosis);
+      emitRoundTiming("stock", agentTurn);
       return diagnosis;
     },
   };
