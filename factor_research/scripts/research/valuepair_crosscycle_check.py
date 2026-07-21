@@ -64,17 +64,18 @@ from scripts.research.signal_source_probe import (  # noqa: E402
     _xcorr,
 )
 
-HOLDOUT_START = pd.Timestamp("2025-01-01")  # app_config/settings.yaml::holdout.start
-DATA_END = pd.Timestamp("2024-12-31")
+from governance.holdout import assert_search_clean, boundary  # noqa: E402
+
 YEARS = list(range(2018, 2025))  # 2018..2024
 
 
 def _enforce_holdout_boundary(df: pd.DataFrame, label: str) -> pd.DataFrame:
-    """立即截断到 holdout 边界之前;不得让任何后续计算看到 2025 年及以后的数据。"""
-    truncated = df[df.index <= DATA_END]
-    assert truncated.index.max() < HOLDOUT_START, (
-        f"{label}: 截断后仍触及 holdout 边界 {HOLDOUT_START.date()},P0 违规"
+    """立即截断到 holdout 边界之前;边界唯一真相源 = governance.holdout.boundary()。"""
+    truncated = df[df.index < boundary()]
+    assert not truncated.empty, (
+        f"{label}: 截断后为空(输入全部落在 holdout 金库内),P0 违规"
     )
+    assert_search_clean(truncated.index, label=label)
     return truncated
 
 
@@ -125,7 +126,7 @@ def crosscycle_check(factor_ref: str, universe: str = "all") -> dict:
         "factor": factor_ref,
         "universe": universe,
         "window": {"start": "2018-01-01", "end": "2024-12-31"},
-        "holdout_boundary": str(HOLDOUT_START.date()),
+        "holdout_boundary": str(boundary().date()),
         "by_year": by_year,
         # 全窗与 round7/8 同定义的 IS/OOS 复算(交叉核对口径一致性用,非新证据)。
         "cross_check_vs_round78": {
