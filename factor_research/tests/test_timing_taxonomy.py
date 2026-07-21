@@ -40,7 +40,7 @@ def test_small_cap_exposure_signal_matches_legacy_small_cap_timing():
     new = small_cap_exposure_signal(close, amount, ma_window=16)
     old = small_cap_timing(close, amount, ma_window=16)
     assert len(new) == 3
-    for a, b in zip(new, old):
+    for a, b in zip(new, old, strict=True):
         pd.testing.assert_series_equal(a, b)
 
 

@@ -1093,7 +1093,7 @@ def test_topn_turnover_proxy():
     # 每期 top-2 完全不同 → churn 1.0
     rot = pd.DataFrame(0.0, index=dates, columns=cols)
     picks = [["A", "B"], ["C", "D"], ["E", "F"], ["A", "B"]]
-    for d, pk in zip(dates, picks):
+    for d, pk in zip(dates, picks, strict=True):
         for j, c in enumerate(pk):
             rot.loc[d, c] = 10 - j
     assert abs(topn_turnover(rot, top_n=2) - 1.0) < 1e-9

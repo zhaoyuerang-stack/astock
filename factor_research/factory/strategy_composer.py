@@ -131,7 +131,7 @@ class StrategyComposer:
         combos = []
 
         for leg_tuple in product(*leg_lists):
-            leg_map = dict(zip(regime_names, leg_tuple))
+            leg_map = dict(zip(regime_names, leg_tuple, strict=True))
             r = self._compose_returns(leg_map)
             if len(r) < 100: continue
 

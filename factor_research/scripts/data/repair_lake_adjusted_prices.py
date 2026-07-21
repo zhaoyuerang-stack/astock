@@ -45,7 +45,7 @@ def main():
     merged_ref["adj_factor"] = merged_ref["close"] / merged_ref["raw_close"]
     
     # Map of code -> adj_factor
-    adj_factors = dict(zip(merged_ref["code"], merged_ref["adj_factor"]))
+    adj_factors = dict(zip(merged_ref["code"], merged_ref["adj_factor"], strict=True))
     print(f"Calculated adjustment factors for {len(adj_factors)} stocks.")
     
     # Perform repair
@@ -70,10 +70,10 @@ def main():
             continue
             
         # Map codes to raw prices on this date
-        raw_close_map = dict(zip(raw_on_date["code"], raw_on_date["raw_close"]))
-        raw_open_map = dict(zip(raw_on_date["code"], raw_on_date["raw_open"]))
-        raw_high_map = dict(zip(raw_on_date["code"], raw_on_date["raw_high"]))
-        raw_low_map = dict(zip(raw_on_date["code"], raw_on_date["raw_low"]))
+        raw_close_map = dict(zip(raw_on_date["code"], raw_on_date["raw_close"], strict=True))
+        raw_open_map = dict(zip(raw_on_date["code"], raw_on_date["raw_open"], strict=True))
+        raw_high_map = dict(zip(raw_on_date["code"], raw_on_date["raw_high"], strict=True))
+        raw_low_map = dict(zip(raw_on_date["code"], raw_on_date["raw_low"], strict=True))
         
         # Get the rows in daily_all on this date
         date_mask = df["date"] == target_date

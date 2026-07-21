@@ -72,7 +72,7 @@ def main(target_dates: list[str]) -> int:
             if expected <= 0 or abs(stored / expected - 1) <= 0.05:
                 continue  # 未污染(含因子≈1 的新股)
             backups.append(df.loc[[idx]].assign(code=code))
-            for col, rcol in zip(PRICE_COLS, ["raw_open", "raw_high", "raw_low", "raw_close"]):
+            for col, rcol in zip(PRICE_COLS, ["raw_open", "raw_high", "raw_low", "raw_close"], strict=True):
                 df.at[idx, col] = float(rc.loc[d, rcol]) * factor
             df.at[idx, "amount"] = float(df.at[idx, "volume"]) * float(df.at[idx, "close"])
             fixed_rows += 1

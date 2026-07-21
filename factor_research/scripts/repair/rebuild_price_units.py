@@ -234,7 +234,7 @@ def _stats(con: duckdb.DuckDBPyConnection, query: str) -> dict:
         "close_proxy_rows",
         "unresolved_rows",
     )
-    return {key: int(value) for key, value in zip(keys, row)}
+    return {key: int(value) for key, value in zip(keys, row, strict=True)}
 
 
 def _validation(con: duckdb.DuckDBPyConnection, query: str) -> dict:

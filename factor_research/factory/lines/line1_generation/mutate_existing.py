@@ -288,7 +288,7 @@ def mutate_factor(
     fn_short = factor_fn_name.rsplit(".", 1)[-1]
 
     for combo in itertools.product(*param_values):
-        params = dict(zip(param_names, combo))
+        params = dict(zip(param_names, combo, strict=True))
         name_suffix = "_".join(f"{k}{v}" for k, v in params.items())
 
         yield Hypothesis(

@@ -40,7 +40,7 @@ def test_builder_never_sees_future_than_window_end():
 
     # 每次喂给 builder 的最大日期 = 对应窗口的 test_end,绝不超过
     assert len(seen_max_dates) == len(wins)
-    for seen, w in zip(seen_max_dates, wins):
+    for seen, w in zip(seen_max_dates, wins, strict=True):
         assert seen <= w.test_end, "builder 看到了 test_end 之后的未来数据 —— 因果截断失效"
 
 

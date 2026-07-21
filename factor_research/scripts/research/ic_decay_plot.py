@@ -82,7 +82,7 @@ def main():
     ax1.set_ylabel("IC Mean")
     ax1.set_title("IC Mean vs Forward Horizon")
     ax1.legend()
-    for bar, val in zip(bars, y_mean):
+    for bar, val in zip(bars, y_mean, strict=True):
         ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.003,
                 f"{val:+.3f}", ha="center", va="bottom", fontsize=8)
 
@@ -96,7 +96,7 @@ def main():
     ax2.set_ylabel("ICIR")
     ax2.set_title("ICIR vs Forward Horizon")
     ax2.legend()
-    for xi, yi in zip(x, y_icir):
+    for xi, yi in zip(x, y_icir, strict=True):
         ax2.annotate(f"{yi:.2f}", (xi, yi), textcoords="offset points",
                     xytext=(0, 8), ha="center", fontsize=8)
 
@@ -123,7 +123,7 @@ def main():
     data_for_box = [ic_series[f].dropna().values for f in forward_days]
     bp = ax4.boxplot(data_for_box, labels=[f"{f}D" for f in forward_days],
                      patch_artist=True, showfliers=False)
-    for patch, fwd in zip(bp["boxes"], forward_days):
+    for patch, fwd in zip(bp["boxes"], forward_days, strict=True):
         if stats[fwd]["mean"] > 0:
             patch.set_facecolor("#2ecc71")
         else:

@@ -371,7 +371,7 @@ def incremental_update(names=None, lookback_days=5, end=None):
             elif mode == "by_index":
                 # 指数日线：按 ts_code+trade_date 检查缺口
                 done_pairs = set(
-                    zip(existing["ts_code"].astype(str), existing["trade_date"].astype(str))
+                    zip(existing["ts_code"].astype(str), existing["trade_date"].astype(str), strict=True)
                 ) if len(existing) else set()
                 new_dates = _trade_dates(start, end)
                 units = [

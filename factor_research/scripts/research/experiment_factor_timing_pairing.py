@@ -111,7 +111,7 @@ def main():
         param_values = [spec["param_grid"][n] for n in param_names]
         fn_short = fn_name.rsplit(".", 1)[-1]
         for combo in itertools.product(*param_values):
-            params = dict(zip(param_names, combo))
+            params = dict(zip(param_names, combo, strict=True))
             name = f"{fn_short}__" + "_".join(f"{k}{v}" for k, v in params.items())
             factor = build_factor(fn_name, params, close, volume, amount)
             if factor is not None:

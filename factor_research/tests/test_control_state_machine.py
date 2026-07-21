@@ -17,7 +17,7 @@ from governance.state_machine import (
 
 def test_legal_happy_path():
     chain = ["DRAFT", "CANDIDATE", "VALIDATED", "REGISTERED", "DEPLOYED"]
-    for a, b in zip(chain, chain[1:]):
+    for a, b in zip(chain, chain[1:], strict=False):
         assert_transition(a, b)  # 不抛即合法
 
 

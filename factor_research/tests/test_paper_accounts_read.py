@@ -134,7 +134,7 @@ def test_backtest_deviation_matches_hand_calculation(hermetic_root):
     navs = [1_000_000.0]
     for _ in range(len(dates) - 1):
         navs.append(navs[-1] * (1 + daily_ret))
-    nav_rows = [(d, nav, nav / 1_000_000.0 - 1.0) for d, nav in zip(dates, navs)]
+    nav_rows = [(d, nav, nav / 1_000_000.0 - 1.0) for d, nav in zip(dates, navs, strict=True)]
     _write_nav_csv(acc_dir, nav_rows)
     # 回测收益序列同窗:每日 +0.5%(与 paper 逐日 +1% 有稳定差,便于手算 tracking_error)
     bt_daily_ret = 0.005

@@ -112,7 +112,7 @@ def rank_strategies(
         r_sharpe = _ranks("sharpe", -np.inf)
         r_calmar = _ranks("calmar", -np.inf)
         r_resid = _ranks("residual_sharpe", -np.inf)
-        for e, a, b, c in zip(eligible, r_sharpe, r_calmar, r_resid):
+        for e, a, b, c in zip(eligible, r_sharpe, r_calmar, r_resid, strict=True):
             e["score"] = round(float((a + b + c) / 3.0), 3)
         eligible.sort(key=lambda e: (e["score"], e["name"]))
 

@@ -31,7 +31,7 @@ def load_industry_groups():
     """Load latest industry mapping from fundamental parquet."""
     fund = pd.read_parquet("data_lake/fundamental_batch.parquet", columns=["code", "avail_date", "industry"])
     mapping = fund.dropna(subset=["industry"]).sort_values("avail_date").drop_duplicates("code", keep="last")
-    stock_to_ind = dict(zip(mapping["code"], mapping["industry"]))
+    stock_to_ind = dict(zip(mapping["code"], mapping["industry"], strict=True))
     return stock_to_ind
 
 def compute_salience_factors(close, W=20, theta=0.1, delta=0.7):

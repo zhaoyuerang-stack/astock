@@ -173,7 +173,7 @@ class FactorSpace:
         results = []
 
         for i, combo in enumerate(combos):
-            params = dict(zip(axis_names, combo))
+            params = dict(zip(axis_names, combo, strict=True))
             factor = self._build_factor(params, data)
             if factor is None:
                 continue

@@ -155,7 +155,7 @@ def main():
         param_values = [spec["param_grid"][n] for n in param_names]
         fn_short = fn_name.rsplit(".", 1)[-1]
         for combo in itertools.product(*param_values):
-            params = dict(zip(param_names, combo))
+            params = dict(zip(param_names, combo, strict=True))
             all_candidates.append((fn_name, params, fn_short))
 
     print(f"\n  候选: {len(all_candidates)} 个因子参数组合")

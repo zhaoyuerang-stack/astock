@@ -188,7 +188,7 @@ def scan_direct_holdout_access(src: str, label: str = "") -> list[str]:
             )
         elif isinstance(node, ast.Compare):
             left = node.left
-            for op, right in zip(node.ops, node.comparators):
+            for op, right in zip(node.ops, node.comparators, strict=True):
                 reads_after_boundary = (
                     isinstance(op, (ast.Gt, ast.GtE))
                     and _contains_boundary_ref(right, boundary_names)
@@ -271,7 +271,7 @@ def check_boundary_monotonic() -> list[tuple[str, str]]:
     except Exception as exc:  # noqa: BLE001
         return [("app_config/holdout_boundary_history.jsonl", f"账本解析失败: {exc}")]
     out = []
-    for prev, cur in zip(bs, bs[1:]):
+    for prev, cur in zip(bs, bs[1:], strict=False):
         if cur <= prev:
             out.append(("app_config/holdout_boundary_history.jsonl",
                         f"边界非严格递增:{cur} <= {prev} —— 后退/重复 = 复活已偷看金库(只进不退)。"))

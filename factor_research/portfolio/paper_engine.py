@@ -221,7 +221,7 @@ def load_names():
     fp = ROOT / "data_lake/meta/codes.parquet"
     if fp.exists():
         df = pd.read_parquet(fp)
-        return dict(zip(df["code"].astype(str), df["name"]))
+        return dict(zip(df["code"].astype(str), df["name"], strict=True))
     return {}
 
 

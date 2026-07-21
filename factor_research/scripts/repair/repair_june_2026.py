@@ -60,7 +60,7 @@ for i, fp in enumerate(files):
             raw_row = df_raw[df_raw["date"] == d].iloc[0]
             
             # Update OHLC
-            for col, rcol in zip(PRICE_COLS, ["raw_open", "raw_high", "raw_low", "raw_close"]):
+            for col, rcol in zip(PRICE_COLS, ["raw_open", "raw_high", "raw_low", "raw_close"], strict=True):
                 df.at[df_idx, col] = float(raw_row[rcol]) * ref_factor
             # Update amount
             df.at[df_idx, "amount"] = float(df.at[df_idx, "volume"]) * float(df.at[df_idx, "close"])

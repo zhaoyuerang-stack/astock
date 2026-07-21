@@ -147,7 +147,7 @@ def _ic_worker(args):
         s = ic_summary(ic)
         row[f"ICIR_{p}d"] = s["ICIR"]
         icir_vals.append(abs(s["ICIR"]))
-    weighted_score = sum(w * v for w, v in zip(WEIGHTS, icir_vals))
+    weighted_score = sum(w * v for w, v in zip(WEIGHTS, icir_vals, strict=True))
     old_pass = abs(row.get("ICIR_1d", 0)) > OLD_GATE_THRESHOLD
     row["weighted_score"] = weighted_score
     row["old_pass"] = old_pass
@@ -180,7 +180,7 @@ def main():
         param_values = [spec["param_grid"][n] for n in param_names]
         fn_short = fn_name.rsplit(".", 1)[-1]
         for combo in itertools.product(*param_values):
-            params = dict(zip(param_names, combo))
+            params = dict(zip(param_names, combo, strict=True))
             name = f"{fn_short}__{'_'.join(f'{k}{v}' for k, v in params.items())}"
             candidates.append({
                 "name": name, "fn_name": fn_name, "params": params,

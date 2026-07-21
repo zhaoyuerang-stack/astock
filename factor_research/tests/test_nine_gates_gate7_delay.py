@@ -28,7 +28,7 @@ def test_delay_shift_moves_exactly_n_trading_days():
     for delay in (1, 2):
         shifted = _shift_decision_weights(w, idx, delay)
         assert len(shifted) == len(w) or len(shifted) == len(w) - 1  # 末行可能越界丢弃
-        for orig, new in zip(w.index, shifted.index):
+        for orig, new in zip(w.index, shifted.index, strict=False):
             gap = idx.searchsorted(new) - idx.searchsorted(orig)
             assert gap == delay, (
                 f"决策日 {orig.date()} 应移 {delay} 个交易日,实际移了 {gap} 个"
