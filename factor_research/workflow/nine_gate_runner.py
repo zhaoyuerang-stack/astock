@@ -12,10 +12,14 @@ from __future__ import annotations
 import json
 import warnings
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, TypeVar
+
+if TYPE_CHECKING:
+    from research_ledger.ledger import ResearchLedger
 
 warnings.filterwarnings("ignore")
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT: Path = Path(__file__).resolve().parent.parent
 
 import pandas as pd
 
@@ -23,7 +27,7 @@ from core.analysis.nine_gates import NineGatesEvaluator, NineGatesReport
 from core.engine import PricePanel, Signal
 
 # CLI 策略名 → 台账母策略 id（用于 --persist 把审计摘要写回对应版本）
-STRATEGY_TO_FAMILY = {
+STRATEGY_TO_FAMILY: dict[str, str] = {
     "small_cap": "small-cap-size",
     "size_earnings": "size-earnings",
     "large_cap": "large-cap-growth-hedged",
@@ -35,7 +39,7 @@ STRATEGY_TO_FAMILY = {
 # 台账版本 → 该版本真实 config 的非周期参数（来自 strategy_versions.json 的 config 字段）。
 # 审计变体版本时必须用其真实配置，否则用默认 config 产出的 DSR 会张冠李戴（假记分牌）。
 # 注：回测窗口（start）不在此处硬编码，统一由 _taibook_start 从台账 data_scope.period 取。
-VERSION_OVERRIDES = {
+VERSION_OVERRIDES: dict[tuple[str, str], dict[str, Any]] = {
     ("large_cap", "v1.1"): {"w_cpv_max": 0.5},
     ("large_cap", "v1.1-full"): {"w_cpv_max": 0.5},
     # v1.0-full 与 v1.0 config 逐字段相同(仅回测窗口不同,_taibook_start 已从台账自动取),
@@ -45,7 +49,7 @@ VERSION_OVERRIDES = {
 
 # illiquidity 各台账版本的真实配置规格(对齐 strategy_versions.json 的 config):
 #   v1.0/v1.1 纯 Amihud 无 veto 二值择时;v1.1 top_n=50;v1.3 illiq+size 混合;v3.1 +Veto+Band。
-ILLIQ_SPECS = {
+ILLIQ_SPECS: dict[str, dict[str, Any]] = {
     "v1.0": {"factor": "amihud", "veto": False, "timing": "plain", "top_n": 25},
     "v1.1": {"factor": "amihud", "veto": False, "timing": "plain", "top_n": 50},
     "v1.3": {"factor": "blend",  "veto": False, "timing": "plain", "top_n": 25},
@@ -61,11 +65,11 @@ def record_nine_gate_research_run(
     *,
     strategy_name: str,
     version: str,
-    summary: dict,
+    summary: dict[str, Any],
     report_path: Path,
-    ledger=None,
-    index_path=None,
-) -> dict:
+    ledger: ResearchLedger | None = None,
+    index_path: Path | str | None = None,
+) -> dict[str, Any]:
     """Archive one 9-Gate run into the immutable research ledger."""
     from research_ledger.ledger import ResearchRunRecord, record_research_run
 
@@ -99,7 +103,7 @@ def record_nine_gate_research_run(
     )
 
 
-def _taibook_start(family, version):
+def _taibook_start(family: str, version: str) -> str | None:
     """从台账 data_scope.period 取该版本声明的起始（'2023-2026' → '2023-01-01'）。
 
     让 DSR/回测窗口与台账声明的 OOS/全历史区间逐版精确对齐，杜绝「证据测的区间≠版本声称区间」。
@@ -123,7 +127,7 @@ class TrialCountUnknown(RuntimeError):
     """DSR 的真实搜索次数缺失，不能降级成固定地板。"""
 
 
-def _family_n_trials(family: str, *, path=None) -> int:
+def _family_n_trials(family: str, *, path: Path | None = None) -> int:
     """从 append-only 实验账本读取真实尝试数；无记录即阻断。"""
     from governance.trial_ledger import honest_n_trials
 
@@ -133,7 +137,12 @@ def _family_n_trials(family: str, *, path=None) -> int:
     return count
 
 
-def _apply_version_overrides(config, strategy_name, version, start):
+# 各策略的 StrategyConfig 是各自的 frozen dataclass,这里只要求"可 dataclasses.replace"。
+_ConfigT = TypeVar("_ConfigT")
+
+
+def _apply_version_overrides(config: _ConfigT, strategy_name: str,
+                             version: str | None, start: str | None) -> _ConfigT:
     """按台账版本设置 config 的 version / 真实参数 / 审计窗口，确保审计的是该版本配置而非默认。
 
     窗口优先级：显式 --start > 台账 data_scope.period > 策略默认。
@@ -589,10 +598,10 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
 
 
 # 各策略的默认版本(无 override 即审此版本)
-DEFAULT_VERSIONS = {"small_cap": "v2.0", "size_earnings": "v1.0", "large_cap": "v1.0", "hq_momentum": "v1.0", "roc_yc": "v1.0"}
+DEFAULT_VERSIONS: dict[str, str] = {"small_cap": "v2.0", "size_earnings": "v1.0", "large_cap": "v1.0", "hq_momentum": "v1.0", "roc_yc": "v1.0"}
 
 
-def _auditable(strategy_name, version) -> bool:
+def _auditable(strategy_name: str | None, version: str | None) -> bool:
     """该 (strategy, version) 是否有已知真实配置可审 —— 避免用错配置产出假 DSR。"""
     if strategy_name is None:
         return False
@@ -609,7 +618,7 @@ def _auditable(strategy_name, version) -> bool:
     return DEFAULT_VERSIONS.get(strategy_name) == version
 
 
-def audit_stale_registered(persist: bool = True) -> list[dict]:
+def audit_stale_registered(persist: bool = True) -> list[dict[str, Any]]:
     """自动补审:扫描所有「在册」但无 DSR 审计的版本,对配置已知者自动跑 9-Gate 并落台账。
 
     配置未知 / 无兼容 runner(如行业级因子)记 SKIP 并说明原因,绝不伪造。
