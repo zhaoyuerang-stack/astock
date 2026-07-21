@@ -45,7 +45,7 @@ AH_PAIRS = {
 
 print(f"Downloading {len(AH_PAIRS)} HK stocks...", flush=True)
 hk_data = {}
-for i, (a_code, h_code) in enumerate(AH_PAIRS.items()):
+for i, (_, h_code) in enumerate(AH_PAIRS.items()):
     df = load_or_fetch_hk_daily(h_code, min_rows=100)
     if df is not None:
         hk_data[h_code] = close_series(df, h_code)

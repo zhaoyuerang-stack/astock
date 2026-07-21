@@ -311,7 +311,7 @@ def run_industry_rotation_strategy(config=_DEFAULT_CONFIG):
         selected_inds = []
         if config.version in ["v1.3", "v1.4"]:
             valid_inds = None
-            for name, factor_df in factors.items():
+            for _, factor_df in factors.items():
                 val_df = factor_df.loc[dt_current].dropna()
                 if valid_inds is None:
                     valid_inds = val_df.index
@@ -319,7 +319,7 @@ def run_industry_rotation_strategy(config=_DEFAULT_CONFIG):
                     valid_inds = valid_inds.intersection(val_df.index)
             if valid_inds is not None and len(valid_inds) > 0:
                 factor_ranks = []
-                for name, factor_df in factors.items():
+                for _, factor_df in factors.items():
                     factor_val = factor_df.loc[dt_current, valid_inds]
                     rank_val = factor_val.rank(pct=True)
                     factor_ranks.append(rank_val)

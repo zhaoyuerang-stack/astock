@@ -161,7 +161,7 @@ class WF3Runner:
         oos_returns = []
         window_results = []
 
-        for i, win in enumerate(windows):
+        for _, win in enumerate(windows):
             # Train period (build factor, but we don't optimize — just verify OOS)
             t_mask = (trade_dates >= win["train_start"]) & (trade_dates <= win["train_end"])
             c_tr = close.loc[t_mask]; v_tr = volume.loc[t_mask]; a_tr = amount.loc[t_mask]

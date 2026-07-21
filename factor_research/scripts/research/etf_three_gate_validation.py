@@ -172,7 +172,7 @@ for end_date, ret_60 in worst_60d.items():
 print("\n  baseline 历史 5 个最差 60 日 (A 股最痛苦时刻):")
 print(f"  {'period':>22s}  {'A股 60d ret':>11s}  {'gold 60d':>10s}  {'gov 60d':>9s}  {'组合 60d':>9s}  防御?")
 print("  " + "-" * 88)
-for s, e, r60 in stress_periods:
+for s, e, _ in stress_periods:
     base_r = baseline.loc[s:e].sum()
     gold_r = gold_a.loc[s:e].sum()
     gov_r = gov_a.loc[s:e].sum()

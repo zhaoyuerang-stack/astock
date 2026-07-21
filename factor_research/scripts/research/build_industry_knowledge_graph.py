@@ -92,7 +92,7 @@ def build_graph():
 
     # 将集合转换为列表，以便 JSON 序列化
     nodes_list = []
-    for name, props in nodes_dict.items():
+    for _, props in nodes_dict.items():
         props["industries"] = sorted(list(props["industries"]))
         props["hypotheses"] = sorted(list(props["hypotheses"]))
         nodes_list.append(props)

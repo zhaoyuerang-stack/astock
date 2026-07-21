@@ -49,7 +49,7 @@ def test_all_segments_missing_falls_back_to_full_sample_edge():
 
 def test_regime_segments_are_all_before_holdout_boundary():
     """三段日期必须全部 < holdout boundary(2025-01-01),min 聚合绝不偷看金库。"""
-    for name, start, end in REGIME_SEGMENTS:
+    for name, _, end in REGIME_SEGMENTS:
         assert end < "2025-01-01", f"{name} 段 {end} 越过 holdout 金库边界"
 
 

@@ -84,7 +84,7 @@ def compute_shadow():
     last_binary_holdings = []
     last_band_holdings = []
 
-    for i, sig in enumerate(sigs):
+    for _, sig in enumerate(sigs):
         t = pd.Timestamp(sig["date"])
         # Find next trade day in close.index
         future = close.index[close.index > t]

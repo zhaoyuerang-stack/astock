@@ -202,7 +202,7 @@ for label in ["noCap", "cap5M", "cap10M"]:
     unique = set(p["params"] for p in hist)
     wins = [(p["tw"], p["floor"]) for p in hist]
     tw_counts = {}
-    for w, f in wins:
+    for w, _ in wins:
         tw_counts[w] = tw_counts.get(w, 0) + 1
     print(f"  Params: {len(unique)} unique / {len(hist)} years", flush=True)
     print(f"  Window freq: {sorted(tw_counts.items(), key=lambda x: -x[1])}", flush=True)

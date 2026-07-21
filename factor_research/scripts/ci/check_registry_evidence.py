@@ -203,14 +203,14 @@ def check(ledger: dict | None = None) -> int:
     pending = [(k, m) for k, m in all_v if k in PENDING_REMEDIATION]
     stale = [k for k in PENDING_REMEDIATION if k not in keys]  # 已修复但还挂在基线
 
-    for k, m in pending:
+    for _, m in pending:
         print(f"  ⚠️ 待处置(基线): {m}")
     for k in stale:
         print(f"  ℹ️ 基线项已修复,请从 PENDING_REMEDIATION 移除: {k}")
 
     if new_v:
         print("台账证据完整性检查发现【新】违规:")
-        for k, m in new_v:
+        for _, m in new_v:
             print(f"  {m}")
         return 1
     print(f"台账证据完整性检查通过(无新违规;{len(pending)} 项待处置已基线)。")

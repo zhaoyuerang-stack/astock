@@ -87,7 +87,7 @@ def apply_universe_mask(
     mask = pd.DataFrame(False, index=factor.index, columns=all_codes)
 
     sorted_u_dates = sorted(universes.keys())
-    for i, dt in enumerate(factor.index):
+    for _, dt in enumerate(factor.index):
         # 找最近一个不超过 dt 的 universe
         past = [d for d in sorted_u_dates if d <= dt]
         if not past:

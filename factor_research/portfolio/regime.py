@@ -114,7 +114,7 @@ def defensive_grade(
 
     # Bear regime performance — LIVE baseline (average)
     live_bear_annuals = []
-    for name, live_r in existing_live_returns.items():
+    for _, live_r in existing_live_returns.items():
         common_l = live_r.dropna().index.intersection(bear_regime_mask.dropna().index)
         if len(common_l) < 20: continue
         l_bear = live_r.loc[common_l][bear_regime_mask.loc[common_l]]
@@ -126,7 +126,7 @@ def defensive_grade(
 
     # Correlation to existing LIVE
     corrs = []
-    for name, live_r in existing_live_returns.items():
+    for _, live_r in existing_live_returns.items():
         common_idx = candidate_returns.dropna().index.intersection(live_r.dropna().index)
         if len(common_idx) > 100:
             corr = candidate_returns.loc[common_idx].corr(live_r.loc[common_idx])

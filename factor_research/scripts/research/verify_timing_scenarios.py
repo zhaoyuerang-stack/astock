@@ -284,7 +284,7 @@ def run():
     print(header)
     print("  " + "─" * 78)
 
-    for label, timing, exp_cap, lev in scenarios:
+    for label, timing, _, _ in scenarios:
         r = stats_returns(results[label])
         m = compute_metrics(r)
         nav = compute_nav(results[label])
@@ -422,7 +422,7 @@ def _write_report(results, scenarios, navA, navB, navC, navA1x,
     # 收集所有指标
     # ═══════════════════════════════════════════════
     M = {}
-    for label, timing, exp_cap, lev in scenarios:
+    for label, timing, _, _ in scenarios:
         r = stats_returns(results[label])
         m = compute_metrics(r)
         nav = compute_nav(results[label])

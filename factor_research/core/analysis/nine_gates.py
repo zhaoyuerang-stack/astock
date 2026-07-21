@@ -775,7 +775,7 @@ class NineGatesEvaluator:
         windows = walk_forward_windows(dates, train_years=3, test_years=1, purge_days=20)
         
         oos_rets_list = []
-        for i, win in enumerate(windows):
+        for _, win in enumerate(windows):
             t_start = win["test_start"]
             t_end = win["test_end"]
             

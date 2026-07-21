@@ -105,7 +105,7 @@ def _print_coverage_summary(coords: pd.DataFrame, status_map: dict):
 
 def _print_legend():
     print("\n  Legend:")
-    for k, (icon, label) in STATUS_COLORS.items():
+    for _, (icon, label) in STATUS_COLORS.items():
         print(f"    {icon} {label}")
 
 

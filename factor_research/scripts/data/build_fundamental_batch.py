@@ -29,7 +29,7 @@ KEEP = ["code","report_date","ann_date","eps","revenue","revenue_yoy",
 print(f"批量财务下载: {len(periods)}个报告期", flush=True)
 frames = []
 for i, p in enumerate(periods):
-    for attempt in range(3):
+    for _ in range(3):
         try:
             df = ak.stock_yjbb_em(date=p)
             if df is not None and not df.empty:

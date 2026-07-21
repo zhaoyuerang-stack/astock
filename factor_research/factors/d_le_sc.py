@@ -146,7 +146,7 @@ class DLESCClustering:
             next_idx = torch.multinomial(probabilities, 1)
             centroids = torch.cat([centroids, X[next_idx]], dim=0)
 
-        for iteration in range(50):
+        for _ in range(50):
             distances = torch.cdist(X, centroids)
             labels = torch.argmin(distances, dim=1)
             new_centroids = torch.stack(
@@ -192,7 +192,7 @@ class DLESCClustering:
 
         if self.backend == "torch":
             A_tensor = torch.from_numpy(A).float().to(self.torch_device)
-            for iteration in range(self.n_iterations):
+            for _ in range(self.n_iterations):
                 old_eta = self.eta
                 H = self._compute_hermitian_matrix_torch(A_tensor)
                 v1 = self._compute_top_eigenvector_torch(H)
@@ -229,7 +229,7 @@ class DLESCClustering:
 
         else:
             # SciPy/CPU Backend
-            for iteration in range(self.n_iterations):
+            for _ in range(self.n_iterations):
                 old_eta = self.eta
                 H = self._compute_hermitian_matrix_scipy(A)
                 v1 = self._compute_top_eigenvector_scipy(H)

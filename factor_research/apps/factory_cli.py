@@ -575,7 +575,7 @@ def cmd_graded(args):
 
     print(f"Marginal-eval results ({len(rows)}):")
     print(f"  {'grade':8s} {'reg_sc':>7s} {'Δsharpe':>8s} {'bear_imp':>9s} {'corr':>6s}  name")
-    for grade, reg_sc, dsh, bear_imp, corr, h, e in rows[: args.limit or 30]:
+    for grade, reg_sc, dsh, bear_imp, corr, h, _ in rows[: args.limit or 30]:
         print(f"  {grade:8s} {reg_sc:+7.3f} {dsh:+8.3f} "
               f"{bear_imp:+9.1%} {corr:6.2f}  {h.name}  [{h.id[:8]}]")
     return 0

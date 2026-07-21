@@ -139,7 +139,7 @@ class IndustryMomentum:
             row_ind = ind.loc[dt].dropna()
             common = row_ret.index.intersection(row_ind.index)
             if len(common) < 50: continue
-            for industry, group in row_ind.loc[common].groupby(row_ind.loc[common]):
+            for _, group in row_ind.loc[common].groupby(row_ind.loc[common]):
                 stocks = group.index.intersection(row_ret.index)
                 if len(stocks) < 3: continue
                 vals = row_ret.loc[stocks]

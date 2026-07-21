@@ -20,7 +20,7 @@ repaired_files = 0
 
 PRICE_COLS = ["open", "high", "low", "close"]
 
-for i, fp in enumerate(files):
+for _, fp in enumerate(files):
     code = fp.stem
     raw_fp = raw_dir / f"{code}.parquet"
     if not raw_fp.exists():
@@ -44,7 +44,7 @@ for i, fp in enumerate(files):
     target_rows = joined[joined["date"] >= pd.Timestamp("2026-06-01")]
     
     changed = False
-    for idx, row in target_rows.iterrows():
+    for _, row in target_rows.iterrows():
         curr_factor = float(row["factor"])
         # If the factor deviated from the reference factor and is close to 1.0
         # (classical Tencent hfqday missing fallback to unadjusted price bug)

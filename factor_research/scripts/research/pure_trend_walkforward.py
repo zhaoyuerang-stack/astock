@@ -68,7 +68,7 @@ print(f"Combo grid: {len(combos)}", flush=True)
 
 print("Pre-computing combo returns...", flush=True)
 combo_rets = {}
-for i, (w, f) in enumerate(combos):
+for _, (w, f) in enumerate(combos):
     combo_rets[(w, f)] = run_pure_trend(close, scheduled, smallcap_timing, cfg, mkt_ret, w, f)
 
 # Walk-forward

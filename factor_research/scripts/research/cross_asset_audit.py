@@ -134,7 +134,7 @@ for code, name in ETFS.items():
 # ─── Step 3: 全部 ETF 一起加 ───
 print("\n  --- 全部 ETF 一起加 (5 个 ETF + 2 A 股) ---")
 all_combo = {**a_ret}
-for code, name in ETFS.items():
+for code, _ in ETFS.items():
     best = best_etf[code]
     if best is None:
         continue
@@ -148,7 +148,7 @@ print(f"  Δ vs baseline: sh={m_all['sharpe']-mb['sharpe']:+.2f} cal={m_all['cal
 print("\n  --- 仅加 Sharpe ≥ 0.95 候选 ---")
 pass_combo = {**a_ret}
 n_pass = 0
-for code, name in ETFS.items():
+for code, _ in ETFS.items():
     best = best_etf[code]
     if best is not None and best[2]["sh"] >= 0.95:
         pass_combo[f"ETF_{code}"] = best[1]
