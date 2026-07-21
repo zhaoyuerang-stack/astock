@@ -5,6 +5,7 @@ hedged with the universe equal-weighted benchmark.
 """
 
 from dataclasses import asdict, dataclass
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -30,7 +31,7 @@ class StrategyConfig:
     sell_cost: float = 0.00275
     hedge_cost_annual: float = 0.015
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -59,7 +60,7 @@ def build_d_le_sc_weights(factor: pd.DataFrame, close: pd.DataFrame, top_n: int)
     return weights
 
 
-def run_d_le_sc_strategy(config=_DEFAULT_CONFIG):
+def run_d_le_sc_strategy(config: StrategyConfig = _DEFAULT_CONFIG) -> dict[str, Any]:
     """Runs the complete d-LE-SC Hedged strategy."""
     # Compute start date for loading data to allow warm-up lookback
     start_dt = pd.Timestamp(config.start)
@@ -153,12 +154,12 @@ def run_d_le_sc_strategy(config=_DEFAULT_CONFIG):
     }
 
 
-def latest_signal(config=_DEFAULT_CONFIG):
+def latest_signal(config: StrategyConfig = _DEFAULT_CONFIG) -> dict[str, Any]:
     """Backward-compatible wrapper for :func:`latest_decision`."""
     return latest_decision(config)
 
 
-def latest_decision(config=_DEFAULT_CONFIG):
+def latest_decision(config: StrategyConfig = _DEFAULT_CONFIG) -> dict[str, Any]:
     """Returns the latest signal and holdings for live trading."""
     result = run_d_le_sc_strategy(config)
     close = result["close"]

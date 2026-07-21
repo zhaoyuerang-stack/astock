@@ -50,5 +50,5 @@ class StrategyVersion:
     parent: str | None = None
     registered: bool = False
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"StrategyVersion({self.family}/{self.version}, status={self.status.value})"

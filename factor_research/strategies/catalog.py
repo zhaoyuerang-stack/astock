@@ -10,10 +10,14 @@ build_executable_strategy 解析。未知类型一律抛 UnsupportedStrategyComp
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
 from core.engine import PricePanel
+
+if TYPE_CHECKING:
+    from factors.registry import FactorRecord
 
 
 class UnsupportedStrategyComponent(ValueError):
@@ -54,7 +58,7 @@ def build_small_cap_amount(prices: PricePanel, params: dict) -> pd.DataFrame:
 # ────────────────────────── timing builders ──────────────────────────
 # 签名: (prices, params) -> (exposure: pd.Series, diagnostics: dict)
 
-def build_pure_trend_band(prices: PricePanel, params: dict):
+def build_pure_trend_band(prices: PricePanel, params: dict) -> tuple[pd.Series, dict[str, Any]]:
     """PureTrend Band 动态择时: exposure = clip(1 + dist*8, 0, cap) × I(dist>0),shift(1)。
 
     生产用当日 dist 决定次日持仓 ⇒ 回测里 exposure 须 shift(1),与二值 timing 的
@@ -78,7 +82,7 @@ def build_pure_trend_band(prices: PricePanel, params: dict):
     }
 
 
-def build_ma_trend(prices: PricePanel, params: dict):
+def build_ma_trend(prices: PricePanel, params: dict) -> tuple[pd.Series, dict[str, Any]]:
     """二值 MA 趋势择时(small-cap nav > MA)。"""
     from factors.small_cap import small_cap_timing
 
@@ -91,11 +95,11 @@ def build_ma_trend(prices: PricePanel, params: dict):
 # 签名: (prices, params) -> (veto_factor: pd.DataFrame | None, veto_q: float)
 # veto 在 build_rebalance_weights 内对候选池过滤,不预改 factor —— 保持真实语义。
 
-def apply_no_policy(prices: PricePanel, params: dict):
+def apply_no_policy(prices: PricePanel, params: dict) -> tuple[pd.DataFrame | None, float]:
     return None, 0.0
 
 
-def apply_salience_veto(prices: PricePanel, params: dict):
+def apply_salience_veto(prices: PricePanel, params: dict) -> tuple[pd.DataFrame, float]:
     from factors.veto import salience_covariance_veto
 
     return salience_covariance_veto(prices.close).shift(1), float(params.get("veto_q", 0.30))
@@ -146,7 +150,7 @@ def _autoregister_builders() -> None:
     消除"新因子要手写 catalog builder"这一处机械接线。"""
     from factors.registry import discover
 
-    def _make(rec):
+    def _make(rec: FactorRecord) -> Callable[[PricePanel, dict[str, Any]], pd.DataFrame]:
         def build(prices: PricePanel, params: dict) -> pd.DataFrame:
             kwargs = {rec.arg_map.get(k, k): (int(params[k]) if isinstance(params[k], (int, float))
                                               else params[k])

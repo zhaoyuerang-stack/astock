@@ -20,7 +20,7 @@ from strategies.catalog import (
 from strategies.small_cap import build_rebalance_weights
 
 
-def select_holdings(factor_row: pd.Series, veto_row, top_n: int, veto_q: float) -> list:
+def select_holdings(factor_row: pd.Series, veto_row: pd.Series | None, top_n: int, veto_q: float) -> list[str]:
     """生产日信号的当日选股——与回测调仓同源(apply_veto_filter 语义)。
 
     run_daily 此前手写 veto 过滤 + nlargest(公式复制,2026-07-11 review);

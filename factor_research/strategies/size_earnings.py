@@ -8,6 +8,7 @@ Timing: PureTrend(MA16) × VolTarget(25%/60d)
 Leverage: 1.10x
 """
 from dataclasses import asdict, dataclass
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -38,7 +39,7 @@ class StrategyConfig:
     leverage: float = 1.10
     cost: CostModel = CostModel()
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -46,7 +47,7 @@ class StrategyConfig:
 # Data loading
 # ---------------------------------------------------------------------------
 
-def load_price_panels(start="2010-01-01"):
+def load_price_panels(start: str = "2010-01-01") -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Load close/volume/amount panels.  Amount uses unadjusted price."""
     from lake.units import implied_amount
 
@@ -70,7 +71,7 @@ def load_price_panels(start="2010-01-01"):
 # Factor construction
 # ---------------------------------------------------------------------------
 
-def build_factor(amount, trade_dates, blend_weight=0.5):
+def build_factor(amount: pd.DataFrame, trade_dates: pd.DatetimeIndex, blend_weight: float = 0.5) -> pd.DataFrame:
     """Build size + NPY blended factor (date×code, z-scored)."""
     fund = load_fundamental_panel(trade_dates, codes=None, fields=["net_profit_yoy"])
     npy = fund.get("net_profit_yoy", pd.DataFrame())
@@ -86,8 +87,9 @@ def build_factor(amount, trade_dates, blend_weight=0.5):
 # Vol Target timing
 # ---------------------------------------------------------------------------
 
-def build_vol_target(close, amount, target_vol=0.25, lookback=60,
-                     min_exp=0.3, max_exp=1.5):
+def build_vol_target(close: pd.DataFrame, amount: pd.DataFrame,
+                     target_vol: float = 0.25, lookback: int = 60,
+                     min_exp: float = 0.3, max_exp: float = 1.5) -> pd.Series:
     """Build continuous vol-target exposure multiplier.
 
     Uses small-cap portfolio returns as vol proxy, shifts by 1 to avoid
@@ -105,7 +107,7 @@ def build_vol_target(close, amount, target_vol=0.25, lookback=60,
 # Weight construction
 # ---------------------------------------------------------------------------
 
-def build_rebalance_weights(factor, close, top_n, rebalance_days, *, veto_factor=None, veto_q=0.10):
+def build_rebalance_weights(factor: pd.DataFrame, close: pd.DataFrame, top_n: int, rebalance_days: int, *, veto_factor: pd.DataFrame | None = None, veto_q: float = 0.10) -> dict[pd.Timestamp, pd.Series]:
     """Convert factor panel to scheduled target weights.
 
     ``veto_factor`` is a policy-layer VetoFilter applied to the candidate pool
@@ -138,7 +140,7 @@ def build_rebalance_weights(factor, close, top_n, rebalance_days, *, veto_factor
 # Strategy execution
 # ---------------------------------------------------------------------------
 
-def run_strategy(config=None):
+def run_strategy(config: StrategyConfig | None = None) -> dict[str, Any]:
     """Run size-earnings strategy via BacktestEngine."""
     config = config or StrategyConfig()
     close, volume, amount = load_price_panels(config.start)
@@ -191,12 +193,12 @@ def run_strategy(config=None):
     }
 
 
-def latest_signal(config=None):
+def latest_signal(config: StrategyConfig | None = None) -> dict[str, Any]:
     """Backward-compatible wrapper for :func:`latest_decision`."""
     return latest_decision(config)
 
 
-def latest_decision(config=None):
+def latest_decision(config: StrategyConfig | None = None) -> dict[str, Any]:
     """Latest signal for live trading."""
     config = config or StrategyConfig()
     result = run_strategy(config)

@@ -4,6 +4,7 @@ This is the canonical implementation of the small-cap-size v2.0 strategy.
 It uses core.engine.BacktestEngine as the unified backtest path.
 """
 from dataclasses import asdict, dataclass
+from typing import Any
 
 import pandas as pd
 
@@ -35,7 +36,7 @@ class StrategyConfig:
     exclude_star: bool = True  # 排除科创板(688):保留验证过的口径(50万门槛/20cm,tradability 受限);
                                # 修复 688 amount bug 后它们会入选,纳入与否是显式策略决策(默认排除,待专项验证)
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -44,7 +45,7 @@ class StrategyConfig:
 _DEFAULT_CONFIG = StrategyConfig()
 
 
-def _drop_star(*panels):
+def _drop_star(*panels: pd.DataFrame) -> list[pd.DataFrame]:
     """从价量面板剔除科创板(688)列 —— 显式 universe 策略,不依赖数据 bug 隐式排除。"""
     out = []
     for p in panels:
@@ -57,7 +58,7 @@ def _drop_star(*panels):
 # Data loading
 # ---------------------------------------------------------------------------
 
-def load_price_panels(start="2010-01-01"):
+def load_price_panels(start: str = "2010-01-01") -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Load canonical close/volume/amount panels.
 
     The lake amount field is authoritative. Missing cells are repaired from
@@ -85,7 +86,7 @@ def load_price_panels(start="2010-01-01"):
 # Weight construction
 # ---------------------------------------------------------------------------
 
-def build_rebalance_weights(factor, close, top_n, rebalance_days, *, veto_factor=None, veto_q=0.10):
+def build_rebalance_weights(factor: pd.DataFrame, close: pd.DataFrame, top_n: int, rebalance_days: int, *, veto_factor: pd.DataFrame | None = None, veto_q: float = 0.10) -> dict[pd.Timestamp, pd.Series]:
     """Convert factor panel to scheduled target weights.
 
     ``veto_factor`` is a policy-layer VetoFilter. It filters the candidate pool
@@ -118,7 +119,7 @@ def build_rebalance_weights(factor, close, top_n, rebalance_days, *, veto_factor
 # Strategy execution via unified engine
 # ---------------------------------------------------------------------------
 
-def run_small_cap_strategy(config=_DEFAULT_CONFIG):
+def run_small_cap_strategy(config: StrategyConfig = _DEFAULT_CONFIG) -> dict[str, Any]:
     """Run small-cap-size strategy via BacktestEngine."""
     close, volume, amount = load_price_panels(config.start)
     if config.exclude_star:
@@ -164,12 +165,12 @@ def run_small_cap_strategy(config=_DEFAULT_CONFIG):
     }
 
 
-def latest_signal(config=_DEFAULT_CONFIG):
+def latest_signal(config: StrategyConfig = _DEFAULT_CONFIG) -> dict[str, Any]:
     """Backward-compatible wrapper for :func:`latest_decision`."""
     return latest_decision(config)
 
 
-def latest_decision(config=_DEFAULT_CONFIG):
+def latest_decision(config: StrategyConfig = _DEFAULT_CONFIG) -> dict[str, Any]:
     """Latest signal for live trading."""
     result = run_small_cap_strategy(config)
     close = result["close"]
@@ -193,7 +194,7 @@ def latest_decision(config=_DEFAULT_CONFIG):
 # Legacy compat: delegate to engine
 # ---------------------------------------------------------------------------
 
-def backtest_weights(close, scheduled_weights, timing_signal=None, config=_DEFAULT_CONFIG):
+def backtest_weights(close: pd.DataFrame, scheduled_weights: dict[pd.Timestamp, pd.Series] | pd.DataFrame, timing_signal: pd.Series | None = None, config: StrategyConfig = _DEFAULT_CONFIG) -> tuple[pd.Series, pd.DataFrame]:
     """.. deprecated:: Use core.engine.BacktestEngine.run() instead.
 
     Kept as a thin compatibility wrapper for research scripts that have not

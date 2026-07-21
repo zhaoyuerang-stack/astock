@@ -5,6 +5,7 @@ Huaxi 11-factor ETF rotation (v1.3), and Huaxi 11-factor stock selection rotatio
 """
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -25,7 +26,7 @@ class StrategyConfig:
     w_cpv: float = 0.5  # CPV penalty weight (0.0 for v1.0/v1.1, 0.5 for v1.2/v1.4)
     cost_mode: str = "stock"  # "stock" (0.47% friction), "etf" (0.05% friction)
     
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -33,7 +34,7 @@ class StrategyConfig:
 _DEFAULT_CONFIG = StrategyConfig()
 
 
-def vectorized_rolling_corr(df1, df2, window=20):
+def vectorized_rolling_corr(df1: pd.DataFrame, df2: pd.DataFrame, window: int = 20) -> pd.DataFrame:
     mean1 = df1.rolling(window).mean()
     mean2 = df2.rolling(window).mean()
     mean_prod = (df1 * df2).rolling(window).mean()
@@ -42,14 +43,14 @@ def vectorized_rolling_corr(df1, df2, window=20):
     std2 = df2.rolling(window).std()
     return cov / (std1 * std2 + 1e-8)
 
-def load_industry_groups():
+def load_industry_groups() -> dict[str, str]:
     """Load latest industry mapping from fundamental parquet."""
     fund = pd.read_parquet("data_lake/fundamental_batch.parquet", columns=["code", "avail_date", "industry"])
     mapping = fund.dropna(subset=["industry"]).sort_values("avail_date").drop_duplicates("code", keep="last")
     stock_to_ind = dict(zip(mapping["code"], mapping["industry"], strict=True))
     return stock_to_ind
 
-def load_all_daily_price_fields(data_lake_path=Path("data_lake")):
+def load_all_daily_price_fields(data_lake_path: Path = Path("data_lake")) -> dict[str, pd.DataFrame]:
     """Load all daily price fields from daily_all.parquet."""
     cal = pd.read_parquet(data_lake_path / "meta/trade_calendar.parquet")
     trade_dates = pd.to_datetime(cal["date"]).sort_values()
@@ -80,14 +81,14 @@ def load_all_daily_price_fields(data_lake_path=Path("data_lake")):
         "raw_close": raw_close
     }
 
-def load_bond_returns(code="511010", data_lake_path=Path("data_lake")):
+def load_bond_returns(code: str = "511010", data_lake_path: Path = Path("data_lake")) -> pd.Series:
     """Loads Gov Bond ETF daily returns."""
     df = pd.read_parquet(data_lake_path / f"cross_asset/etf/{code}.parquet")
     df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values("date").set_index("date")
     return df["close"].pct_change(fill_method=None).dropna()
 
-def aggregate_industry_all_fields(prices, stock_to_ind):
+def aggregate_industry_all_fields(prices: dict[str, pd.DataFrame], stock_to_ind: dict[str, str]) -> dict[str, Any]:
     """Aggregates all price fields to Shenwan L2 industry level."""
     close = prices["close"]
     open_ = prices["open"]
@@ -97,7 +98,7 @@ def aggregate_industry_all_fields(prices, stock_to_ind):
     amount = prices["amount"]
     
     common_codes = close.columns.intersection(amount.columns)
-    ind_groups = {}
+    ind_groups: dict[str, list[str]] = {}
     for code in common_codes:
         ind = stock_to_ind.get(code)
         if ind:
@@ -144,7 +145,7 @@ def aggregate_industry_all_fields(prices, stock_to_ind):
         "ind_groups": ind_groups
     }
 
-def compute_huaxi_industry_factors(ind_prices):
+def compute_huaxi_industry_factors(ind_prices: dict[str, Any]) -> dict[str, pd.DataFrame]:
     """Computes the 11 Huaxi volume-price factors at the industry level."""
     ind_open = ind_prices["open"]
     ind_high = ind_prices["high"]
@@ -153,7 +154,7 @@ def compute_huaxi_industry_factors(ind_prices):
     ind_volume = ind_prices["volume"]
     ind_amount = ind_prices["amount"]
     
-    def ewma(df, span):
+    def ewma(df: pd.DataFrame, span: int) -> pd.DataFrame:
         return df.ewm(span=span, adjust=False).mean()
         
     # 1. SecondMomentum: w=20, w1=60, w2=20
@@ -218,14 +219,14 @@ def compute_huaxi_industry_factors(ind_prices):
         "vac_corr": f_vac_corr
     }
 
-def aggregate_industry_data(close, amount, stock_to_ind):
+def aggregate_industry_data(close: pd.DataFrame, amount: pd.DataFrame, stock_to_ind: dict[str, str]) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, list[str]]]:
     """Aggregates stock-level returns and trade amounts to Shenwan L2 industry level (v1.0-v1.2 fallback)."""
     stock_returns = close.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan).fillna(0.0)
     common_codes = stock_returns.columns.intersection(amount.columns)
     stock_returns = stock_returns[common_codes]
     amount_aligned = amount[common_codes]
     
-    ind_groups = {}
+    ind_groups: dict[str, list[str]] = {}
     for code in common_codes:
         ind = stock_to_ind.get(code)
         if ind:
@@ -241,7 +242,7 @@ def aggregate_industry_data(close, amount, stock_to_ind):
         
     return ind_returns, ind_amounts, ind_groups
 
-def run_industry_rotation_strategy(config=_DEFAULT_CONFIG):
+def run_industry_rotation_strategy(config: StrategyConfig = _DEFAULT_CONFIG) -> dict[str, Any]:
     """Runs the complete SW L2 Industry Rotation strategy (supports v1.0 - v1.4)."""
     # 1. Load data
     if config.version in ["v1.3", "v1.4"]:
@@ -413,12 +414,12 @@ def run_industry_rotation_strategy(config=_DEFAULT_CONFIG):
         "timing": timing_signal
     }
 
-def latest_signal(config=_DEFAULT_CONFIG):
+def latest_signal(config: StrategyConfig = _DEFAULT_CONFIG) -> dict[str, Any]:
     """Backward-compatible wrapper for :func:`latest_decision`."""
     return latest_decision(config)
 
 
-def latest_decision(config=_DEFAULT_CONFIG):
+def latest_decision(config: StrategyConfig = _DEFAULT_CONFIG) -> dict[str, Any]:
     """Returns the latest signal and holdings for live trading."""
     result = run_industry_rotation_strategy(config)
     close = result["close"]

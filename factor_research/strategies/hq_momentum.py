@@ -3,6 +3,7 @@
 Long top N highest smooth momentum stocks from a high-quality fundamental universe, hedged with CSI 800 equal-weighted index.
 """
 from dataclasses import asdict, dataclass
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -25,7 +26,7 @@ class StrategyConfig:
     leverage: float = 1.0
     hedge_cost_annual: float = 0.015
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -33,7 +34,7 @@ class StrategyConfig:
 _DEFAULT_CONFIG = StrategyConfig()
 
 
-def run_hq_momentum_strategy(config=_DEFAULT_CONFIG):
+def run_hq_momentum_strategy(config: StrategyConfig = _DEFAULT_CONFIG) -> dict[str, Any]:
     """Runs the complete High-Quality Momentum Hedged strategy."""
     from factors.large_cap import load_clean_panels_with_growth
     
@@ -99,12 +100,12 @@ def run_hq_momentum_strategy(config=_DEFAULT_CONFIG):
         "engine_result": res_long,
     }
 
-def latest_signal(config=_DEFAULT_CONFIG):
+def latest_signal(config: StrategyConfig = _DEFAULT_CONFIG) -> dict[str, Any]:
     """Backward-compatible wrapper for :func:`latest_decision`."""
     return latest_decision(config)
 
 
-def latest_decision(config=_DEFAULT_CONFIG):
+def latest_decision(config: StrategyConfig = _DEFAULT_CONFIG) -> dict[str, Any]:
     """Returns the latest signal and holdings for live trading."""
     result = run_hq_momentum_strategy(config)
     

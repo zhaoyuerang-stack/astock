@@ -1,6 +1,7 @@
 """Strategy lifecycle: status enum, valid transitions, gate conditions."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
@@ -34,7 +35,7 @@ class MonitorMetrics:
     ic_decayed: bool = False
 
 
-GATES: dict[tuple[Lifecycle, Lifecycle], callable] = {
+GATES: dict[tuple[Lifecycle, Lifecycle], Callable[[MonitorMetrics], bool]] = {
     # incubating → candidate: IC IR > 0.2 且 简单回测年化 > 15%
     (Lifecycle.INCUBATING, Lifecycle.CANDIDATE):
         lambda m: m.ic_ir >= 0.2 and m.simple_backtest_ok,

@@ -3,6 +3,7 @@
 Implementation of the second mother strategy family.
 """
 from dataclasses import asdict, dataclass
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -31,7 +32,7 @@ class StrategyConfig:
     switch_friction: float = 0.0025
     w_cpv_max: float = 0.0  # Weight for adaptive CPV penalty (0.0 for v1.0, 0.5 for v1.1)
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -39,7 +40,7 @@ class StrategyConfig:
 _DEFAULT_CONFIG = StrategyConfig()
 
 
-def run_large_cap_strategy(config=_DEFAULT_CONFIG):
+def run_large_cap_strategy(config: StrategyConfig = _DEFAULT_CONFIG) -> dict[str, Any]:
     """Runs the complete Large-cap Growth Hedged strategy.
     
     1. Runs unified engine on growth premium long portfolio.
@@ -121,12 +122,12 @@ def run_large_cap_strategy(config=_DEFAULT_CONFIG):
         "engine_result": res_long,
     }
 
-def latest_signal(config=_DEFAULT_CONFIG):
+def latest_signal(config: StrategyConfig = _DEFAULT_CONFIG) -> dict[str, Any]:
     """Backward-compatible wrapper for :func:`latest_decision`."""
     return latest_decision(config)
 
 
-def latest_decision(config=_DEFAULT_CONFIG):
+def latest_decision(config: StrategyConfig = _DEFAULT_CONFIG) -> dict[str, Any]:
     """Returns the latest signal and holdings for live trading."""
     # Run strategy
     result = run_large_cap_strategy(config)
