@@ -60,16 +60,16 @@ fi
 python3 -m ruff check --select F,B,I,UP .
 
 echo ""
-echo "=== mypy 类型门禁 (台账 strategy_registry + 调度 workflow/) ==="
-# 门禁口径:--disallow-untyped-defs --ignore-missing-imports --follow-imports=skip,
-# 只查台账/调度两层。2026-07-21 基线 24 错清零(e2363847)后挂上,防注解回退;
-# 全仓 strict 不现实,strategies/ 注解补齐后纳入口径,lake/ 再往后排。
-# mypy 经 uv tool run 执行并 pin 版本,保证各 agent 环境结果可重复。
+echo "=== mypy 类型门禁 (台账 strategy_registry + 调度 workflow/ + 策略 strategies/) ==="
+# 门禁口径:--disallow-untyped-defs --ignore-missing-imports --follow-imports=skip。
+# 2026-07-21 分层清零后挂上:台账/调度层基线 24 错(e2363847)、strategies 注解
+# 18%→100%(94fb7a95)、跨层暴露的分派冲突 21 错(d429d7d4);lake/ 注解仅 34%,
+# 补齐后再纳入口径。mypy 经 uv tool run 执行并 pin 版本,保证各 agent 环境可重复。
 if ! command -v uv >/dev/null 2>&1; then
   echo "❌ 无 uv 可执行文件,无法跑 mypy 门禁(uv tool run);请安装 uv 后重跑"
   exit 1
 fi
-uv tool run mypy==2.3.0 --disallow-untyped-defs --ignore-missing-imports --follow-imports=skip strategy_registry.py workflow/
+uv tool run mypy==2.3.0 --disallow-untyped-defs --ignore-missing-imports --follow-imports=skip strategy_registry.py workflow/ strategies/
 
 echo ""
 echo "=== test_loop_foundations.py (防自欺地基:trial账本 + holdout金库) ==="
