@@ -57,3 +57,6 @@ factor_research/.strategy_versions.json.lock
 
 # MCP 配置含 token,禁止提交
 .mcp.json
+
+# 每日分支体检报告的本地副本(正式产物在 origin/report/branch-status 分支)
+/BRANCH_REPORT.md
