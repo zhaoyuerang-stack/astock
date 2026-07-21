@@ -10,17 +10,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from core.strategy_spec import ExecutableStrategySpec
 
 
 @dataclass(frozen=True)
 class AdmissionEvidence:
-    phase1: dict = field(default_factory=dict)
-    phase2: dict = field(default_factory=dict)
-    phase3: dict = field(default_factory=dict)
-    nine_gate: dict = field(default_factory=dict)
-    holdout: dict = field(default_factory=dict)
-    marginal: dict = field(default_factory=dict)
-    experiment_ids: tuple = ()
+    phase1: dict[str, Any] = field(default_factory=dict)
+    phase2: dict[str, Any] = field(default_factory=dict)
+    phase3: dict[str, Any] = field(default_factory=dict)
+    nine_gate: dict[str, Any] = field(default_factory=dict)
+    holdout: dict[str, Any] = field(default_factory=dict)
+    marginal: dict[str, Any] = field(default_factory=dict)
+    experiment_ids: tuple[str, ...] = ()
     data_fingerprint: str = ""
     spec_hash: str = ""
 
@@ -29,11 +33,11 @@ class AdmissionEvidence:
 class AdmissionDecision:
     approved: bool
     target_status: str          # 「在册」或「候选」
-    blocking_reasons: tuple
+    blocking_reasons: tuple[str, ...]
 
 
 def evaluate_admission(
-    spec,
+    spec: ExecutableStrategySpec,
     evidence: AdmissionEvidence,
     *,
     admission_track: str,
