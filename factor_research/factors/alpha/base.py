@@ -25,7 +25,7 @@ class FactorData:
     """
     close: pd.DataFrame
     volume: pd.DataFrame
-    amount: pd.DataFrame          # volume × 100 × raw_close (unadjusted)
+    amount: pd.DataFrame          # volume × raw_close, share×CNY (canonical; 禁 ×100 手数换算)
     raw_close: Optional[pd.DataFrame] = None
     industry: Optional[pd.DataFrame] = None      # industry code (string/int)
     market_cap: Optional[pd.DataFrame] = None     # total market cap (CNY)
