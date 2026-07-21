@@ -28,26 +28,27 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parent.parent
-LESSONS_DIR = ROOT / "workflow" / "pending_lessons"
+ROOT: Path = Path(__file__).resolve().parent.parent
+LESSONS_DIR: Path = ROOT / "workflow" / "pending_lessons"
 LESSONS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Synthetic data parameters
-N_HISTORY = 100   # days of stable filler before event period
-N_EVENT = 20      # event period length
-N_TOTAL = N_HISTORY + N_EVENT
-EV_START = N_HISTORY
+N_HISTORY: int = 100   # days of stable filler before event period
+N_EVENT: int = 20      # event period length
+N_TOTAL: int = N_HISTORY + N_EVENT
+EV_START: int = N_HISTORY
 
 
 # ---------------------------------------------------------------------------
 # Synthetic data
 # ---------------------------------------------------------------------------
 
-def make_synthetic_clean():
+def make_synthetic_clean() -> dict[str, Any]:
     """Synthetic dataset with CORRECT signal construction.
 
     120 trading days: first 100 stable filler, last 20 event period.
@@ -117,7 +118,7 @@ def make_synthetic_clean():
     }
 
 
-def make_synthetic_leaky():
+def make_synthetic_leaky() -> dict[str, Any]:
     """Synthetic data with LEAKY signals (no shift(1), wrong amount)."""
     clean = make_synthetic_clean()
     close = clean["close"]
@@ -143,12 +144,12 @@ class CheckResult:
     name: str
     verdict: str        # PASS / WARN / FAIL / SKIP
     detail: str
-    evidence: dict = field(default_factory=dict)
+    evidence: dict[str, Any] = field(default_factory=dict)
 
     @property
-    def is_pass(self): return self.verdict == "PASS"
+    def is_pass(self) -> bool: return self.verdict == "PASS"
     @property
-    def is_fail(self): return self.verdict == "FAIL"
+    def is_fail(self) -> bool: return self.verdict == "FAIL"
 
 
 # ---------------------------------------------------------------------------
@@ -166,8 +167,8 @@ class Phase1Checker:
         ],
         timing_builder: Callable[[pd.DataFrame, pd.DataFrame], pd.Series],
         family: str = "unnamed",
-        config: dict | None = None,
-    ):
+        config: dict[str, Any] | None = None,
+    ) -> None:
         self.factor_builder = factor_builder
         self.timing_builder = timing_builder
         self.family = family
@@ -175,7 +176,7 @@ class Phase1Checker:
 
     # ── Check 1: timing穿越 ──
 
-    def _check_timing_no_peek(self, syn: dict) -> CheckResult:
+    def _check_timing_no_peek(self, syn: dict[str, Any]) -> CheckResult:
         """Timing[T] must only use data through T-1.
 
         Two-phase detection:
@@ -247,7 +248,7 @@ class Phase1Checker:
 
     # ── Check 2: 财务对齐 ──
 
-    def _check_fundamental_alignment(self, syn: dict) -> CheckResult:
+    def _check_fundamental_alignment(self, syn: dict[str, Any]) -> CheckResult:
         """Factor respects avail_date alignment for fundamental data.
 
         Two-step detection:
@@ -340,7 +341,7 @@ class Phase1Checker:
 
     # ── Check 3: amount 公式 ──
 
-    def _check_amount_formula(self, syn: dict) -> CheckResult:
+    def _check_amount_formula(self, syn: dict[str, Any]) -> CheckResult:
         """Amount = volume(share) × raw_close, NOT adjusted close.
 
         Tests the INPUT data provided to factor_builder. Since all
@@ -380,7 +381,7 @@ class Phase1Checker:
 
     # ── Check 4: 预热完整 ──
 
-    def _check_warmup(self, syn: dict) -> CheckResult:
+    def _check_warmup(self, syn: dict[str, Any]) -> CheckResult:
         """Factor should have enough data for its rolling windows to warm up.
 
         Checks both:
@@ -437,7 +438,7 @@ class Phase1Checker:
 
     # ── Check 5: 退市股覆盖 ──
 
-    def _check_delisted_coverage(self, syn: dict) -> CheckResult:
+    def _check_delisted_coverage(self, syn: dict[str, Any]) -> CheckResult:
         """Known delisted stocks should be present in price panel."""
         close = syn["close"]
 
@@ -499,7 +500,7 @@ class Phase1Checker:
 
     # ── lesson generation ──
 
-    def _maybe_save_lessons(self, checks: list[CheckResult]):
+    def _maybe_save_lessons(self, checks: list[CheckResult]) -> None:
         saved = 0
         for c in checks:
             if c.verdict not in ("FAIL", "WARN"):
@@ -558,11 +559,11 @@ class AuditReport:
     timestamp: str = field(default_factory=lambda: str(pd.Timestamp.now()))
 
     @property
-    def all_pass(self):
+    def all_pass(self) -> bool:
         return all(r.verdict in ("PASS", "SKIP") for r in self.results)
 
     @property
-    def has_fail(self):
+    def has_fail(self) -> bool:
         return any(r.is_fail for r in self.results)
 
     def summary(self) -> str:
@@ -587,7 +588,7 @@ class AuditReport:
             lines.append("  → ✅ ALL CHECKS PASSED")
         return "\n".join(lines)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "family": self.family, "timestamp": self.timestamp,
             "results": [{"check_id": r.check_id, "name": r.name,
