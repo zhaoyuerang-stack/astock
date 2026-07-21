@@ -37,38 +37,46 @@ FORBIDDEN_EDGES = [
     ("run_daily", ["factory.", "scripts.", "workflow.", "knowledge.", "api.", "services."]),
     ("workflow.", ["scripts."]),
     ("strategies.", ["factory.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
-    ("factors.", ["factory.", "strategies.", "scripts.research.", "workflow.", "core.", "knowledge.", "api.", "services."]),
+    ("factors.", ["factory.", "strategies.", "scripts.research.", "workflow.", "core.", "knowledge.", "api.", "services.", "governance."]),
     # policy 是候选/持仓硬约束的底层叶子(candidate_filters/constraints),被 factors.veto
     # 等兼容 wrapper 反向 import(factors→policy),因此 policy 必须停在 factors 之下:
     # 不得 import factors(否则 factors↔policy 成环)、engine/core,也不得倒灌
     # strategies/factory/workflow/scripts.research 等上层。只可依赖 stdlib/pandas/lake/contracts。
     ("policy.", ["factors.", "engine.", "core.", "factory.", "strategies.",
-                 "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
-    ("lake.", ["factors.", "strategies.", "core.", "factory.", "scripts.", "knowledge.", "api.", "services."]),
-    ("core.engine", ["factory.", "strategies.", "scripts.", "workflow.", "knowledge.", "api.", "services."]),
-    ("core.analysis", ["factory.", "strategies.", "scripts.", "workflow.", "knowledge.", "api.", "services."]),
+                 "scripts.research.", "workflow.", "knowledge.", "api.", "services.", "governance."]),
+    ("lake.", ["factors.", "strategies.", "core.", "factory.", "scripts.", "knowledge.", "api.", "services.", "governance."]),
+    ("core.engine", ["factory.", "strategies.", "scripts.", "workflow.", "knowledge.", "api.", "services.", "governance."]),
+    ("core.analysis", ["factory.", "strategies.", "scripts.", "workflow.", "knowledge.", "api.", "services.", "governance."]),
     # engine/ 是 core.engine 的底层引擎叶子(metrics/composer/portfolio/factor_analysis),
     # 必须停在最底层:不得反向依赖 factors(状态/因子层)、组合构建层(strategies)或探索层
     # (factory/scripts.research/workflow)。黑名单原先漏了这个与 core/ 平级的顶层目录,
     # 导致 regime.py/strategy_composer.py 倒灌未被发现;两者已迁出至 factory/。
-    ("engine.", ["factors.", "factory.", "strategies.", "scripts.", "workflow."]),
+    ("engine.", ["factors.", "factory.", "strategies.", "scripts.", "workflow.", "governance."]),
     ("scripts.data.", ["factory.", "strategies.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
     # ops 默认按生产运维入口处理:不得随手倒灌研究/服务/台账层。
     # 少数已审定的研究编排脚本在 ALLOWED_IMPORT_EXCEPTIONS 中放行;新增例外必须显式留痕。
     ("scripts.ops.", ["factory.", "workflow.", "scripts.research.", "services.", "research_ledger.",
                       "strategy_registry.", "knowledge.", "api.", "metasearch."]),
     # knowledge 是纯机制:只依赖 stdlib(+ duck-typed Hypothesis),不得依赖任何业务层
-    ("knowledge.", ["core.", "lake.", "factors.", "strategies.", "factory.", "workflow.", "scripts.", "api.", "services."]),
+    ("knowledge.", ["core.", "lake.", "factors.", "strategies.", "factory.", "workflow.", "scripts.", "api.", "services.", "governance."]),
     # 产品接缝(Phase 0):api 是薄 HTTP 层,只能走 services/contracts,不得直碰引擎
     ("api.", ["core.", "lake.", "factors.", "strategies.", "factory.", "workflow.",
-              "engine.", "metasearch.", "knowledge.", "scripts."]),
+              "engine.", "metasearch.", "knowledge.", "scripts.", "governance."]),
     # services 是受控接缝(有意允许 import 引擎),但不得反向依赖 api。
     # read 是只读查询面,不得调用 actions 写入/执行面;actions 可按需读 read 视图。
     ("services.read.", ["services.actions."]),
     ("services.", ["api."]),
     # contracts 是纯 DTO 叶子:只依赖 pydantic + stdlib,不得依赖任何业务层
     ("contracts.", ["core.", "lake.", "factors.", "strategies.", "factory.", "workflow.",
-                    "engine.", "metasearch.", "knowledge.", "scripts.", "services.", "api."]),
+                    "engine.", "metasearch.", "knowledge.", "scripts.", "services.", "api.", "governance."]),
+    # governance 治理层(holdout 金库/成本钉/trial 账本/状态机):位于 core 之上、
+    # factory/workflow/portfolio 之下。2026-07-21 P1-1③ 起入表:成本/指纹纯口径已
+    # 下沉 lake(cost.py/fingerprint.py),本层只留执法;可向下依赖 lake/app_config/core,
+    # 不得触碰上层接缝与研究编排层。底层各层反向禁 import governance(见上各条),
+    # 杜绝"下层向执法者要定义"的倒灌边复发。
+    ("governance.", ["factors.", "strategies.", "factory.", "workflow.", "services.", "api.",
+                     "apps.", "portfolio.", "scripts.", "research_ledger.", "strategy_registry.",
+                     "metasearch.", "capacity.", "model_risk.", "factor_store.", "knowledge."]),
 ]
 
 # 全局禁止import的模块(无论从哪一层):已退场的兼容层 / 死接口。

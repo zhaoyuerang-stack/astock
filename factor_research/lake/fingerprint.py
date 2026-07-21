@@ -10,9 +10,13 @@
 from __future__ import annotations
 
 import hashlib
+import json
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+_ROOT = Path(__file__).resolve().parents[1]  # factor_research/
 
 
 def panel_fingerprint(panel: pd.DataFrame, *, n_days: int = 60, col_step: int = 50) -> str:
@@ -29,3 +33,20 @@ def panel_fingerprint(panel: pd.DataFrame, *, n_days: int = 60, col_step: int = 
 def stamp_vintage(base: str, close: pd.DataFrame) -> str:
     """vintage 字符串追加数据指纹;重跑对账时指纹不符 = 数据已漂移。"""
     return f"{base}#{panel_fingerprint(close)}"
+
+
+def current_data_fingerprint(root: Path | None = None) -> str:
+    """当前数据湖 vintage 指纹(data_lake/_manifest.json 的 data_vintage.fingerprint)。
+
+    纯定义层口径:治理层(governance.holdout 的 candidate 身份)、版本收益
+    溯源(lake.version_returns 的 sidecar)共用同一真相源。manifest 缺失或
+    无指纹时 fail-closed 抛 RuntimeError,不静默降级。
+    """
+    manifest = (root or _ROOT) / "data_lake" / "_manifest.json"
+    try:
+        fingerprint = (json.loads(manifest.read_text()).get("data_vintage") or {}).get("fingerprint")
+    except Exception as exc:
+        raise RuntimeError(f"data_fingerprint_unavailable: {manifest}: {exc}") from exc
+    if not fingerprint:
+        raise RuntimeError(f"data_fingerprint_unavailable: {manifest}")
+    return str(fingerprint)

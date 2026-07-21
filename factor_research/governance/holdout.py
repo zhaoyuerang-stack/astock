@@ -20,6 +20,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+# current_data_fingerprint 的定义层权威在 lake.fingerprint(manifest vintage 口径,
+# 2026-07-21 架构 P1-1③ 下沉);此处 re-export 兼容既有消费方(run_daily /
+# strategy_truth_screen / 各 holdout 测试),candidate 身份语义不变。
+from lake.fingerprint import current_data_fingerprint as current_data_fingerprint
+
 _DEFAULT_BOUNDARY = "2025-01-01"
 _VALIDATIONS = Path(__file__).resolve().parents[1] / "data_lake" / "governance" / "holdout_validations.jsonl"
 _VALIDATION_PROCESS_LOCK = threading.RLock()
@@ -152,17 +157,6 @@ def migrate_holdout_boundary(new_boundary, *, reason: str, recorded_at: str | No
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
     return {"new": rec["boundary"], "previous": str(prev.date()) if prev is not None else None,
             "superseded": superseded}
-
-
-def current_data_fingerprint(root: Path | None = None) -> str:
-    manifest = (root or _ROOT) / "data_lake" / "_manifest.json"
-    try:
-        fingerprint = (json.loads(manifest.read_text()).get("data_vintage") or {}).get("fingerprint")
-    except Exception as exc:
-        raise RuntimeError(f"data_fingerprint_unavailable: {manifest}: {exc}") from exc
-    if not fingerprint:
-        raise RuntimeError(f"data_fingerprint_unavailable: {manifest}")
-    return str(fingerprint)
 
 
 def candidate_identity(base_id: str, spec_hash: str, data_fingerprint: str) -> str:

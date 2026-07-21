@@ -13,8 +13,8 @@ data_lake/version_returns/*.csv;此前任何代码可直写,无身份绑定—�
   · 两者皆无 → raise(fail-closed 写)
 
 series_hash = sha256(落盘 CSV 字节),防「换 CSV 留旧 sidecar」投毒。
-cost_hash 复用 governance.cost_pin 的 cost_hash(cost_snapshot())。
-data_fingerprint 复用 governance.holdout.current_data_fingerprint(manifest 口径)。
+cost_hash 复用 lake.cost 的 cost_hash(cost_snapshot())(同层定义)。
+data_fingerprint 复用 lake.fingerprint.current_data_fingerprint(manifest 口径)。
 
 root 可注入(测试 hermetic,照 paper_engine/meta 参数化先例)。
 """
@@ -22,13 +22,16 @@ from __future__ import annotations
 
 import hashlib
 import json
-import sys
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
+
+from lake.cost import cost_hash as _lake_cost_hash
+from lake.cost import cost_snapshot as _lake_cost_snapshot
+from lake.fingerprint import current_data_fingerprint as _lake_data_fingerprint
 
 _DEFAULT_ROOT = Path(__file__).resolve().parents[1]  # factor_research/
 
@@ -60,24 +63,13 @@ def _sha256_bytes(data: bytes) -> str:
 
 
 def _current_cost_hash() -> str:
-    """复用 governance.cost_pin 的 cost_hash(cost_snapshot()) 口径。"""
-    fr = str(_DEFAULT_ROOT)
-    if fr not in sys.path:
-        sys.path.insert(0, fr)
-    from governance.cost_pin import cost_hash as _cost_hash  # noqa: WPS433
-    from governance.cost_pin import cost_snapshot  # noqa: WPS433
-
-    return _cost_hash(cost_snapshot())
+    """复用 lake.cost 的 cost_hash(cost_snapshot()) 口径(同层定义)。"""
+    return _lake_cost_hash(_lake_cost_snapshot())
 
 
 def _default_data_fingerprint(root: Path) -> str:
-    """复用 holdout 的 data_fingerprint 口径(manifest data_vintage.fingerprint)。"""
-    fr = str(_DEFAULT_ROOT)
-    if fr not in sys.path:
-        sys.path.insert(0, fr)
-    from governance.holdout import current_data_fingerprint  # noqa: WPS433
-
-    return current_data_fingerprint(root=root)
+    """复用 lake.fingerprint 的 data_fingerprint 口径(manifest data_vintage.fingerprint)。"""
+    return _lake_data_fingerprint(root=root)
 
 
 def write_version_returns(
