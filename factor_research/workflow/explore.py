@@ -21,18 +21,19 @@ from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT: Path = Path(__file__).resolve().parent.parent
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
 from factors.small_cap import small_cap_timing
 from factors.utils import mad_clip, safe_zscore
 
-OUT_DIR = ROOT / "reports" / "exploration"
+OUT_DIR: Path = ROOT / "reports" / "exploration"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -40,57 +41,64 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 # Picklable factor builders (module-level classes, not closures)
 # ═══════════════════════════════════════════════════════════════════
 
-def _pt_timing(close, amount):
+def _pt_timing(close: pd.DataFrame, amount: pd.DataFrame) -> pd.Series:
     t, _, _ = small_cap_timing(close, amount, ma_window=16)
     return t.astype(float)
 
-def _no_timing(close, amount):
+def _no_timing(close: pd.DataFrame, amount: pd.DataFrame) -> pd.Series:
     return pd.Series(1.0, index=close.index)
 
 
 class LowTurnover:
-    def __init__(self, w=20): self.w = w
-    def __call__(self, c, v, a, d):
+    def __init__(self, w: int = 20) -> None: self.w = w
+    def __call__(self, c: pd.DataFrame, v: pd.DataFrame, a: pd.DataFrame,
+                 d: pd.DatetimeIndex) -> pd.DataFrame:
         t = a / (c * v * 100 + 1)
         return safe_zscore(mad_clip(-t.rolling(self.w).mean()))
 
 class LowVolatility:
-    def __init__(self, w=20): self.w = w
-    def __call__(self, c, v, a, d):
+    def __init__(self, w: int = 20) -> None: self.w = w
+    def __call__(self, c: pd.DataFrame, v: pd.DataFrame, a: pd.DataFrame,
+                 d: pd.DatetimeIndex) -> pd.DataFrame:
         r = c.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan)
         return safe_zscore(mad_clip(-r.rolling(self.w).std()))
 
 class Illiquidity:
-    def __init__(self, w=20): self.w = w
-    def __call__(self, c, v, a, d):
+    def __init__(self, w: int = 20) -> None: self.w = w
+    def __call__(self, c: pd.DataFrame, v: pd.DataFrame, a: pd.DataFrame,
+                 d: pd.DatetimeIndex) -> pd.DataFrame:
         r = c.pct_change(fill_method=None).abs().replace([np.inf, -np.inf], np.nan)
         return safe_zscore(mad_clip((r / (a + 1)).rolling(self.w).mean()))
 
 class VolPriceDivergence:
-    def __init__(self, w=20): self.w = w
-    def __call__(self, c, v, a, d):
+    def __init__(self, w: int = 20) -> None: self.w = w
+    def __call__(self, c: pd.DataFrame, v: pd.DataFrame, a: pd.DataFrame,
+                 d: pd.DatetimeIndex) -> pd.DataFrame:
         pc = c.pct_change(self.w, fill_method=None)
         vc = v.rolling(self.w).mean().pct_change(self.w, fill_method=None)
         return safe_zscore(mad_clip((-pc * vc).rolling(5).mean()))
 
 class MomentumResonance:
-    def __init__(self, fast=5, slow=20): self.fast = fast; self.slow = slow
-    def __call__(self, c, v, a, d):
+    def __init__(self, fast: int = 5, slow: int = 20) -> None: self.fast = fast; self.slow = slow
+    def __call__(self, c: pd.DataFrame, v: pd.DataFrame, a: pd.DataFrame,
+                 d: pd.DatetimeIndex) -> pd.DataFrame:
         mf = c.pct_change(self.fast, fill_method=None)
         ms = c.pct_change(self.slow, fill_method=None)
         return safe_zscore(mad_clip(np.sign(mf) * np.sign(ms) * ms.abs()))
 
 class DualLow:
-    def __init__(self, tw=20, vw=20): self.tw = tw; self.vw = vw
-    def __call__(self, c, v, a, d):
+    def __init__(self, tw: int = 20, vw: int = 20) -> None: self.tw = tw; self.vw = vw
+    def __call__(self, c: pd.DataFrame, v: pd.DataFrame, a: pd.DataFrame,
+                 d: pd.DatetimeIndex) -> pd.DataFrame:
         lt = - (a / (c * v * 100 + 1)).rolling(self.tw).mean()
         r = c.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan)
         lv = -r.rolling(self.vw).std()
         return safe_zscore(mad_clip(lt + lv))
 
 class SizeLowVol:
-    def __init__(self, vw=20): self.vw = vw
-    def __call__(self, c, v, a, d):
+    def __init__(self, vw: int = 20) -> None: self.vw = vw
+    def __call__(self, c: pd.DataFrame, v: pd.DataFrame, a: pd.DataFrame,
+                 d: pd.DatetimeIndex) -> pd.DataFrame:
         sz = -np.log(a.rolling(60).mean() + 1)
         r = c.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan)
         return safe_zscore(mad_clip(sz - r.rolling(self.vw).std()))
@@ -99,8 +107,9 @@ class SizeLowVol:
 
 class MidCapReversal:
     """Mid-cap short-term reversal: fade recent returns in mid/large stocks."""
-    def __init__(self, w=5): self.w = w
-    def __call__(self, c, v, a, d):
+    def __init__(self, w: int = 5) -> None: self.w = w
+    def __call__(self, c: pd.DataFrame, v: pd.DataFrame, a: pd.DataFrame,
+                 d: pd.DatetimeIndex) -> pd.DataFrame:
         # Only consider top 50% by amount (mid-large caps)
         amt_rank = a.rolling(60).mean().rank(axis=1, pct=True)
         mid_mask = amt_rank > 0.50
@@ -111,8 +120,9 @@ class MidCapReversal:
 
 class IndustryMomentum:
     """Momentum ranked within industry — removes size effect."""
-    def __init__(self, w=20): self.w = w
-    def __call__(self, c, v, a, d):
+    def __init__(self, w: int = 20) -> None: self.w = w
+    def __call__(self, c: pd.DataFrame, v: pd.DataFrame, a: pd.DataFrame,
+                 d: pd.DatetimeIndex) -> pd.DataFrame:
         from lake.load_lake import load_fundamental_panel
         ret = c.pct_change(self.w, fill_method=None).replace([np.inf, -np.inf], np.nan)
         # Get industry labels
@@ -138,8 +148,9 @@ class IndustryMomentum:
 
 class LowBeta:
     """Low market sensitivity — defensive stocks."""
-    def __init__(self, w=60): self.w = w
-    def __call__(self, c, v, a, d):
+    def __init__(self, w: int = 60) -> None: self.w = w
+    def __call__(self, c: pd.DataFrame, v: pd.DataFrame, a: pd.DataFrame,
+                 d: pd.DatetimeIndex) -> pd.DataFrame:
         ret = c.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan)
         mkt = ret.mean(axis=1)
         # Rolling beta: Cov(stock, mkt) / Var(mkt)
@@ -150,8 +161,9 @@ class LowBeta:
 
 class IlliqLowVolBlend:
     """illiquidity + low volatility, equal weight."""
-    def __init__(self, iw=20, vw=20): self.iw = iw; self.vw = vw
-    def __call__(self, c, v, a, d):
+    def __init__(self, iw: int = 20, vw: int = 20) -> None: self.iw = iw; self.vw = vw
+    def __call__(self, c: pd.DataFrame, v: pd.DataFrame, a: pd.DataFrame,
+                 d: pd.DatetimeIndex) -> pd.DataFrame:
         r = c.pct_change(fill_method=None).abs().replace([np.inf, -np.inf], np.nan)
         il = safe_zscore(mad_clip((r/(a+1)).rolling(self.iw).mean()))
         lv = safe_zscore(mad_clip(-c.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan).rolling(self.vw).std()))
@@ -159,8 +171,9 @@ class IlliqLowVolBlend:
 
 class IlliqSizeBlend:
     """illiquidity + size factor, equal weight."""
-    def __init__(self, iw=20): self.iw = iw
-    def __call__(self, c, v, a, d):
+    def __init__(self, iw: int = 20) -> None: self.iw = iw
+    def __call__(self, c: pd.DataFrame, v: pd.DataFrame, a: pd.DataFrame,
+                 d: pd.DatetimeIndex) -> pd.DataFrame:
         r = c.pct_change(fill_method=None).abs().replace([np.inf, -np.inf], np.nan)
         il = safe_zscore(mad_clip((r/(a+1)).rolling(self.iw).mean()))
         sz = safe_zscore(mad_clip(-np.log(a.rolling(60).mean() + 1)))
@@ -168,8 +181,9 @@ class IlliqSizeBlend:
 
 class MidCapQuality:
     """Quality in mid-large caps: high ROE, filtered by size."""
-    def __init__(self, w=20): self.w = w
-    def __call__(self, c, v, a, d):
+    def __init__(self, w: int = 20) -> None: self.w = w
+    def __call__(self, c: pd.DataFrame, v: pd.DataFrame, a: pd.DataFrame,
+                 d: pd.DatetimeIndex) -> pd.DataFrame:
         from lake.load_lake import load_fundamental_panel
         amt_rank = a.rolling(60).mean().rank(axis=1, pct=True)
         mid_mask = amt_rank > 0.30  # top 70% by size
@@ -189,9 +203,9 @@ class MidCapQuality:
 @dataclass
 class FactorSpec:
     name: str
-    factor_builder: Callable
-    timing_builder: Callable
-    config: dict = field(default_factory=dict)
+    factor_builder: Callable[..., pd.DataFrame]
+    timing_builder: Callable[..., pd.Series]
+    config: dict[str, Any] = field(default_factory=dict)
     niche: str = ""
     hypothesis: str = ""
 
@@ -260,7 +274,7 @@ def make_candidates() -> list[FactorSpec]:
 # Phase runners (module-level for pickle compatibility)
 # ═══════════════════════════════════════════════════════════════════
 
-def _run_phase1(spec: FactorSpec) -> dict:
+def _run_phase1(spec: FactorSpec) -> dict[str, Any]:
     from workflow.phase1_synthetic import Phase1Checker
     checker = Phase1Checker(spec.factor_builder, spec.timing_builder,
                             spec.name, spec.config)
@@ -273,7 +287,7 @@ def _run_phase1(spec: FactorSpec) -> dict:
             "phase1_warns": [r.check_id for r in warns]}
 
 
-def _run_phase2(spec: FactorSpec) -> dict:
+def _run_phase2(spec: FactorSpec) -> dict[str, Any]:
     from workflow.phase2_backtest import Phase2Runner
     runner = Phase2Runner(spec.factor_builder, spec.timing_builder,
                           spec.name, spec.config)
@@ -299,7 +313,7 @@ def _run_phase2(spec: FactorSpec) -> dict:
             "corr_max": data.get("correlation", {}).get("max_abs_corr", 0)}
 
 
-def _run_phase3(spec: FactorSpec) -> dict:
+def _run_phase3(spec: FactorSpec) -> dict[str, Any]:
     from workflow.phase3_wf import WF3Runner
     runner = WF3Runner(spec.factor_builder, spec.timing_builder,
                        spec.name, spec.config)
@@ -319,12 +333,14 @@ def _run_phase3(spec: FactorSpec) -> dict:
 # ═══════════════════════════════════════════════════════════════════
 
 class Explorer:
-    def __init__(self, candidates: list[FactorSpec], max_workers: int = 8):
+    def __init__(self, candidates: list[FactorSpec], max_workers: int = 8) -> None:
         self.candidates = candidates
         self.max_workers = max_workers
-        self.p1, self.p2, self.p3 = [], [], []
+        self.p1: list[dict[str, Any]] = []
+        self.p2: list[dict[str, Any]] = []
+        self.p3: list[dict[str, Any]] = []
 
-    def run(self):
+    def run(self) -> list[dict[str, Any]]:
         t0 = time.time()
         logger.info(f"Explorer: {len(self.candidates)} candidates, {self.max_workers} workers\n")
 
@@ -373,7 +389,7 @@ class Explorer:
         logger.info(f"Total: {(time.time()-t0)/60:.0f}m")
         return self._report()
 
-    def _report(self):
+    def _report(self) -> list[dict[str, Any]]:
         all_r = self.p3 if self.p3 else self.p2 if self.p2 else self.p1
         ranked = sorted(all_r, key=lambda r: r.get("wf_annual", r.get("is_annual", r.get("oos_annual", -999))), reverse=True)
 
@@ -405,7 +421,7 @@ class Explorer:
         return ranked
 
 
-def _json_safe(obj):
+def _json_safe(obj: Any) -> Any:
     if isinstance(obj, dict): return {k: _json_safe(v) for k, v in obj.items()}
     if isinstance(obj, list): return [_json_safe(v) for v in obj]
     if isinstance(obj, (np.integer,)): return int(obj)
