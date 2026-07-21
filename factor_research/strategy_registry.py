@@ -15,30 +15,34 @@
   register_family("momentum", "截面动量", hypothesis=..., regime=..., decay_signal=...)
   register("momentum", "v1.0", desc, config, data_scope, metrics, status="候选", notes=...)
 """
+from __future__ import annotations
+
 import argparse
 import json
 import os
 import re
+from collections.abc import Iterable
 from datetime import UTC, date
 from pathlib import Path
+from typing import Any, TypedDict
 
 from engine.metrics import compute_hit
 
-REGISTRY = Path(__file__).parent / "strategy_versions.json"
+REGISTRY: Path = Path(__file__).parent / "strategy_versions.json"
 
 # 双轨准入：唯一允许长期占用「在册」的两条轨。
 #   standalone  —— 单体达标（hit=True：年化>15% 且 回撤<20%）+ DSR 多重测试惩罚下显著（dsr_p<DSR_ALPHA）
 #   diversifier —— 单体不达标但作为组合分流器（负相关 / 对组合夏普有正增量），须 rationale 佐证
 # DSR 仅卡 standalone：diversifier 凭组合边际而非单体统计显著性入册，不受此门约束。
-ADMISSION_TRACKS = ("standalone", "diversifier")
+ADMISSION_TRACKS: tuple[str, ...] = ("standalone", "diversifier")
 
 # standalone 准入的 DSR（Deflated Sharpe Ratio）多重测试惩罚显著性阈值。
 # 来源 R-OBJECTIVE-001 / 9-Gate G8：单体达标(hit)不等于经得起搜索惩罚，dsr_p>=此值即多重测试下不显著。
-DSR_ALPHA = 0.05
+DSR_ALPHA: float = 0.05
 
 # 设计上即为「对冲分流器」的母策略：单体低收益 + 与主力负相关，靠组合层增量入册（diversifier 轨）。
 # 仅这两族的对冲假设里显式写了「等额做空…对冲 Beta」并实测负相关，故迁移时自动归类为 diversifier。
-DIVERSIFIER_FAMILIES = {"large-cap-growth-hedged", "hq-momentum-hedged"}
+DIVERSIFIER_FAMILIES: set[str] = {"large-cap-growth-hedged", "hq-momentum-hedged"}
 
 # 版本 status 词表(守卫审计 #3):机械冻结 strategy_versions.json 存量值 + 规范「在册」。
 # 枚举日 2026-07-17 存量:候选/参考/已证伪/退役;「在册」为双轨准入规范态(台账当日无在册版,
@@ -46,13 +50,93 @@ DIVERSIFIER_FAMILIES = {"large-cap-growth-hedged", "hq-momentum-hedged"}
 # (artifacts.py::registry_status,经 veto_filter_marginal 落台账;冻结时只枚举了台账存量、
 # 漏了"代码在用但台账暂无"的状态,主仓全量回归 test_veto_filter 揪出)。
 # register_family 的 family status 是另一字段,不在此列。
-ALLOWED_VERSION_STATUS = frozenset({"候选", "参考", "已证伪", "退役", "在册", "条件假设/观察"})
+ALLOWED_VERSION_STATUS: frozenset[str] = frozenset({"候选", "参考", "已证伪", "退役", "在册", "条件假设/观察"})
 # 英文同义词会让 status≠「在册」从而绕过 register 双轨准入门,同时被证据守卫 ACTIVE_STATUS
 # 宽认——两层网眼错位。一律拒绝并提示用「在册」(枚举日存量词表中无此四词,无需从 ALLOWED 剔除)。
-VERSION_STATUS_SYNONYMS_BLOCKED = frozenset({"active", "ACTIVE", "APPROVED", "registered"})
+VERSION_STATUS_SYNONYMS_BLOCKED: frozenset[str] = frozenset({"active", "ACTIVE", "APPROVED", "registered"})
 
 
-def _load():
+# ── 台账 JSON Schema（契约声明）──────────────────────────────────────────────
+# 本文件是台账唯一写入口,schema 跟着写者走:消费方(services/read、守卫、前端)按此形状读。
+# 必填键 = 写入路径必然产生的键;其余历史/可选键经 total=False 声明。
+# 审计可用"实际 json 键 ⊆ 声明键"的键集合比对做机械核查(schema drift 检测)。
+
+class MetricsDict(TypedDict, total=False):
+    # 规范键词表(compute_hit 与双轨准入门只用这些)。真实台账另含样本切片/压力扩展键——
+    # {annual,maxdd,sharpe,hit}_{2010,search_2018,holdout_2025,...}、wf_*、
+    # {family}_delta_annual_is_oos_stress 等(2026-07 枚举),故运行期字段类型按 dict[str, Any]
+    # 声明,本类仅作规范键文档;drift 比对以"规范键 + 前缀/后缀豁免规则"核查。
+    annual: float
+    maxdd: float
+    sharpe: float
+    calmar: float
+    hit: bool            # 一律由 engine.metrics.compute_hit 重算覆盖,禁止调用方手填
+    n: int
+
+
+class AdmissionDict(TypedDict, total=False):
+    track: str           # "standalone" | "diversifier"(见 ADMISSION_TRACKS)
+    rationale: str
+    note: str
+
+
+class EvidenceDict(TypedDict, total=False):
+    hypothesis_id: str
+    experiment_ids: list[str]
+    data_incidents: list[dict[str, Any]]
+    production_blocked: bool
+    retirement: dict[str, Any]       # retire_version 写入:reason/evidence_refs/retired_at/actor
+    spec_migration: dict[str, Any]   # attach_executable_spec 写入:spec_hash/requires_revalidation
+
+
+class DataScopeDict(TypedDict, total=False):
+    source: str
+    period: str
+    survivorship_bias: bool
+
+
+class _VersionRequired(TypedDict):
+    version: str
+
+
+class VersionRecord(_VersionRequired, total=False):
+    date: str
+    desc: str
+    config: dict[str, Any]
+    data_scope: DataScopeDict | str  # 存量两种形态(show() 兼容 str 直写)
+    metrics: dict[str, Any]        # 规范键见 MetricsDict;含样本切片/压力扩展键(见该类注释)
+    status: str                      # 词表见 ALLOWED_VERSION_STATUS
+    notes: str
+    evidence: EvidenceDict
+    admission: AdmissionDict
+    nine_gate: dict[str, Any]        # NineGatesReport.summarize() 摘要(dsr_p/psr/n_trials/pbo/wf_sharpe/...)
+    executable_spec: dict[str, Any]  # {"spec": ExecutableStrategySpec.to_dict(), "spec_hash": str}
+    decay_check: dict[str, Any]      # governance/decay.py 结果 + checked_at(版本级,别于家族级 decay_signal)
+    catalog_status: dict[str, Any]   # {"status": "ACTIVE"|"SHADOW", "marginal": {...}, "changed_at": str}
+    dsr_demotion: dict[str, Any]     # demote_dsr_insignificant_standalone 的降级审计块
+
+
+class _FamilyRequired(TypedDict):
+    id: str
+    versions: list[VersionRecord]
+
+
+class FamilyRecord(_FamilyRequired, total=False):
+    name: str
+    hypothesis: str
+    regime: str
+    decay_signal: str
+    status: str                      # active / paused / retired(家族生命周期,别于版本 status)
+    style_betas: dict[str, float]
+    capacity_m: float
+    failure_boundaries: dict[str, Any]
+
+
+class RegistryDoc(TypedDict):
+    families: list[FamilyRecord]
+
+
+def _load() -> RegistryDoc:
     if not REGISTRY.exists():
         return {"families": []}
     data = json.loads(REGISTRY.read_text())
@@ -65,13 +149,13 @@ def _load():
     return data
 
 
-def _version_key(version: str):
+def _version_key(version: str) -> tuple[int | str, ...]:
     """版本自然序:'v1.10' > 'v1.2'(字符串序会排反)。数字段转 int 比较,非数字兜底字符串。"""
     parts = re.split(r"(\d+)", str(version))
     return tuple(int(p) if p.isdigit() else p for p in parts)
 
 
-def _save(data):
+def _save(data: RegistryDoc) -> None:
     data["families"].sort(key=lambda f: f["id"])
     # 原子写:临时文件 + os.replace,进程中途挂掉不会留下半截 JSON 损坏台账
     payload = json.dumps(data, ensure_ascii=False, indent=2)
@@ -80,16 +164,19 @@ def _save(data):
     os.replace(tmp, REGISTRY)
 
 
-def register_family(id, name, hypothesis="", regime="", decay_signal="", status="active",
-                    style_betas=None, capacity_m=0.0, failure_boundaries=None):
+def register_family(id: str, name: str, hypothesis: str = "", regime: str = "",
+                    decay_signal: str = "", status: str = "active",
+                    style_betas: dict[str, float] | None = None,
+                    capacity_m: float = 0.0,
+                    failure_boundaries: dict[str, Any] | None = None) -> str:
     """登记/更新一个母策略（同 id 覆盖元信息，保留其下版本）"""
     data = _load()
     fam = next((f for f in data["families"] if f["id"] == id), None)
     if fam is None:
         fam = {"id": id, "versions": []}
         data["families"].append(fam)
-    
-    update_dict = {
+
+    update_dict: FamilyRecord = {
         "name": name,
         "hypothesis": hypothesis,
         "regime": regime,
@@ -104,9 +191,12 @@ def register_family(id, name, hypothesis="", regime="", decay_signal="", status=
     return id
 
 
-def register(family, version, desc, config, data_scope, metrics, status="候选", notes="",
-             evidence=None, admission=None, nine_gate=None, date_str=None,
-             spec=None, spec_hash=None):
+def register(family: str, version: str, desc: str, config: dict[str, Any],
+             data_scope: DataScopeDict | str, metrics: dict[str, Any] | None,
+             status: str = "候选", notes: str = "",
+             evidence: EvidenceDict | None = None, admission: AdmissionDict | None = None,
+             nine_gate: dict[str, Any] | None = None, date_str: str | None = None,
+             spec: dict[str, Any] | None = None, spec_hash: str | None = None) -> str:
     """登记/更新某母策略下的一个版本（同 family+version 覆盖）
 
     hit：一律由 ``engine.metrics.compute_hit`` 按 metrics 里的 annual/maxdd 重算并覆盖，
@@ -212,7 +302,7 @@ def register(family, version, desc, config, data_scope, metrics, status="候选"
     return f"{family}/{version}"
 
 
-def migrate_two_track_admission(apply: bool = True):
+def migrate_two_track_admission(apply: bool = True) -> list[dict[str, Any]]:
     """一次性迁移：用 compute_hit 重算全台账 hit，并按双轨准入规则裁定「在册」去留。
 
     规则（与 register() 闸门一致）：
@@ -272,7 +362,8 @@ def migrate_two_track_admission(apply: bool = True):
     return transitions
 
 
-def demote_dsr_insignificant_standalone(threshold: float = DSR_ALPHA, apply: bool = True):
+def demote_dsr_insignificant_standalone(threshold: float = DSR_ALPHA,
+                                        apply: bool = True) -> list[dict[str, Any]]:
     """一次性治理迁移（ADR-020 / R-OBJECTIVE-001）：把 DSR 多重测试惩罚下不显著的
     「在册 standalone」降为「参考」，保留历史绩效/配置/nine_gate，仅移出有效 alpha 池。
 
@@ -312,7 +403,8 @@ def demote_dsr_insignificant_standalone(threshold: float = DSR_ALPHA, apply: boo
     return transitions
 
 
-def attach_nine_gate(family, version, summary, evidence=None):
+def attach_nine_gate(family: str, version: str, summary: dict[str, Any] | None,
+                     evidence: EvidenceDict | None = None) -> str:
     """把一次 Nine-Gate 审计摘要（NineGatesReport.summarize()）写入指定版本的 nine_gate 字段。
 
     可选 evidence 同步绑定证据链 {"hypothesis_id":..., "experiment_ids":[...]}。
@@ -334,7 +426,7 @@ def attach_nine_gate(family, version, summary, evidence=None):
     return f"{family}/{version}"
 
 
-def attach_data_incident(family, version, incident):
+def attach_data_incident(family: str, version: str, incident: dict[str, Any] | None) -> str:
     """Append a data incident to version evidence without changing lifecycle status."""
     data = _load()
     fam = next((f for f in data["families"] if f["id"] == family), None)
@@ -359,7 +451,8 @@ def attach_data_incident(family, version, incident):
     return f"{family}/{version}"
 
 
-def attach_decay_check(family, version, result, *, checked_at=None):
+def attach_decay_check(family: str, version: str, result: dict[str, Any] | None, *,
+                       checked_at: str | None = None) -> str:
     """把一次 governance/decay.py::decay_check() 的结果写入指定版本的 decay_check 字段。
 
     版本级(不是家族级):decay_check 按 run_active() 的每条腿算,与既有家族级静态
@@ -383,7 +476,9 @@ def attach_decay_check(family, version, result, *, checked_at=None):
     return f"{family}/{version}"
 
 
-def attach_catalog_status(family, version, status, *, marginal=None, changed_at=None):
+def attach_catalog_status(family: str, version: str, status: str, *,
+                          marginal: dict[str, Any] | None = None,
+                          changed_at: str | None = None) -> str:
     """把一次边际贡献定级(governance/marginal.py::marginal_alpha 的残差法判决)写入
     指定版本的 catalog_status 字段。
 
@@ -414,14 +509,8 @@ def attach_catalog_status(family, version, status, *, marginal=None, changed_at=
     return f"{family}/{version}"
 
 
-def attach_executable_spec(
-    family,
-    version,
-    spec,
-    spec_hash,
-    *,
-    require_revalidation=True,
-):
+def attach_executable_spec(family: str, version: str, spec: dict[str, Any],
+                           spec_hash: str, *, require_revalidation: bool = True) -> str:
     """Attach a validated executable identity without copying old evidence to it."""
     from core.strategy_spec import ExecutableStrategySpec
 
@@ -451,8 +540,9 @@ def attach_executable_spec(
     return f"{family}/{version}"
 
 
-def retire_version(family, version, *, reason, evidence_refs=(), actor="workflow",
-                   control_event_path=None):
+def retire_version(family: str, version: str, *, reason: str,
+                   evidence_refs: Iterable[str] = (), actor: str = "workflow",
+                   control_event_path: Path | str | None = None) -> str:
     """唯一的版本退役通道(ADR-017 处置 + Task 15 状态机接线)。
 
     经状态机校验合法转换(非 REGISTERED/DEPLOYED/SUSPENDED 源状态拒绝,不落盘)、追加
@@ -497,7 +587,7 @@ def retire_version(family, version, *, reason, evidence_refs=(), actor="workflow
     return f"{family}/{version}"
 
 
-def show():
+def show() -> None:
     """按母策略分组打印台账"""
     data = _load()
     if not data["families"]:
@@ -507,7 +597,7 @@ def show():
         for k, label in (("hypothesis", "假设"), ("regime", "适用"), ("decay_signal", "失效信号")):
             if fam.get(k):
                 print(f"    {label}：{fam[k]}")
-        
+
         # New fields formatting
         if fam.get("style_betas"):
             betas_str = ", ".join(f"{k}: {v:+.2f}" for k, v in fam["style_betas"].items())
