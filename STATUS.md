@@ -34,6 +34,13 @@
   · **终态账目(主仓实测)**:lake 0 / holdout 0(1 显式豁免带 ADR 留痕)/ control 0 / force 0;全库仅剩 registry 2 条(composite n_trials 人工 workflow)。**守卫审计 9 项:8 项关闭,#9 固有局限不修**。
   · **验证**:Claude 独立复验四对抗样本(间接变量写湖必红/读湖写报告不误报/外部写 factor_store 必红/缺 ADR 豁免条目自检必红)+ 47 测试 + 主仓全量 `test_all.sh` RC=0。
 
+**2026-07-18(教训知识库化:direction_registry 回填 8 条积欠方向级证伪 + LESSONS 写入路由纪律)**:
+  · **诊断**:机器可读教训基础设施早已齐(findings.json 机器自长 / direction_registry 人工策展 / CI 守卫三层),病根是**内容积欠**——LESSONS.md 993 行方向级证伪只有 10 条进了登记簿,生成器看不见,算力反复烧回死路(directions.py 模块注释自证)。不建新系统,只回填+立写入纪律。
+  · **回填 8 条(全 NOTE,scope 精确到用法)**:alpha101 standalone long-only 证伪(DSL 成分仍合法)/ 全市场延续类因子负 IC(反转市场)/ 两融非第二母策略 / raw 财报直接截面弱(与 frontier BOOST 并读:BOOST 的是交互形态)/ 二值择时 overlay 救核心数学死(G5↔G6 死结+Calmar 中性)/ 输家死亡层否决器结构死 / HK long-only 数学拖累(Sharpe 地板=组合×0.5)/ TSMOM=风控 overlay 非 alpha(constant-mix 基准铁律)。每条带 LESSONS/台账/auto-memory 证据指针+revival_condition;结构性证伪永不过期,经验性弱结论 6 个月保质期。
+  · **写入路由纪律(LESSONS.md 头部)**:新教训必须同时落到机器能消费的最高层——①可机械检测→CI 守卫立项 ②方向级→direction_registry ③单候选→findings.json 机器自长 ④操作雷区→agent_skills 剧本 ⑤叙事→LESSONS;只写散文=半知识库化。
+  · **验证**:`test_direction_registry.py` 12/12 绿(含随仓内容校验+LLM prompt 注入端到端);对抗:伪造无证据条目被证据门控真拒;`prompt_block()` 实跑确认 8 条新 prompt_note 全部注入播种块(19 行)。
+  · **解锁的研究效率**:生成端(确定性种子过滤+LLM 播种 prompt)从此机械看见这 8 类死路;LLM 再提"alpha101 主腿/追涨截面/择时 overlay 救核心/死亡层否决器"类候选会被登记簿驱动的教训块直接劝退,不再等 L0-L3 烧完才发现。
+
 **2026-07-17(守卫绕过审计 + R-COST-001 hash-pin 机械化;Grok CLI 委托首单)**:
   · **审计**:对守卫体系做绕过路径审计,9 项发现(共性根因=守卫查内容不查来源),报告 `factor_research/reports/governance/guard_bypass_audit_20260717.md`。最高危 = CostModel 费率无钉死(唯一未机械强制的 P0 成本红线);其余:holdout 守卫只认精确边界字面量、`register()` status 词表未校验(准入门只认「在册」精确匹配)、`check_lake_writers` 仅覆盖 4/30 目录、`version_returns` 无 provenance(排名输入可投毒,修复需 owner 拍板设计)、env-var 人工门对有 shell 的 agent 自助。
   · **#1 已修复(commit da9cc4d6)**:`scripts/ci/check_cost_model_pin.py`(sha256 钉死三费率,照抄 ADR-021 boundary pin 范式,改动须 ADR+更新 pin)+ 对抗测试 9 例 + test_all.sh/CLAUDE §16 接线。实现由 **Grok CLI**(grok-4.5,独立 worktree)按任务书完成,Claude 独立复验(活体突变真红/还原复绿/相邻守卫绿)后 ff 合入 main;主仓全量 `test_all.sh` 全绿(13 守卫+枚举块+兜底 99 文件)。

@@ -2,6 +2,14 @@
 
 > 项目内可见的经验库(我的私有 auto-memory 作补充)。新踩的坑、新做的决策往这里加。
 
+> **写入路由(教训知识库化纪律,2026-07-18)**:本文件是 append-only 叙事日志,**不是机器可读知识库本体**。每写一条新教训,先问"能上哪级阶梯",同时落到机器能消费的最高层:
+> ① **自欺模式可机械检测** → `scripts/ci/` 确定性守卫(先在 `TASKS.md` 立项);
+> ② **方向级证伪/太弱/空白**(因子族/数据源/用法粒度)→ [`factor_research/knowledge/direction_registry.json`](factor_research/knowledge/direction_registry.json)(带 evidence 指针+精确 scope+revival_condition,生成端机器消费;无证据条目会被自动忽略);
+> ③ **单候选粒度验证结论** → `knowledge/findings.json` 由 `record_from_validation()` 机器自长,勿手写;
+> ④ **操作性雷区**(接口/环境/流程)→ 对应 `factor_research/docs/agent_skills/` 剧本;
+> ⑤ **叙事与"为什么"** → 本文件。
+> 只写本文而漏掉 ①②④ 的教训 = 半知识库化:自然语言生成器不消费,算力会反复烧回死路(2026-07-18 回填了 8 条积欠方向条目,教训是别再积欠)。scope 必须精确到**用法**——Alpha101"standalone long-only 证伪"但"DSL 成分合法",划宽了误杀活方向,划窄了白烧算力。
+
 ## 因子评估 / 统计量
 - **正交增量 alpha ≠ 残差均值(OLS 数学坑)**(2026-06):算「子版本对父版本的正交增量 alpha」时,把它写成 `mean(child - a - b·parent)×252` → **永远≈0**。因为带截距的 OLS 残差均值恒等于 0(最小二乘正规方程性质)。**正确 = 截距 a 的年化**(`a×252`,父版本无法解释的那部分日均收益)。修复后 illiquidity/v3.1 对 v1.3 的 incΑ 从 0.0 变 12.9%(高相关 corr=0.79 但仍有实质增量)。`lineage_pbo.py`。
 - **9-Gate 大量已算指标在 `summarize()` 被默默丢弃**(2026-06):`NineGatesEvaluator` 内部 gate2 早算了 `nw_icir/monotonicity_corr/ic_decay`、gate3 算了中性化后 `neut_nw_icir/icir_retention`、gate6 算了 `cost_decay_rate/capacity_limit_aum`、gate7 算了 `bull/bear_sharpe`,但 `NineGatesReport.summarize()` 只留了 DSR/PSR/WF/CV/tail 一小撮 → 台账/前端看着像「没算」。**补字段优先查 summarize() 的留存白名单,别急着写新计算**。
