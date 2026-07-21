@@ -86,7 +86,6 @@ def test_walk_forward_service_exposes_and_forwards_regime_aware():
     assert "regime_aware" in sig.parameters
     assert sig.parameters["regime_aware"].default is False  # 只有调度显式开;其它调用方行为不变
     src = (ROOT / "services" / "actions" / "autoresearch_search.py").read_text(encoding="utf-8")
-    kwargs = _call_kwargs(src, "run_walk_forward_search")
     assert "regime_aware" in {kw.arg for node in pyast.walk(pyast.parse(src))
                               if isinstance(node, pyast.Call)
                               and getattr(node.func, "id", getattr(node.func, "attr", None)) == "run_walk_forward_search"

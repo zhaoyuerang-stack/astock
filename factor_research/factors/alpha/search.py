@@ -314,7 +314,6 @@ class FactorSpace:
             timing_full = self._timing_builder(close, amount)
 
         oos_returns_all = []
-        oos_returns_by_strategy = {}  # For PBO
         best_params_per_window = []
         all_combos_returns = {}       # name → concatenated OOS returns (for PBO)
 
@@ -441,7 +440,7 @@ class FactorSpace:
             if len(all_oos) > 200:
                 skew = float(all_oos.skew())
                 kurt = float(all_oos.kurtosis()) + 3.0  # pandas kurtosis is excess
-                n_trials = len(combos := list(product(*[
+                n_trials = len(list(product(*[
                     self._axes[n].values for n in self._axes
                 ])))
                 dsr_report = deflated_sharpe(

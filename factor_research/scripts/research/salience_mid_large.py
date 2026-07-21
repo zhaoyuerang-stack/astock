@@ -129,7 +129,6 @@ def main():
             h_sharpe = h_annual / h_vol if h_vol > 0 else 0.0
             cum_h = (1 + r_hedged).cumprod()
             h_maxdd = float((cum_h / cum_h.cummax() - 1).min())
-            h_calmar = h_annual / abs(h_maxdd) if h_maxdd < 0 else 0.0
             
             print(f"  Long-Only Annual Return: {m['annual']:.2%}, Sharpe: {m['sharpe']:.2f}, MaxDD: {m['maxdd']:.2%}")
             print(f"  Hedged L-S  Annual Return: {h_annual:.2%}, Sharpe: {h_sharpe:.2f}, MaxDD: {h_maxdd:.2%}")

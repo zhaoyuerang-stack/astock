@@ -203,7 +203,6 @@ class NineGatesEvaluator:
                 verdict = "WARN"
 
         # Look-ahead Bias Leakage perturbation test
-        leak_detected = False
         if self.factor_builder is not None:
             try:
                 # 1. Choose a date near the middle of index
@@ -233,7 +232,6 @@ class NineGatesEvaluator:
                 if diff > 1e-7:
                     reasons.append(f"Future leak detected: perturbing price on {pert_date.date()} changed historical factor values (diff={diff:.6f})")
                     verdict = "FAIL"
-                    leak_detected = True
             except Exception as e:
                 reasons.append(f"Look-ahead perturbation test failed to run: {str(e)}")
                 verdict = "WARN"
@@ -837,7 +835,6 @@ class NineGatesEvaluator:
                 metrics[f"annual_delay_{delay}d"] = res_delayed.annual
                 metrics[f"sharpe_delay_{delay}d"] = res_delayed.sharpe
                 
-            original_annual = metrics.get("annual_delay_1d", 0.0)
         except Exception as e:
             reasons.append(f"Delayed execution test failed: {str(e)}")
             if verdict != "FAIL":

@@ -239,7 +239,6 @@ def main():
     blend_weights = [0.3, 0.5, 0.7, 1.0]
     pt_options = [False, True]
 
-    years = sorted(set(d.year for d in trade_dates))
     windows = []
     for test_year in range(2020, 2027):
         train_start = pd.Timestamp(f"{test_year - 3}-01-01")
@@ -346,7 +345,6 @@ def main():
         print(f"  Calmar: {wf_annual / abs(wf_maxdd) if wf_maxdd < 0 else 0:.2f}")
 
         oos_annuals = [r["oos_annual"] for r in all_results]
-        oos_dds = [r["oos_maxdd"] for r in all_results]
         for r in all_results:
             print(f"    {r['test_year']}: Annual={r['oos_annual']:+.1%} DD={r['oos_maxdd']:+.1%}", flush=True)
         print(f"  Positive: {sum(1 for a in oos_annuals if a > 0)}/{len(oos_annuals)}")

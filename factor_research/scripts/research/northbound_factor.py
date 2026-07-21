@@ -89,7 +89,6 @@ def main():
     base = run_small_cap_strategy(cfg)
     close_v20 = base["close"]
     v20_ret = base["returns"]
-    timing = base["timing"].astype(float)
 
     # Build scheduled weights (quarterly)
     dates = sorted(nb_rank.dropna(how="all").index)
@@ -105,7 +104,6 @@ def main():
 
     ones = pd.Series(1.0, index=close_v20.index, dtype="float64")
     ret_nb, _ = backtest_weights(close_v20, sched_nb, ones, cfg)
-    ret_nb_pt2 = None
 
     # ── v2.0 small-cap baseline ──
     from factors.small_cap import small_cap_factor, small_cap_timing

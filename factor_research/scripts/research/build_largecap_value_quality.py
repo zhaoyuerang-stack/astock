@@ -183,7 +183,6 @@ def backtest_long(factor, close, top_n=30, rebalance_months=3):
     rets = {}
     for i, dt in enumerate(dates):
         if i == 0 or dt not in daily_ret.index: continue
-        prev_dt = dates[i - 1]
 
         should_rebal = any(abs((dt - rd).days) <= 2 for rd in rebal_dates)
         if should_rebal or len(current_weight) == 0:

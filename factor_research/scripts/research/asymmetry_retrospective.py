@@ -154,7 +154,6 @@ def main():
               f"{row['sortino']:>6.2f} {row['sharpe']:>6.2f} {row['asym_score']:>5.0%}")
 
     # 3. 关键: 不对称好但 Sharpe 差的候选 (被对称指标误杀)
-    median_sharpe = df["sharpe"].median()
     df["sharpe_rank"] = df["sharpe"].rank(pct=True)
     df["asym_rank"] = df["asym_score"].rank(pct=True)
     df["rank_diff"] = df["asym_rank"] - df["sharpe_rank"]

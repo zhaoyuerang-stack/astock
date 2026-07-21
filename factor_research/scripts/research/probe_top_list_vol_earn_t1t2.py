@@ -196,7 +196,6 @@ def attach_features(events: pd.DataFrame, close: pd.DataFrame, amount: pd.DataFr
 
 def build_rules(df: pd.DataFrame) -> dict[str, pd.Series]:
     nb = df["net_amount"] > 0
-    ns = df["net_amount"] < 0
     strong_b = nb & (df["net_rate"] > 5)
     mild_v = df["vol_ratio"].between(VOL_MILD_LO, VOL_MILD_HI)
     hot_v = df["vol_ratio"] > VOL_HOT

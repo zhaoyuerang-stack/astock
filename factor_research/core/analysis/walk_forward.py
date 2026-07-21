@@ -82,7 +82,6 @@ def walk_forward_windows(
     """
     years = sorted(dates.year.unique())
     approx_train = pd.Timedelta(days=int(train_years * 252))
-    approx_test = pd.Timedelta(days=int(test_years * 252))
     purge = pd.Timedelta(days=purge_days)
 
     windows = []

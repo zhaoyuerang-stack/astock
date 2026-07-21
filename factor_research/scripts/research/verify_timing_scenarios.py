@@ -139,7 +139,6 @@ def compute_metrics(returns, rf=0.025):
     worst_month = float(monthly.min())
 
     # Max drawdown recovery
-    dd = cum / cum.cummax() - 1
     recovery_days = _max_recovery(r)
 
     return {
@@ -397,7 +396,6 @@ def _write_report(results, scenarios, navA, navB, navC, navA1x,
     today_str = date.today().strftime('%Y%m%d')
     report_path = out_dir / f"timing_verify_{today_str}.md"
     csv_path = out_dir / f"timing_verify_{today_str}_nav.csv"
-    cost_csv_path = out_dir / f"timing_verify_{today_str}_cost.csv"
 
     # 场景标签映射
     LABEL_MAP = {
@@ -446,7 +444,6 @@ def _write_report(results, scenarios, navA, navB, navC, navA1x,
         # Monthly
         monthly = r.resample("ME").apply(lambda g: (1 + g).prod() - 1)
         n_months = len(monthly)
-        monthly_win = (monthly > 0).mean()
 
         M[label] = {
             **m,
@@ -606,8 +603,6 @@ def _write_report(results, scenarios, navA, navB, navC, navA1x,
     w("\n### 5.1 全部回撤期段 (> 10%)\n")
     for label, _, _, _ in scenarios:
         r = stats_returns(results[label])
-        cum = (1 + r).cumprod()
-        dd = cum / cum.cummax() - 1
         periods = find_drawdown_periods(r, top_n=5)
         deep = [p for p in periods if p['depth'] < -0.10]
         w(f"\n**{label}** — 最深 {M[label]['maxdd']:.1%}, 最长恢复 {M[label]['recovery_days']} 天\n")

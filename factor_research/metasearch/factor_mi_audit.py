@@ -85,7 +85,6 @@ def audit_hypothesis_pool(close, volume, amount,
 def mi_matrix(ic_dict: dict) -> pd.DataFrame:
     """两两 MI 矩阵 (bits)."""
     names = list(ic_dict.keys())
-    n = len(names)
     mat = pd.DataFrame(0.0, index=names, columns=names)
     for i, a in enumerate(names):
         for j, b in enumerate(names):

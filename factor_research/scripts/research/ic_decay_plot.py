@@ -61,7 +61,6 @@ def main():
 
     ic1 = ic_series[1]
     roll_mean = ic1.rolling(252, min_periods=100).mean()
-    roll_std = ic1.rolling(252, min_periods=100).std()
 
     print("生成图表...", flush=True)
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))

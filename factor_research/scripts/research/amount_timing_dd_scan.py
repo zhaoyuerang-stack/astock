@@ -164,7 +164,6 @@ def run_combo(
         timing_signal = timing.astype(float)
         exposure_cap = 1.0
     elif timing_mode == "band":
-        dist = timing.replace({True: 1.0, False: 0.0})
         # Recompute from raw dist for band, lagged one day, clipped in engine.
         _, _, raw_dist = small_cap_timing(close, amount, 16)
         timing_signal = ((1.0 + raw_dist.shift(1) * 8.0).clip(0.0, 1.5) * (raw_dist.shift(1) > 0).astype(float)).fillna(0.0)

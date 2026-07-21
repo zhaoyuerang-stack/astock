@@ -153,9 +153,6 @@ def main():
     if OLD_OBSIDIAN.exists():
         old_files = list(OLD_OBSIDIAN.glob("今日操作*.md"))
         if old_files:
-            old_md = old_files[0]
-            old_time = datetime.fromtimestamp(os.path.getmtime(old_md))
-            old_age_days = (now_local - old_time).days
             check(True, "旧输出目录", f"A股模拟盘/ ({len(old_files)}个文件, 已废弃, 可手动删除)")
         else:
             check(True, "旧输出", "空目录")

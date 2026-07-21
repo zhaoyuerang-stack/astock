@@ -286,8 +286,6 @@ def main():
     missed = df[df["old_pass"] == False][df["new_pass"]]
 
     # L1 精度: 各象限的 L1 通过率
-    bp_l1 = both_pass["bt_pass"].sum() if len(both_pass) > 0 else 0
-    bf_l1 = both_fail["bt_pass"].sum() if len(both_fail) > 0 else 0
     m_l1 = missed["bt_pass"].sum() if len(missed) > 0 else 0
 
     print(f"  {'象限':<25} {'数量':>5} {'L1通过':>7} {'精度':>7} {'平均年化':>9} {'平均回撤':>9}")

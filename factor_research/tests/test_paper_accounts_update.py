@@ -56,7 +56,7 @@ def test_healthy_empty_candidates_skips_update(tmp_path, monkeypatch):
     """名单健康但空(status=ok, accounts=[])→ 不是错误,但也没有账户可更新。"""
     summary_fp = tmp_path / "summary.json"
     with mock.patch("portfolio.paper_accounts.provision_from_recompose",
-                    return_value={"status": "ok", "reason": "", "accounts": []}) as m_provision, \
+                    return_value={"status": "ok", "reason": "", "accounts": []}), \
          mock.patch("portfolio.paper_accounts.update_all") as m_update, \
          mock.patch.object(pau, "_load_prices") as m_load_prices, \
          mock.patch("portfolio.paper_accounts.SUMMARY_FP", summary_fp):
@@ -75,7 +75,7 @@ def test_dry_run_skips_price_loading_and_update(tmp_path):
     summary_fp = tmp_path / "summary.json"
     with mock.patch("portfolio.paper_accounts.provision_from_recompose",
                     return_value={"status": "ok", "reason": "",
-                                 "accounts": [{"family": "f", "version": "v1.0", "status": "active"}]}) as m_provision, \
+                                 "accounts": [{"family": "f", "version": "v1.0", "status": "active"}]}), \
          mock.patch("portfolio.paper_accounts.update_all") as m_update, \
          mock.patch.object(pau, "_load_prices") as m_load_prices, \
          mock.patch("portfolio.paper_accounts.SUMMARY_FP", summary_fp):

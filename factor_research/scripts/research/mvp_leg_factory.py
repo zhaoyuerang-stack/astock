@@ -126,7 +126,6 @@ def main():
     print("\n[1/4] 加载数据 + Regime 引擎...", flush=True)
     close, volume, amount = load_price_panels("2010-01-01")
     re = RegimeEngine(close, amount)
-    labels = re.classify()
     summary = re.summary()
     print(f"  Trend:  {summary['trend']}")
     print(f"  Vol:    {summary['volatility']}")

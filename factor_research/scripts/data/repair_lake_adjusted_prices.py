@@ -54,7 +54,6 @@ def main():
     
     # We will merge the raw prices on the target dates with the adj_factor map
     # and update the values in daily_all.parquet
-    target_mask = df["date"].isin(target_dates)
     
     # Create a backup of the original daily_all.parquet first
     backup_fp = daily_all_fp.with_name("daily_all_backup_before_repair.parquet")

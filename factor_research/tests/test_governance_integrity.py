@@ -152,7 +152,7 @@ def test_migrate_two_track_idempotent_and_invariant():
     ]}
     R.REGISTRY.write_text(json.dumps(data, ensure_ascii=False))
 
-    t1 = R.migrate_two_track_admission(apply=True)
+    R.migrate_two_track_admission(apply=True)
     d1 = R._load()
 
     def reg_versions(d):

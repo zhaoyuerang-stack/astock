@@ -53,7 +53,7 @@ def test_attach_catalog_status_unknown_identity_raises(tmp_path, monkeypatch):
 
 def test_research_strategy_catalog_picks_up_registry_override(tmp_path, monkeypatch):
     """portfolio/strategy_runners.py::_apply_registry_catalog_status 真的会覆盖写死的 status。"""
-    reg = _seed(tmp_path, monkeypatch)
+    _seed(tmp_path, monkeypatch)
     sr.attach_catalog_status("toyfam", "v1.0", "SHADOW")
 
     from portfolio.strategy_runners import _apply_registry_catalog_status

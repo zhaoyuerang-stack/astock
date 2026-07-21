@@ -103,7 +103,6 @@ def analyze_parameter_stability(
         return report
 
     avg_neighbor_sharpe = float(np.mean(neighbor_sharpes))
-    std_neighbor_sharpe = float(np.std(neighbor_sharpes)) if len(neighbor_sharpes) > 1 else 0.0
     max_neighbor_sharpe = float(np.max(neighbor_sharpes))
 
     stability_ratio = avg_neighbor_sharpe / target_sharpe if target_sharpe > 0 else 0.0

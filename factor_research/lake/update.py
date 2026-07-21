@@ -266,7 +266,6 @@ def update_fundamental():
 
     from lake.schema import YJBB_RENAME
     RENAME = YJBB_RENAME
-    KEEP = list(set(RENAME.values()) | {"report_date","avail_date"})
     new_frames = []
     for p in missing:
         try:

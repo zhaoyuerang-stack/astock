@@ -17,8 +17,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from factory.ontology import EconomicThesis
-
 # 影子日志与表现记录路径
 SHADOW_LOG = ROOT / "data_lake" / "agent" / "shadow_incubation_log.json"
 
@@ -59,13 +57,6 @@ def configure_shadow_incubation():
     
     # 1. 在台账中进行观察期登记 (Family Registry)
     print("[*] 步骤1: 在 strategy_registry 中登记母策略家族...")
-    
-    # 构造核心假设与经济学论证
-    thesis = EconomicThesis(
-        mechanism="BOM成本传导与财务议价权定价差 (预期差) 驱动行业轮动与避险",
-        citation="BOM-Driven Supply Chain Ontology Model v1.0",
-        falsifiability="当预测最强的行业毛利率在随后财报中持续萎缩，或影子组合最大回撤超过 15% 时证伪。"
-    )
     
     # 注册观察期母策略
     # 设状态为 SHADOW (影子模式)，这保证了主决策层 run_daily.py 在跑选股时，会跳过该因子的权重注入。

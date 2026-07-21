@@ -58,7 +58,6 @@ def make_synthetic_clean() -> dict[str, Any]:
     """
     np.random.seed(42)
     dates = pd.bdate_range("2019-07-01", periods=N_TOTAL)
-    stocks = ["000001", "000002", "000003"]
 
     # ---- Random walk prices ----
     close_data = {}

@@ -52,7 +52,6 @@ def apply_adv_cap(weights_schedule, amount, pv_yuan, adv_window=20, adv_pct=0.05
             capped[date] = w.copy()
             continue
         adv_row = adv.loc[date]
-        max_weight_per_stock = (adv_pct * adv_row) / pv_yuan  # 每股最大权重
 
         codes = w.index
         adv_for_codes = adv_row.reindex(codes)

@@ -92,7 +92,6 @@ def main():
     print("  " + "-" * 90)
 
     current_name = "AmihudIlliq (当前v3.0)"
-    current_mom = 0.0
     results = []
 
     for name, sh in sharpe_data.items():
@@ -102,7 +101,6 @@ def main():
 
         cur = float(vals.iloc[-1])
         prev_6m = float(vals.iloc[-126]) if len(vals) >= 126 else cur
-        prev_12m = float(vals.iloc[-252]) if len(vals) >= 252 else cur
 
         # 变化率: 当前 vs 6月前
         if prev_6m != 0:
@@ -120,7 +118,6 @@ def main():
 
         # 信号判定
         if name == current_name:
-            current_mom = mom_6m
             if mom_6m < -0.2:
                 signal = "🔴 减速! 关注切换"
             elif mom_6m < -0.1:
