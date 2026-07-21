@@ -14,6 +14,7 @@ logger = get_logger(__name__)
 import argparse
 import sys
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -30,7 +31,7 @@ from lake.load_lake import load_daily_basic_panel
 from strategies.small_cap import load_price_panels
 from strategy_registry import attach_nine_gate, register, register_family
 
-AST_REVERSAL = {
+AST_REVERSAL: dict[str, Any] = {
     "type": "linear_combo",
     "terms": [
         {"factor": "momentum", "params": {"window": 60}, "transforms": ["mad_clip", "zscore", "rank"], "weight": 0.5},
@@ -53,7 +54,8 @@ def parse_allocation(alloc_str: str) -> dict[str, float]:
         raise ValueError(f"Portfolio weights must sum up to 1.0, got: {total}")
     return alloc
 
-def run_pipeline(version: str, allocation_str: str, persist: bool = False, start_date: str = "2023-01-01"):
+def run_pipeline(version: str, allocation_str: str, persist: bool = False,
+                 start_date: str = "2023-01-01") -> None:
     logger.info("=" * 95)
     logger.info(f"  Composite Strategy Promotion Pipeline (with Adversarial Guard) | Version: {version}")
     logger.info("=" * 95)
@@ -179,7 +181,8 @@ def run_pipeline(version: str, allocation_str: str, persist: bool = False, start
     res_t0 = engine_comp.run(Signal(weights=w_composite_t0, timing=None, family="comp_t0", version=version))
     res_t1 = engine_comp.run(Signal(weights=w_composite_t1, timing=None, family="comp_t1", version=version))
     
-    def get_quick_metrics(rets):
+    def get_quick_metrics(rets: pd.Series) -> tuple[float, float, float]:
+        """(年化, 最大回撤, 夏普) 快速三指标。"""
         ann = float(rets.mean() * 252)
         vol = float(rets.std() * np.sqrt(252))
         sr = ann / vol if vol > 0 else 0.0
