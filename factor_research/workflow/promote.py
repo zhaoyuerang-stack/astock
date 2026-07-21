@@ -24,11 +24,20 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
-ROOT = Path(__file__).resolve().parent.parent
+if TYPE_CHECKING:
+    # 仅为类型注解引入,保持 "import promote 很轻"(重依赖都在函数体内延迟导入)
+    from factory.ontology import Hypothesis
+    from workflow.explore import FactorSpec
+    from workflow.phase1_synthetic import CheckResult
+    from workflow.phase4_register import RegistrationReport
 
-NINE_GATE_STRATEGY_TO_FAMILY = {
+ROOT: Path = Path(__file__).resolve().parent.parent
+
+NINE_GATE_STRATEGY_TO_FAMILY: dict[str, str] = {
     "small_cap": "small-cap-size",
     "size_earnings": "size-earnings",
     "large_cap": "large-cap-growth-hedged",
@@ -36,11 +45,14 @@ NINE_GATE_STRATEGY_TO_FAMILY = {
 }
 
 
-def promote_spec(spec, version="v1.0", warmup_start="2010-01-01",
-                 force=False, run_marginal=False, regime="", decay_signal="", hyp=None,
-                 run_nine_gate=False, nine_gate_strategy=None, nine_gate_runner=None,
-                 nine_gate_trials=15, nine_gate_start=None, target_status="", holdout_id="",
-                 seed_provenance=None):
+def promote_spec(spec: FactorSpec, version: str = "v1.0", warmup_start: str = "2010-01-01",
+                 force: bool = False, run_marginal: bool = False, regime: str = "",
+                 decay_signal: str = "", hyp: Hypothesis | None = None,
+                 run_nine_gate: bool = False, nine_gate_strategy: str | None = None,
+                 nine_gate_runner: Callable[..., dict[str, Any]] | None = None,
+                 nine_gate_trials: int = 15, nine_gate_start: str | None = None,
+                 target_status: str = "", holdout_id: str = "",
+                 seed_provenance: dict[str, Any] | None = None) -> RegistrationReport | None:
     """把一个 workflow FactorSpec 走完整 phase1~4,返回 RegistrationReport。
 
     spec 可来自 from_factory.hypothesis_to_spec(hyp) 或 explore.make_candidates()。
@@ -133,7 +145,8 @@ def promote_spec(spec, version="v1.0", warmup_start="2010-01-01",
     return report
 
 
-def _phase_summary(p1, p2, p3, report) -> dict:
+def _phase_summary(p1: list[CheckResult] | None, p2: dict[str, Any] | None,
+                   p3: dict[str, Any] | None, report: RegistrationReport) -> dict[str, Any]:
     """Compact phase summary for async job results."""
     p1_fails = [getattr(r, "check_id", "") for r in (p1 or []) if getattr(r, "is_fail", False)]
     p2_segments = {}
@@ -176,7 +189,8 @@ def _infer_nine_gate_strategy(family: str) -> str | None:
     return None
 
 
-def _default_nine_gate_runner(strategy_name, n_trials=15, persist=False, version=None, start=None):
+def _default_nine_gate_runner(strategy_name: str, n_trials: int = 15, persist: bool = False,
+                              version: str | None = None, start: str | None = None) -> dict[str, Any]:
     """Lazy adapter so importing promote.py stays light."""
     from workflow.nine_gate_runner import run_evaluation
     return run_evaluation(
@@ -189,7 +203,7 @@ def _default_nine_gate_runner(strategy_name, n_trials=15, persist=False, version
 
 
 def _attach_nine_gate_control_status(family: str, version: str, status: str, *,
-                                     strategy: str = "", error: str = "") -> dict:
+                                     strategy: str = "", error: str = "") -> dict[str, Any]:
     """Persist a control-plane Nine-Gate status without changing registration state."""
     summary = {
         "status": status,
@@ -205,8 +219,10 @@ def _attach_nine_gate_control_status(family: str, version: str, status: str, *,
     return summary
 
 
-def run_nine_gate_after_registration(report, *, strategy_name=None, runner=None,
-                                     n_trials=15, start=None) -> dict:
+def run_nine_gate_after_registration(report: RegistrationReport | None, *,
+                                     strategy_name: str | None = None,
+                                     runner: Callable[..., dict[str, Any]] | None = None,
+                                     n_trials: int = 15, start: str | None = None) -> dict[str, Any]:
     """Run full 9-Gate after a successful Phase4 registration.
 
     A Nine-Gate failure is deliberately non-transactional: the registry entry stays,
@@ -252,7 +268,7 @@ def run_nine_gate_after_registration(report, *, strategy_name=None, runner=None,
         )
 
 
-def _record_kg(hyp, p1, p3):
+def _record_kg(hyp: Hypothesis, p1: list[CheckResult] | None, p3: dict[str, Any] | None) -> None:
     """把验证结果写进知识图谱(失败也记,避免重复尝试)。best-effort。"""
     try:
         from knowledge.graph import load_graph
@@ -272,7 +288,7 @@ def _record_kg(hyp, p1, p3):
         print(f"  [knowledge] 记录跳过(non-fatal): {type(e).__name__}: {str(e)[:80]}", flush=True)
 
 
-def _run_marginal(spec, report):
+def _run_marginal(spec: FactorSpec, report: RegistrationReport) -> None:
     """登记后:对当前 ACTIVE 组合算边际贡献,标 ACTIVE/SHADOW。best-effort。"""
     try:
         from factory.lines.line3_marginal.marginal_eval import evaluate_candidate
@@ -325,7 +341,7 @@ def _run_marginal(spec, report):
         print(f"  marginal 跳过(non-fatal): {type(e).__name__}: {str(e)[:80]}", flush=True)
 
 
-def promote_hypothesis(hyp, version="v1.0", **kw):
+def promote_hypothesis(hyp: Hypothesis, version: str = "v1.0", **kw: Any) -> RegistrationReport | None:
     """factory Hypothesis → 完整 phase1~4。"""
     from workflow.from_factory import hypothesis_to_spec
     spec = hypothesis_to_spec(hyp)
@@ -336,7 +352,7 @@ def promote_hypothesis(hyp, version="v1.0", **kw):
     return promote_spec(spec, version=version, hyp=hyp, **kw)
 
 
-def promote_pool_l3(version="v1.0", **kw):
+def promote_pool_l3(version: str = "v1.0", **kw: Any) -> list[RegistrationReport | None]:
     """升 factory pool 中所有 L3_PASSED 的 Hypothesis。"""
     from factory.ontology import HypothesisStatus
     from factory.pool import HypothesisPool
