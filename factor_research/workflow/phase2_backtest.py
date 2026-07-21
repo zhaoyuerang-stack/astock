@@ -27,6 +27,7 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -35,25 +36,26 @@ from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, S
 from governance.holdout import assert_search_clean, boundary
 from strategies.small_cap import load_price_panels as load_data
 
-ROOT = Path(__file__).resolve().parent.parent
-OUT_DIR = ROOT / "reports" / "discovery"
+ROOT: Path = Path(__file__).resolve().parent.parent
+OUT_DIR: Path = ROOT / "reports" / "discovery"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Non-overlapping segments。OOS 终点由 holdout.boundary 动态裁定(见 run() 的 _segments)——
 # date >= boundary 是金库,Phase 2 是搜索/验证栈不得触碰,金库仅 validate_on_holdout 唯一一次。
-IS_SEG = ("IS  2018-2022", "2018-01-01", "2022-12-31")
-STRESS_SEG = ("压力 2010-2017", "2010-01-01", "2017-12-31")
+IS_SEG: tuple[str, str, str] = ("IS  2018-2022", "2018-01-01", "2022-12-31")
+STRESS_SEG: tuple[str, str, str] = ("压力 2010-2017", "2010-01-01", "2017-12-31")
 
-DEFAULT_TOP_N = 25
-DEFAULT_REBALANCE = 20
-DEFAULT_LEVERAGE = 1.25
+DEFAULT_TOP_N: int = 25
+DEFAULT_REBALANCE: int = 20
+DEFAULT_LEVERAGE: float = 1.25
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def build_rebalance_weights(factor, close, top_n=25, rebalance_days=20):
+def build_rebalance_weights(factor: pd.DataFrame, close: pd.DataFrame, top_n: int = 25,
+                            rebalance_days: int = 20) -> dict[pd.Timestamp, pd.Series]:
     fdates = factor.dropna(how="all").index.intersection(close.index)
     if len(fdates) < 50:
         return {}
@@ -71,7 +73,8 @@ def build_rebalance_weights(factor, close, top_n=25, rebalance_days=20):
         weights[effective] = pd.Series(1.0 / top_n, index=f.nlargest(top_n).index)
     return weights
 
-def build_rebalance_weights_offset(factor, close, top_n=25, rebalance_days=20, offset=0):
+def build_rebalance_weights_offset(factor: pd.DataFrame, close: pd.DataFrame, top_n: int = 25,
+                                   rebalance_days: int = 20, offset: int = 0) -> dict[pd.Timestamp, pd.Series]:
     fdates = factor.dropna(how="all").index.intersection(close.index)
     if len(fdates) < 50:
         return {}
@@ -90,7 +93,9 @@ def build_rebalance_weights_offset(factor, close, top_n=25, rebalance_days=20, o
     return weights
 
 
-def run_segment(close, volume, amount, weights, timing, leverage, cost_model):
+def run_segment(close: pd.DataFrame, volume: pd.DataFrame, amount: pd.DataFrame,
+                weights: dict[pd.Timestamp, pd.Series], timing: pd.Series | None,
+                leverage: float, cost_model: CostModel) -> dict[str, Any]:
     """Run a single backtest segment and return metrics."""
     prices = PricePanel(close=close, volume=volume, amount=amount)
     engine = BacktestEngine(
@@ -132,8 +137,8 @@ class Phase2Runner:
         ],
         timing_builder: Callable[[pd.DataFrame, pd.DataFrame], pd.Series],
         family: str = "unnamed",
-        config: dict | None = None,
-    ):
+        config: dict[str, Any] | None = None,
+    ) -> None:
         self.factor_builder = factor_builder
         self.timing_builder = timing_builder
         self.family = family
@@ -150,7 +155,7 @@ class Phase2Runner:
 
     # ── main ──
 
-    def run(self, warmup_start: str = "2010-01-01") -> dict:
+    def run(self, warmup_start: str = "2010-01-01") -> dict[str, Any]:
         """Run all Phase 2 checks. Returns dict with segments + checks."""
         logger.info(f"Phase 2: {self.family}")
 
@@ -267,7 +272,9 @@ class Phase2Runner:
 
     # ── checks ──
 
-    def _check_cost_sensitivity(self, close, volume, amount, weights, timing):
+    def _check_cost_sensitivity(self, close: pd.DataFrame, volume: pd.DataFrame,
+                                amount: pd.DataFrame, weights: dict[pd.Timestamp, pd.Series],
+                                timing: pd.Series | None) -> dict[str, Any]:
         """Run backtest with +50% costs, compare annual return."""
         # Full period 2018-2026 for cost sensitivity
         mask = (close.index >= "2018-01-01") & (close.index <= "2026-12-31")
@@ -301,7 +308,9 @@ class Phase2Runner:
             "threshold": 0.5,
         }
 
-    def _check_correlation(self, close, volume, amount, weights, timing):
+    def _check_correlation(self, close: pd.DataFrame, volume: pd.DataFrame,
+                           amount: pd.DataFrame, weights: dict[pd.Timestamp, pd.Series],
+                           timing: pd.Series | None) -> dict[str, Any]:
         """Check daily return correlation vs registered strategies."""
         # Load registered strategies from strategy_versions.json
         reg_path = ROOT / "strategy_versions.json"
@@ -377,7 +386,7 @@ class Phase2Runner:
             "threshold_fail": 0.85,
         }
 
-    def _check_decay(self, segments):
+    def _check_decay(self, segments: dict[str, Any]) -> dict[str, Any]:
         """Check OOS/IS annual return decay。按前缀取段(OOS 标签的终点年随 boundary 变)。"""
         is_seg = next((v for k, v in segments.items() if k.startswith("IS")), {})
         oos_seg = next((v for k, v in segments.items() if k.startswith("OOS")), {})
@@ -412,7 +421,7 @@ class Phase2Runner:
 @dataclass
 class BacktestReport:
     family: str
-    data: dict
+    data: dict[str, Any]
     timestamp: str = field(default_factory=lambda: str(pd.Timestamp.now()))
 
     @property
@@ -470,7 +479,7 @@ class BacktestReport:
         return "\n".join(lines)
 
 
-def _make_serializable(obj):
+def _make_serializable(obj: Any) -> Any:
     """Convert numpy types to Python native types for JSON serialization."""
     if isinstance(obj, dict):
         return {k: _make_serializable(v) for k, v in obj.items()}
