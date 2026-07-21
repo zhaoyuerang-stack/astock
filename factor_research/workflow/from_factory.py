@@ -15,7 +15,14 @@ workflow/phase1~4 负责"深度":合成防未来审计 + 多段回测 + WF + 唯
 from __future__ import annotations
 
 import importlib
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from typing import TYPE_CHECKING
+
+import pandas as pd
+
+if TYPE_CHECKING:
+    from factory.ontology import Hypothesis
+    from workflow.explore import FactorSpec
 
 
 def _resolve_fn(fn_name: str) -> Callable:
@@ -24,7 +31,8 @@ def _resolve_fn(fn_name: str) -> Callable:
     return getattr(importlib.import_module(module_path), fn)
 
 
-def _dispatch_args(deps, close, volume, amount):
+def _dispatch_args(deps: Iterable[str], close: pd.DataFrame, volume: pd.DataFrame,
+                   amount: pd.DataFrame) -> list[pd.DataFrame]:
     """按 data_dependencies 选 positional 价量面板(镜像 factory 的同名逻辑)。
 
     工厂因子函数签名各异(如 small_cap_factor(amount) 只吃 amount),
@@ -44,34 +52,35 @@ def _dispatch_args(deps, close, volume, amount):
     return [amount]
 
 
-def _default_pt_timing(close, amount):
+def _default_pt_timing(close: pd.DataFrame, amount: pd.DataFrame) -> pd.Series:
     """缺省择时 = PureTrend MA16(生产标准)。Hypothesis 无 timing 时用此。"""
     from factors.small_cap import small_cap_timing
     t, _, _ = small_cap_timing(close, amount, ma_window=16)
     return t.astype(float)
 
 
-def factor_builder_from_hypothesis(hyp) -> Callable:
+def factor_builder_from_hypothesis(hyp: Hypothesis) -> Callable[..., pd.DataFrame]:
     """Hypothesis -> factor_builder(close, volume, amount, dates) -> DataFrame。"""
     fn = _resolve_fn(hyp.factor_fn_name)
     deps = tuple(hyp.data_dependencies)
     params = dict(hyp.factor_params)
 
-    def builder(close, volume, amount, dates):  # dates 兼容 phase1 签名,纯价量因子忽略
+    def builder(close: pd.DataFrame, volume: pd.DataFrame, amount: pd.DataFrame,
+                dates: pd.DatetimeIndex) -> pd.DataFrame:  # dates 兼容 phase1 签名,纯价量因子忽略
         args = _dispatch_args(deps, close, volume, amount)
         return fn(*args, **params)
 
     return builder
 
 
-def timing_builder_from_hypothesis(hyp) -> Callable:
+def timing_builder_from_hypothesis(hyp: Hypothesis) -> Callable[..., pd.Series]:
     """Hypothesis -> timing_builder(close, amount) -> Series。无 timing 时用 PT-MA16。"""
     if not getattr(hyp, "timing_fn_name", None):
         return _default_pt_timing
     fn = _resolve_fn(hyp.timing_fn_name)
     tparams = dict(getattr(hyp, "timing_params", {}) or {})
 
-    def builder(close, amount):
+    def builder(close: pd.DataFrame, amount: pd.DataFrame) -> pd.Series:
         out = fn(close, amount, **tparams)
         if isinstance(out, tuple):      # small_cap_timing 返回 (t, nav, dist)
             out = out[0]
@@ -80,7 +89,7 @@ def timing_builder_from_hypothesis(hyp) -> Callable:
     return builder
 
 
-def hypothesis_to_spec(hyp):
+def hypothesis_to_spec(hyp: Hypothesis) -> FactorSpec:
     """Hypothesis -> workflow.explore.FactorSpec(可直接喂 phase1~4)。"""
     from workflow.explore import FactorSpec
     base = {"top_n": 25, "rebalance_days": 20, "leverage": 1.25,
