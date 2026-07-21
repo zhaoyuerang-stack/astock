@@ -8,7 +8,7 @@ mutate_existing.py 注册时 data_dependencies 仍写 ('price/close',),engine di
 喂 close 即可,fundamental panel 由本模块内部 cache 加载。
 
 第一版只暴露 6 个核心字段:
-  - net_profit_yoy   (NPY,净利润同比增长 — size_earnings v1.0 实证)
+  - net_profit_yoy   (NPY,净利润同比增长 — size_earnings v1.0 成长腿;台账状态=参考)
   - revenue_yoy      (营收同比)
   - roe              (净资产收益率)
   - gross_margin     (毛利率)
@@ -66,7 +66,13 @@ _FUND_EVIDENCE = (
     evidence=_FUND_EVIDENCE,
 )
 def net_profit_yoy(close, **_):
-    """净利润同比增长 — size_earnings v1.0 LIVE 实证基本面动量."""
+    """净利润同比增长 — size_earnings v1.0(台账状态=参考,passed_all=False)成长腿.
+
+    standalone 全市场线性 IC 稳定为负(round7 probe raw IS=-0.0115/OOS=-0.0182);
+    台账 v1.0 的正 IC(0.051)属 0.5*size+0.5*npy 混合因子、由 size 腿主导,
+    不构成本因子单独正向证据。
+    见 reports/research/probe_round7_fundamental_net_profit_yoy.json。
+    """
     panel = _load_fundamental_cache()
     aligned = _align_to_close(panel["net_profit_yoy"], close)
     return safe_zscore(mad_clip(aligned))
