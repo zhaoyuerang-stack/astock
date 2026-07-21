@@ -79,8 +79,7 @@
 > **推荐序**:观测 → A2+A4 → A3 流式 → A1 常驻 → B 快路径/会话;一意图一 commit + 对抗测试。
 
 #### 第 0 步 — 观测(先做,指导后续取舍)
-- [ ] **L0.1 回合计时日志** — 每轮诊断落: `pi_ms` / `tool_count` / `tool_ms_sum` / `model_est` / `path`(strategy|stock|agent_only);可写桌面 `.runtime/` 或 stderr(gitignore)。对抗:一次假诊断必产出完整字段。谁:桌面。  
-  **验收**:能回答「模型 vs CLI 谁占 70%+」,再决定先做 A1 还是 A2。
+- [x] **L0.1 回合计时日志** — ✅ 2026-07-20 落地(commit 84344c58,Grok 委托单,Claude 验收):`roundTiming.cjs`(fail-open 落盘 `.runtime/round_timing.jsonl`,gitignored)+ piBridge WeakMap 侧信道计时(hrtime 测 pi_ms/tool 区间,不污染返回值)+ diagnosisService 三分支(strategy|stock|agent_only)回合末落盘。对抗测试 3 例(mock 假诊断字段逐项齐全/不可写路径不阻断诊断/返回值逐位不变);验收=47/47 测试亲跑 + 活体突变复验(挖 model_est_ms 字段 3 例真红→还原复绿;破坏内层 fail-open 被外层 catch 吸收=三层冗余防护确认)。**后续**:积累若干真实回合数据后读 `.runtime/round_timing.jsonl` 回答「模型 vs CLI 谁占 70%+」,再决定先做 A1 还是 A2。
 
 #### A 类 — 高 ROI 优先
 - [ ] **A2 策略预检单 tool 纪律** — system prompt + `strategy-precheck` skill:策略类默认只调 1 次 `strategy_idea_check`(已含质量/漏斗/成本);禁止为凑证据再调 `data_quality`/`experiments`/`factors`;缺字段再 `data_gap_audit`。对抗:录一轮 tool 列表,冗余只读 ≤1(或 +data_gap)。谁:桌面。  

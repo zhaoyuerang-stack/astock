@@ -4,7 +4,13 @@
 
 ## 一句话
 
-**2026-07-19(daily round 方向④:量化策略专项扫描接入定时任务,ADR-039)**:
+**2026-07-20(三层分工编排轮:Grok/Sonnet5/Claude 各按判断密度接单,round7/8 needs_human 双闭环)**:
+  · **共享树修复(Claude)**:解掉主仓遗留的知识库化单合并冲突(STATUS.md UU,3d10e614);daily-research-round 剧本 §0 加**账本分叉核查**纪律(0b6e1fd7,终结 round6/7/8 三次点名的孤立分支重复 probe 风险,纯纪律行不新增治理工具)。
+  · **needs_human① 闭环(Claude,判断类)**:net_profit_yoy 符号疑点核对(7d795b7c)——**无真矛盾**:台账 size-earnings v1.0 正 ic_mean=0.051 是 size 腿主导的混合因子读数,与 standalone 负 IC(raw IS -0.0115/OOS -0.0182)是两个测量对象;且该版 status=参考、passed_all=false、dsr_p=0.603。fundamental.py『LIVE 实证』过期夸大标注已修正,结论回写 direction_registry(成长对若利用须按反向候选专项 probe)。
+  · **needs_human② 闭环(Sonnet 5 执行+Claude 验收,2e21e7ad)**:价值对 bp/ep 跨周期反例检验——口径逐函数复用 signal_source_probe 且 round7/8 数字复算逐位一致;分年拆解:2019/2020 残差 IC 双双为负,『OOS 骤强』几乎全由 **2023 单年**贡献(bp 残差 ICIR 1.28),2024 已回落≈0,七年两口径符号完全同步。按预登记判据:**regime 共同贝塔怀疑被加强**。登记簿收紧:结构性论点+非2023年份独立复现齐备前不提『价值对接工厂』。
+  · **桌面延迟 L0.1 落地(Grok 委托+Claude 验收,84344c58)**:诊断回合计时日志(roundTiming.cjs fail-open + piBridge WeakMap 侧信道 + 三分支落盘 .runtime/round_timing.jsonl);对抗测试 3 例;验收=47/47 亲跑+活体突变(挖字段 3 例真红/破内层 fail-open 被外层吸收=三层冗余确认)。首次实测:**grok 派单命中权限白名单坑**($(cat) 命令替换破坏前缀匹配→改短 -p 指令引用任务书文件)。
+  · **移交 owner**:round-9(限售解禁 probe)合回 main 被本会话权限分类器拒(合并类命令不放行)——改动面已核实与 main 零冲突,命令:`git merge claude/daily-round-9 --no-edit`。round-10 worktree 有未提交在途改动(疑今晨定时轮中断遗留),未触碰。
+
   · **背景**:生成端活方向清零(`direction_registry` 11 条 = 6 falsified / 4 weak / 1 mixed,0 active);自动环最近一轮 83 候选 0 过 L3;round7/8 连续在同一空白区打转——内部空白区趋于耗尽,假设进水管成为瓶颈;literature-scan 被"枯竭形式判定+逐次人批"锁死(判定器窗口样本 1/4 不足),事实枯竭先于形式枯竭。
   · **交付**:新剧本 [`quant_strategy_scan.md`](factor_research/docs/agent_skills/quant_strategy_scan.md)——检索源四类(卖方金工公开/策略社区/开源实现/英文可迁移)、**可行性五判**(long-only 可投/T+1 涨跌停/日频 PIT 可得/审慎成本后有肉/非证伪路换皮)、**三路分流**(信号层 Hypothesis 入 factory queue / 构造层 direction_registry NOTE / 数据需求 data_source_backlog),五判存活候选必过 `strategy_idea_check` 确定性预检(ADR-037);daily-research-round §2 扩**四方向轮换** + ①/②无目标时 fallback ④;定时任务 SKILL.md(~/.claude/scheduled-tasks/daily-research-round)同步方向枚举;ADR-039 常备授权(外探门仅此局部放宽,literature-scan 维持枯竭触发+人批不变)。
   · **红线不变**:业界/社区回测数字一律待证伪不作证据(R-LLM-001);只产草案/报告不碰台账(R-WF-001);进搜索即记 n_trials;不复制实现、PIT 对齐(R-DATA-003)。
