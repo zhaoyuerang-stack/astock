@@ -1,8 +1,11 @@
 """Audit v3.0 large-cap value+quality against the 17 backtest risks."""
-import os, sys, warnings
+import os
+import sys
+import warnings
+
 warnings.filterwarnings("ignore")
 from pathlib import Path
-import numpy as np
+
 import pandas as pd
 
 ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
@@ -23,12 +26,14 @@ results.append({"risk": "过拟合", "verdict": "✅ PASS",
 # === Risk 2: Survivorship ===
 print("[2/17] 幸存者偏差...")
 from strategies.small_cap import StrategyConfig, run_small_cap_strategy
+
 cfg = StrategyConfig(start="2010-01-01")
 base = run_small_cap_strategy(cfg)
 close = base["close"]
 codes_in_panel = close.shape[1]
 
 from scripts.research.build_largecap_value_quality import load_clean_panels
+
 panels = load_clean_panels()
 pe = panels["pe"]
 pe_codes = pe.notna().sum()
@@ -53,6 +58,7 @@ results.append({"risk": "前视偏差(财务)", "verdict": "✅ PASS" if has_ava
 print("[4/17] 停牌处理...")
 # v3.0 uses build_scheduled_weights with active filter
 from scripts.research.build_largecap_value_quality import build_factors
+
 comp, univ, _, _ = build_factors(panels, 500)
 # Check if scheduled weights filter active stocks
 results.append({"risk": "停牌处理", "verdict": "△ WARN",
@@ -120,10 +126,12 @@ results.append({"risk": "极端事件", "verdict": "⚠️ WARN",
 # === Risk 14: Benchmark ===
 print("[14/17] 基准选择...")
 from strategies.small_cap import run_small_cap_strategy
+
 v20base = run_small_cap_strategy(StrategyConfig(start="2010-01-01"))
 v20_ret = v20base["returns"]
 # Load v30
 from scripts.research.build_largecap_value_quality import build_factors
+
 factor_500, _, _, _ = build_factors(panels, 500)
 
 def build_scheduled_w(factor, close, top_n, rebal_days):
@@ -142,6 +150,7 @@ def build_scheduled_w(factor, close, top_n, rebal_days):
     return sched
 
 from strategies.small_cap import backtest_weights
+
 sch = build_scheduled_w(factor_500, close, 30, 63)
 mkt = close.pct_change(fill_method=None).mean(axis=1).fillna(0.0)
 trend = mkt.rolling(2).sum()

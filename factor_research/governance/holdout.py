@@ -8,13 +8,13 @@ boundary 来自 app_config/settings.yaml::holdout.start(缺省 2025-01-01)。
 """
 from __future__ import annotations
 
-import json
-import hashlib
 import fcntl
+import hashlib
+import json
 import os
 import threading
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -141,7 +141,7 @@ def migrate_holdout_boundary(new_boundary, *, reason: str, recorded_at: str | No
     superseded = [str(pd.Timestamp(h["boundary"]).date()) for h in hist] if prev is not None else []
     rec = {
         "boundary": str(new_ts.date()),
-        "recorded_at": recorded_at or datetime.now(timezone.utc).date().isoformat(),
+        "recorded_at": recorded_at or datetime.now(UTC).date().isoformat(),
         "reason": reason,
         "kind": "migration",
         "supersedes": superseded,
@@ -354,8 +354,8 @@ def validate_on_holdout(
             dsr_p, dsr_sig = round(float(rep["p_value"]), 4), bool(rep["significant_05"])
 
         rec = {
-            "ts": ts or datetime.now(timezone.utc).isoformat(),
-            "consumed_at": ts or datetime.now(timezone.utc).isoformat(),
+            "ts": ts or datetime.now(UTC).isoformat(),
+            "consumed_at": ts or datetime.now(UTC).isoformat(),
             "candidate_id": candidate_id,
             "spec_hash": str(spec_hash),
             "data_fingerprint": str(data_fingerprint),

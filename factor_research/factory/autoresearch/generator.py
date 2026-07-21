@@ -7,7 +7,6 @@ from dataclasses import replace
 from .models import Candidate
 from .validator import validate_candidate_ast
 
-
 _SEEDS = [
     # 股东户数/北向正交族:probe 早期看好(原始 ICIR 0.57),但后续全市场 top25 long-only
     # 实测太弱(research_ledger e6e655401623899d,残差 ICIR~0.2)——现由方向登记簿
@@ -71,7 +70,12 @@ def _steer_seed_order(all_seeds: list) -> list:
     方向层故障绝不阻断搜索;验真端(L0-L3/9-Gate/holdout)不受本函数影响。
     """
     try:
-        from knowledge.directions import boost_factors, redundancy_clusters, same_cluster, seed_action
+        from knowledge.directions import (
+            boost_factors,
+            redundancy_clusters,
+            same_cluster,
+            seed_action,
+        )
 
         boosts = boost_factors()
         clusters = redundancy_clusters()

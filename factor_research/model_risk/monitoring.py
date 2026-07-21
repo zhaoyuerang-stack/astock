@@ -5,14 +5,16 @@ and triggers alerts on performance breach.
 """
 from __future__ import annotations
 
-import pandas as pd
+from typing import Any
+
 import numpy as np
-from typing import Dict, Any, List
+import pandas as pd
+
 
 class PerformanceMonitor:
     def __init__(self, strategy_id: str):
         self.strategy_id = strategy_id
-        self.alerts: List[Dict[str, Any]] = []
+        self.alerts: list[dict[str, Any]] = []
 
     def check_ic_decay(self, recent_ic_series: pd.Series, baseline_ic: float, threshold_pct: float = 0.5):
         """Monitor if the recent IC is decaying significantly below the historical baseline."""

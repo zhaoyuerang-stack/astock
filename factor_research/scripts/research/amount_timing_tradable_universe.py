@@ -42,8 +42,12 @@ from scripts.research.amount_timing_priority_audit import (
     print_universe_summary,
 )
 from services.actions.run_backtest import run_production_engine_backtest
-from strategies.small_cap import StrategyConfig, _drop_star, load_price_panels, run_small_cap_strategy
-
+from strategies.small_cap import (
+    StrategyConfig,
+    _drop_star,
+    load_price_panels,
+    run_small_cap_strategy,
+)
 
 START = "2018-01-01"
 WARMUP = "2010-01-01"

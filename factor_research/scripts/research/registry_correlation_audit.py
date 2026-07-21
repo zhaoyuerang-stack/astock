@@ -33,8 +33,8 @@ FUND_MOM_AST = {
 
 
 def _collect_returns() -> dict[str, pd.Series]:
-    from portfolio.strategy_runners import _run_with_factor, run_all_live
     from factors.autoresearch_dsl import compute_dsl_factor
+    from portfolio.strategy_runners import _run_with_factor, run_all_live
 
     series = run_all_live(start=START)  # 5 LIVE 母策略(含 SHADOW + 国债 ETF)
 
@@ -80,7 +80,7 @@ def main():
     bond = [c for c in df.columns if "gov_bond" in c]
     eq_corr = corr.loc[equity, equity]
     avg_eq = (eq_corr.values[np.triu_indices(len(equity), k=1)]).mean()
-    print(f"\n== 多样性结构 ==")
+    print("\n== 多样性结构 ==")
     print(f"  股票腿两两平均相关: {avg_eq:.2f}  (n={len(equity)})")
     if bond:
         b = bond[0]

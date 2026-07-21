@@ -1,8 +1,8 @@
 """Test Institutional Quant OS upgrades."""
 from __future__ import annotations
 
-import unittest
 import sys
+import unittest
 from pathlib import Path
 
 import numpy as np
@@ -11,22 +11,15 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from capacity.dollar_capacity import estimate_dollar_capacity
+from model_risk.independent_validation import (
+    analyze_parameter_stability,
+    validate_strategy_performance,
+)
 from model_risk.model_inventory import ModelCard, ModelInventory
-from model_risk.independent_validation import validate_strategy_performance, analyze_parameter_stability
-from model_risk.challenger import ChallengerComparison
-from model_risk.limitations import LimitationCheck
-from model_risk.monitoring import PerformanceMonitor
-from model_risk.approval_workflow import ApprovalWorkflow
-
-from portfolio.alpha_forecast import synthesize_alpha
-from portfolio.risk_model import compute_shrunk_covariance, RiskModel
 from portfolio.constraints import PortfolioConstraints
 from portfolio.optimizer import PortfolioOptimizer
-from portfolio.cost_aware_rebalance import CostAwareRebalancer
-
 from research_ledger.ledger import LedgerEntry, ResearchLedger
-from capacity.dollar_capacity import estimate_dollar_capacity
-from reporting.performance_attribution import attribute_returns
 
 
 class TestInstitutionalUpgrades(unittest.TestCase):

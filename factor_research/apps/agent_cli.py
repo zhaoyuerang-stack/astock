@@ -24,13 +24,11 @@ logger = logging.getLogger(__name__)
 
 from services.agent.tools import (  # noqa: E402
     RISK_HIGH,
-    RISK_LOW,
     RISK_MID,
     RISK_READONLY,
     Tool,
     tool_registry,
 )
-
 
 MAX_ARGUMENTS_BYTES = 16 * 1024
 # Optional args for tools that accept more than required minimum.

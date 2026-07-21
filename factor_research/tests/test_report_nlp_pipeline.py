@@ -1,24 +1,25 @@
-import unittest
-import tempfile
 import json
-import shutil
-from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-import pandas as pd
 
 # Adjust sys.path to find factor_research packages
 import os
+import shutil
 import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pandas as pd
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from scripts.research.report_nlp_pipeline import (
     calculate_file_hash,
-    load_inbox_state,
-    save_inbox_state,
     get_next_trade_date,
+    load_inbox_state,
     process_report_file,
-    run_inbox_pipeline
+    run_inbox_pipeline,
+    save_inbox_state,
 )
 
 

@@ -16,8 +16,10 @@ All tests are strictly look-ahead-free (v2.0 already has correct shift(1)).
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/optimize_v20.py
 """
-import os, sys
+import os
+import sys
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -25,9 +27,13 @@ ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, load_price_panels, backtest_weights, build_rebalance_weights
 from factors.small_cap import small_cap_factor, small_cap_timing
-from engine.metrics import metrics as std_metrics
+from strategies.small_cap import (
+    StrategyConfig,
+    backtest_weights,
+    build_rebalance_weights,
+    load_price_panels,
+)
 
 OUT = ROOT / "reports" / "research"
 OUT.mkdir(parents=True, exist_ok=True)

@@ -4,9 +4,10 @@ Calculates the adjustment factor for each stock on 2026-06-09:
   adj_factor = close_adj / raw_close
 Then applies this factor to raw OHLC columns on 2026-06-10 and 2026-06-11.
 """
-import pandas as pd
-import numpy as np
 from pathlib import Path
+
+import pandas as pd
+
 
 def main():
     lake_path = Path("/Users/kiki/astcok/factor_research/data_lake")

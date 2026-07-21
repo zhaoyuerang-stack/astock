@@ -8,25 +8,31 @@ This script integrates the core analysis modules:
 5. Shadow portfolio weight generation & real-price NAV simulation (incubation_policy.py)
 """
 
-import os
-import sys
 import json
-import numpy as np
-import pandas as pd
-from pathlib import Path
+import sys
 from datetime import datetime
+from pathlib import Path
+
+import pandas as pd
 
 # Setup workspace root
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+from factory.fundamental.analyst_framework_model import (
+    AnalystIndustryFramework,
+    IndustryFrameworkProfile,
+)
+from factory.fundamental.data_quality_grader import (
+    DataCategory,
+    DataFeedInput,
+    DataQualityGrade,
+    DataQualityGrader,
+)
 from factory.ontology.bom_chain_analysis import BOMChainAnalyzer
-from factory.fundamental.data_quality_grader import DataQualityGrader, DataFeedInput, DataCategory, DataQualityGrade
-from factory.fundamental.analyst_framework_model import AnalystIndustryFramework, IndustryFrameworkProfile
 from factory.ontology.industry_ontology_engine import IndustryOntologyPredictor
-from factory.ontology.report_logic import TransmissionNodeCategory, NodeChange
-from strategies.small_cap import load_price_panels
 from lake.load_lake import load_fundamental_panel
+from strategies.small_cap import load_price_panels
 
 # Output Paths
 SHADOW_LOG = ROOT / "data_lake" / "agent" / "shadow_incubation_log.json"

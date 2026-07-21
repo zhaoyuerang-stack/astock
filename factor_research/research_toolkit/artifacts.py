@@ -42,7 +42,7 @@ class ControlArtifact:
         veto_q: float,
         hypothesis: str,
         config: dict[str, Any] | None = None,
-    ) -> "ControlArtifact":
+    ) -> ControlArtifact:
         merged = {
             "artifact_type": ArtifactType.VETO_FILTER.value,
             "host": host.to_dict(),

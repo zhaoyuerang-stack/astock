@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from services.agent.llm_adapter import get_adapter, LLMAdapter
+from services.agent.llm_adapter import LLMAdapter, get_adapter
 
 ALLOWED_VERIFY_COMMANDS = {"python", "python3", "pytest", "ruff", "mypy"}
 SHELL_CONTROL_CHARS = re.compile(r"[;&|<>`$]")
@@ -300,7 +300,7 @@ class Controller:
                 state["last_error"] = curr_error
 
                 # 5. Call Actuator
-                print(f"\n🤖 [Actuator] Querying LLM adapter for edits...")
+                print("\n🤖 [Actuator] Querying LLM adapter for edits...")
                 try:
                     edits = self.actuator.act(self.intent, state, sensor_res.output, self.cwd)
                     if not edits:

@@ -5,11 +5,11 @@ Aggregates individual account or strategy return streams into GIPS-compliant com
 from __future__ import annotations
 
 import pandas as pd
-from typing import Dict, List
+
 
 def compute_composite_return(
-    strategy_returns: Dict[str, pd.Series],
-    strategy_aums: Dict[str, pd.Series]
+    strategy_returns: dict[str, pd.Series],
+    strategy_aums: dict[str, pd.Series]
 ) -> pd.Series:
     """Compute AUM-weighted composite returns across multiple strategies."""
     # Find all dates

@@ -5,12 +5,11 @@
 """
 import json
 from collections import Counter
+from collections.abc import Iterator
 from dataclasses import asdict
 from pathlib import Path
-from typing import Iterator, Optional
 
 from factory.ontology import EconomicThesis, Hypothesis, HypothesisStatus
-
 
 DEFAULT_POOL_PATH = (
     Path(__file__).resolve().parent.parent.parent
@@ -50,7 +49,7 @@ class HypothesisPool:
                 dup += 1
         return added, dup
 
-    def get(self, hyp_id: str) -> Optional[Hypothesis]:
+    def get(self, hyp_id: str) -> Hypothesis | None:
         rec = self._cache.get(hyp_id)
         return self._deserialize(rec) if rec else None
 

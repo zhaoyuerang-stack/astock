@@ -25,7 +25,6 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
-import pandas as pd  # noqa: E402
 
 from core.engine import PricePanel  # noqa: E402
 from strategies.catalog import build_holder_count_chg, build_ma_trend  # noqa: E402
@@ -71,10 +70,10 @@ def _seg(segments: dict, key: str) -> dict:
 
 
 def run_phase123(warmup_start: str = "2010-01-01") -> dict:
+    from engine.metrics import compute_hit
     from workflow.phase1_synthetic import Phase1Checker
     from workflow.phase2_backtest import Phase2Runner
     from workflow.phase3_wf import WF3Runner
-    from engine.metrics import compute_hit
 
     print(f"\n{'='*64}\n  holder_count_chg standalone → phase1-3 (family={FAMILY})\n{'='*64}",
           flush=True)

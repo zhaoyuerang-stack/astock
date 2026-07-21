@@ -5,7 +5,7 @@ Measures trade sizes relative to historical ADV to prevent market disruption.
 from __future__ import annotations
 
 import pandas as pd
-import numpy as np
+
 
 def calculate_participation_rates(
     target_trades: pd.Series,               # Asset codes -> trade shares

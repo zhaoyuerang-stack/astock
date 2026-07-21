@@ -5,9 +5,11 @@ style neutrality rules, and liquidity/tradability filters.
 """
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Optional, Tuple
+
 
 class PortfolioConstraints:
     def __init__(
@@ -29,8 +31,8 @@ class PortfolioConstraints:
     def build_bounds(
         self,
         n_assets: int,
-        tradable_flags: Optional[np.ndarray] = None
-    ) -> List[Tuple[float, float]]:
+        tradable_flags: np.ndarray | None = None
+    ) -> list[tuple[float, float]]:
         """Build lower and upper bounds for each asset's weight.
 
         Non-tradable assets are bound to (0, 0).
@@ -48,8 +50,8 @@ class PortfolioConstraints:
         weights: np.ndarray,
         initial_weights: np.ndarray,
         exposures: pd.DataFrame,
-        industry_mapping: Optional[pd.Series] = None
-    ) -> List[Dict[str, Any]]:
+        industry_mapping: pd.Series | None = None
+    ) -> list[dict[str, Any]]:
         """Verify if current weights satisfy all constraints."""
         violations = []
 

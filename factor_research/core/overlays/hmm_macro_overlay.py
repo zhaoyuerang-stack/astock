@@ -28,7 +28,6 @@ import json
 import logging
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -69,7 +68,7 @@ class OverlayConfig:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict) -> "OverlayConfig":
+    def from_dict(cls, d: dict) -> OverlayConfig:
         return cls(**{k: v for k, v in d.items() if k in {f.name for f in cls.__dataclass_fields__.values()}})
 
 
@@ -84,10 +83,10 @@ class _ConstrainedGaussianHMM:
         self.n_states = n_states
         self.max_iter = max_iter
         self.tol = tol
-        self.pi: Optional[np.ndarray] = None
-        self.A: Optional[np.ndarray] = None
-        self.means: Optional[np.ndarray] = None
-        self.vars: Optional[np.ndarray] = None
+        self.pi: np.ndarray | None = None
+        self.A: np.ndarray | None = None
+        self.means: np.ndarray | None = None
+        self.vars: np.ndarray | None = None
 
     # -- helpers --
     @staticmethod
@@ -299,17 +298,17 @@ class HMMMacroOverlay:
 
     FEATURE_COLS = ["risk_appetite", "volatility", "liquidity", "ma_diffusion"]
 
-    def __init__(self, config: Optional[OverlayConfig] = None):
+    def __init__(self, config: OverlayConfig | None = None):
         self.cfg = config or OverlayConfig()
-        self._features: Optional[pd.DataFrame] = None
-        self._stress_prob: Optional[pd.Series] = None
-        self._mkt_ret: Optional[pd.Series] = None
-        self._dates: Optional[pd.DatetimeIndex] = None
+        self._features: pd.DataFrame | None = None
+        self._stress_prob: pd.Series | None = None
+        self._mkt_ret: pd.Series | None = None
+        self._dates: pd.DatetimeIndex | None = None
         self._is_fitted = False
 
     # -- public API --
 
-    def fit(self, close: pd.DataFrame, amount: pd.DataFrame) -> "HMMMacroOverlay":
+    def fit(self, close: pd.DataFrame, amount: pd.DataFrame) -> HMMMacroOverlay:
         """Pre-compute macro features and HMM stress signal."""
         self._features = _macro_features(close, amount)
         self._dates = self._features.index
@@ -344,8 +343,8 @@ class HMMMacroOverlay:
     def signal(
         self,
         target_date: pd.Timestamp | str,
-        close: Optional[pd.DataFrame] = None,
-        amount: Optional[pd.DataFrame] = None,
+        close: pd.DataFrame | None = None,
+        amount: pd.DataFrame | None = None,
     ) -> float:
         """Return exposure multiplier for target_date (0.0 ~ 1.0).
 
@@ -433,14 +432,14 @@ class HealthStatus:
     reason: str
     months_since_stress: int
     months_bull_stress: int
-    last_check: Optional[pd.Timestamp] = None
+    last_check: pd.Timestamp | None = None
     detail: dict = field(default_factory=dict)
 
 
 class OverlayMonitor:
     """Monitors overlay health and triggers failure review."""
 
-    def __init__(self, config: Optional[OverlayConfig] = None):
+    def __init__(self, config: OverlayConfig | None = None):
         self.cfg = config or OverlayConfig()
         self._history: list[dict] = []
 

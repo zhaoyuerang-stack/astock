@@ -2,12 +2,16 @@
 import warnings; warnings.filterwarnings("ignore")
 import os
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 import sys
+
 sys.path.insert(0, str(ROOT))
-import pandas as pd
 from collections import Counter
+
+import pandas as pd
+
 from lake.validator import DataValidator
 
 # 6只超级大盘股(几乎不停牌)，出现在>=5只的日期=真交易日(排除多余日期,容忍个别停牌)
@@ -30,6 +34,6 @@ for i, fp in enumerate(files):
     if (i + 1) % 1500 == 0:
         print(f"  校验 {i+1}/{len(files)}", flush=True)
 report = v.quality_report(results, save_path="data_lake/quality_report.json")
-print(f"\n=== 真实质量(准确日历) ===", flush=True)
+print("\n=== 真实质量(准确日历) ===", flush=True)
 print(f"干净 {report['clean']}/{report['total']} ({report['clean_ratio']:.1%})", flush=True)
 print(f"真问题分布: {report['issue_breakdown']}", flush=True)

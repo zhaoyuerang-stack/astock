@@ -3,9 +3,8 @@
 F-7 强制：所有 Experiment（含 DISCARDED）必产 ≥1 Insight。
 失败的实验也是知识——避免未来重复试错。
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 
 class InsightKind(Enum):
@@ -28,7 +27,7 @@ class Insight:
     confidence: float = 0.5                         # 0-1
     evidence_experiment_ids: tuple[str, ...] = ()
     related_hypothesis_ids: tuple[str, ...] = ()
-    superseded_by: Optional[str] = None             # 后来 insight 推翻了它
+    superseded_by: str | None = None             # 后来 insight 推翻了它
     created_at: str = ""
     distilled_by: str = "auto"                      # auto | llm | human
 

@@ -18,10 +18,15 @@ sys.path.insert(0, str(Path.cwd()))
 import numpy as np
 import pandas as pd
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from factors.hq_momentum import build_hq_momentum_factor
-from factors.large_cap import load_clean_panels_with_growth, build_large_cap_premium_factor, large_cap_timing_hysteresis
+from factors.large_cap import (
+    build_large_cap_premium_factor,
+    large_cap_timing_hysteresis,
+    load_clean_panels_with_growth,
+)
 from strategies.small_cap import build_rebalance_weights
+
 
 def compute_salience_covariance(close, W=20, theta=0.1, delta=0.7):
     """Computes faded Salience Covariance (-ST_cov)."""

@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import asdict
-from typing import Iterable
 
 from contracts.views import (
     ResearchReviewView,

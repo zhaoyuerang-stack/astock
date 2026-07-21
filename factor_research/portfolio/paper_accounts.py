@@ -72,7 +72,7 @@ class AccountPaths:
     state_fp: Path
 
     @classmethod
-    def for_version(cls, family: str, version: str, accounts_root: Path | None = None) -> "AccountPaths":
+    def for_version(cls, family: str, version: str, accounts_root: Path | None = None) -> AccountPaths:
         """accounts_root=None(默认)→ 模块常量 ACCOUNTS_ROOT(生产路径);
         显式传入时按该根目录解析——调用方(provision_from_recompose/update_account/
         update_all)必须把自己收到的 accounts_root 原样转发到这里,否则「传了
@@ -107,7 +107,7 @@ class AccountRecord:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "AccountRecord":
+    def from_dict(cls, d: dict) -> AccountRecord:
         return cls(family=d["family"], version=d["version"], status=d["status"],
                     reason=d.get("reason", ""), opened_at=d.get("opened_at", ""),
                     frozen_at=d.get("frozen_at", ""), last_update_date=d.get("last_update_date", ""))

@@ -1,18 +1,15 @@
 """Adversarial tests for ADR-037 Evidence Envelope + dual-rail + protocols."""
 from __future__ import annotations
 
-import json
-import os
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
+from apps.agent_cli import AgentCliError, call_capability
 from contracts.evidence import (
-    EvidenceEnvelope,
     EvidenceTier,
     make_envelope,
-    payload_has_performance_metrics,
     strip_performance_for_display,
 )
 from services.agent.evidence import (
@@ -21,10 +18,9 @@ from services.agent.evidence import (
     public_view,
     wrap_tool_result,
 )
-from services.agent.protocols import UnknownProtocolError, assert_tool_allowed, get_protocol
 from services.agent.proposals import propose_high_risk_action
-from services.agent.tools import RISK_MID, RISK_READONLY, tool_registry
-from apps.agent_cli import AgentCliError, call_capability, main
+from services.agent.protocols import UnknownProtocolError, assert_tool_allowed, get_protocol
+from services.agent.tools import tool_registry
 
 
 def test_default_can_claim_valid_is_false():

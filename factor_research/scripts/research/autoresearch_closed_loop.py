@@ -45,6 +45,7 @@ def _prior_champion_asts(experiment_log, repository, icir_threshold=0.5):
 
 
 def main():
+    from factory.autoresearch import ast_to_hypothesis
     from factory.autoresearch.novelty import (
         candidate_factor_panel,
         novelty_score,
@@ -53,7 +54,6 @@ def main():
     from factory.autoresearch.reflection import build_failure_ledger, ledger_to_prompt
     from factory.autoresearch.repositories import CandidateRepository, ExperimentLog
     from factory.lines.line2_validation.l1_quick_bt import run_l1
-    from factory.autoresearch import ast_to_hypothesis
     from services.actions.autoresearch import _load_validation_data
     from services.actions.autoresearch_search import run_autoresearch_walk_forward
 

@@ -14,17 +14,20 @@ Key A-H pairs (A-code → H-code):
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/ah_premium_factor.py
 """
-import os, sys
+import os
+import sys
 from pathlib import Path
-import numpy as np, pandas as pd
+
+import numpy as np
+import pandas as pd
 from scipy.stats import spearmanr
 
 ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT); sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import load_price_panels
 from factors.small_cap import small_cap_factor
 from scripts.data.hk_daily import HK_DIR, close_series, load_or_fetch_hk_daily
+from strategies.small_cap import load_price_panels
 
 OUT = ROOT / "reports" / "research"; OUT.mkdir(parents=True, exist_ok=True)
 
@@ -101,7 +104,7 @@ for dt in factor.index[::30]:
     if not np.isnan(ic): ics.append(ic)
 
 print(f"\n{'='*50}")
-print(f"  A-H Premium Factor IC")
+print("  A-H Premium Factor IC")
 print(f"{'='*50}")
 print(f"  Pairs: {len(premiums)}")
 print(f"  IC20d mean: {np.mean(ics):+.4f}  ICIR: {np.mean(ics)/np.std(ics):.2f}  pos: {(np.array(ics)>0).mean():.0%}")

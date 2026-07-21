@@ -4,20 +4,24 @@
   cd /Users/kiki/astcok/factor_research
   /opt/homebrew/bin/python3 scripts/research/run_composer.py
 """
-import os, sys, warnings
+import os
+import sys
+import warnings
 from pathlib import Path
+
 warnings.filterwarnings("ignore")
 os.chdir(Path(__file__).resolve().parent.parent.parent)
 sys.path.insert(0, str(Path.cwd()))
 
-import numpy as np; import pandas as pd
 import akshare as ak
-from strategies.small_cap import load_price_panels
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
+import pandas as pd
+
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from factors.small_cap import small_cap_factor, small_cap_timing
-from strategies.small_cap import build_rebalance_weights
-from factory.regime import RegimeEngine, RegimeConfig
-from factory.strategy_composer import StrategyComposer, LegSpec, StrategyDefinition
+from factory.regime import RegimeConfig, RegimeEngine
+from factory.strategy_composer import LegSpec, StrategyComposer
+from strategies.small_cap import build_rebalance_weights, load_price_panels
+
 
 def main():
     print("=" * 80)
@@ -81,7 +85,7 @@ def main():
 
     # 输出策略定义
     print(f"\n{'='*80}")
-    print(f"  最优策略定义")
+    print("  最优策略定义")
     print(f"{'='*80}")
     print(best.to_json())
 

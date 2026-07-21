@@ -1,21 +1,23 @@
-import unittest
-import tempfile
 import json
-import shutil
-from pathlib import Path
-from unittest.mock import patch
 
 # Adjust sys.path to find factor_research packages
 import os
+import shutil
 import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from scripts.research.report_feedback_loop import (
-    load_registry,
-    find_matching_metrics,
     classify_performance,
-    run_feedback_loop
+    find_matching_metrics,
+    load_registry,
+    run_feedback_loop,
 )
+
 
 class TestReportFeedbackLoop(unittest.TestCase):
     def setUp(self):

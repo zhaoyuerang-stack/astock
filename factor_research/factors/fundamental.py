@@ -20,8 +20,8 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 
-from factors.utils import mad_clip, safe_zscore
 from factors.registry import register_factor
+from factors.utils import mad_clip, safe_zscore
 
 
 @lru_cache(maxsize=1)

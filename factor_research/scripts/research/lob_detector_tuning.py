@@ -6,8 +6,10 @@ Key hypotheses to test:
   3. Test individual channels (not just MAX aggregate)
   4. Adaptive percentile-based thresholds
 """
-import os, sys
+import os
+import sys
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -15,8 +17,13 @@ ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, load_price_panels, backtest_weights, build_rebalance_weights
 from factors.small_cap import small_cap_factor, small_cap_timing
+from strategies.small_cap import (
+    StrategyConfig,
+    backtest_weights,
+    build_rebalance_weights,
+    load_price_panels,
+)
 
 OUT = ROOT / "reports" / "research"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -179,7 +186,7 @@ for ch_name, ch_score in ch_z.items():
 df = pd.DataFrame(results).sort_values("sharpe", ascending=False)
 df.to_csv(OUT / "lob_tuning_results.csv", index=False)
 
-print(f"\n=== Top 15 Results ===")
+print("\n=== Top 15 Results ===")
 print(f"{'Mode':<25} {'th':>5} {'cut':>4} {'fl':>4} {'supp':>4} {'ann':>7} {'sharpe':>7} {'maxdd':>8} {'trig':>5}")
 for _, r in df.head(20).iterrows():
     print(f"{r['mode']:<25} {r['th']:>4.1f} {int(r['cut']):>4d} {r['fl']:>4.1f} {int(r['suppress']):>4d} "

@@ -1,7 +1,9 @@
 # [STATUS: archived] 已退役探索变体族,不再维护;仅供追溯。见 scripts/research/archive/__init__.py
 """A-D exploration with CORRECT metrics (annualized returns, 2018+)."""
-import os, sys
+import os
+import sys
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -10,7 +12,6 @@ os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
 from strategies.small_cap import StrategyConfig, backtest_weights, run_small_cap_strategy
-from engine.metrics import metrics
 
 OUT = ROOT / "reports" / "research"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -82,6 +83,8 @@ def hmm_exposure(sp, mkt, threshold=0.05, tw=3, floor=0.0):
 # HMM tw=3 baseline
 sys.path.insert(0, str(ROOT / "core" / "overlays"))
 from hmm_macro_overlay import _ConstrainedGaussianHMM
+
+
 def build_stress_signal(features, lookback=250, retrain_days=60):
     dates = features.index
     feature_cols = list(features.columns)

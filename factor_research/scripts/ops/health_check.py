@@ -18,15 +18,18 @@
 launchd 集成:
   配合 scheduled_daily_update.py，每日盘后自动跑。
 """
-import argparse, json, os, subprocess, sys
-from datetime import datetime, date
+import argparse
+import json
+import os
+import subprocess
+import sys
+from datetime import date, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-import numpy as np
 import pandas as pd
 
 OBSIDIAN = Path("/Users/kiki/Personal Wiki/30.output/A股模拟盘")

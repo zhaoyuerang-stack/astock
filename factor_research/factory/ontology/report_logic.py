@@ -4,10 +4,8 @@
 将定性的行业动态/事实，映射为定量的因子假设输入。
 """
 
-import json
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Any
 
 
 class TransmissionNodeCategory(Enum):
@@ -38,7 +36,7 @@ class TransmissionNode:
     category: TransmissionNodeCategory
     change: NodeChange
     evidence: str                   # 研报中的原文证据/数据支持
-    numeric_value: Optional[float] = None  # 数值指标（可选，如 2100元，或 增长率 15%）
+    numeric_value: float | None = None  # 数值指标（可选，如 2100元，或 增长率 15%）
 
 
 @dataclass(frozen=True)

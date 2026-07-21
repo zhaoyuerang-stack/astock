@@ -6,7 +6,7 @@ financing fees, and management/performance charges.
 from __future__ import annotations
 
 import pandas as pd
-from typing import Dict, Any
+
 
 def calculate_gross_to_net(
     gross_returns: pd.Series,

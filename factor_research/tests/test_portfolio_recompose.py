@@ -204,6 +204,7 @@ def test_defensive_cap_prevents_bond_domination():
     (v0.2 探针实证 87%),v2 必须压到 DEFENSIVE_CAP——旧实现本测试必挂。"""
     import numpy as np
     import pandas as pd
+
     from portfolio.recompose import DEFENSIVE_CAP, recompose
     rng = np.random.default_rng(9)
     idx = pd.bdate_range("2020-01-01", periods=700)
@@ -223,6 +224,7 @@ def test_all_equity_pool_unaffected_by_cap():
     """全股票池(无防守腿):v2 行为必须与 v1 完全一致(帽不触发)。"""
     import numpy as np
     import pandas as pd
+
     from portfolio.recompose import recompose
     rng = np.random.default_rng(11)
     idx = pd.bdate_range("2020-01-01", periods=700)
@@ -237,6 +239,7 @@ def test_all_defensive_pool_no_cap_deadlock():
     """全防守池(无非防守腿接收释放权重):帽不适用,正常归一不死锁。"""
     import numpy as np
     import pandas as pd
+
     from portfolio.recompose import recompose
     rng = np.random.default_rng(13)
     idx = pd.bdate_range("2020-01-01", periods=700)
@@ -250,7 +253,6 @@ def test_all_defensive_pool_no_cap_deadlock():
 
 def test_mixed_provenance_excludes_no_stamp_and_passes_tier():
     """三腿混合(spec / config-only / 无戳):无戳排除并如实列出,tier 透传,RANKING_VERSION 不变。"""
-    from lake.version_returns import write_version_returns
     from portfolio.recompose import RANKING_VERSION, recompose
 
     # 纯 recompose 层:returns 只含已通过校验的腿;excluded 由编排层填入

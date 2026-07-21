@@ -16,7 +16,6 @@ Vote mapping:
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/hmm_macro_multi_window.py
 """
-import json
 import os
 import sys
 from pathlib import Path
@@ -28,8 +27,8 @@ ROOT = Path(__file__).resolve().parents[3]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, backtest_weights, run_small_cap_strategy
 from engine.metrics import metrics
+from strategies.small_cap import StrategyConfig, backtest_weights, run_small_cap_strategy
 
 OUT_DIR = ROOT / "reports" / "research"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -277,7 +276,7 @@ def main():
     rows.append(single_row)
 
     # Multi-frame vote exposures
-    print(f"\nVoting grid...", flush=True)
+    print("\nVoting grid...", flush=True)
     for floor in [0.0, 0.1, 0.2, 0.3]:
         for vote_power in [1.0, 1.5, 2.0]:
             # exposure = floor + (1 - floor) * (1 - vote_count/n_frames)^vote_power

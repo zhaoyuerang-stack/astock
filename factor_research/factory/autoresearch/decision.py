@@ -5,7 +5,6 @@ from .complexity import compute_complexity
 from .models import Candidate, CandidateDecision
 from .redundancy import factor_redundancy_score
 
-
 L0_GATES = {
     "rank_ic_mean": 0.02,
     "icir": 0.3,

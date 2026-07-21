@@ -9,7 +9,7 @@ scope = 候选的「搜索血缘」键(默认母策略/家族 id;跨家族择优
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 _LEDGER = Path(__file__).resolve().parents[1] / "data_lake" / "governance" / "trial_ledger.jsonl"
@@ -31,7 +31,7 @@ def record_trials(scope: str, n_configs: int, context: str = "",
         raise ValueError("n_configs 必须 ≥ 1(每次搜索至少 1 个配置)")
     p = path or _path()
     rec = {
-        "ts": ts or datetime.now(timezone.utc).isoformat(),
+        "ts": ts or datetime.now(UTC).isoformat(),
         "scope": scope,
         "n_configs": int(n_configs),
         "context": context,

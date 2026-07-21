@@ -11,17 +11,23 @@ WF protocol: 2010-2014 warmup, 2015-2026 OOS. Same as all prior WF.
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/optimize_v20_combo.py
 """
-import os, sys
+import os
+import sys
 from pathlib import Path
+
 import numpy as np
-import pandas as pd
 
 ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, load_price_panels, backtest_weights, build_rebalance_weights
 from factors.small_cap import small_cap_factor, small_cap_timing
+from strategies.small_cap import (
+    StrategyConfig,
+    backtest_weights,
+    build_rebalance_weights,
+    load_price_panels,
+)
 
 OUT = ROOT / "reports" / "research"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -80,7 +86,7 @@ for name in variants:
     print(f"{name:<20} {cagr(r):>+8.1%}  {sharpe(r):>5.2f}  {maxdd(r):>+7.1%}")
 
 # ── WF: test each pair vs baseline ──
-print(f"\n=== Walk-Forward: v2.1_full(30,15,30) vs Base(60,20,25) ===")
+print("\n=== Walk-Forward: v2.1_full(30,15,30) vs Base(60,20,25) ===")
 years = sorted(set(close.dropna(how="all").index.year))
 wf_years = [y for y in years if y >= 2015]
 

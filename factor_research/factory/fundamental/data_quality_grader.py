@@ -19,12 +19,11 @@
 - GRADE_D (低级，Trust = 0.25): 高噪/未验证另类数据 (如自媒体舆情、非官方抽样价格)。
 """
 
-import os
 import sys
-from pathlib import Path
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Tuple, Any
+from pathlib import Path
+from typing import Any
 
 # 设定工作目录
 ROOT = Path(__file__).resolve().parents[3]
@@ -83,7 +82,7 @@ class DataQualityGrader:
         """
         return data_input.value * data_input.trust_score
 
-    def get_discounted_cost_shock(self, items_with_data: List[Tuple[Any, DataFeedInput]]) -> float:
+    def get_discounted_cost_shock(self, items_with_data: list[tuple[Any, DataFeedInput]]) -> float:
         """融合数据评级，计算 BOM 成本冲击值。
         
         公式升级：

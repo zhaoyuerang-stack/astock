@@ -12,11 +12,11 @@
   ② 独立 IC 与策略方向一致且 |IC|≥0.02——因子截面真有效
   ③ DSR 在诚实 n_trials 下 p<0.05——惩罚后仍显著
 """
+import hashlib
 import io
+import json
 import os
 import sys
-import json
-import hashlib
 from contextlib import redirect_stdout
 from pathlib import Path
 
@@ -26,15 +26,14 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import numpy as np
-import pandas as pd
 from scipy.stats import spearmanr
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from engine.metrics import metrics, compute_hit
 from core.analysis.walk_forward import deflated_sharpe
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
+from engine.metrics import metrics
 from governance import holdout as HO
-from governance.trial_ledger import honest_n_trials
 from governance.alpha_overlay import split_alpha_overlay
+from governance.trial_ledger import honest_n_trials
 
 
 def _run(prices, weights, timing, lev, cost, start):
@@ -168,8 +167,8 @@ def screen(name, prices, factor, weights, timing, leverage, cost, start,
 
 def build_smallcap_illiq():
     """小盘 illiquidity:全市场 Amihud top25 + MA16 + lev1.25(台账 illiquidity 家族配方)。"""
-    from strategies.small_cap import load_price_panels
     from factors.small_cap import small_cap_timing
+    from strategies.small_cap import load_price_panels
     sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "research"))
     from illiq_largecap_audit import build_weights  # 稀疏 builder(引擎可正确持有)
     buf = io.StringIO()
@@ -215,7 +214,7 @@ def main():
         if cap:
             print(f"  容量     : 选中票ADV中位{cap['median_selected_adv_万']}万 → 上界≈{cap['capacity_aum_亿']}亿(10%ADV/{cap['n_pos']}票)")
         print(f"  择时依赖 : {r['timing_dependence']:.0%}  (越低=越靠因子非择时)  [搜索窗 <{HO.boundary().date()}]")
-        print(f"  DSR曲线  : " + " ".join(f"n={nt}:p={v['p']}{'*' if v['sig'] else ''}" for nt,v in r['dsr_honest_curve'].items()) + f"  (诚实n={r['n_trials_honest']})")
+        print("  DSR曲线  : " + " ".join(f"n={nt}:p={v['p']}{'*' if v['sig'] else ''}" for nt,v in r['dsr_honest_curve'].items()) + f"  (诚实n={r['n_trials_honest']})")
         ho = r['holdout']
         print(f"  金库样本外: 2025~26 年化{ho.get('annual',0):+.1%} 夏普{ho.get('sharpe',0):.2f} 回撤{ho.get('maxdd',0):+.1%} (n={ho.get('n')},偷看{ho.get('peek_count')}次){'  '+ho['warning'] if 'warning' in ho else ''}")
         print(f"  >>> 判决: {r['verdict']}  (真alpha={r['L0_bare']['real_alpha']} ∧ 金库未崩={r['holdout_ok']} → deployable={r['deployable']})")

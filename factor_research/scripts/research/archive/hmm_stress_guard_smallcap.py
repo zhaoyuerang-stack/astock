@@ -20,21 +20,20 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-
 ROOT = Path(__file__).resolve().parents[3]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, backtest_weights, run_small_cap_strategy
-from engine.metrics import metrics
 from factors.market_stress import (  # noqa: E402
     HMMStressConfig,
     build_market_features,
-    guard_exposure as market_stress_guard_exposure,
     hmm_stress_probability,
 )
+from factors.market_stress import (
+    guard_exposure as market_stress_guard_exposure,
+)
 from scripts.research.archive.hmm_exit_smallcap import row_for  # noqa: E402
-
+from strategies.small_cap import StrategyConfig, backtest_weights, run_small_cap_strategy
 
 OUT_DIR = ROOT / "reports" / "research"
 OUT_DIR.mkdir(parents=True, exist_ok=True)

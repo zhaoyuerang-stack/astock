@@ -6,7 +6,6 @@ file for local customisation.
 """
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 try:
     import yaml
@@ -92,7 +91,7 @@ class Settings:
     notify: NotifyConfig = field(default_factory=NotifyConfig)
 
     @classmethod
-    def from_yaml(cls, path: Optional[str] = None):
+    def from_yaml(cls, path: str | None = None):
         """Load settings from YAML, with optional env override."""
         if yaml is None:
             return cls()
@@ -114,7 +113,7 @@ class Settings:
         )
 
 
-def _env_config_path() -> Optional[str]:
+def _env_config_path() -> str | None:
     import os
     env_path = os.environ.get("ASTOCK_CONFIG")
     if env_path:
@@ -129,7 +128,7 @@ def _env_config_path() -> Optional[str]:
 # Singleton instance (lazy loaded)
 # ---------------------------------------------------------------------------
 
-_SETTINGS: Optional[Settings] = None
+_SETTINGS: Settings | None = None
 
 
 def get_settings() -> Settings:

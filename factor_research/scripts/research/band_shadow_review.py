@@ -15,7 +15,6 @@
   · --summary 仅打印汇总对比 (默认)
 """
 import argparse
-import csv
 import json
 import os
 import sys
@@ -29,7 +28,7 @@ sys.path.insert(0, str(ROOT))
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from lake.load_lake import load_prices, load_raw_close  # noqa: E402
+from lake.load_lake import load_prices  # noqa: E402
 
 SIGNALS = ROOT / "signals"
 PAPER = ROOT / "paper"
@@ -154,11 +153,11 @@ def print_summary():
     in_mkt_pct = df["in_market_binary"].mean()
     exp_avg = df[df["exposure_band"] > 0]["exposure_band"].mean() if (df["exposure_band"] > 0).any() else 0.0
 
-    print(f"\n  Binary (current LIVE):")
+    print("\n  Binary (current LIVE):")
     print(f"    NAV          : {nav_b:.4f} ({(nav_b-1)*100:+.2f}%)")
     print(f"    in_market 占比: {in_mkt_pct:.0%}")
     print(f"    leverage     : {BINARY_LEV}x")
-    print(f"\n  Band (SHADOW):")
+    print("\n  Band (SHADOW):")
     print(f"    NAV          : {nav_bd:.4f} ({(nav_bd-1)*100:+.2f}%)")
     print(f"    avg exposure : {exp_avg:.2f}x (when > 0)")
     print(f"    leverage     : {BAND_LEV}x")
@@ -169,17 +168,17 @@ def print_summary():
     if len(rb) >= 10:
         sh_b = rb.mean() / (rb.std() + 1e-9) * np.sqrt(252)
         sh_bd = rbd.mean() / (rbd.std() + 1e-9) * np.sqrt(252)
-        print(f"\n  Annualized Sharpe (cum 至今):")
+        print("\n  Annualized Sharpe (cum 至今):")
         print(f"    Binary: {sh_b:+.2f}")
         print(f"    Band:   {sh_bd:+.2f}")
 
     print(f"\n  Δ (Band − Binary): NAV {(nav_bd - nav_b)*100:+.2f}pp")
     if nav_bd > nav_b:
-        print(f"    → Band 领先,符合 plan 预期")
+        print("    → Band 领先,符合 plan 预期")
     elif nav_bd < nav_b * 0.99:
-        print(f"    → Band 落后 > 1%,质疑回测结论")
+        print("    → Band 落后 > 1%,质疑回测结论")
     else:
-        print(f"    → 持平 (期数太少,需更多观察)")
+        print("    → 持平 (期数太少,需更多观察)")
 
 
 def main():

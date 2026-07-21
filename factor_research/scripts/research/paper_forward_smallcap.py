@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -73,7 +73,7 @@ def main() -> int:
 
     LOG.parent.mkdir(parents=True, exist_ok=True)
     snap = {
-        "run_at": datetime.now(timezone.utc).isoformat(),
+        "run_at": datetime.now(UTC).isoformat(),
         "data_asof": str(ret.index[-1].date()),
         "experiment_start": EXPERIMENT_START,
         "dsr_at_start": DSR_AT_START,

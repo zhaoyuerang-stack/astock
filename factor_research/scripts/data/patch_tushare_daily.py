@@ -11,8 +11,8 @@ hfq 重建公式（无除权日）：
 invariants 检查兜底：compact 时 |r|>30% 超限自动拒绝。
 """
 import json
-import sys
 import os
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]

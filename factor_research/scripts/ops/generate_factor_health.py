@@ -7,17 +7,18 @@
   /opt/homebrew/bin/python3 scripts/ops/generate_factor_health.py
 """
 import warnings; warnings.filterwarnings('ignore')
-import os, json, sys; os.chdir(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+import os; import json; import sys; os.chdir(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.insert(0, os.getcwd())
 from pathlib import Path
-import numpy as np; import pandas as pd
-from strategies.small_cap import load_price_panels
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from factors.small_cap import small_cap_timing
-from factors.alpha import transforms
+
+import numpy as np
+
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
+from factors.alpha import transforms  # noqa: F401 —— 副作用注册 DSL 变换(zscore/mad_clip/shift 等)
 from factors.alpha.base import FactorData
 from factors.alpha.builtins.illiq import AmihudIlliq, SizeProxy
-from strategies.small_cap import build_rebalance_weights
+from factors.small_cap import small_cap_timing
+from strategies.small_cap import build_rebalance_weights, load_price_panels
 
 close, volume, amount = load_price_panels('2010-01-01')
 data = FactorData(close=close, volume=volume, amount=amount)

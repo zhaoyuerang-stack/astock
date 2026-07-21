@@ -12,12 +12,12 @@ ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-import numpy as np                                          # noqa: E402
-import pandas as pd                                         # noqa: E402
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
 
-from strategies.small_cap import load_price_panels, build_rebalance_weights
 from factors.small_cap import small_cap_factor
-from lake.load_lake import load_raw_close                   # noqa: E402
+from lake.load_lake import load_raw_close  # noqa: E402
+from strategies.small_cap import build_rebalance_weights, load_price_panels
 
 close, volume, amount = load_price_panels("2018-01-01")
 factor = small_cap_factor(amount, 60)
@@ -63,6 +63,6 @@ for d in dates:
             if pd.isna(v) or v == 0 or (pd.notna(r) and r <= -0.098):
                 sb += 1
     prev = cur
-print(f"\n[② 可成交率] 近似(涨跌停±9.8% + 停牌volume=0):")
+print("\n[② 可成交率] 近似(涨跌停±9.8% + 停牌volume=0):")
 print(f"  买入 {bt} 笔,受阻(涨停/停牌) {bb} = {bb/max(bt,1):.1%} 买不进")
 print(f"  卖出 {st} 笔,受阻(跌停/停牌) {sb} = {sb/max(st,1):.1%} 卖不出")

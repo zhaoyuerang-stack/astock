@@ -5,7 +5,6 @@ evaluate them through 9-Gate audits, and write reports for manual review.
 """
 from __future__ import annotations
 
-import os
 import sys
 import warnings
 from pathlib import Path
@@ -18,20 +17,22 @@ if str(ROOT) not in sys.path:
 
 import pandas as pd
 
-from core.engine import PricePanel, Signal
 from core.analysis.nine_gates import NineGatesEvaluator, NineGatesReport
-from services.actions.autoresearch_search import run_autoresearch_walk_forward
-from factory.autoresearch.repositories import CandidateRepository, ReviewQueue, ExperimentLog
-from strategies.small_cap import load_price_panels
-from governance.trial_ledger import honest_n_trials, record_trials  # LOOP_ENGINEERING §5.1(record 下沉到 orchestrator)
+from core.engine import PricePanel, Signal
+from factory.autoresearch.repositories import CandidateRepository, ExperimentLog, ReviewQueue
 from governance.holdout import (
-    boundary,
     assert_search_clean,
+    boundary,
     candidate_identity,
     current_data_fingerprint,
     validate_on_holdout,
 )
-
+from governance.trial_ledger import (  # LOOP_ENGINEERING §5.1(record 下沉到 orchestrator)
+    honest_n_trials,
+    record_trials,
+)
+from services.actions.autoresearch_search import run_autoresearch_walk_forward
+from strategies.small_cap import load_price_panels
 
 _DEFAULT_TOP_N = 25
 _DEFAULT_REBALANCE_DAYS = 20
@@ -144,8 +145,9 @@ def sweep_audit_size(
     返回 (chosen_size, sweep{size: {net_sharpe, net_annual, capacity_aum}})。
     """
     import pandas as pd
-    from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
+
     from capacity.dollar_capacity import estimate_dollar_capacity
+    from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 
     cost = CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065)
     prices = PricePanel(close=close, volume=volume, amount=amount)
@@ -235,8 +237,9 @@ def main():
         
         # Copy newly evolved candidate experiments to the immutable ResearchLedger
         try:
-            from research_ledger.ledger import ResearchLedger, LedgerEntry
             import time
+
+            from research_ledger.ledger import LedgerEntry, ResearchLedger
             ledger = ResearchLedger()
             logged_count = 0
             for e in experiment_log.iter_all():
@@ -394,7 +397,7 @@ def main():
             # §5.2 晋级前唯一一次 holdout 校验:可部署形态(因子+veto 权重)的全样本收益,
             # validate_on_holdout 只读 ≥boundary 段。best-effort——失败不吞 9-Gate 报告;
             # 崩(夏普<0.6)→holdout_failed,仅作 review 证据,本脚本不自动晋级(文档 §6)。
-            from core.engine import BacktestEngine, BacktestConfig, CostModel
+            from core.engine import BacktestConfig, BacktestEngine, CostModel
             ret_full = None  # §5.3 缝④:供 holdout 与 marginal 复用;holdout try 内赋值
             try:
                 veto_full = salience_covariance_veto(close_full).shift(1)

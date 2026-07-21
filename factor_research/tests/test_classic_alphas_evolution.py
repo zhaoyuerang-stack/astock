@@ -5,12 +5,12 @@ Run:
 """
 import os
 import sys
-import unittest
 import tempfile
+import unittest
 from pathlib import Path
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -23,11 +23,10 @@ from factory.autoresearch import (
     ExperimentLog,
     ReviewQueue,
     generate_seed_candidates,
-    validate_candidate_ast
+    validate_candidate_ast,
 )
 from factory.autoresearch.islands import run_island_search
 from factory.lines.line2_validation.l0_ic_scan import precompute_forward_returns
-
 
 SEARCHABLE_ALPHA_FACTORS = (
     "alpha_001", "alpha_002", "alpha_003", "alpha_006", "alpha_008",

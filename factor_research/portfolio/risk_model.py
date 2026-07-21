@@ -5,9 +5,9 @@ and Ledoit-Wolf shrunk covariance matrices.
 """
 from __future__ import annotations
 
-import pandas as pd
 import numpy as np
-from typing import Dict, Tuple, Optional
+import pandas as pd
+
 
 def compute_shrunk_covariance(
     returns: pd.DataFrame,
@@ -33,14 +33,14 @@ class RiskModel:
     def __init__(
         self,
         stock_returns: pd.DataFrame,
-        style_factors: Optional[Dict[str, pd.DataFrame]] = None,
-        industry_mapping: Optional[pd.Series] = None
+        style_factors: dict[str, pd.DataFrame] | None = None,
+        industry_mapping: pd.Series | None = None
     ):
         self.stock_returns = stock_returns
         self.style_factors = style_factors or {}
         self.industry_mapping = industry_mapping
 
-    def estimate_components(self, date: pd.Timestamp) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
+    def estimate_components(self, date: pd.Timestamp) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
         """Estimate B (exposures), F (factor covariance), and Specific Variance on a given date.
 
         Returns

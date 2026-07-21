@@ -7,16 +7,18 @@ Implements independent validation processes:
 """
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Any
+
 
 class ValidationReport:
     def __init__(self, strategy_id: str):
         self.strategy_id = strategy_id
         self.passed = True
-        self.metrics: Dict[str, Any] = {}
-        self.checks: List[Dict[str, Any]] = []
+        self.metrics: dict[str, Any] = {}
+        self.checks: list[dict[str, Any]] = []
         self.verdict = "PASS"
 
     def add_check(self, name: str, passed: bool, value: Any, threshold: Any, note: str = ""):
@@ -88,7 +90,7 @@ def validate_strategy_performance(
 def analyze_parameter_stability(
     strategy_id: str,
     target_sharpe: float,
-    neighbor_sharpes: List[float]
+    neighbor_sharpes: list[float]
 ) -> ValidationReport:
     """Analyze parameter sensitivity to detect p-hacking/overfitting.
 

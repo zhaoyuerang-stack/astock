@@ -19,9 +19,8 @@ ROOT = Path(__file__).resolve().parent.parent
 
 import pandas as pd
 
-from core.engine import PricePanel, Signal
 from core.analysis.nine_gates import NineGatesEvaluator, NineGatesReport
-from strategies.small_cap import load_price_panels
+from core.engine import PricePanel, Signal
 
 # CLI 策略名 → 台账母策略 id（用于 --persist 把审计摘要写回对应版本）
 STRATEGY_TO_FAMILY = {
@@ -203,9 +202,10 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
 
     if spec_dict:
         print(f"  Found executable_spec in registry for {family_id}/{version}. Running dynamically via ExecutableStrategySpec...", flush=True)
+        from types import SimpleNamespace
+
         from core.strategy_spec import ExecutableStrategySpec
         from strategies.executable import build_executable_strategy
-        from types import SimpleNamespace
 
         ts = start or _taibook_start(family_id, version) or spec_dict.get("data", {}).get("warmup_start", "2018-01-01")
         spec_dict["data"]["warmup_start"] = ts
@@ -251,7 +251,7 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
         config = SimpleNamespace(version=spec.version, start=ts)
     else:
         if strategy_name == "small_cap":
-            from strategies.small_cap import run_small_cap_strategy, StrategyConfig
+            from strategies.small_cap import StrategyConfig, run_small_cap_strategy
             config = StrategyConfig()
             config = _apply_version_overrides(config, strategy_name, version, start)
             res = run_small_cap_strategy(config)
@@ -260,7 +260,7 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
                 "citation": "small_cap size premium"
             }
         elif strategy_name == "size_earnings":
-            from strategies.size_earnings import run_strategy, StrategyConfig
+            from strategies.size_earnings import StrategyConfig, run_strategy
             config = StrategyConfig()
             config = _apply_version_overrides(config, strategy_name, version, start)
             res = run_strategy(config)
@@ -269,7 +269,7 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
                 "citation": "size-earnings blend strategy"
             }
         elif strategy_name == "large_cap":
-            from strategies.large_cap import run_large_cap_strategy, StrategyConfig
+            from strategies.large_cap import StrategyConfig, run_large_cap_strategy
             config = StrategyConfig()
             config = _apply_version_overrides(config, strategy_name, version, start)
             res = run_large_cap_strategy(config)
@@ -278,7 +278,7 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
                 "citation": "large_cap growth hedged"
             }
         elif strategy_name == "hq_momentum":
-            from strategies.hq_momentum import run_hq_momentum_strategy, StrategyConfig
+            from strategies.hq_momentum import StrategyConfig, run_hq_momentum_strategy
             config = StrategyConfig()
             config = _apply_version_overrides(config, strategy_name, version, start)
             res = run_hq_momentum_strategy(config)
@@ -287,7 +287,7 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
                 "citation": "high quality momentum hedged"
             }
         elif strategy_name == "roc_yc":
-            from strategies.roc_yc import run_roc_yc_strategy, StrategyConfig
+            from strategies.roc_yc import StrategyConfig, run_roc_yc_strategy
             config = StrategyConfig(
                 blend_weight=0.5,
                 neutralize=True,
@@ -305,14 +305,14 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
             spec = ILLIQ_SPECS.get(ver)
             if spec is None:
                 raise ValueError(f"illiquidity 无 {ver} 配置规格;请在 ILLIQ_SPECS 按台账 config 补该版本")
-            from strategies.small_cap import load_price_panels, build_rebalance_weights
-            from factors.small_cap import small_cap_timing, small_cap_factor
+            from app_config.settings import get_settings
             from factors.alpha import transforms  # noqa: F401 register zscore/mad_clip/shift
             from factors.alpha.base import FactorData
             from factors.alpha.builtins.illiq import AmihudIlliq
+            from factors.small_cap import small_cap_factor, small_cap_timing
             from factors.veto import salience_covariance_veto
             from services.actions.run_backtest import _band_exposure
-            from app_config.settings import get_settings
+            from strategies.small_cap import build_rebalance_weights, load_price_panels
 
             ts = start or _taibook_start("illiquidity", ver) or "2018-01-01"
             config = SimpleNamespace(version=ver, start=ts)
@@ -345,11 +345,12 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
         elif strategy_name.startswith("small_cap_factor__window"):
             # 窗口扫描家族:无 executable_spec,按台账 config 真实参数驱动(防假记分牌铁律:
             # 审计变体必须用其真实配置,拒绝 fallback 默认参数)。factor 一律 .shift(1)(T+1)。
-            from types import SimpleNamespace
             import importlib
+            from types import SimpleNamespace
+
             import strategy_registry
-            from strategies.small_cap import load_price_panels, build_rebalance_weights
             from app_config.settings import get_settings
+            from strategies.small_cap import build_rebalance_weights, load_price_panels
 
             ver = version or "v1.0"
             cfg = None

@@ -27,12 +27,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-
 ROOT = Path(__file__).resolve().parents[3]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, run_small_cap_strategy
 from core.engine import CostModel
 from scripts.research.archive.hmm_exit_smallcap import make_features  # noqa: E402
 from scripts.research.archive.hmm_stress_guard_smallcap import build_market_features  # noqa: E402
@@ -48,7 +46,7 @@ from scripts.research.archive.state_transition_lead_experiment import (  # noqa:
     make_trigger_mask,
     stress_onsets,
 )
-
+from strategies.small_cap import StrategyConfig, run_small_cap_strategy
 
 OUT_DIR = ROOT / "reports" / "research"
 EXIT_DAILY = OUT_DIR / "hmm_exit_smallcap_daily.csv"

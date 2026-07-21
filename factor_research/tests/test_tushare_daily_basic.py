@@ -11,9 +11,9 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from lake.sources.tushare import to_code  # noqa: E402
-from lake.load_lake import pivot_daily_basic, load_tushare_panel  # noqa: E402
+from lake.load_lake import load_tushare_panel, pivot_daily_basic  # noqa: E402
 from lake.schema import TUSHARE_DATASETS  # noqa: E402
+from lake.sources.tushare import to_code  # noqa: E402
 
 
 def test_to_code_normalizes_suffix():

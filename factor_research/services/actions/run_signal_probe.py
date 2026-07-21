@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import importlib.util
 import json
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from app_config.settings import get_settings
 
@@ -88,7 +89,7 @@ def run_signal_probe(
 
     discover()
     registered = factor_name in FACTOR_REGISTRY
-    created = datetime.now(timezone.utc).isoformat()
+    created = datetime.now(UTC).isoformat()
 
     base: dict[str, Any] = {
         "factor_name": factor_name,
@@ -169,7 +170,7 @@ def run_signal_probe(
 def _write_report(factor_name: str, payload: dict[str, Any]) -> dict[str, Any]:
     REPORTS.mkdir(parents=True, exist_ok=True)
     safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in factor_name)[:60]
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     out = REPORTS / f"agent_l0_probe_{safe}_{stamp}.json"
     out.write_text(json.dumps(payload, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
     payload["report_path"] = str(out.relative_to(ROOT))

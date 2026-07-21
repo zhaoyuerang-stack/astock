@@ -1,16 +1,18 @@
-import unittest
-import tempfile
 import json
-import shutil
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 # Adjust sys.path to find factor_research packages
 import os
+import shutil
 import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from scripts.research.run_ontology_shadow_pipeline import run_ontology_shadow_pipeline
+
 
 class TestOntologyShadowPipeline(unittest.TestCase):
     def setUp(self):

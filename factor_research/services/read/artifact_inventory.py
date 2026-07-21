@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from contracts.agent_control import ArtifactPolicy
 
-
 _POLICIES = {
     "data_lake": ArtifactPolicy(
         name="data_lake",

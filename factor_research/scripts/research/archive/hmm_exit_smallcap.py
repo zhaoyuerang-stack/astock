@@ -17,14 +17,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-
 ROOT = Path(__file__).resolve().parents[3]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, backtest_weights, load_price_panels, run_small_cap_strategy
 from engine.metrics import metrics, yearly_returns
-
+from strategies.small_cap import StrategyConfig, backtest_weights, run_small_cap_strategy
 
 OUT_DIR = ROOT / "reports" / "research"
 OUT_DIR.mkdir(parents=True, exist_ok=True)

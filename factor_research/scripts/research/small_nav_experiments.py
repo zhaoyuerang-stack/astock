@@ -15,18 +15,19 @@ PoC 提示: small_cap_timing output[1] = small_nav 100% 被丢弃 → 可能是�
   ✗ 否则 → small_nav 这个输出无独立价值,关闭分支
 """
 import warnings; warnings.filterwarnings("ignore")
-import numpy as np
-import pandas as pd
 import sys
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from lake.load_lake import load_prices, load_raw_close
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from strategies.small_cap import build_rebalance_weights
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from factors.small_cap import small_cap_timing
-from factors.utils import safe_zscore, mad_clip
-
+from factors.utils import mad_clip, safe_zscore
+from lake.load_lake import load_prices, load_raw_close
+from strategies.small_cap import build_rebalance_weights
 
 print("Loading...", flush=True)
 from lake.units import implied_amount

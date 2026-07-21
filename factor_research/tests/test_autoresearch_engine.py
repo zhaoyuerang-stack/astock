@@ -20,6 +20,7 @@ os.chdir(ROOT)
 # (例:BOOST 基本面族会把 bp_proxy 种子推到队头,在合成价格面板上算不出因子)。
 # steering 行为本身的对抗测试归 tests/test_direction_registry.py。
 import knowledge.directions as _kd  # noqa: E402
+
 _kd.DEFAULT_REGISTRY = "/nonexistent/direction_registry.json"
 _kd.DEFAULT_CLUSTERS = "/nonexistent/redundancy_clusters.json"
 _kd.DEFAULT_FRONTIER = "/nonexistent/frontier.json"
@@ -39,9 +40,14 @@ from factory.autoresearch import (  # noqa: E402
     run_validation_pipeline,
     validate_candidate_ast,
 )
-from factory.ontology import Decision, Experiment, ExperimentProtocol, ExperimentResult  # noqa: E402
 from factory.autoresearch.guards import LeakageGuardError, run_leakage_guard  # noqa: E402
 from factory.autoresearch.validator import DSLValidationError  # noqa: E402
+from factory.ontology import (  # noqa: E402
+    Decision,
+    Experiment,
+    ExperimentProtocol,
+    ExperimentResult,
+)
 from services.read.autoresearch import (  # noqa: E402
     autoresearch_candidates,
     autoresearch_funnel,
@@ -674,7 +680,10 @@ def test_human_review_approve_reject_without_registry_write():
 
 
 def test_promote_approved_candidate_gates_and_calls_workflow_promote():
-    from services.actions.autoresearch import promote_approved_candidate, review_autoresearch_candidate
+    from services.actions.autoresearch import (
+        promote_approved_candidate,
+        review_autoresearch_candidate,
+    )
 
     promote_kwargs = dict(
         l0_metrics={"rank_ic_mean": 0.035, "icir": 0.55, "coverage": 0.91, "nan_ratio": 0.02, "extreme_ratio": 0.01},
@@ -763,7 +772,10 @@ def test_review_approve_auto_promote_submits_shadow_job():
 def test_auto_promote_shadow_updates_review_queue_and_never_active():
     from types import SimpleNamespace
 
-    from services.actions.autoresearch import promote_approved_candidate, review_autoresearch_candidate
+    from services.actions.autoresearch import (
+        promote_approved_candidate,
+        review_autoresearch_candidate,
+    )
 
     promote_kwargs = dict(
         l0_metrics={"rank_ic_mean": 0.035, "icir": 0.55, "coverage": 0.91, "nan_ratio": 0.02, "extreme_ratio": 0.01},
@@ -826,7 +838,10 @@ def test_auto_promote_shadow_updates_review_queue_and_never_active():
 
 
 def test_auto_promote_failure_marks_retryable_promote_failed():
-    from services.actions.autoresearch import promote_approved_candidate_job, review_autoresearch_candidate
+    from services.actions.autoresearch import (
+        promote_approved_candidate_job,
+        review_autoresearch_candidate,
+    )
 
     promote_kwargs = dict(
         l0_metrics={"rank_ic_mean": 0.035, "icir": 0.55, "coverage": 0.91, "nan_ratio": 0.02, "extreme_ratio": 0.01},
@@ -960,9 +975,12 @@ def test_island_search_mutation_stays_in_whitelist_and_search_is_deterministic()
 
 def test_novelty_scores_behavioral_distance_not_syntax():
     """新颖性按行为算:克隆(含反向克隆)被识别为冗余,行为不同的因子得高分。"""
-    from factory.autoresearch.novelty import candidate_factor_panel, novelty_score, sample_behavior_dates
-
     from factors.autoresearch_dsl import clear_factor_cache
+    from factory.autoresearch.novelty import (
+        candidate_factor_panel,
+        novelty_score,
+        sample_behavior_dates,
+    )
     clear_factor_cache()
     close, volume, _ = _synthetic_panel()
     dates = sample_behavior_dates(close.index, 60)
@@ -1040,6 +1058,7 @@ def test_island_fitness_blends_novelty_with_icir():
 def test_marginal_return_correlation_helpers():
     """top-N 收益代理 + 有符号最大相关:自相关≈1、反相关为负、无效→0。"""
     import numpy as np
+
     from factory.autoresearch.novelty import max_return_correlation, topn_long_return
 
     dates = pd.bdate_range("2024-01-01", periods=6)
@@ -1140,7 +1159,7 @@ def test_island_fitness_penalizes_correlation_to_book():
     (越去相关越靠前)。直接证明边际惩罚把选择推向去相关。
     """
     from factory.autoresearch.islands import run_island_search
-    from factory.autoresearch.novelty import candidate_factor_panel, sample_behavior_dates
+    from factory.autoresearch.novelty import candidate_factor_panel
     from factory.lines.line2_validation.l0_ic_scan import precompute_forward_returns
 
     def fake_l0(hyp, *args, **kwargs):
@@ -1191,6 +1210,7 @@ def test_island_fitness_penalizes_correlation_to_book():
 def test_newey_west_icir_corrects_overlap_inflation():
     """NW 校正:重叠/自相关 IC 序列的 ICIR 被压回真值;白噪声基本不变。"""
     import numpy as np
+
     from engine.factor_analysis import newey_west_icir
 
     rng = np.random.default_rng(7)
@@ -1494,7 +1514,6 @@ def test_llm_generation_injects_failure_ledger_into_prompt():
 def test_island_fitness_penalizes_complexity():
     """测试在进化搜索中复杂度惩罚生效。"""
     from factory.autoresearch.islands import run_island_search
-    from factory.autoresearch.complexity import compute_complexity
 
     def fake_l0(hyp, *args, **kwargs):
         return Experiment(
@@ -1850,6 +1869,7 @@ def test_window_mutation_snaps_to_fixed_grid():
 def test_run_island_search_defaults_to_thread_backend():
     """L0 搜索默认 thread backend,避免 ProcessPool 反复 pickle 大 DataFrame。"""
     import inspect
+
     from factory.autoresearch.islands import run_island_search
 
     sig = inspect.signature(run_island_search)
@@ -1902,8 +1922,9 @@ def test_validation_pipeline_computation_time_budget():
 
 def test_dsl_memory_cache_key_collision_prevention():
     """对抗式审查：测试两个具有不同形状/索引但巧合具有相同内存地址 id(close) 的 DataFrame 决不能发生缓存碰撞。"""
-    from factors.autoresearch_dsl import _panel_key, _data_signature
     import gc
+
+    from factors.autoresearch_dsl import _data_signature, _panel_key
 
     # 1. 构造第一个 DataFrame
     close1 = pd.DataFrame(1.0, index=pd.date_range("2020-01-01", periods=10), columns=["A", "B"])

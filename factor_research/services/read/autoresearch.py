@@ -11,7 +11,6 @@ from contracts.views import (
 from factory.autoresearch import CandidateRepository, ReviewQueue, compute_complexity
 from factory.autoresearch.models import CandidateStatus
 
-
 _FUNNEL_ORDER = [
     CandidateStatus.GENERATED.value,
     CandidateStatus.L0_PASSED.value,

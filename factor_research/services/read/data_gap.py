@@ -10,7 +10,6 @@ from typing import Any
 from lake.schema import TUSHARE_DATASETS
 from services.read.strategy_idea import check_strategy_idea
 
-
 # Tokens that typically need external inputs beyond current lake defaults.
 _SPECIAL_NEEDS: list[tuple[re.Pattern[str], list[str]]] = [
     (re.compile(r"WACC|wacc|资本成本|股权成本|债务成本", re.I), [

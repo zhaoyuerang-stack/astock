@@ -17,10 +17,10 @@ import json
 import os
 import sys
 import time
+from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -30,7 +30,7 @@ os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
 from factors.small_cap import small_cap_timing
-from factors.utils import safe_zscore, mad_clip
+from factors.utils import mad_clip, safe_zscore
 
 OUT_DIR = ROOT / "reports" / "exploration"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -378,7 +378,7 @@ class Explorer:
         ranked = sorted(all_r, key=lambda r: r.get("wf_annual", r.get("is_annual", r.get("oos_annual", -999))), reverse=True)
 
         logger.info(f"\n{'='*90}")
-        logger.info(f"FINAL RANKINGS")
+        logger.info("FINAL RANKINGS")
         logger.info(f"{'='*90}")
         hdr = f"{'#':<4} {'Name':<30} {'P1':<5} {'P2':<5} {'P3':<5} {'IS':>7} {'OOS':>7} {'WF':>7} {'WF_DD':>7} {'Shpe':>6}"
         logger.info(hdr); print("-" * 90)

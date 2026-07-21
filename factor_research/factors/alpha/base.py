@@ -7,11 +7,9 @@ Transforms return new Factor nodes (chainable).  Expression operators
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 import pandas as pd
-
 
 # ---------------------------------------------------------------------------
 # FactorData — input container passed to compute()
@@ -26,9 +24,9 @@ class FactorData:
     close: pd.DataFrame
     volume: pd.DataFrame
     amount: pd.DataFrame          # volume × raw_close, share×CNY (canonical; 禁 ×100 手数换算)
-    raw_close: Optional[pd.DataFrame] = None
-    industry: Optional[pd.DataFrame] = None      # industry code (string/int)
-    market_cap: Optional[pd.DataFrame] = None     # total market cap (CNY)
+    raw_close: pd.DataFrame | None = None
+    industry: pd.DataFrame | None = None      # industry code (string/int)
+    market_cap: pd.DataFrame | None = None     # total market cap (CNY)
 
     @property
     def trade_dates(self) -> pd.DatetimeIndex:
@@ -46,7 +44,7 @@ class FactorData:
 @dataclass(frozen=True)
 class Filter:
     """A lazy boolean mask produced by factor comparisons."""
-    factor: "Factor"
+    factor: Factor
     op: str          # '>', '<', '>=', '<=', '==', '!='
     threshold: float
 
@@ -85,8 +83,8 @@ class Factor(ABC):
     def __hash__(self):
         return id(self)
 
-    def __eq__(self, other):
-        return self is other
+    # 注:__eq__ 在本类下方定义为 DSL 表达式构造(factor == 阈值 → Filter),
+    # 不是身份比较;身份语义由 __hash__ = id(self) 承载,dict/set 按身份工作。
 
     # -- subclasses override this --
     @abstractmethod
@@ -94,56 +92,56 @@ class Factor(ABC):
         """Return factor values as (date × code) DataFrame."""
 
     # -- transforms (return TransformedFactor) --
-    def zscore(self) -> "Factor":
+    def zscore(self) -> Factor:
         return TransformedFactor(self, [("zscore", (), {})])
 
-    def mad_clip(self, n: float = 5.0) -> "Factor":
+    def mad_clip(self, n: float = 5.0) -> Factor:
         return TransformedFactor(self, [("mad_clip", (n,), {})])
 
-    def rank(self, ascending: bool = True) -> "Factor":
+    def rank(self, ascending: bool = True) -> Factor:
         return TransformedFactor(self, [("rank", (ascending,), {})])
 
-    def shift(self, periods: int = 1) -> "Factor":
+    def shift(self, periods: int = 1) -> Factor:
         return TransformedFactor(self, [("shift", (periods,), {})])
 
-    def neutralize(self, groups: pd.DataFrame) -> "Factor":
+    def neutralize(self, groups: pd.DataFrame) -> Factor:
         return TransformedFactor(self, [("neutralize", (groups,), {})])
 
-    def rolling_mean(self, window: int) -> "Factor":
+    def rolling_mean(self, window: int) -> Factor:
         return TransformedFactor(self, [("rolling_mean", (window,), {})])
 
-    def rolling_std(self, window: int) -> "Factor":
+    def rolling_std(self, window: int) -> Factor:
         return TransformedFactor(self, [("rolling_std", (window,), {})])
 
-    def log1p(self) -> "Factor":
+    def log1p(self) -> Factor:
         return TransformedFactor(self, [("log1p", (), {})])
 
-    def neg(self) -> "Factor":
+    def neg(self) -> Factor:
         return TransformedFactor(self, [("neg", (), {})])
 
     # -- expression algebra (deferred import to avoid circular deps) --
-    def __add__(self, other: "Factor") -> "Factor":
+    def __add__(self, other: Factor) -> Factor:
         from factors.blend import FactorBlend
         return FactorBlend({self: 1.0, other: 1.0})
 
-    def __sub__(self, other: "Factor") -> "Factor":
+    def __sub__(self, other: Factor) -> Factor:
         from factors.blend import FactorBlend
         return FactorBlend({self: 1.0, other: -1.0})
 
-    def __mul__(self, weight: float) -> "Factor":
+    def __mul__(self, weight: float) -> Factor:
         if not isinstance(weight, (int, float)):
             return NotImplemented
         from factors.blend import FactorBlend
         return FactorBlend({self: float(weight)})
 
-    def __rmul__(self, weight: float) -> "Factor":
+    def __rmul__(self, weight: float) -> Factor:
         return self.__mul__(weight)
 
-    def __truediv__(self, other: "Factor") -> "Factor":
+    def __truediv__(self, other: Factor) -> Factor:
         from factors.blend import FactorBlend
         return FactorBlend({self: 1.0, other: -1.0})  # ratio proxy: a / b ≈ a - b in z-score space
 
-    def __neg__(self) -> "Factor":
+    def __neg__(self) -> Factor:
         return self.neg()
 
     # -- comparisons (return Filter) --
@@ -212,29 +210,29 @@ class TransformedFactor(Factor):
             result = fn(result, *args, **kwargs)
         return result
 
-    def zscore(self) -> "Factor":
+    def zscore(self) -> Factor:
         return TransformedFactor(self._parent, self._ops + [("zscore", (), {})])
 
-    def mad_clip(self, n: float = 5.0) -> "Factor":
+    def mad_clip(self, n: float = 5.0) -> Factor:
         return TransformedFactor(self._parent, self._ops + [("mad_clip", (n,), {})])
 
-    def rank(self, ascending: bool = True) -> "Factor":
+    def rank(self, ascending: bool = True) -> Factor:
         return TransformedFactor(self._parent, self._ops + [("rank", (ascending,), {})])
 
-    def shift(self, periods: int = 1) -> "Factor":
+    def shift(self, periods: int = 1) -> Factor:
         return TransformedFactor(self._parent, self._ops + [("shift", (periods,), {})])
 
-    def neutralize(self, groups: pd.DataFrame) -> "Factor":
+    def neutralize(self, groups: pd.DataFrame) -> Factor:
         return TransformedFactor(self._parent, self._ops + [("neutralize", (groups,), {})])
 
-    def rolling_mean(self, window: int) -> "Factor":
+    def rolling_mean(self, window: int) -> Factor:
         return TransformedFactor(self._parent, self._ops + [("rolling_mean", (window,), {})])
 
-    def rolling_std(self, window: int) -> "Factor":
+    def rolling_std(self, window: int) -> Factor:
         return TransformedFactor(self._parent, self._ops + [("rolling_std", (window,), {})])
 
-    def log1p(self) -> "Factor":
+    def log1p(self) -> Factor:
         return TransformedFactor(self._parent, self._ops + [("log1p", (), {})])
 
-    def neg(self) -> "Factor":
+    def neg(self) -> Factor:
         return TransformedFactor(self._parent, self._ops + [("neg", (), {})])

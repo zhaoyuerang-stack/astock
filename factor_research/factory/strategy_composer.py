@@ -14,12 +14,11 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 import pandas as pd
 
-from factory.regime import RegimeEngine, RegimeConfig
+from factory.regime import RegimeEngine
 
 
 @dataclass

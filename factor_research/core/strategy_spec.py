@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, field, replace as _dc_replace
-from typing import Any, Mapping
+from collections.abc import Mapping
+from dataclasses import dataclass
+from dataclasses import replace as _dc_replace
+from typing import Any
 
 # execution.fill 的显式枚举 —— 禁止自由文本,使「成交时点」成为受控身份字段。
 # Task 13 会把生产/回测统一到 T_PLUS_1_CLOSE;两者并存于枚举,改 fill 即换 spec_hash。
@@ -50,7 +52,7 @@ class ExecutableStrategySpec:
         return {k: getattr(self, k) for k in self._FIELDS}
 
     @classmethod
-    def from_dict(cls, d: Mapping[str, Any]) -> "ExecutableStrategySpec":
+    def from_dict(cls, d: Mapping[str, Any]) -> ExecutableStrategySpec:
         missing = [k for k in cls._FIELDS if k not in d]
         if missing:
             raise ValueError(f"spec 缺字段: {missing}")
@@ -64,7 +66,7 @@ class ExecutableStrategySpec:
     def spec_hash(self) -> str:
         return hashlib.sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
-    def replace(self, **changes: Any) -> "ExecutableStrategySpec":
+    def replace(self, **changes: Any) -> ExecutableStrategySpec:
         return _dc_replace(self, **changes)
 
     # ---- 校验 ----

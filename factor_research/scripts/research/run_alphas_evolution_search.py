@@ -5,7 +5,6 @@ Usage:
 """
 from __future__ import annotations
 
-import os
 import sys
 import warnings
 from pathlib import Path
@@ -16,8 +15,9 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from factory.autoresearch.repositories import CandidateRepository, ExperimentLog, ReviewQueue
 from services.actions.autoresearch_search import run_autoresearch_island_search
-from factory.autoresearch.repositories import CandidateRepository, ReviewQueue, ExperimentLog
+
 
 def main():
     print("=" * 80)
@@ -29,9 +29,9 @@ def main():
     experiment_log = ExperimentLog()
 
     # Strictly isolate search data from holdout boundary (ADR-021) to prevent leakage
-    from strategies.small_cap import load_price_panels
-    from governance.holdout import boundary, assert_search_clean
     from factory.lines.line2_validation.l0_ic_scan import precompute_forward_returns
+    from governance.holdout import assert_search_clean, boundary
+    from strategies.small_cap import load_price_panels
     
     start_date = "2018-01-01"
     HOLDOUT = boundary()

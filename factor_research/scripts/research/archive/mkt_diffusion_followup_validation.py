@@ -22,12 +22,10 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-
 ROOT = Path(__file__).resolve().parents[3]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, run_small_cap_strategy
 from core.engine import CostModel
 from engine.metrics import metrics
 from scripts.research.archive.mkt_diffusion_robustness import (  # noqa: E402
@@ -36,9 +34,14 @@ from scripts.research.archive.mkt_diffusion_robustness import (  # noqa: E402
     FIXED_TRIGGER,
     build_fixed_triggers,
 )
-from scripts.research.archive.state_transition_execution_explore import backtest_execution_overlay  # noqa: E402
-from scripts.research.archive.state_transition_lead_experiment import evaluate_lead, stress_onsets  # noqa: E402
-
+from scripts.research.archive.state_transition_execution_explore import (
+    backtest_execution_overlay,  # noqa: E402
+)
+from scripts.research.archive.state_transition_lead_experiment import (  # noqa: E402
+    evaluate_lead,
+    stress_onsets,
+)
+from strategies.small_cap import StrategyConfig, run_small_cap_strategy
 
 OUT_DIR = ROOT / "reports" / "research"
 CHART_DIR = OUT_DIR / "mkt_diffusion_followup_charts"

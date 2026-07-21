@@ -28,7 +28,6 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.ops import paper_accounts_update as pau  # noqa: E402
 
-
 # ─────────────────────────── 1/2/3/4. paper_accounts_update.run_paper_accounts_update ───────────────────────────
 
 def test_rejected_provision_skips_price_loading_and_update(tmp_path, monkeypatch):

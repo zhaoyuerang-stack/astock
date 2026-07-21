@@ -18,9 +18,9 @@ import numpy as np
 import pandas as pd
 
 from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
-from strategies.small_cap import build_rebalance_weights, load_price_panels
 from factors.small_cap import small_cap_factor, small_cap_timing
 from factors.utils import mad_clip, safe_zscore
+from strategies.small_cap import build_rebalance_weights, load_price_panels
 
 
 @lru_cache(maxsize=4)
@@ -264,7 +264,11 @@ def run_research_active(start: str = "2018-01-01") -> dict[str, pd.Series]:
 
 def run_active(start: str = "2018-01-01") -> dict[str, pd.Series]:
     """Run only legs from the validated DeploymentManifest."""
-    from runtime.deployment import load_active_deployment, load_deployed_strategy_spec, DeploymentNotReady
+    from runtime.deployment import (
+        DeploymentNotReady,
+        load_active_deployment,
+        load_deployed_strategy_spec,
+    )
 
     try:
         deployment = load_active_deployment()
@@ -306,7 +310,7 @@ def active_strategies() -> list[str]:
     family/version 为准(映射回目录键 'family.version')。清单未就绪(尚未 spec 化迁移)
     时返回空列表；研究目录由 research_active_strategies() 显式读取。
     """
-    from runtime.deployment import load_active_deployment, DeploymentNotReady
+    from runtime.deployment import DeploymentNotReady, load_active_deployment
 
     try:
         dep = load_active_deployment()
@@ -327,7 +331,7 @@ def shadow_strategies() -> list[str]:
 
 def defensive_strategies() -> set[str]:
     """返回 role=defensive 的 ACTIVE 腿(跨资产防御腿),供 compose(method='capped') 封顶权重。"""
-    from runtime.deployment import load_active_deployment, DeploymentNotReady
+    from runtime.deployment import DeploymentNotReady, load_active_deployment
 
     try:
         dep = load_active_deployment()

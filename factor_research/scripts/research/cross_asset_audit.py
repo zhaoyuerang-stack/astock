@@ -6,8 +6,11 @@
   · 候选池逐个加入 A 股 ACTIVE 组合, 测 risk_parity Sharpe/Calmar Δ
   · 同 2018 起算 (与 A 股 baseline 同口径)
 """
-import os, sys, warnings
+import os
+import sys
+import warnings
 from pathlib import Path
+
 warnings.filterwarnings("ignore")
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
@@ -58,7 +61,7 @@ def metrics(r):
 
 # ─── Step 1: ETF 趋势策略 grid ───
 print(f"{'='*70}")
-print(f"  Phase 2.2 — Cross-Asset ETF 趋势策略 (MA60 / MA120, 1.0x lev)")
+print("  Phase 2.2 — Cross-Asset ETF 趋势策略 (MA60 / MA120, 1.0x lev)")
 print(f"{'='*70}")
 print(f"  {'ETF':<18s} {'MA':>3s} {'ann':>8s} {'sh':>5s} {'mdd':>7s} {'cal':>5s}  pass(≥0.95)?")
 print("  " + "-" * 65)
@@ -82,12 +85,13 @@ for code, name in ETFS.items():
 
 # ─── Step 2: 加入 A 股 ACTIVE 组合验证 ───
 print(f"\n{'='*70}")
-print(f"  组合层: A 股 ACTIVE + ETF 候选 (risk_parity)")
+print("  组合层: A 股 ACTIVE + ETF 候选 (risk_parity)")
 print(f"{'='*70}")
+from portfolio.composer import compose
+from portfolio.composer import metrics as pm
 from portfolio.strategy_runners import run_active
-from portfolio.composer import compose, metrics as pm
 
-print(f"  loading A 股 ACTIVE strategies...")
+print("  loading A 股 ACTIVE strategies...")
 a_ret = run_active(start=START)
 
 # Baseline
@@ -128,7 +132,7 @@ for code, name in ETFS.items():
           f"{d_sh:+5.2f} {d_cal:+5.2f}  {avg_corr:+5.2f}{mark}")
 
 # ─── Step 3: 全部 ETF 一起加 ───
-print(f"\n  --- 全部 ETF 一起加 (5 个 ETF + 2 A 股) ---")
+print("\n  --- 全部 ETF 一起加 (5 个 ETF + 2 A 股) ---")
 all_combo = {**a_ret}
 for code, name in ETFS.items():
     best = best_etf[code]
@@ -141,7 +145,7 @@ print(f"  全部加: sh={m_all['sharpe']:+.2f} cal={m_all['calmar']:+.2f} mdd={m
 print(f"  Δ vs baseline: sh={m_all['sharpe']-mb['sharpe']:+.2f} cal={m_all['calmar']-mb['calmar']:+.2f}")
 
 # ─── Step 4: 仅加 Sharpe ≥ 0.95 候选 ───
-print(f"\n  --- 仅加 Sharpe ≥ 0.95 候选 ---")
+print("\n  --- 仅加 Sharpe ≥ 0.95 候选 ---")
 pass_combo = {**a_ret}
 n_pass = 0
 for code, name in ETFS.items():
@@ -156,4 +160,4 @@ if n_pass > 0:
     print(f"  {n_pass} ETF 入候选, 组合: sh={m_pass['sharpe']:+.2f} cal={m_pass['calmar']:+.2f} mdd={m_pass['maxdd']:+.1%}")
     print(f"  Δ vs baseline: sh={m_pass['sharpe']-mb['sharpe']:+.2f} cal={m_pass['calmar']-mb['calmar']:+.2f}")
 else:
-    print(f"  无 ETF 单 Sharpe ≥ 0.95, 候选池空")
+    print("  无 ETF 单 Sharpe ≥ 0.95, 候选池空")

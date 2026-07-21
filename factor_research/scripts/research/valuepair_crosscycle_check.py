@@ -54,6 +54,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 # 逐函数原样复用 signal_source_probe 的残差化口径(不重写/不改参数)。
+from governance.holdout import assert_search_clean, boundary  # noqa: E402
 from scripts.research.signal_source_probe import (  # noqa: E402
     _forward_returns,
     _load_close,
@@ -63,8 +64,6 @@ from scripts.research.signal_source_probe import (  # noqa: E402
     _seg_ic,
     _xcorr,
 )
-
-from governance.holdout import assert_search_clean, boundary  # noqa: E402
 
 YEARS = list(range(2018, 2025))  # 2018..2024
 

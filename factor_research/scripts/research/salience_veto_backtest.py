@@ -15,13 +15,12 @@ warnings.filterwarnings("ignore")
 os.chdir(Path(__file__).resolve().parent.parent.parent)
 sys.path.insert(0, str(Path.cwd()))
 
-import numpy as np
 import pandas as pd
 
-from strategies.small_cap import load_price_panels, build_rebalance_weights
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from factors.small_cap import small_cap_timing, small_cap_factor
-from factors.utils import safe_zscore, mad_clip
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
+from factors.small_cap import small_cap_factor, small_cap_timing
+from strategies.small_cap import build_rebalance_weights, load_price_panels
+
 
 def compute_salience_covariance(close, W=20, theta=0.1, delta=0.7):
     """Computes faded Salience Covariance (-ST_cov)."""

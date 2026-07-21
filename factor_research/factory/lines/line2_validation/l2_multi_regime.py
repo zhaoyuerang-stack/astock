@@ -10,14 +10,12 @@ import importlib
 import time
 import uuid
 from datetime import date
-from typing import Optional
 
 import numpy as np
 import pandas as pd
 
 from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
-
-from factory.analysis import classify_regime, REGIME_LABELS
+from factory.analysis import REGIME_LABELS, classify_regime
 from factory.ontology import (
     Decision,
     Experiment,

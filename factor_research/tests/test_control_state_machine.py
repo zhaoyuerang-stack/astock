@@ -3,16 +3,15 @@ import json
 
 import pytest
 
+from governance import control_events as CE
 from governance.state_machine import (
+    CN_LABELS,
+    CN_TO_STATE,
     IllegalTransition,
     assert_transition,
     can_transition,
     is_terminal,
-    CN_LABELS,
-    CN_TO_STATE,
 )
-from governance import control_events as CE
-
 
 # ───────── 状态机 ─────────
 

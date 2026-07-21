@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from contracts.agent_control import AgentAction
 from contracts.evidence import (
     EvidenceEnvelope,
     EvidenceTier,
@@ -11,7 +12,6 @@ from contracts.evidence import (
     strip_performance_for_display,
 )
 from services.read.action_policy import can_agent_do
-from contracts.agent_control import AgentAction
 
 
 def wrap_tool_result(

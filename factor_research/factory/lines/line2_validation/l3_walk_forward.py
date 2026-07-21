@@ -18,8 +18,6 @@ import numpy as np
 import pandas as pd
 
 from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
-from factors.small_cap import small_cap_timing
-
 from factory.ontology import (
     Decision,
     Experiment,

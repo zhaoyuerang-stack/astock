@@ -22,18 +22,25 @@ Factors tested per pool:
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/multi_strategy_search.py
 """
-import os, sys
-from pathlib import Path
-import numpy as np, pandas as pd
-from scipy.stats import spearmanr
+import os
+import sys
 from dataclasses import dataclass
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from scipy.stats import spearmanr
 
 ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT); sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, load_price_panels, backtest_weights, build_rebalance_weights
 from factors.small_cap import small_cap_factor, small_cap_timing
-from factors.small_cap import small_cap_factor
+from strategies.small_cap import (
+    StrategyConfig,
+    backtest_weights,
+    build_rebalance_weights,
+    load_price_panels,
+)
 
 OUT = ROOT / "reports" / "research"; OUT.mkdir(parents=True, exist_ok=True)
 
@@ -154,7 +161,7 @@ if found:
 else:
     # Show closest
     closest = sorted(results, key=lambda r: (abs(r.maxdd+0.15) + abs(r.annual-0.15)))[:10]
-    print(f"  None found. Closest 10:")
+    print("  None found. Closest 10:")
     for r in closest:
         print(f"  {r.name:<30} ann={r.annual:+.1%} sharpe={r.sharpe:.2f} maxdd={r.maxdd:+.1%} pool={r.pool}")
 

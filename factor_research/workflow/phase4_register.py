@@ -22,13 +22,11 @@ logger = get_logger(__name__)
 
 import hashlib
 import json
-import logging
 import subprocess
 import sys
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 
@@ -57,7 +55,7 @@ def _extract_nine_gate_summary(phase2_data, phase3_data) -> dict:
     return {k: v for k, v in out.items() if v is not None}
 
 
-def _holdout_gate(holdout_id: str, *, min_sharpe: float = 0.6) -> tuple[Optional[str], dict]:
+def _holdout_gate(holdout_id: str, *, min_sharpe: float = 0.6) -> tuple[str | None, dict]:
     """§5.2 登记前金库闸:holdout_id 提供时,要求存在一条**通过**的 holdout 校验记录。
 
     读 data_lake/governance/holdout_validations.jsonl(由 governance.holdout.validate_on_holdout
@@ -175,7 +173,7 @@ def _suggest_fix(check_id: str) -> str:
         ),
         "warmup": (
             "Load price data from >=2 years before backtest start. "
-            f"For typical window=60, load from at least 2016 for a 2018 start."
+            "For typical window=60, load from at least 2016 for a 2018 start."
         ),
         "delisted": (
             "Ensure data pipeline includes delisted stocks. "
@@ -331,10 +329,10 @@ class Phase4Register:
         decay_signal: str = "",
         force: bool = False,
         hypothesis_id: str = "",
-        evidence_experiment_ids: Optional[list] = None,
+        evidence_experiment_ids: list | None = None,
         target_status: str = "",
         holdout_id: str = "",
-        seed_provenance: Optional[dict] = None,
+        seed_provenance: dict | None = None,
     ) -> RegistrationReport:
         """Register strategy. Saves lessons regardless; registers only if all clear or forced."""
 
@@ -351,7 +349,7 @@ class Phase4Register:
         blocked = self._check_blocked(phase1_results, phase2_data, phase3_data)
         if blocked and not force:
             logger.info(f"  Registration BLOCKED: {blocked}")
-            logger.info(f"  Use force=True to override.")
+            logger.info("  Use force=True to override.")
             return RegistrationReport(
                 family=self.family, version=self.version,
                 registered=False, repro_meta=repro, lessons_saved=n_lessons,
@@ -362,7 +360,7 @@ class Phase4Register:
         ho_block, ho_summary = _holdout_gate(holdout_id)
         if holdout_id and ho_block and not force:
             logger.info(f"  Registration BLOCKED (holdout §5.2): {ho_block}")
-            logger.info(f"  Use force=True to override.")
+            logger.info("  Use force=True to override.")
             return RegistrationReport(
                 family=self.family, version=self.version,
                 registered=False, repro_meta=repro, lessons_saved=n_lessons,
@@ -421,8 +419,8 @@ class Phase4Register:
 
         # Write to registry
         try:
-            from strategy_registry import register_family, register
             from engine.metrics import compute_hit
+            from strategy_registry import register, register_family
 
             # 自动入册只走 standalone 轨：单体达标(hit=True)才考虑「在册」，否则入「候选」。
             # diversifier 轨需人工判断组合契合度，不在工厂自动通道里授予。
@@ -518,7 +516,7 @@ class Phase4Register:
                 }
         return evidence
 
-    def _check_blocked(self, p1, p2, p3) -> Optional[str]:
+    def _check_blocked(self, p1, p2, p3) -> str | None:
         """Return reason if registration should be blocked, or None."""
         # Phase 1: any FAIL?
         for r in (p1 or []):

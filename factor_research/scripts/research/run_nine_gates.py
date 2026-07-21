@@ -5,7 +5,6 @@ and writes a comprehensive report to reports/research/amihud_9_gates_report.md.
 """
 from __future__ import annotations
 
-import os
 import sys
 import warnings
 from pathlib import Path
@@ -18,12 +17,12 @@ if str(ROOT) not in sys.path:
 
 import pandas as pd
 
-from core.engine import PricePanel, Signal
 from core.analysis.nine_gates import NineGatesEvaluator, NineGatesReport
-from strategies.small_cap import load_price_panels, build_rebalance_weights
+from core.engine import PricePanel, Signal
+from factors.alpha import transforms  # noqa: F401 —— 副作用注册 DSL 变换(zscore/mad_clip/shift 等)
 from factors.alpha.builtins.illiq import AmihudIlliq
-from factors.alpha import transforms
 from factors.veto import salience_covariance_veto
+from strategies.small_cap import build_rebalance_weights, load_price_panels
 
 
 def main():

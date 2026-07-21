@@ -24,16 +24,16 @@ from app_config.log import get_logger
 logger = get_logger(__name__)
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
 
 import numpy as np
 import pandas as pd
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
+from governance.holdout import assert_search_clean, boundary
 from strategies.small_cap import load_price_panels as load_data
-from governance.holdout import boundary, assert_search_clean
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = ROOT / "reports" / "discovery"
@@ -132,7 +132,7 @@ class Phase2Runner:
         ],
         timing_builder: Callable[[pd.DataFrame, pd.DataFrame], pd.Series],
         family: str = "unnamed",
-        config: Optional[dict] = None,
+        config: dict | None = None,
     ):
         self.factor_builder = factor_builder
         self.timing_builder = timing_builder
@@ -432,7 +432,7 @@ class BacktestReport:
             f"Phase 2 Backtest: {self.family}",
             f"  Time: {self.timestamp}",
             f"  {'─' * 50}",
-            f"  Segments:",
+            "  Segments:",
         ]
         # 按前缀稳定排序展示(OOS 标签的终点年随 holdout boundary 变)。
         _order = {"IS": 0, "OOS": 1, "压力": 2}

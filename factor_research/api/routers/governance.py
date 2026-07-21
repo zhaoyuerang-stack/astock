@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 from fastapi import APIRouter
-from contracts.views import GovernanceView, GateVerdictsView, TrustCalibrationView
+
+from contracts.views import GateVerdictsView, GovernanceView, TrustCalibrationView
 from services.read.governance import get_governance_overview
-from services.read.validation_gate import get_gate_verdicts
 from services.read.trust_calibration import get_trust_calibration
+from services.read.validation_gate import get_gate_verdicts
 
 router = APIRouter(prefix="/governance", tags=["governance"])
 

@@ -7,7 +7,9 @@ Usage:
   python3 apps/portfolio_cli.py --analyze
   python3 apps/portfolio_cli.py --marginal   # regime-aware eval
 """
-import argparse, os, sys
+import argparse
+import os
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,20 +19,22 @@ sys.path.insert(0, str(ROOT))
 import numpy as np
 import pandas as pd
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel
-from strategies.small_cap import load_price_panels
-from factors.utils import safe_zscore, mad_clip
+from core.engine import BacktestConfig, BacktestEngine, PricePanel, Signal
 from factors.small_cap import small_cap_timing
-from strategies.size_earnings import build_vol_target
+from factors.utils import mad_clip, safe_zscore
 from lake.load_lake import load_fundamental_panel
-
-from portfolio.composer import compose, metrics as port_metrics
 from portfolio.analysis import (
-    correlation_matrix, contribution_decompose, regime_breakdown, rolling_correlation,
+    contribution_decompose,
+    correlation_matrix,
+    regime_breakdown,
+    rolling_correlation,
 )
-from portfolio.regime import classify, regime_stats
+from portfolio.composer import compose
+from portfolio.composer import metrics as port_metrics
 from portfolio.marginal import evaluate as marginal_evaluate
-
+from portfolio.regime import classify, regime_stats
+from strategies.size_earnings import build_vol_target
+from strategies.small_cap import load_price_panels
 
 # ═══════════════════════════════════════════════════
 # Strategy builders
@@ -147,7 +151,7 @@ def cmd_compose(returns, regime, method):
           f"Days: {m['n_days']}")
 
     # Compare to individual strategies
-    print(f"\n  vs Individual Strategies:")
+    print("\n  vs Individual Strategies:")
     print(f"  {'Strategy':<20} {'Annual':>8} {'MaxDD':>8} {'Sharpe':>7}")
     print(f"  {'-'*45}")
     for name in returns:
@@ -160,17 +164,17 @@ def cmd_compose(returns, regime, method):
 def cmd_analyze(returns, regime):
     """Run full analysis suite."""
     print(f"\n{'='*60}")
-    print(f"  PORTFOLIO ANALYSIS")
+    print("  PORTFOLIO ANALYSIS")
     print(f"{'='*60}")
 
     # Correlation matrix
     corr = correlation_matrix(returns)
-    print(f"\n  Correlation Matrix:")
+    print("\n  Correlation Matrix:")
     print(corr.round(3).to_string())
 
     # Contribution decomposition (equal weight baseline)
     contrib = contribution_decompose(returns)
-    print(f"\n  Contribution Decomposition (equal weight):")
+    print("\n  Contribution Decomposition (equal weight):")
     print(f"  {'Strategy':<20} {'Weight':>7} {'Ann':>7} {'Contrib':>8} {'Risk%':>7} {'MargS':>7}")
     for idx, row in contrib.iterrows():
         print(f"  {idx:<20} {row['weight']:>6.1%} {row['annual']:>+6.1%} "
@@ -180,7 +184,7 @@ def cmd_analyze(returns, regime):
     # Regime breakdown
     if regime is not None:
         rb = regime_breakdown(returns, regime)
-        print(f"\n  Regime Breakdown (PureTrend ON vs OFF):")
+        print("\n  Regime Breakdown (PureTrend ON vs OFF):")
         print(rb.round(3).to_string())
 
     # Rolling correlation
@@ -204,10 +208,10 @@ def cmd_marginal(returns, regime_signal):
     stats = regime_stats(mkt_ret, regimes)
 
     print(f"\n{'='*60}")
-    print(f"  REGIME-AWARE MARGINAL EVALUATION")
+    print("  REGIME-AWARE MARGINAL EVALUATION")
     print(f"{'='*60}")
 
-    print(f"\n  Market Regime Distribution (2010-2026):")
+    print("\n  Market Regime Distribution (2010-2026):")
     for idx, row in stats.iterrows():
         print(f"    {idx:<18} {row['pct_days']:>5.0%}  ann={row['annual']:>+6.1%}  "
               f"vol={row['vol']:.0%}  sharpe={row['sharpe']:>+5.2f}  n={row['n_days']}d")
@@ -215,10 +219,10 @@ def cmd_marginal(returns, regime_signal):
     # Build existing LIVE pool (all 4 strategies)
     live_pool = returns.copy()
 
-    print(f"\n  Evaluating each strategy against LIVE pool (4 strategies):")
+    print("\n  Evaluating each strategy against LIVE pool (4 strategies):")
 
     # Test: add defensive candidates (low-vol, amplitude, quality)
-    from factors.utils import safe_zscore, mad_clip
+    from factors.utils import mad_clip, safe_zscore
     ret_daily = close.pct_change(fill_method=None).replace([np.inf,-np.inf],np.nan)
 
     # Low vol variants
@@ -299,22 +303,22 @@ def cmd_marginal(returns, regime_signal):
     # Highlight defensive findings
     defensive = [r for r in results if r["grade"] == "LIVE_D"]
     if defensive:
-        print(f"\n  ⭐ DEFENSIVE ASSETS FOUND:")
+        print("\n  ⭐ DEFENSIVE ASSETS FOUND:")
         for r in defensive:
             print(f"    {r['candidate']}: {r['recommendation']}")
     else:
         # Show near-misses
         near = [r for r in results if "NEAR MISS" in r.get("recommendation", "")]
         if near:
-            print(f"\n  ⚡ NEAR-MISS DEFENSIVE:")
+            print("\n  ⚡ NEAR-MISS DEFENSIVE:")
             for r in near:
                 print(f"    {r['candidate']}: {r['recommendation']}")
         else:
-            print(f"\n  ℹ️  No defensive candidates with sufficient bear protection yet.")
-            print(f"    Current LIVE all highly correlated (0.8+) — cross-asset data needed.")
+            print("\n  ℹ️  No defensive candidates with sufficient bear protection yet.")
+            print("    Current LIVE all highly correlated (0.8+) — cross-asset data needed.")
 
     # Regime detail for top candidates
-    print(f"\n  Regime detail (top 3 + any LIVE_D):")
+    print("\n  Regime detail (top 3 + any LIVE_D):")
     shown = set()
     count = 0
     for r in results:

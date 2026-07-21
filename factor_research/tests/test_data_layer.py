@@ -6,9 +6,14 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import pandas as pd
-from lake.load_lake import load_prices, load_raw_close, load_fundamental_panel, load_capital_panel, load_panel
-from lake.schema import FUNDAMENTAL_FIELDS, CAPITAL_FIELDS
 
+from lake.load_lake import (
+    load_capital_panel,
+    load_fundamental_panel,
+    load_panel,
+    load_prices,
+)
+from lake.schema import CAPITAL_FIELDS, FUNDAMENTAL_FIELDS
 
 # Use a narrow date window for fast test execution.
 TEST_START = "2025-06-01"

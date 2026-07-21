@@ -1,6 +1,4 @@
 """Factor computation utilities."""
-import numpy as np
-import pandas as pd
 
 
 def safe_zscore(df):

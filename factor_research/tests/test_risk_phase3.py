@@ -4,10 +4,10 @@ Run:
     cd factor_research && python3 tests/test_risk_phase3.py
     cd factor_research && PHASE3_FULL=1 python3 tests/test_risk_phase3.py   # 含 target 现算集成
 """
+import json
 import os
 import sys
 import tempfile
-import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,8 +15,14 @@ sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
 import services.read.risk as risk_mod
-from services.read.risk import _cap_check, _registered_maxdd, _settings, load_risk_policy, risk_report
 from contracts.models import ControlAction
+from services.read.risk import (
+    _cap_check,
+    _registered_maxdd,
+    _settings,
+    load_risk_policy,
+    risk_report,
+)
 
 
 def test_cap_check_levels():

@@ -7,15 +7,18 @@ Previously failed because:
 
 Now: test fundamental combos on top% pools with proper cleaning.
 """
-import os, sys
+import os
+import sys
 from pathlib import Path
-import numpy as np, pandas as pd
+
+import numpy as np
+import pandas as pd
 from scipy.stats import spearmanr
 
 ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT); sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, load_price_panels, backtest_weights
+from strategies.small_cap import StrategyConfig, backtest_weights, load_price_panels
 
 OUT = ROOT / "reports" / "research"; OUT.mkdir(parents=True, exist_ok=True)
 
@@ -149,10 +152,10 @@ for pool_name, pool_mask in POOLS.items():
             })
 
 if all_results:
-    print(f"\n=== STRATEGIES MEETING CRITERIA (ann>15%, maxdd>-15%) ===")
+    print("\n=== STRATEGIES MEETING CRITERIA (ann>15%, maxdd>-15%) ===")
     for r in all_results:
         print(f"  {r['pool']:<16} {r['factor']:<10} ann={r['annual']:+.1%} sharpe={r['sharpe']:.2f} maxdd={r['maxdd']:+.1%}")
 else:
-    print(f"\nNo strategy meets criteria. V2.1 remains the only option.")
+    print("\nNo strategy meets criteria. V2.1 remains the only option.")
 
 pd.DataFrame(all_results).to_csv(OUT / "fundamental_midcap_results.csv", index=False)

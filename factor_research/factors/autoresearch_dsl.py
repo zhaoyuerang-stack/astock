@@ -9,15 +9,14 @@ from __future__ import annotations
 import hashlib as _hashlib
 import importlib
 import json
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
 from factor_store.store import write_panel_cache
 from factors.utils import mad_clip, safe_zscore
-
 
 _FACTOR_CALLS = {
     # momentum/illiquidity 已迁 @register_factor;volume_ratio/volatility 仍手工
@@ -252,7 +251,7 @@ def _apply_transform(values: pd.DataFrame, op: str, close: pd.DataFrame | None =
     if op == "fundamental_veto":
         if close is None:
             raise ValueError("fundamental_veto requires close price panel")
-        from factors.fundamental import _load_fundamental_cache, _align_to_close
+        from factors.fundamental import _align_to_close, _load_fundamental_cache
         fund = _load_fundamental_cache()
         roe_panel = _align_to_close(fund["roe"], close)
         npy_panel = _align_to_close(fund["net_profit_yoy"], close)

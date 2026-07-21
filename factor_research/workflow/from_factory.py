@@ -15,9 +15,7 @@ workflow/phase1~4 负责"深度":合成防未来审计 + 多段回测 + WF + 唯
 from __future__ import annotations
 
 import importlib
-from typing import Callable
-
-import pandas as pd
+from collections.abc import Callable
 
 
 def _resolve_fn(fn_name: str) -> Callable:

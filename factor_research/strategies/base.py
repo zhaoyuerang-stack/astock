@@ -5,8 +5,9 @@ A StrategyVersion is the canonical combination of:
 
 Once instantiated, it is frozen — changes require a new version.
 """
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any
 
 from .lifecycle import Lifecycle
 
@@ -37,16 +38,16 @@ class StrategyVersion:
     desc: str
     factor_fn: Callable
     factor_config: dict[str, Any] = field(default_factory=dict)
-    timing_fn: Optional[Callable] = None
+    timing_fn: Callable | None = None
     timing_config: dict[str, Any] = field(default_factory=dict)
-    overlay: Optional[Any] = None
+    overlay: Any | None = None
     top_n: int = 25
     rebalance_days: int = 20
     leverage: float = 1.25
     data_sources: tuple[str, ...] = ()
     status: Lifecycle = Lifecycle.INCUBATING
     created: str = ""
-    parent: Optional[str] = None
+    parent: str | None = None
     registered: bool = False
 
     def __repr__(self):

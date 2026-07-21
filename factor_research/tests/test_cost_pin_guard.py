@@ -16,9 +16,8 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.ci import check_cost_model_pin as guard  # noqa: E402
 from core.engine import CostModel  # noqa: E402
-
+from scripts.ci import check_cost_model_pin as guard  # noqa: E402
 
 # ── 注入检测:可吃 dict / dataclass / namespace ───────────────────────────
 

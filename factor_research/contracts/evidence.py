@@ -7,7 +7,7 @@ must not be presented as system-verified facts.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -31,7 +31,7 @@ class EvidenceEnvelope(BaseModel):
     evidence_tier: EvidenceTier = EvidenceTier.NARRATIVE
     can_claim_valid: bool = False
     fake_curve_allowed: bool = False
-    protocol_id: Optional[str] = None
+    protocol_id: str | None = None
     sources: list[str] = Field(default_factory=list)
     summary: str = ""
     payload: dict[str, Any] = Field(default_factory=dict)
@@ -45,7 +45,7 @@ class EvidenceEnvelope(BaseModel):
         return bool(v)
 
     @model_validator(mode="after")
-    def _enforce_adr037(self) -> "EvidenceEnvelope":
+    def _enforce_adr037(self) -> EvidenceEnvelope:
         # Never allow fake equity curves in product envelopes.
         object.__setattr__(self, "fake_curve_allowed", False)
 

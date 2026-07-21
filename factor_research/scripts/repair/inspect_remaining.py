@@ -2,11 +2,14 @@
 import warnings; warnings.filterwarnings("ignore")
 import os
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 import sys
+
 sys.path.insert(0, str(ROOT))
 import pandas as pd
+
 from lake.validator import DataValidator
 
 cal = pd.read_parquet("data_lake/meta/trade_calendar.parquet")["date"]

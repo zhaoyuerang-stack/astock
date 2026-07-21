@@ -4,8 +4,8 @@ This module provides:
 - ``to_signal()`` – bridge factor panels to ``core.engine.Signal``
 - ``performance_metrics()`` – metrics from a return series
 """
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 from engine.metrics import max_drawdown
 

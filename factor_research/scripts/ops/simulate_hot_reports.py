@@ -5,8 +5,8 @@ to represent the industry directions identified as most valuable (Semiconductors
 These files will trigger the NLP inbox pipeline in demo mode to generate structural signals.
 """
 
-import os
 from pathlib import Path
+
 
 def main():
     # Define root path relative to this script

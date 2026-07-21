@@ -35,8 +35,8 @@ def _services_status() -> list[dict]:
 
 def system_config() -> SystemConfigView:
     s = _settings()
-    from services.agent.llm_adapter import ai_model_info
     from lake.cleaning import load_quarantine
+    from services.agent.llm_adapter import ai_model_info
     return SystemConfigView(
         cost={**(s.get("cost") or {}), "locked": True},   # 成本铁律,只读
         strategy=s.get("strategy") or {},

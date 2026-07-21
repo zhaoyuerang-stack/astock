@@ -15,17 +15,23 @@ from __future__ import annotations
 
 import json
 import logging
-import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
 from scipy import stats
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel, BacktestResult
 from core.analysis.walk_forward import deflated_sharpe, walk_forward_windows, wf_metrics
+from core.engine import (
+    BacktestConfig,
+    BacktestEngine,
+    BacktestResult,
+    CostModel,
+    PricePanel,
+    Signal,
+)
 
 logger = logging.getLogger("nine_gates")  # Task 17:控制路径异常须可见,不得静默 except:pass
 
@@ -113,17 +119,16 @@ def _shift_decision_weights(
 # ---------------------------------------------------------------------------
 # 9-Gate Classes
 # ---------------------------------------------------------------------------
-from typing import Union
 
 @dataclass
 class GateReport:
-    gate_id: Union[int, str]
+    gate_id: int | str
     name: str
     passed: bool
     verdict: str  # PASS, WARN, FAIL
-    metrics: Dict[str, Any]
+    metrics: dict[str, Any]
     details: str
-    reasons: List[str] = field(default_factory=list)
+    reasons: list[str] = field(default_factory=list)
 
 
 class NineGatesEvaluator:
@@ -133,8 +138,8 @@ class NineGatesEvaluator:
         self,
         prices: PricePanel,
         factor_df: pd.DataFrame,
-        factor_builder: Optional[Callable[[PricePanel], pd.DataFrame]] = None,
-        thesis: Optional[Dict[str, str] | Any] = None,
+        factor_builder: Callable[[PricePanel], pd.DataFrame] | None = None,
+        thesis: dict[str, str] | Any | None = None,
         n_trials: int = 1,
         forward_days: int = 20,
     ):
@@ -585,7 +590,7 @@ class NineGatesEvaluator:
     # ───────────────────────────────────────────────────────────────────────
     # Gate 5: Portfolio Backtesting (组合回测)
     # ───────────────────────────────────────────────────────────────────────
-    def run_gate5_backtest(self, signal: Signal, start: str = "2018-01-01") -> Tuple[GateReport, BacktestResult]:
+    def run_gate5_backtest(self, signal: Signal, start: str = "2018-01-01") -> tuple[GateReport, BacktestResult]:
         """Run backtest on standard parameters and extract core metrics."""
         reasons = []
         metrics = {}
@@ -971,7 +976,7 @@ class NineGatesEvaluator:
     # ───────────────────────────────────────────────────────────────────────
     def run_gate8_live_monitoring(
         self,
-        backtest_report: Dict[str, Any]
+        backtest_report: dict[str, Any]
     ) -> GateReport:
         """Produce concrete thresholds and boundaries for live tracking."""
         metrics = {}
@@ -1008,7 +1013,7 @@ class NineGatesEvaluator:
     # ───────────────────────────────────────────────────────────────────────
     # Unified Executive Runner
     # ───────────────────────────────────────────────────────────────────────
-    def evaluate_all(self, signal: Signal, start: str = "2018-01-01") -> List[GateReport]:
+    def evaluate_all(self, signal: Signal, start: str = "2018-01-01") -> list[GateReport]:
         """Run all 9 gates in sequence and return a list of GateReports."""
         reports = []
         
@@ -1063,7 +1068,7 @@ class NineGatesReport:
     factor_name: str
     run_date: str
     passed_all: bool
-    reports: List[GateReport]
+    reports: list[GateReport]
 
     def summarize(self) -> dict:
         """抽取台账级审计摘要（DSR/PSR/多重检验 + WF/CV + 容量），写入 strategy_versions 的 nine_gate 字段。
@@ -1152,7 +1157,7 @@ class NineGatesReport:
             else:
                 md.append("No errors or warnings detected.")
                 
-            md.append(f"\n**Key Metrics:**")
+            md.append("\n**Key Metrics:**")
             md.append("```json")
             clean_metrics = {}
             for k, v in r.metrics.items():

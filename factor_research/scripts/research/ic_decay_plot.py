@@ -7,15 +7,16 @@ ROOT = Path(__file__).resolve().parents[2]  # factor_research/
 sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)  # data_lake 相对路径与脚本原先位于包根时一致
 
+import matplotlib
 import numpy as np
 import pandas as pd
-import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
 
-from strategies.small_cap import load_price_panels
 from factors.small_cap import small_cap_factor
+from strategies.small_cap import load_price_panels
 
 
 def calc_ic_decay(factor, close, forward_days_list=[1, 2, 3, 5, 10, 20, 40, 60]):

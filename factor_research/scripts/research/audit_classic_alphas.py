@@ -5,7 +5,6 @@ Usage:
 """
 from __future__ import annotations
 
-import os
 import sys
 import warnings
 from pathlib import Path
@@ -17,12 +16,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import pandas as pd
-import numpy as np
 
-from core.engine import PricePanel, Signal, BacktestConfig, CostModel
 from core.analysis.nine_gates import NineGatesEvaluator, NineGatesReport
-from strategies.small_cap import load_price_panels, build_rebalance_weights, _drop_star
-from factors.alpha.base import FactorData
+from core.engine import PricePanel, Signal
+from strategies.small_cap import _drop_star, build_rebalance_weights, load_price_panels
+
 
 # --- Shared Operators ---
 def R(x): return x.rank(axis=1, pct=True)

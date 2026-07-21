@@ -15,16 +15,17 @@ v2.1 参数:
   python3 scripts/ops/signal_check.py --no-holdings # 只看信号，不显示持仓
   python3 scripts/ops/signal_check.py --monthly     # 当月复盘
 """
-import argparse, os, sys
+import argparse
+import os
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-import pandas as pd
-from strategies.small_cap import load_price_panels
 from factors.small_cap import small_cap_factor, small_cap_timing
+from strategies.small_cap import load_price_panels
 
 # ─── v2.1 参数 ───
 SIZE_WINDOW = 30       # sw=30, 捕捉近期流动性萎缩
@@ -81,7 +82,7 @@ def print_signal(sig, close, amount, show_holdings=True):
         print(f"  📋 明日操作: 买入 {TOP_N} 只 (每只 {per_stock:,} 元)" +
               ("  [调仓窗口]" if is_rebal else "  [维持原持仓]"))
     else:
-        print(f"  💰 明日操作: 清仓 → 资金转场内货基 / 逆回购")
+        print("  💰 明日操作: 清仓 → 资金转场内货基 / 逆回购")
 
     if in_market and show_holdings:
         holdings = get_holdings(close, amount, last)

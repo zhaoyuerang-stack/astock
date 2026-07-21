@@ -49,7 +49,7 @@ class Candidate:
     # LLM 起源不可机械证否(其先验可能含 2025+ 行情认知)→ 晋级时进 evidence,供人工额外审视。
     provenance: dict[str, Any] = field(default_factory=dict)
 
-    def with_status(self, status: CandidateStatus, notes: str = "") -> "Candidate":
+    def with_status(self, status: CandidateStatus, notes: str = "") -> Candidate:
         return replace(self, status=status, notes=notes or self.notes)
 
 

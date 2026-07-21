@@ -16,8 +16,13 @@ os.chdir(ROOT)
 
 import pandas as pd
 
-from factory.fundamental import (BargainingPowerEstimator, FinancialProfile,
-                                 MarketPricingProfile, PricingGapEstimator, PricingState)
+from factory.fundamental import (
+    BargainingPowerEstimator,
+    FinancialProfile,
+    MarketPricingProfile,
+    PricingGapEstimator,
+    PricingState,
+)
 from services.read.fundamentals import fundamental_profile
 
 

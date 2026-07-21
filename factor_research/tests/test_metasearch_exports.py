@@ -21,9 +21,9 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+import knowledge.directions as kd
 from metasearch.factor_mi_audit import factor_clusters_from
 from metasearch.information_map import frontier_from_distances
-import knowledge.directions as kd
 
 
 def test_factor_clusters_collapse_and_drop_singletons():

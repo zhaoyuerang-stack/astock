@@ -4,14 +4,16 @@ Evaluates tracking error, active premium, correlation, and beta against benchmar
 """
 from __future__ import annotations
 
-import pandas as pd
+from typing import Any
+
 import numpy as np
-from typing import Dict, Any
+import pandas as pd
+
 
 def compare_to_benchmark(
     strategy_returns: pd.Series,
     benchmark_returns: pd.Series
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Calculate comparative statistics against a benchmark index."""
     common_idx = strategy_returns.index.intersection(benchmark_returns.index)
     if len(common_idx) == 0:

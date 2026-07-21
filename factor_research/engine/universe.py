@@ -8,7 +8,6 @@
   - 涨跌停（可选，避免无法成交）
 """
 import pandas as pd
-import numpy as np
 
 
 def build_universe(

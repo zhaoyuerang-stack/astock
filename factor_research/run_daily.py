@@ -13,29 +13,31 @@
       python3 run_daily.py --no-update # 跳过数据更新，仅用现有数据出信号
 """
 import warnings; warnings.filterwarnings("ignore")
-import os, json, argparse
-from pathlib import Path
+import argparse
+import json
+import os
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
+
 os.chdir(Path(__file__).parent)
 CHINA_TZ = ZoneInfo("Asia/Shanghai")
-import numpy as np
 import pandas as pd
 
+from app_config.settings import get_settings
 from core.engine import PricePanel
-from strategies.small_cap import load_price_panels
-from strategies.executable import build_executable_strategy, select_holdings
+from governance.holdout import current_data_fingerprint
 from lake.load_lake import load_raw_close
 from lake.validator import DataValidator
-from app_config.settings import get_settings
-from runtime.production_readiness import get_production_readiness
 from runtime.deployment import (
     DeploymentNotReady,
     defensive_authorization,
     load_active_deployment,
     load_deployed_strategy_spec,
 )
-from governance.holdout import current_data_fingerprint
+from runtime.production_readiness import get_production_readiness
+from strategies.executable import build_executable_strategy, select_holdings
+from strategies.small_cap import load_price_panels
 
 _cfg = get_settings().strategy
 
@@ -233,11 +235,11 @@ def main():
     # 轮动信号
     defensive_auth = defensive_authorization(deployment)
     if regime == "bear" and defensive_auth is not None:
-        print(f"  ⚠️ BEAR regime → 建议: 空仓资金配置 511010 国债ETF")
+        print("  ⚠️ BEAR regime → 建议: 空仓资金配置 511010 国债ETF")
     elif regime == "bear":
         print("  ⛔ BEAR regime → 未授权独立 defensive overlay,不生成国债轮动指令")
     else:
-        print(f"  ℹ️ BULL regime → 按 Band exposure 配置 illiq 股票")
+        print("  ℹ️ BULL regime → 按 Band exposure 配置 illiq 股票")
 
     # ④ 持仓清单 —— 经 canonical select_holdings(与回测 apply_veto_filter 同源,禁手写复制)
     print("\n[4/6] 持仓清单...")
@@ -335,9 +337,9 @@ def main():
     if in_market:
         print(f"  持仓({len(holdings)}只): {', '.join(holdings[:12])}{' ...' if len(holdings)>12 else ''}")
     if regime == "bear" and defensive_auth is not None:
-        print(f"  💡 建议   : 空仓资金配置 511010 国债ETF")
+        print("  💡 建议   : 空仓资金配置 511010 国债ETF")
     if persist_result["published"]:
-        print(f"  Readiness : 已放行")
+        print("  Readiness : 已放行")
         print(f"  已保存    : {out}")
     else:
         reasons = ", ".join(readiness.blocking_reasons) or "unknown"
@@ -353,7 +355,8 @@ def main():
 
     print("\n[7/6] 自动结算模拟盘...")
     try:
-        import subprocess, sys
+        import subprocess
+        import sys
         proc = subprocess.run([sys.executable, "-m", "scripts.ops.paper_trade"], capture_output=True, text=True)
         print(proc.stdout)
         if proc.stderr:

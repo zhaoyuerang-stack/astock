@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import unittest
-import numpy as np
+
 import pandas as pd
 
 from core.overlays.moving_average_overlay import MovingAverageOverlay

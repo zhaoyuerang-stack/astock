@@ -8,6 +8,6 @@
 对接 factory.ontology.Hypothesis(duck-typed:只读 factor_fn_name/factor_params/
 timing_fn_name/id),不在本层硬依赖 factory。
 """
-from knowledge.graph import Finding, SearchGate, KnowledgeGraph, load_graph
+from knowledge.graph import Finding, KnowledgeGraph, SearchGate, load_graph
 
 __all__ = ["Finding", "SearchGate", "KnowledgeGraph", "load_graph"]

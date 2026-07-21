@@ -71,8 +71,8 @@ def test_engine_synthetic_smoke():
 
 def _make_test_signal_weights():
     """Minimal fixture: load real data, build small-cap weights."""
-    from strategies.small_cap import build_rebalance_weights, load_price_panels
     from factors.small_cap import small_cap_factor, small_cap_timing
+    from strategies.small_cap import build_rebalance_weights, load_price_panels
     close, volume, amount = load_price_panels("2018-01-01")
     factor = small_cap_factor(amount, 60)
     timing, _, _ = small_cap_timing(close, amount, 16)
@@ -86,8 +86,8 @@ def _make_test_signal_weights():
 
 def test_backtest_result_metrics():
     """Engine result.metrics must equal legacy metrics() function."""
-    from strategies.small_cap import run_small_cap_strategy
     from engine.metrics import metrics
+    from strategies.small_cap import run_small_cap_strategy
     result = run_small_cap_strategy()
     ret = result["returns"]
 
@@ -130,8 +130,8 @@ def test_engine_run_weights():
 
 def test_engine_run_factor():
     """Signal(factor=...) via engine must match Signal(weights=...) via engine."""
-    from strategies.small_cap import build_rebalance_weights, load_price_panels
     from factors.small_cap import small_cap_factor, small_cap_timing
+    from strategies.small_cap import build_rebalance_weights, load_price_panels
     close, volume, amount = load_price_panels("2018-01-01")
     factor = small_cap_factor(amount, 60)
     timing, _, _ = small_cap_timing(close, amount, 16)
@@ -211,7 +211,9 @@ def test_engine_backtest_compat():
 def test_calc_ic_skips_constant_cross_section_without_warning():
     """Constant factor/return cross-sections have undefined IC and must be quiet."""
     import warnings
+
     from scipy.stats import ConstantInputWarning
+
     from engine.factor_analysis import calc_ic
 
     idx = pd.date_range("2026-01-01", periods=1)

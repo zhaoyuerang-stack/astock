@@ -1,7 +1,8 @@
-import pandas as pd
-from pathlib import Path
 import os
 import sys
+from pathlib import Path
+
+import pandas as pd
 
 ROOT = Path("/Users/kiki/astcok/factor_research")
 os.chdir(ROOT)

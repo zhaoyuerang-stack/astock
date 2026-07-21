@@ -17,6 +17,7 @@ import os
 import sys
 from datetime import datetime
 from zoneinfo import ZoneInfo
+
 CHINA_TZ = ZoneInfo("Asia/Shanghai")
 from pathlib import Path
 
@@ -25,10 +26,22 @@ os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
 from portfolio.paper_engine import (  # noqa: E402
-    INIT_CAPITAL, LEVERAGE, BUY_COST, SELL_COST, ETF_BUY_COST, ETF_SELL_COST, SIGNALS,
-    load_names, load_account, save_account, append_trades, upsert_nav,
-    execute_to_target, valuation, estimate_basket, estimate_bond_order, get_close,
+    BUY_COST,
+    ETF_BUY_COST,
+    INIT_CAPITAL,
+    LEVERAGE,
+    SELL_COST,
+    SIGNALS,
+    append_trades,
     defensive_bond_authorized,
+    estimate_basket,
+    estimate_bond_order,
+    execute_to_target,
+    load_account,
+    load_names,
+    save_account,
+    upsert_nav,
+    valuation,
 )
 
 OBSIDIAN = Path("/Users/kiki/Personal Wiki/30.output/A股v2.0模拟盘")
@@ -155,8 +168,8 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocke
     dist = signal.get("small_index_vs_ma16", 0)
     lines += ["## 📈 择时 & 失效监控", "",
               f"- 择时: {'🟢 持仓' if signal['in_market'] else '🔴 空仓'}  (小盘指数 vs MA16: {dist:+.2%})",
-              f"  > 小盘指数=成交额后50%股票的等权平均净值. MA16=其16日均线.",
-              f"  > 站上MA16=小盘趋势向好→持仓; 跌破=小盘走弱→空仓."]
+              "  > 小盘指数=成交额后50%股票的等权平均净值. MA16=其16日均线.",
+              "  > 站上MA16=小盘趋势向好→持仓; 跌破=小盘走弱→空仓."]
     # decay_status.json 是 scripts/ops/decay_monitor.py 写的多版本 schema
     # ({"strategies": [{"strategy": "family.version", "decayed", "rolling_3y_sharpe_latest",
     # "reasons", "action"}, ...]}),按本卡实际部署的 illiquidity.{strategy_ver} 取一条。
@@ -185,13 +198,13 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocke
         lines += [
             "", "## 🔄 Regime 轮动", "",
             f"- 当前 Regime: **{regime_icon}** (偏离度: {dist_val:+.2%})",
-            f"  > 偏离度=小盘指数相对MA16的距离. >0=BULL(趋势向上), ≤0=BEAR(趋势向下).",
+            "  > 偏离度=小盘指数相对MA16的距离. >0=BULL(趋势向上), ≤0=BEAR(趋势向下).",
             f"  > 数据来源: 最新交易日 {signal['date']} 收盘价, T日只用T-1日数据(shifted,防未来函数).",
         ]
         if regime == "bear" and rotation.get("recommend_bond"):
             lines += [
                 f"- 💡 **建议**: 空仓资金配置 **{rotation.get('bond_code', '511010')} {rotation.get('bond_name', '国债ETF')}**",
-                f"  > 回测验证: BEAR期间债券年化+2.7% vs 现金0%, 10年累计多赚592万(AmihudIlliq).",
+                "  > 回测验证: BEAR期间债券年化+2.7% vs 现金0%, 10年累计多赚592万(AmihudIlliq).",
                 f"- 买入方式: 和买股票一样, 代码 {rotation.get('bond_code', '511010')}, 股票账户直接交易",
                 "- 切换回 BULL 时卖出债券, 买回 illiq 股票",
             ]
@@ -238,9 +251,9 @@ def render_card(date, signal, decay, acc, nav, pos_value, detail, trades, blocke
 
 def build_preview(names):
     """假设择时转多:展示「次日开盘建仓清单」(不碰正式账户)。"""
-    from strategies.small_cap import load_price_panels
-    from factors.utils import safe_zscore, mad_clip
     from factors.small_cap import small_cap_timing
+    from factors.utils import mad_clip, safe_zscore
+    from strategies.small_cap import load_price_panels
     print("[preview] 加载数据 + 计算 illiquidity top25 名单(约 1-2 分钟)...")
     close, volume, amount = load_price_panels("2010-01-01")
     last = close.index[-1]
@@ -367,7 +380,7 @@ def main():
     if daily_file:
         print(f"  → Obsidian: {daily_file}")
     else:
-        print(f"  → Obsidian: (Not written due to permission error)")
+        print("  → Obsidian: (Not written due to permission error)")
     return 0
 
 

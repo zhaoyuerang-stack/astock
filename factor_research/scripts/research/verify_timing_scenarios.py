@@ -13,7 +13,9 @@
   cd /Users/kiki/astcok/factor_research
   /usr/bin/python3 scripts/research/verify_timing_scenarios.py
 """
-import os, sys, warnings
+import os
+import sys
+import warnings
 from pathlib import Path
 
 warnings.filterwarnings("ignore")
@@ -23,15 +25,14 @@ sys.path.insert(0, str(Path.cwd()))
 import numpy as np
 import pandas as pd
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from strategies.small_cap import load_price_panels
-from factors.small_cap import small_cap_factor, small_cap_timing
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from factors.market_stress import (
     HMMStressConfig,
     build_market_features,
     hmm_stress_probability,
 )
-from strategies.small_cap import build_rebalance_weights
+from factors.small_cap import small_cap_factor, small_cap_timing
+from strategies.small_cap import build_rebalance_weights, load_price_panels
 
 INITIAL_CAPITAL = 1_000_000  # 100万
 STATS_START = "2018-01-01"   # 统计起点 (2010-2017 仅用于预热)
@@ -349,19 +350,19 @@ def run():
     rC = compute_metrics(stats_returns(results["C  PT Band"]))
     rA1x = compute_metrics(stats_returns(results["A-1x PT Bin(1x)"]))
 
-    print(f"\n  HMM 边际 (B - A):")
+    print("\n  HMM 边际 (B - A):")
     print(f"    年化: {rB['annual'] - rA['annual']:+.2%}  |  "
           f"回撤: {abs(rB['maxdd']) - abs(rA['maxdd']):+.2%}  |  "
           f"夏普: {rB['sharpe'] - rA['sharpe']:+.2f}  |  "
           f"卡玛: {rB['calmar'] - rA['calmar']:+.2f}")
 
-    print(f"\n  Band vs Binary 纯 timing (C vs A-1x, 同1.0x杠杆):")
+    print("\n  Band vs Binary 纯 timing (C vs A-1x, 同1.0x杠杆):")
     print(f"    年化: {rC['annual'] - rA1x['annual']:+.2%}  |  "
           f"回撤: {abs(rC['maxdd']) - abs(rA1x['maxdd']):+.2%}  |  "
           f"夏普: {rC['sharpe'] - rA1x['sharpe']:+.2f}  |  "
           f"卡玛: {rC['calmar'] - rA1x['calmar']:+.2f}")
 
-    print(f"\n  Band(1.0x) vs Binary(1.25x):")
+    print("\n  Band(1.0x) vs Binary(1.25x):")
     print(f"    年化: {rC['annual'] - rA['annual']:+.2%}  |  "
           f"回撤: {abs(rC['maxdd']) - abs(rA['maxdd']):+.2%}  |  "
           f"夏普: {rC['sharpe'] - rA['sharpe']:+.2f}  |  "
@@ -474,32 +475,32 @@ def _write_report(results, scenarios, navA, navB, navC, navA1x,
     w = lines.append
 
     # ── 标题 ──
-    w(f"# 择时场景验证报告")
+    w("# 择时场景验证报告")
     w(f"\n> 生成: {date.today()}  |  数据: data_lake 全市场 | 个股: 5207只")
     w(f"  \n> 统计区间: {STATS_START} ~ {end_date} (共 {mA['n']} 个交易日)")
-    w(f"  \n> 回测引擎: core.engine.BacktestEngine  |  预热: 2010-01-01 → 2018-01-01")
+    w("  \n> 回测引擎: core.engine.BacktestEngine  |  预热: 2010-01-01 → 2018-01-01")
 
     # ── 场景定义 ──
-    w(f"\n---\n## 一、场景定义\n")
-    w(f"| 场景 | 择时机制 | 杠杆 | exposure_cap | 说明 |")
-    w(f"|------|----------|------|-------------|------|")
-    w(f"| **A** | PT Binary (MA16 交叉 → 0/1) | 1.25x | 1.0 | PureTrend 裸奔，无 HMM |")
-    w(f"| **B** | PT Binary × HMM guard (th=0.15) | 1.25x | 1.0 | 当前生产配置 |")
-    w(f"| **C** | PT Band (dist → [0, 1.5]) | 1.00x | 1.5 | SHADOW 候选 |")
-    w(f"| **A-1x** | PT Binary (MA16 交叉 → 0/1) | 1.00x | 1.0 | 杠杆归一对照 |")
-    w(f"\n**共同配置:**")
-    w(f"- 因子: illiquidity (amount rolling 60, zscore + MAD clip)")
-    w(f"- 选股: top-25, 等权")
+    w("\n---\n## 一、场景定义\n")
+    w("| 场景 | 择时机制 | 杠杆 | exposure_cap | 说明 |")
+    w("|------|----------|------|-------------|------|")
+    w("| **A** | PT Binary (MA16 交叉 → 0/1) | 1.25x | 1.0 | PureTrend 裸奔，无 HMM |")
+    w("| **B** | PT Binary × HMM guard (th=0.15) | 1.25x | 1.0 | 当前生产配置 |")
+    w("| **C** | PT Band (dist → [0, 1.5]) | 1.00x | 1.5 | SHADOW 候选 |")
+    w("| **A-1x** | PT Binary (MA16 交叉 → 0/1) | 1.00x | 1.0 | 杠杆归一对照 |")
+    w("\n**共同配置:**")
+    w("- 因子: illiquidity (amount rolling 60, zscore + MAD clip)")
+    w("- 选股: top-25, 等权")
     w(f"- 调仓: 每 20 个交易日, 共 {len(scheduled)} 个调仓日")
-    w(f"- 成本: CostModel(buy=0.225%, sell=0.275%, financing=6.5%/年)")
-    w(f"- 数据: data_lake 全市场 daily_all, amount=volume×100×不复权价")
-    w(f"- 预热: 2010-01-01 起加载, 2018-01-01 起统计")
+    w("- 成本: CostModel(buy=0.225%, sell=0.275%, financing=6.5%/年)")
+    w("- 数据: data_lake 全市场 daily_all, amount=volume×100×不复权价")
+    w("- 预热: 2010-01-01 起加载, 2018-01-01 起统计")
 
     # ── 核心指标完整对比 ──
-    w(f"\n---\n## 二、核心绩效指标\n")
-    w(f"\n### 2.1 综合对比\n")
-    w(f"| 指标 | A PT Binary | B PT+HMM | C PT Band | A-1x Bin(1x) |")
-    w(f"|------|-----------:|---------:|----------:|-------------:|")
+    w("\n---\n## 二、核心绩效指标\n")
+    w("\n### 2.1 综合对比\n")
+    w("| 指标 | A PT Binary | B PT+HMM | C PT Band | A-1x Bin(1x) |")
+    w("|------|-----------:|---------:|----------:|-------------:|")
     w(f"| 年化收益 | {mA['annual']:+.2%} | {mB['annual']:+.2%} | {mC['annual']:+.2%} | {mA1['annual']:+.2%} |")
     w(f"| 年化波动率 | {mA['ret_vol']:.1%} | {mB['ret_vol']:.1%} | {mC['ret_vol']:.1%} | {mA1['ret_vol']:.1%} |")
     w(f"| 夏普比率 (rf=2.5%) | {mA['sharpe']:.2f} | {mB['sharpe']:.2f} | {mC['sharpe']:.2f} | {mA1['sharpe']:.2f} |")
@@ -518,19 +519,19 @@ def _write_report(results, scenarios, navA, navB, navC, navA1x,
     w(f"| 终值 (100万→) | **{mA['nav_final']/1e4:.0f}万** | **{mB['nav_final']/1e4:.0f}万** | **{mC['nav_final']/1e4:.0f}万** | **{mA1['nav_final']/1e4:.0f}万** |")
 
     # ── 成本与换手 ──
-    w(f"\n### 2.2 成本与交易\n")
-    w(f"| 指标 | A PT Binary | B PT+HMM | C PT Band | A-1x Bin(1x) |")
-    w(f"|------|-----------:|---------:|----------:|-------------:|")
+    w("\n### 2.2 成本与交易\n")
+    w("| 指标 | A PT Binary | B PT+HMM | C PT Band | A-1x Bin(1x) |")
+    w("|------|-----------:|---------:|----------:|-------------:|")
     w(f"| 年均换手 (x) | {mA['turnover']:.1f} | {mB['turnover']:.1f} | {mC['turnover']:.1f} | {mA1['turnover']:.1f} |")
     w(f"| 年成本拖累 | {mA['cost_drag']:.1%} | {mB['cost_drag']:.1%} | {mC['cost_drag']:.1%} | {mA1['cost_drag']:.1%} |")
     w(f"| 平均 exposure | {mA['avg_exposure']:.2f} | {mB['avg_exposure']:.2f} | {mC['avg_exposure']:.2f} | {mA1['avg_exposure']:.2f} |")
     w(f"| 持仓占比 | {mA['pct_invested']:.0f}% | {mB['pct_invested']:.0f}% | {mC['pct_invested']:.0f}% | {mA1['pct_invested']:.0f}% |")
 
     # ── 成本分解 ──
-    w(f"\n### 2.3 成本分解 (年均)\n")
-    w(f"交易成本构成: 佣金(万0.65 双边) + 印花税(0.05% 卖出) + 过户费(万0.1 双边) + 冲击滑点(0.2% 双边) + 融资成本(6.5%/年, 仅杠杆部分)")
-    w(f"\n| 场景 | 佣金+印花+过户 | 冲击滑点 | 融资成本 | **总成本拖累** |")
-    w(f"|------|-------------:|--------:|--------:|--------------:|")
+    w("\n### 2.3 成本分解 (年均)\n")
+    w("交易成本构成: 佣金(万0.65 双边) + 印花税(0.05% 卖出) + 过户费(万0.1 双边) + 冲击滑点(0.2% 双边) + 融资成本(6.5%/年, 仅杠杆部分)")
+    w("\n| 场景 | 佣金+印花+过户 | 冲击滑点 | 融资成本 | **总成本拖累** |")
+    w("|------|-------------:|--------:|--------:|--------------:|")
     for label, _, _, _ in scenarios:
         m = M[label]
         # Approximate decomposition: 0.065% commission + 0.05% stamp + 0.001% transfer
@@ -540,11 +541,11 @@ def _write_report(results, scenarios, navA, navB, navC, navA1x,
         impact = to * 0.004   # 0.4% per round trip
         financing = m['cost_drag'] - fees - impact
         w(f"| {label} | {fees:.1%} | {impact:.1%} | {financing:.1%} | **{m['cost_drag']:.1%}** |")
-    w(f"\n> 注: 成本分解为估算值。冲击滑点假设可能偏乐观 (0.2% 单边)。")
+    w("\n> 注: 成本分解为估算值。冲击滑点假设可能偏乐观 (0.2% 单边)。")
 
     # ── 逐年收益详细对比 ──
-    w(f"\n---\n## 三、逐年绩效对比\n")
-    w(f"\n### 3.1 年收益\n")
+    w("\n---\n## 三、逐年绩效对比\n")
+    w("\n### 3.1 年收益\n")
     header = "| 年份 | A PT Binary | B PT+HMM | Δ(HMM) | 判定 | C PT Band | A-1x Bin(1x) | Δ(Band) | 判定 |"
     sep    = "|------|------------:|---------:|-------:|-----:|----------:|-------------:|--------:|-----:|"
     w(header)
@@ -561,9 +562,9 @@ def _write_report(results, scenarios, navA, navB, navC, navA1x,
     w(f"| **全期** | **{mA['annual']:+.1%}** | **{mB['annual']:+.1%}** | **{mB['annual']-mA['annual']:+.1%}** | | **{mC['annual']:+.1%}** | **{mA1['annual']:+.1%}** | **{mC['annual']-mA1['annual']:+.1%}** | |")
 
     # 逐年累计
-    w(f"\n### 3.2 逐年累计收益 (期末净值, 万)\n")
-    w(f"| 年份 | A PT Binary | B PT+HMM | C PT Band | A-1x Bin(1x) |")
-    w(f"|------|-----------:|---------:|----------:|-------------:|")
+    w("\n### 3.2 逐年累计收益 (期末净值, 万)\n")
+    w("| 年份 | A PT Binary | B PT+HMM | C PT Band | A-1x Bin(1x) |")
+    w("|------|-----------:|---------:|----------:|-------------:|")
     for yr in years:
         vals = []
         for label, _, _, _ in scenarios:
@@ -573,13 +574,13 @@ def _write_report(results, scenarios, navA, navB, navC, navA1x,
         w(f"| {yr} | {vals[0]:.0f}万 | {vals[1]:.0f}万 | {vals[2]:.0f}万 | {vals[3]:.0f}万 |")
 
     # ── HMM 详细分析 ──
-    w(f"\n---\n## 四、HMM 压力 guard 详细分析\n")
-    w(f"\n### 4.1 触发统计\n")
-    w(f"- threshold: 0.15")
+    w("\n---\n## 四、HMM 压力 guard 详细分析\n")
+    w("\n### 4.1 触发统计\n")
+    w("- threshold: 0.15")
     w(f"- 总触发空仓: {(hmm_guard.loc[STATS_START:]==0).sum()} / {len(hmm_guard.loc[STATS_START:])} 日 ({(hmm_guard.loc[STATS_START:]==0).mean()*100:.1f}%)")
-    w(f"\n### 4.2 分年触发与效果\n")
-    w(f"| 年份 | 触发天数 | 触发率 | A(PT)收益 | B(+HMM)收益 | Δ(HMM) | 判定 | 说明 |")
-    w(f"|------|--------:|------:|---------:|----------:|------:|-----|------|")
+    w("\n### 4.2 分年触发与效果\n")
+    w("| 年份 | 触发天数 | 触发率 | A(PT)收益 | B(+HMM)收益 | Δ(HMM) | 判定 | 说明 |")
+    w("|------|--------:|------:|---------:|----------:|------:|-----|------|")
     for yr in years:
         yr_mask = hmm_guard.loc[STATS_START:].index.year == yr
         n_trig = int((hmm_guard.loc[STATS_START:][yr_mask] == 0).sum())
@@ -598,11 +599,11 @@ def _write_report(results, scenarios, navA, navB, navC, navA1x,
         else:
             v, note = "—", "影响中性"
         w(f"| {yr} | {n_trig} | {n_trig/n_yr*100:.0f}% | {yb_a:+.1%} | {yb_b:+.1%} | {delta:+.1%} | {v} | {note} |")
-    w(f"\n**结论: HMM 在 9 年中仅 2 年有效避险 (2018, 2026), 6 年踏空。** 38.2% 的日均空仓率说明 threshold=0.15 过于敏感。")
+    w("\n**结论: HMM 在 9 年中仅 2 年有效避险 (2018, 2026), 6 年踏空。** 38.2% 的日均空仓率说明 threshold=0.15 过于敏感。")
 
     # ── 回撤对比 ──
-    w(f"\n---\n## 五、回撤分析\n")
-    w(f"\n### 5.1 全部回撤期段 (> 10%)\n")
+    w("\n---\n## 五、回撤分析\n")
+    w("\n### 5.1 全部回撤期段 (> 10%)\n")
     for label, _, _, _ in scenarios:
         r = stats_returns(results[label])
         cum = (1 + r).cumprod()
@@ -614,15 +615,15 @@ def _write_report(results, scenarios, navA, navB, navC, navA1x,
             for i, p in enumerate(deep, 1):
                 w(f"{i}. {p['start'].date()} ~ {p['end'].date()} ({p['days']}天) 最深 **{p['depth']:.1%}** @ {p['valley'].date()}")
         else:
-            w(f"无 >10% 回撤期段")
+            w("无 >10% 回撤期段")
 
     # ── 月度收益全量 ──
-    w(f"\n---\n## 六、全时段月度收益\n")
+    w("\n---\n## 六、全时段月度收益\n")
     for label, _, _, _ in scenarios:
         r = stats_returns(results[label])
         w(f"\n### {label}\n")
-        w(f"| 年份 | 1月 | 2月 | 3月 | 4月 | 5月 | 6月 | 7月 | 8月 | 9月 | 10月 | 11月 | 12月 | 年收益 |")
-        w(f"|------|----:|----:|----:|----:|----:|----:|----:|----:|----:|-----:|-----:|-----:|------:|")
+        w("| 年份 | 1月 | 2月 | 3月 | 4月 | 5月 | 6月 | 7月 | 8月 | 9月 | 10月 | 11月 | 12月 | 年收益 |")
+        w("|------|----:|----:|----:|----:|----:|----:|----:|----:|----:|-----:|-----:|-----:|------:|")
         for yr in years:
             row = f"| {yr} |"
             for m in range(1, 13):
@@ -636,25 +637,25 @@ def _write_report(results, scenarios, navA, navB, navC, navA1x,
             row += f" {yv:+.1%} |" if not np.isnan(yv) else " N/A |"
             w(row)
         # 月均值
-        w(f"| 月均值 |")
+        w("| 月均值 |")
         for m in range(1, 13):
             mv = r[r.index.month == m].mean() * 21  # approx monthly
             w(f" {mv:+.1%} |")
         w(f" {mA['annual']:+.1%} |")
 
     # ── 滚动 12 个月收益 ──
-    w(f"\n---\n## 七、滚动 12 个月收益\n")
-    w(f"\n| 场景 | 均值 | 最小 | 最大 | 标准差 | <0 占比 |")
-    w(f"|------|-----:|-----:|-----:|------:|-------:|")
+    w("\n---\n## 七、滚动 12 个月收益\n")
+    w("\n| 场景 | 均值 | 最小 | 最大 | 标准差 | <0 占比 |")
+    w("|------|-----:|-----:|-----:|------:|-------:|")
     for label, _, _, _ in scenarios:
         roll = M[label]['roll_12m'].dropna()
         w(f"| {label} | {roll.mean():+.1%} | {roll.min():+.1%} | {roll.max():+.1%} | {roll.std():.1%} | {(roll<0).mean():.0%} |")
 
     # ── 场景差异矩阵 ──
-    w(f"\n---\n## 八、场景差异矩阵\n")
-    w(f"\n### 8.1 HMM 边际贡献 (B vs A)\n")
-    w(f"| 维度 | A (PT Binary) | B (+HMM) | 差异 | 评价 |")
-    w(f"|------|-------------:|---------:|-----:|------|")
+    w("\n---\n## 八、场景差异矩阵\n")
+    w("\n### 8.1 HMM 边际贡献 (B vs A)\n")
+    w("| 维度 | A (PT Binary) | B (+HMM) | 差异 | 评价 |")
+    w("|------|-------------:|---------:|-----:|------|")
     for metric, fmt in [("annual", ".2%"), ("ret_vol", ".1%"), ("sharpe", ".2f"),
                          ("sortino", ".2f"), ("maxdd", ".1%"), ("calmar", ".2f"),
                          ("monthly_win", ".0%"), ("turnover", ".1f"), ("cost_drag", ".1%")]:
@@ -666,9 +667,9 @@ def _write_report(results, scenarios, navA, navB, navC, navA1x,
         w(f"| {metric} | {mA[metric]:{fmt}} | {mB[metric]:{fmt}} | {delta:{fmt}} | {better} |")
     w(f"| **终值(万)** | **{mA['nav_final']/1e4:.0f}** | **{mB['nav_final']/1e4:.0f}** | **{(mB['nav_final']-mA['nav_final'])/1e4:+.0f}** | ❌ |")
 
-    w(f"\n### 8.2 Band 纯 timing 贡献 (C vs A-1x, 同 1.0x 杠杆)\n")
-    w(f"| 维度 | A-1x (Binary 1.0x) | C (Band 1.0x) | 差异 | 评价 |")
-    w(f"|------|------------------:|-------------:|-----:|------|")
+    w("\n### 8.2 Band 纯 timing 贡献 (C vs A-1x, 同 1.0x 杠杆)\n")
+    w("| 维度 | A-1x (Binary 1.0x) | C (Band 1.0x) | 差异 | 评价 |")
+    w("|------|------------------:|-------------:|-----:|------|")
     for metric, fmt in [("annual", ".2%"), ("ret_vol", ".1%"), ("sharpe", ".2f"),
                          ("sortino", ".2f"), ("maxdd", ".1%"), ("calmar", ".2f"),
                          ("monthly_win", ".0%"), ("turnover", ".1f"), ("cost_drag", ".1%")]:
@@ -680,33 +681,33 @@ def _write_report(results, scenarios, navA, navB, navC, navA1x,
         w(f"| {metric} | {mA1[metric]:{fmt}} | {mC[metric]:{fmt}} | {delta:{fmt}} | {better} |")
     w(f"| **终值(万)** | **{mA1['nav_final']/1e4:.0f}** | **{mC['nav_final']/1e4:.0f}** | **{(mC['nav_final']-mA1['nav_final'])/1e4:+.0f}** | ✅ |")
 
-    w(f"\n### 8.3 Band(1.0x) vs Binary(1.25x) — 低杠杆能否替代高杠杆?\n")
-    w(f"| 维度 | A (Binary 1.25x) | C (Band 1.0x) | 差异 |")
-    w(f"|------|----------------:|-------------:|-----:|")
+    w("\n### 8.3 Band(1.0x) vs Binary(1.25x) — 低杠杆能否替代高杠杆?\n")
+    w("| 维度 | A (Binary 1.25x) | C (Band 1.0x) | 差异 |")
+    w("|------|----------------:|-------------:|-----:|")
     for metric, fmt in [("annual", ".2%"), ("ret_vol", ".1%"), ("sharpe", ".2f"),
                          ("maxdd", ".1%"), ("calmar", ".2f"), ("turnover", ".1f")]:
         w(f"| {metric} | {mA[metric]:{fmt}} | {mC[metric]:{fmt}} | {mC[metric]-mA[metric]:{fmt}} |")
     w(f"| **终值(万)** | **{mA['nav_final']/1e4:.0f}** | **{mC['nav_final']/1e4:.0f}** | **{(mC['nav_final']-mA['nav_final'])/1e4:+.0f}** |")
 
     # ── 决策建议 ──
-    w(f"\n---\n## 九、决策建议\n")
-    w(f"\n### HMM 去留: **立即移除**\n")
-    w(f"- 9 年中年化损失 -5.5pp, 终值少 250 万")
-    w(f"- 回撤几乎无改善 (-19.4% vs -19.1%)")
-    w(f"- 38.2% 空仓率表明频繁误报")
-    w(f"- 唯一受益年 2018/2026 是 PureTrend 自身也能部分防御的熊市")
-    w(f"- 行动: 从 `run_daily.py` 移除 HMM guard, 移除 `app_config` 中 hmm_stress 配置依赖")
+    w("\n---\n## 九、决策建议\n")
+    w("\n### HMM 去留: **立即移除**\n")
+    w("- 9 年中年化损失 -5.5pp, 终值少 250 万")
+    w("- 回撤几乎无改善 (-19.4% vs -19.1%)")
+    w("- 38.2% 空仓率表明频繁误报")
+    w("- 唯一受益年 2018/2026 是 PureTrend 自身也能部分防御的熊市")
+    w("- 行动: 从 `run_daily.py` 移除 HMM guard, 移除 `app_config` 中 hmm_stress 配置依赖")
 
-    w(f"\n### Band 切换: **暂缓, 先做换手惩罚版本验证**\n")
-    w(f"- 信号质量确实更好: 同 1.0x 杠杆下 +3.77pp 年化, Calmar +0.04")
+    w("\n### Band 切换: **暂缓, 先做换手惩罚版本验证**\n")
+    w("- 信号质量确实更好: 同 1.0x 杠杆下 +3.77pp 年化, Calmar +0.04")
     w(f"- 但换手 +29% ({mA1['turnover']:.0f}x → {mC['turnover']:.0f}x) 是执行隐患")
-    w(f"- 若真实滑点 > 假设, Band 优势可能被成本吃掉")
-    w(f"- 行动: 验证 Band + 换手惩罚 (exposure 变化 < 5% 不调仓) / 降低 exposure 调整频率")
+    w("- 若真实滑点 > 假设, Band 优势可能被成本吃掉")
+    w("- 行动: 验证 Band + 换手惩罚 (exposure 变化 < 5% 不调仓) / 降低 exposure 调整频率")
 
-    w(f"\n---\n## 附录: 输出文件\n")
+    w("\n---\n## 附录: 输出文件\n")
     w(f"- 本报告: `{report_path.name}`")
     w(f"- NAV 序列: `{csv_path.name}` (日频, 含 daily_ret + NAV)")
-    w(f"- 验证脚本: `scripts/research/verify_timing_scenarios.py`")
+    w("- 验证脚本: `scripts/research/verify_timing_scenarios.py`")
 
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"  详细报告 → {report_path}")

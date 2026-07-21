@@ -5,13 +5,14 @@ transaction costs, market impact, and constraints.
 """
 from __future__ import annotations
 
-import pandas as pd
 import numpy as np
-from typing import Dict, Any, Optional
+import pandas as pd
+
 from portfolio.optimizer import PortfolioOptimizer
 
+
 class CostAwareRebalancer:
-    def __init__(self, optimizer: Optional[PortfolioOptimizer] = None):
+    def __init__(self, optimizer: PortfolioOptimizer | None = None):
         self.optimizer = optimizer or PortfolioOptimizer()
 
     def rebalance(
@@ -21,9 +22,9 @@ class CostAwareRebalancer:
         risk_exposures: pd.DataFrame,          # stocks x factors
         factor_cov: pd.DataFrame,              # factors x factors
         specific_var: pd.Series,              # stocks
-        tradable_flags: Optional[pd.Series] = None,
-        buy_sell_costs: Optional[pd.Series] = None,
-        market_impact_coefs: Optional[pd.Series] = None,
+        tradable_flags: pd.Series | None = None,
+        buy_sell_costs: pd.Series | None = None,
+        market_impact_coefs: pd.Series | None = None,
         target_sum: float = 1.0
     ) -> pd.Series:
         """Run rebalance optimization to find the new portfolio weights.

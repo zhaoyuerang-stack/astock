@@ -5,8 +5,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.ci.check_registry_evidence import (
-    extract_versions, find_cross_family_ic_copies, find_standalone_evidence_gaps,
-    find_understated_trials, find_active_without_track, check,
+    check,
+    extract_versions,
+    find_active_without_track,
+    find_cross_family_ic_copies,
+    find_standalone_evidence_gaps,
+    find_understated_trials,
 )
 
 IC_A = {"ic_mean": 0.078, "nw_icir": 0.126, "ic_decay": {"1": 0.02}}

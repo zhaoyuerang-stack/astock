@@ -38,10 +38,16 @@ def build_cne6_styles(close: pd.DataFrame, amount: pd.DataFrame,
     Value(BP/EP), Growth(营收+利润 yoy), Quality(ROE+毛利)。
     传 total_mv 后 Size 与 small_cap(-log amount)解耦,中性化不再半定义性。
     """
-    from factors.utils import safe_zscore, mad_clip
+    from factors.fundamental import (
+        bp_proxy,
+        ep_proxy,
+        gross_margin,
+        net_profit_yoy,
+        revenue_yoy,
+        roe,
+    )
     from factors.momentum import mom_n, volatility
-    from factors.fundamental import (bp_proxy, ep_proxy, roe, revenue_yoy,
-                                     net_profit_yoy, gross_margin)
+    from factors.utils import mad_clip, safe_zscore
     Z = lambda p: safe_zscore(mad_clip(p))
     ret = close.pct_change(fill_method=None)
     mkt = ret.mean(axis=1)
@@ -115,11 +121,11 @@ def audit_style_neutral(candidates: dict[str, pd.DataFrame], styles: dict, fwd,
 
 
 def main():
-    from services.actions.autoresearch import _load_validation_data
-    from factors.small_cap import small_cap_factor
     from factors.momentum import mom_n
-    from factors.utils import safe_zscore, mad_clip
+    from factors.small_cap import small_cap_factor
+    from factors.utils import mad_clip, safe_zscore
     from lake.load_lake import load_daily_basic_panel
+    from services.actions.autoresearch import _load_validation_data
 
     close, volume, amount, _ = _load_validation_data(START)
     fwd = close.pct_change(HORIZON, fill_method=None).shift(-HORIZON)

@@ -42,9 +42,10 @@ def search_cross_asset_legs(
     每条腿:单独 sharpe/ann/mdd + 对在册有符号相关 + 2018 逆风 + 崩盘日捕获 + Δsharpe/Δcalmar。
     shadow_recommend = Δsharpe≥阈值 且 对在册相关≤阈值(真分散且有边际)。
     """
-    from portfolio.composer import compose, metrics as pm
+    from governance.holdout import assert_search_clean, boundary  # §5.2 缝③:择优不得碰金库
+    from portfolio.composer import compose
+    from portfolio.composer import metrics as pm
     from portfolio.strategy_runners import _load_etf_close, _run_etf_trend, run_active
-    from governance.holdout import boundary, assert_search_clean  # §5.2 缝③:择优不得碰金库
 
     HOLDOUT = boundary()
     a_ret = {k: v[v.index < HOLDOUT] for k, v in run_active(start=start).items()}

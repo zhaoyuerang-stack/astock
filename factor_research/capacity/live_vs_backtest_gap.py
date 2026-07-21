@@ -4,9 +4,9 @@ Compares simulated live paper-trading results with historical backtest targets.
 """
 from __future__ import annotations
 
-import pandas as pd
 import numpy as np
-from typing import Dict
+import pandas as pd
+
 
 def analyze_live_vs_backtest_gap(
     live_returns: pd.Series,

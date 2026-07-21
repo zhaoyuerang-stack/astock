@@ -25,8 +25,10 @@ baostock 提供后复权(复权因子*price), 也提供不复权; 通过 adjustf
   全量重抓: /usr/bin/python3 -m scripts.data.fetch_cross_asset_etf
   增量(供 scheduled_daily_update 调用): from scripts.data.fetch_cross_asset_etf import update_etfs
 """
-import os, sys
+import os
+import sys
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))

@@ -9,7 +9,11 @@ v2.2 策略回测验证
   - 终端：逐年对比表 + 三段汇总
   - 文件：reports/research/validate_v22.json
 """
-import os, sys, json, warnings
+import json
+import os
+import sys
+import warnings
+
 warnings.filterwarnings("ignore")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -18,9 +22,15 @@ sys.path.insert(0, ROOT)
 
 import numpy as np
 import pandas as pd
-from strategies.small_cap import StrategyConfig, load_price_panels, build_rebalance_weights, backtest_weights
-from factors.small_cap import small_cap_factor, small_cap_timing
+
 from app_config.settings import get_settings
+from factors.small_cap import small_cap_factor, small_cap_timing
+from strategies.small_cap import (
+    StrategyConfig,
+    backtest_weights,
+    build_rebalance_weights,
+    load_price_panels,
+)
 
 # ── 参数 ──────────────────────────────────────────────────────────────
 WARMUP_START = "2010-01-01"

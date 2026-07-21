@@ -34,7 +34,6 @@ from lake.load_lake import load_raw_close, load_tushare_panel
 from scripts.research.amount_timing_priority_audit import load_list_dates, load_st_history
 from strategies.small_cap import load_price_panels
 
-
 START = "2018-01-01"
 WARMUP = "2010-01-01"
 MIN_AGE_DAYS = 60

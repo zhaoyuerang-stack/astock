@@ -1,7 +1,9 @@
 # [STATUS: archived] 已退役探索变体族,不再维护;仅供追溯。见 scripts/research/archive/__init__.py
 """Direction C: Adaptive parameters (vol/trend regime) on top of B4 4+3 new features."""
-import os, sys
+import os
+import sys
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 

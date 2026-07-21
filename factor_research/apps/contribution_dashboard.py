@@ -10,15 +10,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import numpy as np
-import pandas as pd
 
 from portfolio.analysis import contribution_decompose, correlation_matrix
-from portfolio.composer import compose, metrics as portfolio_metrics
-from portfolio.strategy_runners import LIVE_STRATEGIES, run_all_live
+from portfolio.composer import compose
+from portfolio.composer import metrics as portfolio_metrics
+from portfolio.strategy_runners import LIVE_STRATEGIES
 
 
 def _print_strategy_summary(returns: dict):
-    print(f"\n[1] Live strategies (start..end, ann/sharpe/maxdd):")
+    print("\n[1] Live strategies (start..end, ann/sharpe/maxdd):")
     for name, r in returns.items():
         if len(r) < 50:
             print(f"  {name:30s}  insufficient data ({len(r)} days)")
@@ -34,7 +34,7 @@ def _print_strategy_summary(returns: dict):
 
 def _print_correlation(returns: dict):
     corr = correlation_matrix(returns)
-    print(f"\n[2] Correlation matrix:")
+    print("\n[2] Correlation matrix:")
     # short column names
     short = {c: c.split(".")[0][:14] for c in corr.columns}
     corr_s = corr.rename(columns=short, index=short)
@@ -65,7 +65,7 @@ def _print_contribution(returns: dict, method: str = "equal_weight"):
 
 
 def _print_portfolio_metrics(returns: dict):
-    print(f"\n[4] Portfolio (equal weight) metrics:")
+    print("\n[4] Portfolio (equal weight) metrics:")
     port_ret, _ = compose(returns, method="equal_weight")
     m = portfolio_metrics(port_ret)
     print(f"  annual = {m['annual']:+.1%}")
@@ -77,7 +77,7 @@ def _print_portfolio_metrics(returns: dict):
 
 
 def _print_pareto_gaps(returns: dict):
-    print(f"\n[5] Pareto 空白分析:")
+    print("\n[5] Pareto 空白分析:")
     # 简单分析：每个策略的 annual / vol 二维位置
     pts = []
     for name, r in returns.items():
@@ -101,8 +101,8 @@ def _print_pareto_gaps(returns: dict):
     n_lowvol = sum(1 for _, _, v, _ in pts if v < low_vol_threshold)
     if n_lowvol == 0:
         print(f"  ⚠ 组合缺低波资产 (vol < {low_vol_threshold:.0%})")
-        print(f"    → Discovery 应优先找 volatility / low_vol / defensive 类因子")
-        print(f"    → L1 survivors 中 volatility__n10/n60 是候选 (vol=8-10%)")
+        print("    → Discovery 应优先找 volatility / low_vol / defensive 类因子")
+        print("    → L1 survivors 中 volatility__n10/n60 是候选 (vol=8-10%)")
     else:
         print(f"  ✓ 含 {n_lowvol} 个低波资产")
 
@@ -113,12 +113,12 @@ def _print_pareto_gaps(returns: dict):
     avg_corr = float(pairs.mean()) if len(pairs) else 0
     print(f"  组合平均两两 corr = {avg_corr:.2f}")
     if avg_corr > 0.6:
-        print(f"  ⚠ 多元化偏弱 (corr > 0.6) → 需找不同性质的 alpha 源")
-        print(f"    → 候选: 动量类 (mom_n)、价值类 (BP/EP)、基本面类 (ROE/quality)")
+        print("  ⚠ 多元化偏弱 (corr > 0.6) → 需找不同性质的 alpha 源")
+        print("    → 候选: 动量类 (mom_n)、价值类 (BP/EP)、基本面类 (ROE/quality)")
     elif avg_corr > 0.4:
-        print(f"  ◐ 多元化中等 → 可继续加低相关候选")
+        print("  ◐ 多元化中等 → 可继续加低相关候选")
     else:
-        print(f"  ✓ 多元化良好")
+        print("  ✓ 多元化良好")
 
 
 def main():

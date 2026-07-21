@@ -14,7 +14,6 @@ import numpy as np
 import pandas as pd
 
 from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
-
 from factory.ontology import (
     Decision,
     Experiment,

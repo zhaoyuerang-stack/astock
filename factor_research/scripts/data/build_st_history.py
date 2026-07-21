@@ -9,11 +9,14 @@ ST历史推断（改进版：涨停封板特征）
 import warnings; warnings.filterwarnings("ignore")
 import os
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 import sys
+
 sys.path.insert(0, str(ROOT))
 import pandas as pd
+
 from lake.load_lake import load_prices
 
 print("加载全市场价量(含high/low)...", flush=True)
@@ -46,4 +49,4 @@ st_stocks = (st_df.sum() > 0).sum()
 total = int(st_df.sum().sum())
 print(f"\nST历史推断(封板法, 主板{n_main}只):", flush=True)
 print(f"  疑似ST: {st_stocks}只 ({st_stocks/n_main:.1%}主板), {total}个(股×日)标记", flush=True)
-print(f"  保存: data_lake/meta/st_history.parquet", flush=True)
+print("  保存: data_lake/meta/st_history.parquet", flush=True)

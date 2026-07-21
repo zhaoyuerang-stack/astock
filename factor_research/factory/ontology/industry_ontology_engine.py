@@ -9,19 +9,15 @@
 4. 行业轮动输出：计算行业“景气预测得分”，为组合优化层提供行业配置权重。
 """
 
-import os
 import sys
-import json
-from pathlib import Path
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Dict, List, Tuple, Optional
+from pathlib import Path
 
 # 设定工作目录
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
-from factory.ontology.report_logic import TransmissionNodeCategory, NodeChange
+from factory.ontology.report_logic import NodeChange, TransmissionNodeCategory
 
 
 @dataclass(frozen=True)
@@ -65,7 +61,7 @@ class AggregatedNodeState:
 class IndustryState:
     """行业状态快照：包含各个因果层级节点的聚合得分。"""
     industry: str
-    aggregated_nodes: Dict[TransmissionNodeCategory, AggregatedNodeState] = field(default_factory=dict)
+    aggregated_nodes: dict[TransmissionNodeCategory, AggregatedNodeState] = field(default_factory=dict)
     
     def get_score(self, cat: TransmissionNodeCategory) -> float:
         if cat in self.aggregated_nodes:
@@ -83,13 +79,13 @@ class IndustryState:
 # ══════════════════════════════════════════════════
 class IndustryOntologyPredictor:
     
-    def __init__(self, causal_network: List[CausalLink] = None):
+    def __init__(self, causal_network: list[CausalLink] = None):
         self.network = causal_network or DEFAULT_CAUSAL_NETWORK
         
-    def aggregate_signals(self, raw_signals: List[dict]) -> List[IndustryState]:
+    def aggregate_signals(self, raw_signals: list[dict]) -> list[IndustryState]:
         """第一步：将零散的研报 JSON 信号，按行业及节点类别进行横截面聚合。"""
         # 按行业整理数据
-        industry_data: Dict[str, Dict[TransmissionNodeCategory, List[Tuple[float, float]]]] = {}
+        industry_data: dict[str, dict[TransmissionNodeCategory, list[tuple[float, float]]]] = {}
         
         for sig in raw_signals:
             ind = sig.get("industry")
@@ -202,7 +198,7 @@ class IndustryOntologyPredictor:
             
         return inferred_scores[TransmissionNodeCategory.EARNINGS]
 
-    def rank_industries(self, states: List[IndustryState]) -> List[Tuple[str, float]]:
+    def rank_industries(self, states: list[IndustryState]) -> list[tuple[str, float]]:
         """第三步：对所有行业未来的业绩释放概率进行排名，作为组合配置依据。"""
         rankings = []
         for state in states:

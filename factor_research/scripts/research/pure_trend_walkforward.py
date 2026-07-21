@@ -12,8 +12,10 @@ Test: same as HMM walk-forward:
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/pure_trend_walkforward.py
 """
-import os, sys
+import os
+import sys
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -22,7 +24,6 @@ os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
 from strategies.small_cap import StrategyConfig, backtest_weights, run_small_cap_strategy
-from engine.metrics import metrics
 
 OUT = ROOT / "reports" / "research"
 OUT.mkdir(parents=True, exist_ok=True)

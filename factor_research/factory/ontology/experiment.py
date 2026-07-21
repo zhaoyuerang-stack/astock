@@ -4,7 +4,7 @@ append-only：归档后不可改。同 fingerprint 重跑 → 写新 experiment_
 """
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 
 class ExperimentProtocol(Enum):
@@ -30,7 +30,7 @@ class ExperimentResult:
     """L0/L1/L2/L3 共享的结果数据。"""
     metrics: dict[str, float] = field(default_factory=dict)  # ic_ir / annual / sharpe / maxdd
     details: dict[str, Any] = field(default_factory=dict)    # 自由扩展
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass(frozen=True)

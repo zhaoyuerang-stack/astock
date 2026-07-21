@@ -67,6 +67,7 @@ def _world_state() -> dict:
 
     try:
         import json
+
         from services.read.decision_inbox import DECAY_STATUS
 
         if DECAY_STATUS.exists():

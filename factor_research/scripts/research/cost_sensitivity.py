@@ -2,13 +2,15 @@
 import warnings; warnings.filterwarnings("ignore")
 import os
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 import sys
+
 sys.path.insert(0, str(ROOT))
-from strategies.small_cap import StrategyConfig, run_small_cap_strategy
 from core.engine import CostModel
 from engine.metrics import metrics
+from strategies.small_cap import StrategyConfig, run_small_cap_strategy
 
 print("v2.0 (2018-2026) 交易成本敏感性\n")
 print(f"{'买/卖成本':<17}{'年化':>9}{'回撤':>9}{'夏普':>7}{'成本拖累':>10}{'达标':>5}  说明")

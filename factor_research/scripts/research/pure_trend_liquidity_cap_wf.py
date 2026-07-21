@@ -13,8 +13,10 @@ Walk-forward verifies whether pure-trend tw=2 still wins after capping.
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/pure_trend_liquidity_cap_wf.py
 """
-import os, sys
+import os
+import sys
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 

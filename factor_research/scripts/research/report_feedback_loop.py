@@ -7,9 +7,8 @@
 3. 导出失败与证伪台账至 reports/research/report_feedback_ledger.json，供 NLP 提取管线动态读取，实现“回测失败反思 -> 引导 LLM 优化提取”的自我反馈迭代。
 """
 
-import os
-import sys
 import json
+import sys
 from pathlib import Path
 
 # 设定工作目录

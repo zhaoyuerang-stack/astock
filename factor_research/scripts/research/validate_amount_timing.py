@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import sys
 import warnings
+from datetime import datetime
 from pathlib import Path
 
 warnings.filterwarnings("ignore")
@@ -26,7 +27,6 @@ from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, S
 from factors.small_cap import small_cap_timing
 from research_toolkit import newey_west_icir
 from strategies.small_cap import _drop_star, load_price_panels
-
 
 STATS_START = "2018-01-01"
 WARMUP_START = "2010-01-01"

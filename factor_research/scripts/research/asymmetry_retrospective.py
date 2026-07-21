@@ -6,21 +6,25 @@
   cd /Users/kiki/astcok/factor_research
   /opt/homebrew/bin/python3 scripts/research/asymmetry_retrospective.py
 """
-import os, sys, warnings, importlib, itertools
+import importlib
+import itertools
+import os
+import sys
+import warnings
 from pathlib import Path
+
 warnings.filterwarnings("ignore")
 os.chdir(Path(__file__).resolve().parent.parent.parent)
 sys.path.insert(0, str(Path.cwd()))
 
-import numpy as np
 import pandas as pd
-from strategies.small_cap import load_price_panels
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
+
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from factors.small_cap import small_cap_factor, small_cap_timing
-from factors.utils import safe_zscore, mad_clip
-from strategies.small_cap import build_rebalance_weights
+from factors.utils import mad_clip, safe_zscore
 from factory.analysis.asymmetry_audit import asymmetry_report
 from factory.lines.line1_generation.mutate_existing import FACTOR_MUTATION_SPECS
+from strategies.small_cap import build_rebalance_weights, load_price_panels
 
 
 def build_factor(fn_name, params, close, volume, amount):
@@ -121,14 +125,14 @@ def main():
             n_done += 1
             if n_done % 10 == 0:
                 print(f"  ... {n_done}", flush=True)
-        except Exception as e:
+        except Exception:
             continue
 
     df = pd.DataFrame(results)
     print(f"  完成 {len(df)} 个候选")
 
     # ── 分析 ──
-    print(f"\n[4/4] 结果分析\n")
+    print("\n[4/4] 结果分析\n")
     print("=" * 80)
 
     # 1. 不对称性 Top 10
@@ -141,7 +145,7 @@ def main():
               f"{row['sortino']:>6.2f} {row['sharpe']:>6.2f} {row['asym_score']:>5.0%}")
 
     # 2. 对比: Sharpe Top 10
-    print(f"\n  Sharpe Top 10 (对照):")
+    print("\n  Sharpe Top 10 (对照):")
     print(f"  {'候选':<35} {'年化':>8} {'gain/p':>6} {'up/dn':>6} {'sortino':>7} {'sharpe':>7} {'评分':>6}")
     print("  " + "-" * 80)
     top10_sh = df.nlargest(10, "sharpe")
@@ -164,7 +168,7 @@ def main():
                   f"asym={row['asym_score']:.0%} g/p={row['gain_pain']:.2f} up/dn={row['up_down_cap']:.1f}")
 
     # 4. 按家族汇总
-    print(f"\n  按因子家族汇总:")
+    print("\n  按因子家族汇总:")
     family_summary = df.groupby("family").agg(
         n=("name", "count"),
         avg_annual=("annual", "mean"),

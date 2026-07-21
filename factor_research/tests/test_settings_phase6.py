@@ -10,8 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
-from services.read.settings import system_config
 from services.read.audit import recent_audit
+from services.read.settings import system_config
 
 
 def test_cost_locked_and_iron_law():

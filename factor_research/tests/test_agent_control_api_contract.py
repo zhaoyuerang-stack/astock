@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from api.routers.agent_control import module_inventory, artifact_inventory, action_policy
+from api.routers.agent_control import action_policy, artifact_inventory, module_inventory
 
 
 def test_module_inventory_endpoint_shape():

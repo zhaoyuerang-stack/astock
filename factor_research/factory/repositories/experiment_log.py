@@ -3,9 +3,9 @@
 任何 Experiment（含失败/DISCARDED）都写入，永不删除。
 """
 import json
+from collections.abc import Iterator
 from dataclasses import asdict
 from pathlib import Path
-from typing import Iterator, Optional
 
 from factory.ontology import (
     Decision,
@@ -13,7 +13,6 @@ from factory.ontology import (
     ExperimentProtocol,
     ExperimentResult,
 )
-
 
 DEFAULT_LOG_PATH = (
     Path(__file__).resolve().parent.parent.parent

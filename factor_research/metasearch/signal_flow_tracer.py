@@ -20,10 +20,9 @@
 import ast
 import json
 from collections import defaultdict
-from dataclasses import dataclass, asdict
+from collections.abc import Iterator
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterator, Optional
-
 
 ROOT = Path(__file__).resolve().parent.parent
 SCAN_DIRS = ["factor_research", "factor_research/strategies", "factor_research/portfolio"]
@@ -45,7 +44,7 @@ def _is_underscore(node) -> bool:
     return isinstance(node, ast.Name) and node.id == "_"
 
 
-def _get_callee_name(call: ast.Call) -> Optional[str]:
+def _get_callee_name(call: ast.Call) -> str | None:
     """提取被调用的函数名,如 'small_cap_timing' 或 'foo.bar.baz'."""
     func = call.func
     if isinstance(func, ast.Name):
@@ -169,7 +168,7 @@ def main():
 
     # High-priority candidates: ≥3 calls AND ≥1 output discarded ≥50% time
     print(f"\n{'='*70}")
-    print(f"  HIGH PRIORITY — 默认被忽略的输出")
+    print("  HIGH PRIORITY — 默认被忽略的输出")
     print(f"{'='*70}")
     print(f"  {'callee':<35} {'#calls':>7} {'output[i]':>10} {'discard%':>10}")
     print(f"  {'-'*68}")
@@ -184,12 +183,12 @@ def main():
 
     rows.sort(reverse=True)
     if not rows:
-        print(f"  (无高优先级候选)")
+        print("  (无高优先级候选)")
     for rate, callee, n, idx, total in rows[:20]:
         print(f"  {callee[:35]:<35} {n:>7d} {idx}/{total-1:<6d} {rate:>9.0%}")
 
-    print(f"\n💡 这些'默认被忽略'的输出是下一个 Band 候选。")
-    print(f"  每个都问: 这个被丢的信号能不能做出新策略? 像 dist 之于 Band。")
+    print("\n💡 这些'默认被忽略'的输出是下一个 Band 候选。")
+    print("  每个都问: 这个被丢的信号能不能做出新策略? 像 dist 之于 Band。")
 
 
 if __name__ == "__main__":

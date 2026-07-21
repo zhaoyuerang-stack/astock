@@ -7,7 +7,7 @@ import hashlib
 import json
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 
 class HypothesisStatus(Enum):
@@ -46,14 +46,14 @@ class Hypothesis:
     description: str
     factor_fn_name: str                             # "factors.small_cap.small_cap_factor"
     factor_params: dict[str, Any] = field(default_factory=dict)
-    timing_fn_name: Optional[str] = None
+    timing_fn_name: str | None = None
     timing_params: dict[str, Any] = field(default_factory=dict)
     data_dependencies: tuple[str, ...] = ()         # ("price/close", "price/amount")
-    thesis: Optional[EconomicThesis] = None
+    thesis: EconomicThesis | None = None
 
     source: str = "manual"                          # mutation | llm_paper | anomaly | manual
-    source_ref: Optional[str] = None                # 父 hyp_id / DOI / 异象 id
-    parent_hypothesis_id: Optional[str] = None
+    source_ref: str | None = None                # 父 hyp_id / DOI / 异象 id
+    parent_hypothesis_id: str | None = None
     novelty_score: float = 0.0                      # 与现有 LIVE 的距离，0=完全重复
     estimated_cost_seconds: float = 0.0
     status: HypothesisStatus = HypothesisStatus.DRAFTED

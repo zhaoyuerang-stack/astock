@@ -1,9 +1,14 @@
 """
 v2.1 strategy comprehensive analysis — starting 2018, 100万 initial capital.
 """
-import os, sys, json, warnings
+import json
+import os
+import sys
+import warnings
+
 warnings.filterwarnings("ignore")
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -11,8 +16,13 @@ ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, load_price_panels, backtest_weights, build_rebalance_weights
 from factors.small_cap import small_cap_factor, small_cap_timing
+from strategies.small_cap import (
+    StrategyConfig,
+    backtest_weights,
+    build_rebalance_weights,
+    load_price_panels,
+)
 
 OUT = ROOT / "reports" / "research"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -81,7 +91,7 @@ print(f"    最差月: {monthly.idxmin().strftime('%Y-%m')}  {monthly.min():+.1%
 print(f"    月均收益: {monthly.mean():+.2%}")
 print(f"    月收益标准差: {monthly.std():+.2%}")
 print(f"    月胜率: {(monthly>0).mean():.0%}")
-print(f"    连续正收益最长: 计算中")
+print("    连续正收益最长: 计算中")
 
 # 胜率连续
 months_pos = (monthly > 0).values
@@ -98,7 +108,7 @@ print(f"    最长连续负收益月: {max_consec_neg} 个月")
 
 # 年度收益
 yearly = ret_2018.resample("YE").apply(lambda x: (1 + x).prod() - 1)
-print(f"\n  年度收益:")
+print("\n  年度收益:")
 for y in sorted(set(ret_2018.index.year)):
     r = yearly.loc[f"{y}-12-31"] if f"{y}-12-31" in yearly.index else yearly[yearly.index.year == y].iloc[0]
     amt = INITIAL * (1 + r)
@@ -113,7 +123,7 @@ print(f"{'='*70}")
 
 # 滚动波动率
 roll_vol = ret_2018.rolling(60).std() * np.sqrt(252)
-print(f"  年化波动率:")
+print("  年化波动率:")
 print(f"    当前:    {roll_vol.iloc[-1]:.1%}")
 print(f"    均值:    {roll_vol.mean():.1%}")
 print(f"    中位数:  {roll_vol.median():.1%}")
@@ -125,17 +135,17 @@ alpha_95 = np.percentile(daily_r, 5)
 alpha_99 = np.percentile(daily_r, 1)
 cvar_95 = daily_r[daily_r <= alpha_95].mean()
 cvar_99 = daily_r[daily_r <= alpha_99].mean()
-print(f"\n  VaR (Value at Risk):")
+print("\n  VaR (Value at Risk):")
 print(f"    95% VaR:  {alpha_95:+.3%}/日  (每100万单日最多亏 {abs(alpha_95)*INITIAL:,.0f} 元)")
 print(f"    99% VaR:  {alpha_99:+.3%}/日  (每100万单日最多亏 {abs(alpha_99)*INITIAL:,.0f} 元)")
-print(f"  CVaR (条件VaR):")
+print("  CVaR (条件VaR):")
 print(f"    95% CVaR: {cvar_95:+.3%}/日  (极端5%的天数平均亏损)")
 print(f"    99% CVaR: {cvar_99:+.3%}/日")
 
 # 最大回撤分析
 nav_2018 = (1 + ret_2018).cumprod()
 dd = (nav_2018 / nav_2018.cummax() - 1)
-print(f"\n  最大回撤分析:")
+print("\n  最大回撤分析:")
 print(f"    最大回撤: {dd.min():+.1%}")
 print(f"    发生日期: {dd.idxmin().strftime('%Y-%m-%d')}")
 # Find the drawdown start (last peak before trough)
@@ -152,11 +162,11 @@ if recovery_idx:
     recover_days = nav_2018.index.get_loc(recovery_idx) - nav_2018.index.get_loc(peak_before)
     print(f"    恢复天数: {recover_days} 个交易日")
 else:
-    print(f"    尚未恢复")
+    print("    尚未恢复")
 
 # 回撤分布
 dd_nonzero = dd[dd < 0]
-print(f"\n  回撤分布:")
+print("\n  回撤分布:")
 print(f"    最大回撤:      {dd.min():+.1%}")
 print(f"    95%分位回撤:   {dd_nonzero.quantile(0.05):+.1%}")
 print(f"    90%分位回撤:   {dd_nonzero.quantile(0.10):+.1%}")

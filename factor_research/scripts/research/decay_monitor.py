@@ -6,7 +6,9 @@
 
 用法(cwd=factor_research): /opt/homebrew/bin/python3 scripts/research/decay_monitor.py
 """
-import json, os, sys
+import json
+import os
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -18,13 +20,12 @@ import pandas as pd
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from strategies.small_cap import load_price_panels
-from factors.small_cap import small_cap_timing
-from factors.alpha import transforms
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
+from factors.alpha import transforms  # noqa: F401 —— 副作用注册 DSL 变换(zscore/mad_clip/shift 等)
 from factors.alpha.base import FactorData
 from factors.alpha.builtins.illiq import AmihudIlliq
-from strategies.small_cap import build_rebalance_weights
+from factors.small_cap import small_cap_timing
+from strategies.small_cap import load_price_panels
 
 # ── Load data ──
 close, volume, amount = load_price_panels("2010-01-01")
@@ -140,6 +141,7 @@ print("  → 状态已写 reports/decay_status.json")
 # ── §5.4 缝④: governance.decay 通用复测 — 扫所有在册版本收益,decayed 写退役复核清单 ──
 # 让 governance.decay 真正被自动路径消费(此前建好没接);退役执行仍人确认(§6),不自动下架。
 from governance.decay import decay_check
+
 _vr = ROOT / "data_lake" / "version_returns"
 _retire = []
 if _vr.exists():

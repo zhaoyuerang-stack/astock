@@ -5,15 +5,14 @@
 自动下载 PDF 报告并落盘，然后自动调用 NLP 提取管线进行解析，并在解析成功后立即自动删除 PDF 临时文件。
 """
 
-import os
+import datetime
+import json
+import subprocess
 import sys
 import time
-import json
-import urllib.request
 import urllib.error
-import datetime
+import urllib.request
 from pathlib import Path
-import subprocess
 
 # 设定工作目录
 ROOT = Path(__file__).resolve().parents[2]

@@ -20,11 +20,11 @@ sys.path.insert(0, str(Path.cwd()))
 import numpy as np
 import pandas as pd
 
-from strategies.small_cap import load_price_panels, build_rebalance_weights
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from factors.utils import safe_zscore, mad_clip
-from factors.alpha.transforms import neutralize
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from engine.factor_analysis import calc_ic, ic_summary
+from factors.alpha.transforms import neutralize
+from factors.utils import mad_clip, safe_zscore
+from strategies.small_cap import build_rebalance_weights, load_price_panels
 
 
 def load_industry_groups():

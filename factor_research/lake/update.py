@@ -21,21 +21,25 @@ from app_config.log import get_logger
 logger = get_logger(__name__)
 
 import warnings; warnings.filterwarnings("ignore")
-import os, json
-from pathlib import Path
+import json
+import os
 from datetime import date, datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
+
 ROOT = Path(__file__).resolve().parents[1]  # factor_research/
 _CHINA_TZ = ZoneInfo("Asia/Shanghai")
 def _china_today():
     return datetime.now(_CHINA_TZ).date()
 os.chdir(ROOT)
 import sys
+
 sys.path.insert(0, str(ROOT))
-import pandas as pd
 import akshare as ak
-from lake.sources.registry import resolve_source
+import pandas as pd
+
 from lake.sources.exchange import merge_margin
+from lake.sources.registry import resolve_source
 
 LAKE = Path("data_lake")
 MANIFEST = LAKE / "_manifest.json"
@@ -60,8 +64,8 @@ def stamp_data_vintage(prev=None):
     走 load_prices(含 688 单位归一修复)——重跑指纹不符=数据漂移。
     若末日不变而指纹变(如 2026-06-12 同日三次重写事故)→ 立即告警。
     """
-    from lake.load_lake import load_prices
     from lake.fingerprint import panel_fingerprint
+    from lake.load_lake import load_prices
     close = load_prices(fields=("close",))["close"]
     fp = panel_fingerprint(close)
     last = str(close.index[-1].date())
@@ -86,13 +90,13 @@ def _require_price_unit_report(report: dict) -> None:
 
 # ── 价量增量 ──
 def update_prices():
-    from lake.sources.tushare_price import fetch_new_day
     from lake.compact import compact_prices
     from lake.invariants import (
         LakeInvariantError,
         PriceAmountInvariantError,
         validate_price_amount_units,
     )
+    from lake.sources.tushare_price import fetch_new_day
 
     daily = LAKE / "price/daily"
     today = pd.Timestamp(_china_today())

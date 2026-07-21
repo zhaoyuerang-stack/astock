@@ -25,7 +25,6 @@ from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, S
 from factors.utils import mad_clip, safe_zscore
 from portfolio.strategy_runners import run_active
 
-
 HK_DIR = ROOT / "data_lake" / "price" / "hk_daily"
 
 
@@ -107,7 +106,7 @@ def main():
         print(f"⚠ too few HK stocks ({close.shape[1]})")
         return
 
-    print(f"\n=== HK Strategy ===")
+    print("\n=== HK Strategy ===")
     factor = hk_small_cap_factor(amount, window=60)
     timing = hk_small_cap_timing(close, amount, ma_window=16)
     weights = build_weights(factor, close, top_n=15, rebal=20)
@@ -123,16 +122,16 @@ def main():
     hk_ret = result.returns.dropna()
 
     m = metrics(hk_ret)
-    print(f"\n  HK small-cap (Binary MA16, 1.25x):")
+    print("\n  HK small-cap (Binary MA16, 1.25x):")
     print(f"  annual={m['annual']:+.1%}, sharpe={m['sharpe']:+.2f}, "
           f"maxdd={m['maxdd']:+.1%}, calmar={m['calmar']:+.2f}")
 
     # ── 与 A 股 LIVE 对比 ──
-    print(f"\n=== Cross-market correlation vs A 股 ACTIVE ===")
-    print(f"  Running A 股 ACTIVE strategies...")
+    print("\n=== Cross-market correlation vs A 股 ACTIVE ===")
+    print("  Running A 股 ACTIVE strategies...")
     a_returns = run_active(start="2018-01-01")
 
-    print(f"\n  Correlation matrix:")
+    print("\n  Correlation matrix:")
     print(f"  {'A 股 strategy':<30s} {'corr to HK':>11s}")
     print(f"  {'-'*45}")
     for name, a_ret in a_returns.items():
@@ -144,45 +143,46 @@ def main():
         print(f"  {name:<30s}  {corr:>+10.3f}")
 
     # ── Portfolio test ──
-    print(f"\n=== Portfolio test: A 股 ACTIVE + HK ===")
-    from portfolio.composer import compose, metrics as port_metrics
+    print("\n=== Portfolio test: A 股 ACTIVE + HK ===")
+    from portfolio.composer import compose
+    from portfolio.composer import metrics as port_metrics
     combined = {**a_returns, "HK_small_cap": hk_ret}
 
     # Equal weight
     port_eq, _ = compose(combined, method="equal_weight")
     me = port_metrics(port_eq)
-    print(f"  A 股 + HK equal weight:")
+    print("  A 股 + HK equal weight:")
     print(f"  annual={me['annual']:+.1%}, sharpe={me['sharpe']:+.2f}, "
           f"maxdd={me['maxdd']:+.1%}, calmar={me['calmar']:+.2f}")
 
     # Risk parity
     port_rp, _ = compose(combined, method="risk_parity")
     mr = port_metrics(port_rp)
-    print(f"  A 股 + HK risk_parity:")
+    print("  A 股 + HK risk_parity:")
     print(f"  annual={mr['annual']:+.1%}, sharpe={mr['sharpe']:+.2f}, "
           f"maxdd={mr['maxdd']:+.1%}, calmar={mr['calmar']:+.2f}")
 
     # Without HK baseline
-    print(f"\n  vs (A 股 ACTIVE only baseline):")
+    print("\n  vs (A 股 ACTIVE only baseline):")
     port_a, _ = compose(a_returns, method="risk_parity")
     ma = port_metrics(port_a)
-    print(f"  A 股 only risk_parity:")
+    print("  A 股 only risk_parity:")
     print(f"  annual={ma['annual']:+.1%}, sharpe={ma['sharpe']:+.2f}, "
           f"maxdd={ma['maxdd']:+.1%}, calmar={ma['calmar']:+.2f}")
 
     delta_sharpe = mr["sharpe"] - ma["sharpe"]
     delta_calmar = mr["calmar"] - ma["calmar"]
     delta_mdd = mr["maxdd"] - ma["maxdd"]
-    print(f"\n  Δ (加 HK − 不加 HK):")
+    print("\n  Δ (加 HK − 不加 HK):")
     print(f"    sharpe: {delta_sharpe:+.3f}")
     print(f"    calmar: {delta_calmar:+.3f}")
     print(f"    maxdd:  {delta_mdd:+.2%}")
     if delta_sharpe > 0.05 or delta_calmar > 0.1:
-        print(f"  ⭐ HK 真正多元化 — 显著改善组合")
+        print("  ⭐ HK 真正多元化 — 显著改善组合")
     elif delta_sharpe > 0:
-        print(f"  ◐ HK 微改善 — 值得 SHADOW 持续观察")
+        print("  ◐ HK 微改善 — 值得 SHADOW 持续观察")
     else:
-        print(f"  ❌ HK 不改善组合 — 可能 HK 单独 sharpe 太弱拖累")
+        print("  ❌ HK 不改善组合 — 可能 HK 单独 sharpe 太弱拖累")
 
 
 if __name__ == "__main__":

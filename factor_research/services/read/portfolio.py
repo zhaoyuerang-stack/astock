@@ -45,8 +45,9 @@ def _target_cached(start: str, top_n: int, rebalance_days: int, factor_window: i
     返回 hashable 元组。
     """
     import pandas as pd
-    from strategies.small_cap import load_price_panels
+
     from factors.small_cap import small_cap_factor
+    from strategies.small_cap import load_price_panels
 
     # 1. Load fdates directly from the first few symbol files to avoid loading the whole large pivot table
     daily_dir = ROOT / "data_lake/price/daily"

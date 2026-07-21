@@ -34,7 +34,7 @@ def _dsl_system_prompt() -> str:
         '"transforms": ["mad_clip", "zscore", "rank"], "weight": <数值>}], '
         '"direction": "positive"|"negative", '
         '"thesis": {"mechanism": "<经济机制,一句话>", "citation": "<出处或经验观察>"}}\n'
-        f"白名单因子(参数必须全部给出且在范围内):\n" + "\n".join(factor_lines) + "\n"
+        "白名单因子(参数必须全部给出且在范围内):\n" + "\n".join(factor_lines) + "\n"
         f"白名单 transforms(子集,按序应用): {sorted(ALLOWED_TRANSFORMS)}\n"
         "硬约束:terms 数量 1~3(复杂度预算);|weight| ≤ 2;不允许 neutralize 字段;"
         "thesis.mechanism 必填且要给真实的经济机制,不是指标描述;"

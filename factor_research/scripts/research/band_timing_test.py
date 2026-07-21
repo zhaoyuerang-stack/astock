@@ -8,8 +8,10 @@ dist = small_nav / MA16(small_nav) - 1
 Usage:
   python3 scripts/research/band_timing_test.py
 """
-import os, sys
+import os
+import sys
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
@@ -17,9 +19,9 @@ sys.path.insert(0, str(ROOT))
 import numpy as np
 import pandas as pd
 
+from core.engine import BacktestConfig, BacktestEngine, PricePanel, Signal
 from factors.small_cap import small_cap_timing
-from factors.utils import safe_zscore, mad_clip
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel
+from factors.utils import mad_clip, safe_zscore
 from strategies.small_cap import load_price_panels
 
 
@@ -83,7 +85,7 @@ def main():
     timing_band = build_band(close, amount)
 
     print(f"\n{'='*75}")
-    print(f"  BAND vs BINARY — Three Segments")
+    print("  BAND vs BINARY — Three Segments")
     print(f"{'='*75}")
 
     for label, start, end in [
@@ -115,7 +117,7 @@ def main():
 
     # ── Full period + yearly ──
     print(f"\n{'='*75}")
-    print(f"  FULL PERIOD + YEARLY (2010-2026)")
+    print("  FULL PERIOD + YEARLY (2010-2026)")
     print(f"{'='*75}")
 
     cfg_full = BacktestConfig(start="2010-01-01", leverage=1.25)

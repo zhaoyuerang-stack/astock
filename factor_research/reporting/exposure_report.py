@@ -5,14 +5,16 @@ and industry sector exposure over time.
 """
 from __future__ import annotations
 
+from typing import Any
+
 import pandas as pd
-from typing import Dict, Any
+
 
 def generate_exposure_report(
     weights: pd.DataFrame,
-    style_exposures: Dict[str, pd.DataFrame], # factor -> date x asset
-    industry_mapping: Optional[pd.Series] = None
-) -> Dict[str, Any]:
+    style_exposures: dict[str, pd.DataFrame], # factor -> date x asset
+    industry_mapping: pd.Series | None = None
+) -> dict[str, Any]:
     """Report average and maximum portfolio factor and sector exposures."""
     report = {}
     

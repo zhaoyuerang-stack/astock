@@ -8,18 +8,19 @@
 诚实边界:L0,非 alpha。
 """
 from __future__ import annotations
-import os, sys
+
+import os
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT)); os.chdir(ROOT)
 
 import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
 
-from scripts.research import signal_source_probe as P  # noqa: E402
+from factors.utils import mad_clip, safe_zscore  # noqa: E402
 from lake.load_lake import load_prices  # noqa: E402
-from factors.utils import safe_zscore, mad_clip  # noqa: E402
+from scripts.research import signal_source_probe as P  # noqa: E402
 
 START, CUTOFF, END = "2018-01-01", "2022-12-31", "2024-12-31"
 

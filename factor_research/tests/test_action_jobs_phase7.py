@@ -2,9 +2,9 @@
 
 Run: cd factor_research && python3 tests/test_action_jobs_phase7.py
 """
+import asyncio
 import os
 import sys
-import asyncio
 from pathlib import Path
 from unittest.mock import patch
 
@@ -15,9 +15,9 @@ sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 os.environ["ASTCOK_ACTION_TOKEN"] = "phase7-unit-token"
 
+import api.routers.experiments as experiments_router
 from api.main import app
 from contracts.views import AutoResearchRunResponse
-import api.routers.experiments as experiments_router
 
 
 def _run(coro):

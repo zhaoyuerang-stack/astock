@@ -16,8 +16,8 @@ def requires_confirmation(risk_level: str) -> bool:
     return risk_level in REQUIRES_CONFIRMATION
 
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
 
 
 @dataclass(frozen=True)
@@ -25,20 +25,24 @@ class Tool:
     name: str
     risk: str
     desc: str
-    fn: Optional[Callable]
+    fn: Callable | None
     args: tuple[str, ...] = ()
 
 
 def tool_registry() -> dict[str, Tool]:
     """白名单工具。读类 = readonly; L0 probe = low; run_backtest = mid; 高风险 = 提案。"""
-    from services.read import factors as fac, registry as reg
-    from services.read import experiments as ex, portfolio as pf, risk as rk, state as st
+    from contracts.evidence import EvidenceTier
+    from services.agent.evidence import wrap_tool_result
+    from services.agent.protocols import list_protocols
+    from services.read import experiments as ex
+    from services.read import factors as fac
+    from services.read import portfolio as pf
+    from services.read import registry as reg
+    from services.read import risk as rk
+    from services.read import state as st
+    from services.read.data_gap import data_gap_audit
     from services.read.stocks import resolve_stock_code, stock_profile
     from services.read.strategy_idea import check_strategy_idea
-    from services.read.data_gap import data_gap_audit
-    from services.agent.protocols import list_protocols
-    from services.agent.evidence import wrap_tool_result
-    from contracts.evidence import EvidenceTier
 
     def _idea(idea: str):
         raw = check_strategy_idea(idea)

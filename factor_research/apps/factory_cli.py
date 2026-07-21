@@ -47,7 +47,9 @@ def cmd_generate(args):
 def cmd_mi_audit(args):
     """L-1 MI 关: 信息冗余簇识别."""
     from metasearch.factor_mi_audit import (
-        audit_hypothesis_pool, mi_matrix, cluster_by_redundancy,
+        audit_hypothesis_pool,
+        cluster_by_redundancy,
+        mi_matrix,
     )
 
     print(f"L−1 MI audit (max_hyps={args.max_hyps}, threshold={args.threshold} bits)")
@@ -70,7 +72,7 @@ def cmd_mi_audit(args):
     off = [mat.iloc[i,j] for i in range(len(mat)) for j in range(i+1, len(mat))]
     import numpy as np
     off = np.array(off)
-    print(f"\n  MI distribution (off-diag):")
+    print("\n  MI distribution (off-diag):")
     print(f"    min/med/max: {off.min():.2f} / {np.median(off):.2f} / {off.max():.2f}")
     print(f"    redundant pairs (>{args.threshold}): {(off > args.threshold).sum()}")
 
@@ -122,7 +124,7 @@ def cmd_inspect(args):
         print(f"no hypothesis matches id prefix '{args.id_prefix}'", file=sys.stderr)
         return 1
     if len(matches) > 1:
-        print(f"multiple matches; refine prefix:", file=sys.stderr)
+        print("multiple matches; refine prefix:", file=sys.stderr)
         for h in matches[:10]:
             print(f"  {h.id}  {h.name}")
         return 1
@@ -149,8 +151,8 @@ def cmd_inspect(args):
 
 
 def cmd_queue(args):
-    from factory.pool import HypothesisPool
     from factory.ontology import HypothesisStatus
+    from factory.pool import HypothesisPool
 
     pool = HypothesisPool()
     drafts = pool.list_by_status(HypothesisStatus.DRAFTED)
@@ -393,8 +395,8 @@ def cmd_run_l2(args):
 
 
 def cmd_regimes(args):
-    from factory.repositories import ExperimentLog
     from factory.pool import HypothesisPool
+    from factory.repositories import ExperimentLog
 
     pool = HypothesisPool()
     log = ExperimentLog()
@@ -441,7 +443,6 @@ def cmd_regimes(args):
 def cmd_run_marginal(args):
     from factory.lines.line3_marginal import (
         GRADE_PRIORITY,
-        NON_SHELVE_GRADES,
         evaluate_candidate,
     )
     from factory.ontology import HypothesisStatus
@@ -472,7 +473,7 @@ def cmd_run_marginal(args):
     vintage_id = f"data_lake@{close.index[-1].strftime('%Y-%m-%d')}"
     print(f"  loaded {close.shape}, vintage={vintage_id}, {time.time()-t0:.1f}s")
 
-    print(f"running all LIVE strategies for baseline...")
+    print("running all LIVE strategies for baseline...")
     t1 = time.time()
     live_returns = run_all_live(start=args.start)
     print(f"  {time.time()-t1:.1f}s  {len(live_returns)} LIVE strategies")
@@ -514,7 +515,7 @@ def cmd_run_marginal(args):
             -x[0].regime_weighted_score,
         ))
         print()
-        print(f"Top candidates by grade + regime_score:")
+        print("Top candidates by grade + regime_score:")
         for report, h in rows[:12]:
             tag = (f"Δsh={report.delta_sharpe:+.3f} "
                    f"reg_sc={report.regime_weighted_score:+.3f} "

@@ -5,17 +5,18 @@ together with a deterministic verification hash.
 """
 from __future__ import annotations
 
-import json
 import hashlib
-from typing import Dict, Any, List
+import json
+from typing import Any
+
 
 def generate_audit_pack(
     strategy_id: str,
-    performance_metrics: Dict[str, Any],
-    drawdown_report: Dict[str, Any],
-    exposure_report: Dict[str, Any],
-    compliance_checks: List[Dict[str, Any]]
-) -> Dict[str, Any]:
+    performance_metrics: dict[str, Any],
+    drawdown_report: dict[str, Any],
+    exposure_report: dict[str, Any],
+    compliance_checks: list[dict[str, Any]]
+) -> dict[str, Any]:
     """Compile a signed and versioned audit pack for external governance reviews."""
     pack = {
         "strategy_id": strategy_id,

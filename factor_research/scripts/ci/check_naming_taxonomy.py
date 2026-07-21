@@ -5,9 +5,7 @@ but blocks new modules with ambiguous names that already caused confusion.
 """
 from __future__ import annotations
 
-import sys
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parents[2]
 

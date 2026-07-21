@@ -6,10 +6,14 @@
   cd /Users/kiki/astcok/factor_research
   /opt/homebrew/bin/python3 scripts/research/full_leg_factory.py
 """
-import os, sys, warnings, importlib, itertools
-from pathlib import Path
-from concurrent.futures import ProcessPoolExecutor, as_completed
+import importlib
+import itertools
 import multiprocessing
+import os
+import sys
+import warnings
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
 
 warnings.filterwarnings("ignore")
 os.chdir(Path(__file__).resolve().parent.parent.parent)
@@ -17,14 +21,14 @@ sys.path.insert(0, str(Path.cwd()))
 
 import numpy as np
 import pandas as pd
-from strategies.small_cap import load_price_panels
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
+
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from factors.small_cap import small_cap_factor, small_cap_timing
-from factors.utils import safe_zscore, mad_clip
-from strategies.small_cap import build_rebalance_weights
-from factory.regime import RegimeEngine
-from factory.lines.line1_generation.mutate_existing import FACTOR_MUTATION_SPECS
+from factors.utils import mad_clip, safe_zscore
 from factory.analysis.asymmetry_audit import asymmetry_report
+from factory.lines.line1_generation.mutate_existing import FACTOR_MUTATION_SPECS
+from factory.regime import RegimeEngine
+from strategies.small_cap import build_rebalance_weights, load_price_panels
 
 # ── 全局数据 (模块级, 供子进程 pickle) ──
 _close = _volume = _amount = None
@@ -155,7 +159,7 @@ def main():
             all_candidates.append((fn_name, params, fn_short))
 
     print(f"\n  候选: {len(all_candidates)} 个因子参数组合")
-    print(f"  每条候选 × 2方向 × 2择时 = 4条腿")
+    print("  每条候选 × 2方向 × 2择时 = 4条腿")
     print(f"  总腿数: {len(all_candidates) * 4}")
 
     # ── 并行计算 ──
@@ -194,14 +198,14 @@ def main():
     print(f"\n  有 bull 数据的腿: {len(bull_candidates)}")
     print(f"  有 bear 数据的腿: {len(bear_candidates)}")
 
-    print(f"\n  Bull regime Top 10 (trend=up):")
+    print("\n  Bull regime Top 10 (trend=up):")
     print(f"  {'腿':<50} {'Bull年化':>9} {'Bull回撤':>9} {'全日年化':>9}")
     print("  " + "-" * 80)
     for l in bull_candidates[:10]:
         full_ann = float(l["r_series"].mean() * 252)
         print(f"  {l['name']:<50} {l['bull']['ann']:>+8.1%} {l['bull']['dd']:>+8.1%} {full_ann:>+8.1%}")
 
-    print(f"\n  Bear regime Top 10 (trend=down):")
+    print("\n  Bear regime Top 10 (trend=down):")
     print(f"  {'腿':<50} {'Bear年化':>9} {'Bear回撤':>9} {'全日年化':>9}")
     print("  " + "-" * 80)
     for l in bear_candidates[:10]:
@@ -211,7 +215,7 @@ def main():
     # ── 编排 ──
     # 用 top-10 bull × top-10 bear 编排
     print(f"\n{'='*80}")
-    print(f"  编排优化 (top-10 × top-10)")
+    print("  编排优化 (top-10 × top-10)")
     print(f"{'='*80}")
 
     # 基线

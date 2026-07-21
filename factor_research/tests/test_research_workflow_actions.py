@@ -61,7 +61,11 @@ def test_hypothesis_promotion_requires_generic_human_approval():
     from factory.ontology import EconomicThesis, Hypothesis, HypothesisStatus
     from factory.pool.pool_repo import HypothesisPool
     from research_ledger.workspace import ResearchReviewRepository
-    from services.actions.research_workspace import WorkItemConflict, promote_work_item, review_work_item
+    from services.actions.research_workspace import (
+        WorkItemConflict,
+        promote_work_item,
+        review_work_item,
+    )
 
     pool = HypothesisPool(_tmp("hypothesis_pool.jsonl"))
     reviews = ResearchReviewRepository(_tmp("reviews.jsonl"))

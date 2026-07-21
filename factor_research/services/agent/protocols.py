@@ -4,11 +4,11 @@ Agent may only select a registered protocol; it may not invent validation paths.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from contracts.evidence import EvidenceTier
-from services.agent.tools import RISK_HIGH, RISK_LOW, RISK_MID, RISK_READONLY
+from services.agent.tools import RISK_HIGH, RISK_MID, RISK_READONLY
 
 
 @dataclass(frozen=True)

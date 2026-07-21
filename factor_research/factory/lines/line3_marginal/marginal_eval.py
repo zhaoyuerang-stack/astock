@@ -22,9 +22,8 @@
 import importlib
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -32,12 +31,8 @@ import pandas as pd
 from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from factors.small_cap import small_cap_timing
 
-# 合并核心：复用 portfolio.marginal.evaluate
-from portfolio.marginal import evaluate as portfolio_marginal_evaluate
-
 # 不对称性审计
 from factory.analysis.asymmetry_audit import asymmetry_report
-
 from factory.ontology import (
     Decision,
     Experiment,
@@ -46,6 +41,8 @@ from factory.ontology import (
     Hypothesis,
 )
 
+# 合并核心：复用 portfolio.marginal.evaluate
+from portfolio.marginal import evaluate as portfolio_marginal_evaluate
 
 # ────────────────────────── 配置 grid ──────────────────────────
 
@@ -103,7 +100,7 @@ def _dispatch_args(deps, close, volume, amount):
     raise ValueError(f"未识别数据依赖: {deps}")
 
 
-def _build_timing(timing_kind: str, close, amount) -> Optional[pd.Series]:
+def _build_timing(timing_kind: str, close, amount) -> pd.Series | None:
     if timing_kind == "none":
         return None
     if timing_kind == "small_cap_ma16":
@@ -201,9 +198,9 @@ def evaluate_candidate(
     amount: pd.DataFrame,
     vintage_id: str,
     start: str = "2018-01-01",
-    config_grid: Optional[list[StrategyConfig]] = None,
-    market_returns: Optional[pd.Series] = None,
-) -> tuple[Experiment, Optional[MarginalReport]]:
+    config_grid: list[StrategyConfig] | None = None,
+    market_returns: pd.Series | None = None,
+) -> tuple[Experiment, MarginalReport | None]:
     """跑 config grid，每个调 portfolio.marginal.evaluate，选 best grade。
 
     选 best 规则:

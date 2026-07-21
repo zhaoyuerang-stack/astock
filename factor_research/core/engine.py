@@ -23,8 +23,8 @@ from app_config.log import get_logger
 
 logger = get_logger(__name__)
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, Optional
 
 import numpy as np
 import pandas as pd
@@ -41,7 +41,6 @@ from engine.metrics import (
     sharpe_ratio,
 )
 from engine.metrics import metrics as canonical_metrics
-
 
 # ---------------------------------------------------------------------------
 # Config & Data Containers
@@ -84,7 +83,7 @@ class PricePanel:
     close: pd.DataFrame          # adjusted close (for return calculation)
     volume: pd.DataFrame         # shares (canonical data-lake unit; not 手)
     amount: pd.DataFrame         # turnover in CNY  (volume × raw_close; see lake.units.implied_amount)
-    raw_close: Optional[pd.DataFrame] = None  # unadjusted close (for valuation / order sizing)
+    raw_close: pd.DataFrame | None = None  # unadjusted close (for valuation / order sizing)
     # 注:曾有 raw_open 字段(暗示开盘成交)但引擎从不读取 → 已删,避免误导。执行契约 = T+1 收盘
     # (见下方 Signal.execution_timing);若要 T+1 开盘/VWAP 成交须新增 T_PLUS_1_OPEN 分支 + 立 ADR。
 
@@ -103,24 +102,24 @@ class Signal:
     3. **factor_builder** – callable ``(prices, config) -> factor DataFrame``.
     """
     # Mode A: decision-date target weights. The engine applies execution_timing.
-    decision_weights: Optional[pd.DataFrame] = None
+    decision_weights: pd.DataFrame | None = None
 
     # Legacy alias. New code must use decision_weights.
-    weights: Optional[pd.DataFrame] = None
+    weights: pd.DataFrame | None = None
 
     # Mode B: factor → top-n weights
-    factor: Optional[pd.DataFrame] = None
+    factor: pd.DataFrame | None = None
     top_n: int = 25
     direction: int = 1                      # 1 = long top, -1 = long bottom
     rebalance_freq: str = "20D"             # pandas offset alias
 
     # Mode C: lazy factor builder (used by factory)
-    factor_builder: Optional[Callable[[PricePanel, Optional[dict]], pd.DataFrame]] = None
-    factor_config: Optional[dict] = None
+    factor_builder: Callable[[PricePanel, dict | None], pd.DataFrame] | None = None
+    factor_config: dict | None = None
 
     # Timing exposure (daily multiplier). Default cap 1.0 (binary).
     # 2026-06-07: Boost band 需要 > 1.0；调 Signal.exposure_cap 解除。
-    timing: Optional[pd.Series] = None
+    timing: pd.Series | None = None
     exposure_cap: float = 1.0   # boost timing 需要传 1.5 等
 
     # Metadata
@@ -205,17 +204,17 @@ class BacktestResult:
 
     # Derived
     detail: pd.DataFrame = field(init=False)
-    weights_history: Optional[pd.DataFrame] = None
+    weights_history: pd.DataFrame | None = None
 
     # IC / stratify (populated by optional analysis calls)
-    ic_series: Optional[pd.Series] = None
-    ic_summary: Optional[dict] = None
-    stratify_ret: Optional[pd.DataFrame] = None
+    ic_series: pd.Series | None = None
+    ic_summary: dict | None = None
+    stratify_ret: pd.DataFrame | None = None
 
     # Metadata
     family: str = ""
     version: str = ""
-    config: Optional[BacktestConfig] = None
+    config: BacktestConfig | None = None
 
     def __post_init__(self):
         self.detail = pd.DataFrame(
@@ -364,8 +363,8 @@ class BacktestEngine:
     def _run_weight_backtest(
         self,
         scheduled_weights: dict | pd.DataFrame,
-        timing_signal: Optional[pd.Series] = None,
-        signal_meta: Optional[Signal] = None,
+        timing_signal: pd.Series | None = None,
+        signal_meta: Signal | None = None,
     ) -> BacktestResult:
         """Daily vector backtest with turnover, timing, leverage and financing.
 

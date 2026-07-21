@@ -6,12 +6,9 @@
 3. 结合下游产品的定价权指数（Pricing Power），推导下游行业的毛利冲击值（Margin Shock），从而精确预测产业链业绩恶化或改善的拐点。
 """
 
-import os
 import sys
-import json
+from dataclasses import dataclass
 from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Dict, List, Tuple, Optional
 
 # 设定工作目录
 ROOT = Path(__file__).resolve().parents[3]
@@ -83,10 +80,10 @@ DEFAULT_BOM_DATABASE = [
 # ══════════════════════════════════════════════════
 class BOMChainAnalyzer:
     
-    def __init__(self, bom_db: List[ProductBOM] = None):
+    def __init__(self, bom_db: list[ProductBOM] = None):
         self.bom_db = bom_db or DEFAULT_BOM_DATABASE
         
-    def calculate_cost_shock(self, material_price_changes: Dict[str, float]) -> Dict[str, dict]:
+    def calculate_cost_shock(self, material_price_changes: dict[str, float]) -> dict[str, dict]:
         """根据上游原材料价格变动，计算下游制成品的直接成本冲击值及利润空间受挤压程度。
         
         计算公式：
@@ -160,7 +157,7 @@ def run_bom_demo():
         print(f"  ├─ 定价权指数 (Pricing Power)   : {res['pricing_power']:.2f}")
         print(f"  ├─ 上游BOM综合原料成本上涨幅度   : {res['raw_cost_shock']:+.2%}")
         print(f"  ├─ 预估行业综合毛利率受损 (Margin Shock): {res['margin_shock']:+.2%}")
-        print(f"  └─ 触发现货传导细节:")
+        print("  └─ 触发现货传导细节:")
         for det in res['details']:
             print(f"      • {det['material']:<8} (占比 {det['weight']:.0%}): 提价 {det['price_change']:+.1%} -> 贡献成本涨幅 {det['cost_contribution']:+.2%}")
             

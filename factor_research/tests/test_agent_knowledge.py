@@ -51,7 +51,7 @@ def test_retrieve_knowledge_returns_runtime_state():
 
 
 def test_agent_fallback_rag_utilizes_llm():
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import MagicMock, patch
     
     mock_adapter = MagicMock()
     mock_adapter.available.return_value = True

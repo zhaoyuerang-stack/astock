@@ -7,7 +7,9 @@
   cd /Users/kiki/astcok/factor_research
   /opt/homebrew/bin/python3 scripts/research/top_n_sensitivity.py
 """
-import os, sys, warnings
+import os
+import sys
+import warnings
 from pathlib import Path
 
 warnings.filterwarnings("ignore")
@@ -17,11 +19,9 @@ sys.path.insert(0, str(Path.cwd()))
 import numpy as np
 import pandas as pd
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from strategies.small_cap import load_price_panels
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from factors.small_cap import small_cap_factor, small_cap_timing
-from factors.utils import safe_zscore, mad_clip
-from strategies.small_cap import build_rebalance_weights
+from strategies.small_cap import build_rebalance_weights, load_price_panels
 
 STATS_START = "2018-01-01"
 INITIAL_CAPITAL = 1_000_000
@@ -108,12 +108,12 @@ def main():
     df = pd.DataFrame(results)
 
     print(f"\n{'='*90}")
-    print(f"  结果汇总")
+    print("  结果汇总")
     print(f"{'='*90}")
 
     # Band timing results
     band_df = df[df["timing"] == "band"].sort_values("top_n")
-    print(f"\n  Band timing (动态杠杆 0~1.5):")
+    print("\n  Band timing (动态杠杆 0~1.5):")
     print(f"  {'top_n':>5} {'年化':>8} {'回撤':>8} {'夏普':>6} {'卡玛':>6} {'终值(万)':>9} {'换手':>7} {'成本':>7}")
     print("  " + "─" * 70)
     for _, r in band_df.iterrows():
@@ -122,7 +122,7 @@ def main():
 
     # Binary timing results
     binary_df = df[df["timing"] == "binary"].sort_values("top_n")
-    print(f"\n  Binary timing (固定 1.25x 杠杆):")
+    print("\n  Binary timing (固定 1.25x 杠杆):")
     print(f"  {'top_n':>5} {'年化':>8} {'回撤':>8} {'夏普':>6} {'卡玛':>6} {'终值(万)':>9} {'换手':>7} {'成本':>7}")
     print("  " + "─" * 70)
     for _, r in binary_df.iterrows():
@@ -131,7 +131,7 @@ def main():
 
     # Best by metric
     print(f"\n{'='*90}")
-    print(f"  最优 top_n (Band timing)")
+    print("  最优 top_n (Band timing)")
     print(f"{'='*90}")
     best_sharpe = band_df.loc[band_df["sharpe"].idxmax()]
     best_calmar = band_df.loc[band_df["calmar"].idxmax()]

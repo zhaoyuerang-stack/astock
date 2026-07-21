@@ -12,8 +12,8 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 
-from factors.utils import mad_clip, safe_zscore
 from factors.registry import register_factor
+from factors.utils import mad_clip, safe_zscore
 
 _BUY = ["buy_sm_amount", "buy_md_amount", "buy_lg_amount", "buy_elg_amount"]
 _SELL = ["sell_sm_amount", "sell_md_amount", "sell_lg_amount", "sell_elg_amount"]

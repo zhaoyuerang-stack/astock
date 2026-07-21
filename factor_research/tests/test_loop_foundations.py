@@ -8,8 +8,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from governance import trial_ledger as TL
 from governance import holdout as HO
+from governance import trial_ledger as TL
 
 
 # ---------------- trial 账本 ----------------
@@ -80,8 +80,8 @@ def test_validate_on_holdout_retry_is_idempotent(tmp_path):
 
 
 # ---------------- §5.3 边际 alpha ----------------
-from governance import marginal as MG
 from governance import decay as DC
+from governance import marginal as MG
 
 
 def test_marginal_flags_redundant():

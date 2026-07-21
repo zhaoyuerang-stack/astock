@@ -13,24 +13,26 @@
   cd /Users/kiki/astcok/factor_research
   /opt/homebrew/bin/python3 scripts/research/sharpe_monitor.py
 """
-import os, sys, warnings
+import os
+import sys
+import warnings
 from pathlib import Path
+
 warnings.filterwarnings("ignore")
 os.chdir(Path(__file__).resolve().parent.parent.parent)
 sys.path.insert(0, str(Path.cwd()))
 
 import numpy as np
 import pandas as pd
-from strategies.small_cap import load_price_panels
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from factors.small_cap import small_cap_timing
-from factors.alpha import transforms
+
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
+from factors.alpha import transforms  # noqa: F401 —— 副作用注册 DSL 变换(zscore/mad_clip/shift 等)
 from factors.alpha.base import FactorData
 from factors.alpha.builtins.illiq import AmihudIlliq, SizeProxy
 from factors.alpha.builtins.momentum import PriceMomentum
-from factors.alpha.builtins.reversal import ShortReversal
 from factors.alpha.builtins.volatility import Volatility
-from strategies.small_cap import build_rebalance_weights
+from factors.small_cap import small_cap_timing
+from strategies.small_cap import build_rebalance_weights, load_price_panels
 
 
 def rolling_sharpe(returns, window=252):
@@ -85,7 +87,7 @@ def main():
         except Exception as e:
             print(f"  {name:<35} ERROR: {str(e)[:40]}", flush=True)
 
-    print(f"\n[3/3] Sharpe动量分析\n")
+    print("\n[3/3] Sharpe动量分析\n")
     print(f"  {'因子':<35} {'当前Sharpe':>10} {'6月前':>8} {'变化率':>8} {'加速度':>8} {'信号':<15}")
     print("  " + "-" * 90)
 
@@ -141,7 +143,7 @@ def main():
 
     # 总结
     print(f"\n{'='*80}")
-    print(f"  总结")
+    print("  总结")
     print(f"{'='*80}")
 
     cur_strategy = [r for r in results if "当前" in r["name"]]
@@ -150,7 +152,7 @@ def main():
         print(f"  当前策略: {c['name']}")
         print(f"    Sharpe={c['cur']:+.2f}, 6月变化={c['mom']:+.0%}")
         if c['mom'] < -0.1:
-            print(f"    ⚠️ Sharpe 在减速, 关注是否有替代因子在加速")
+            print("    ⚠️ Sharpe 在减速, 关注是否有替代因子在加速")
 
     accelerating = [r for r in results if "📈" in r["signal"]]
     if accelerating:
@@ -158,7 +160,7 @@ def main():
         for a in accelerating:
             print(f"    📈 {a['name']}: Sharpe={a['cur']:+.2f}, 变化率={a['mom']:+.0%}")
     else:
-        print(f"\n  暂无加速候选 — 当前策略仍是最优")
+        print("\n  暂无加速候选 — 当前策略仍是最优")
 
     print()
 

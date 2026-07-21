@@ -17,7 +17,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -62,7 +61,7 @@ def _classify_regime(market_ret: pd.Series) -> pd.Series:
 
 def asymmetry_report(
     returns: pd.Series,
-    market_returns: Optional[pd.Series] = None,
+    market_returns: pd.Series | None = None,
     name: str = "candidate",
     rf: float = 0.025,
 ) -> AsymmetryReport:
@@ -185,7 +184,7 @@ def _asymmetry_score(gain_pain, up_down_cap, pos_neg_var, skew, sortino, annual=
 
 def compare_candidates(
     candidates: dict[str, pd.Series],
-    market_returns: Optional[pd.Series] = None,
+    market_returns: pd.Series | None = None,
 ) -> pd.DataFrame:
     """批量比较候选的不对称性, 返回排序好的 DataFrame."""
     reports = []

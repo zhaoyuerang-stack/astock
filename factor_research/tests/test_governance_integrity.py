@@ -245,7 +245,7 @@ def test_ledger_migrate_legacy():
 
 # ── B1: Nine-Gate 摘要抽取 + attach 到台账 ───────────────────────────────────────
 def test_nine_gate_summarize_and_attach():
-    from core.analysis.nine_gates import NineGatesReport, GateReport
+    from core.analysis.nine_gates import GateReport, NineGatesReport
     reports = [
         GateReport(4, "Multiple Testing", True, "PASS",
                    {"dsr": 1.2, "dsr_p_value": 0.01, "dsr_significant": True, "psr": 0.97,
@@ -269,9 +269,9 @@ def test_nine_gate_summarize_and_attach():
 
 # ── B2: 模型卡持久化 ────────────────────────────────────────────────────────────
 def test_model_card_sync_persists_real_cards():
+    import services.read.governance as G
     import strategy_registry as R
     from model_risk.model_inventory import ModelInventory
-    import services.read.governance as G
     # 临时台账：一个在册（应 APPROVED）+ 一个候选（PENDING）
     tmp_reg = Path(tempfile.mkdtemp()) / "tv.json"
     R.REGISTRY = tmp_reg

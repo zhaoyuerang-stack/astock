@@ -34,7 +34,7 @@ class FactorDefinition(BaseModel):
     winsorize_method: str = ""
     standardize_method: str = ""
     direction: str = "positive"  # positive|negative
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
 
 # ── §7.3 Experiment / §7.4 ExperimentResult ────────────────────────────────────
@@ -60,7 +60,7 @@ class Strategy(BaseModel):
 # ── §7.6 PortfolioState ────────────────────────────────────────────────────────
 class PortfolioState(BaseModel):
     portfolio_id: str
-    date: Optional[date] = None
+    date: Optional[date] = None  # noqa: UP045 —— 字段名遮蔽类型名;改写成 date | None 时,pydantic get_type_hints 会在类命名空间把 date 解析成字段默认 None,None|None 直接 TypeError
     nav: float = 0.0
     cash_ratio: float = 0.0
     gross_exposure: float = 0.0
@@ -76,7 +76,7 @@ class PortfolioState(BaseModel):
 # ── §7.7 ControlAction ─────────────────────────────────────────────────────────
 class ControlAction(BaseModel):
     action_id: str
-    date: Optional[datetime] = None
+    date: datetime | None = None
     object_type: str = ""  # data|factor|strategy|portfolio|experiment|agent
     object_id: str = ""
     trigger_state: str = ""
@@ -122,4 +122,4 @@ class AgentTask(BaseModel):
     output_type: str = ""  # explanation|report|recommendation|check|summary
     output: str = ""
     confidence: float = 0.0
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None

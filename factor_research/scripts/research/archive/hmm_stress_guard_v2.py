@@ -10,8 +10,10 @@ Fixed to: df_env.index < target_dt (only yesterday and earlier)
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/hmm_stress_guard_v2.py
 """
-import os, sys, json, time
+import os
+import sys
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -19,8 +21,13 @@ ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, load_price_panels, backtest_weights, build_rebalance_weights
 from factors.small_cap import small_cap_factor, small_cap_timing
+from strategies.small_cap import (
+    StrategyConfig,
+    backtest_weights,
+    build_rebalance_weights,
+    load_price_panels,
+)
 
 OUT = ROOT / "reports" / "research"
 OUT.mkdir(parents=True, exist_ok=True)

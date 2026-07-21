@@ -8,7 +8,6 @@ from __future__ import annotations
 from contracts.agent_control import ActionDecision, AgentAction
 from services.read.artifact_inventory import get_artifact_inventory
 
-
 # Canonical formal-evidence sources beyond the artifact areas (governance/registry).
 _EVIDENCE_ALLOWED_EXTRA = {"workflow", "registry", "research_ledger"}
 _REGISTRY_EVIDENCE_FILES = {"strategy_versions.json", "strategy_families.json"}

@@ -10,11 +10,11 @@ from app_config.log import get_logger
 
 logger = get_logger(__name__)
 
-import time
 import random
 import threading
-from pathlib import Path
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 # 给所有 requests 请求加默认超时（防东财等接口hang卡死整个下载）
 try:

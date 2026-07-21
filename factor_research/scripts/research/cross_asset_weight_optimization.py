@@ -5,17 +5,20 @@ risk_parity 给国债 vol 3% 过多权重 (>60%) → ann 7.2% 太低.
 
 Grid: (illiq, small_cap, gold, gov_bond) 权重组合
 """
-import os, sys, warnings
+import os
+import sys
+import warnings
 from pathlib import Path
+
 warnings.filterwarnings("ignore")
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-import numpy as np
 import pandas as pd
-from portfolio.strategy_runners import run_active
+
 from portfolio.composer import metrics as pm
+from portfolio.strategy_runners import run_active
 
 ETF_DIR = ROOT / "data_lake" / "cross_asset" / "etf"
 START = "2018-01-01"
@@ -56,12 +59,12 @@ def portfolio(w_illiq, w_small, w_gold, w_gov):
 # Baseline (A only risk_parity ≈ 50/50)
 base = portfolio(0.5, 0.5, 0, 0)
 mb = pm(base)
-print(f"\nBaseline (50% illiq + 50% small-cap):")
+print("\nBaseline (50% illiq + 50% small-cap):")
 print(f"  ann={mb['annual']:+.1%}  sh={mb['sharpe']:+.2f}  cal={mb['calmar']:+.2f}  mdd={mb['maxdd']:+.1%}")
 
 # Weight grid
 print(f"\n{'='*70}")
-print(f"  Weight Grid Search (illiq/small/gold/gov_bond)")
+print("  Weight Grid Search (illiq/small/gold/gov_bond)")
 print(f"{'='*70}")
 print(f"  {'illiq':>6s} {'small':>6s} {'gold':>5s} {'gov':>5s}  {'ann':>7s} {'sh':>5s} {'cal':>5s} {'mdd':>7s}  Δsh    Δcal")
 print("  " + "-" * 78)
@@ -103,10 +106,10 @@ for wi, ws, wg, wb in configs:
 if best:
     wi, ws, wg, wb = best[0]
     m = best[1]
-    print(f"\n  ⭐ 最优 (ann ≥ 20% 且 sh > baseline + 0.05):")
+    print("\n  ⭐ 最优 (ann ≥ 20% 且 sh > baseline + 0.05):")
     print(f"     权重: illiq {wi:.0%} / small {ws:.0%} / gold {wg:.0%} / gov_bond {wb:.0%}")
     print(f"     ann={m['annual']:+.1%}  sh={m['sharpe']:+.2f}  cal={m['calmar']:+.2f}  mdd={m['maxdd']:+.1%}")
     print(f"     vs baseline: Δsh={m['sharpe']-mb['sharpe']:+.2f}  Δcal={m['calmar']-mb['calmar']:+.2f}  "
           f"Δmdd={m['maxdd']-mb['maxdd']:+.1%}")
 else:
-    print(f"\n  ❌ 无配置同时满足 ann ≥ 20% 且 sh 改善 > 0.05")
+    print("\n  ❌ 无配置同时满足 ann ≥ 20% 且 sh 改善 > 0.05")

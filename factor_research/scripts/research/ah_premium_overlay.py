@@ -6,15 +6,23 @@ reduce v2.1 position. When cheap, increase.
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/ah_premium_overlay.py
 """
-import os, sys
+import os
+import sys
 from pathlib import Path
-import numpy as np, pandas as pd
+
+import numpy as np
+import pandas as pd
 
 ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT); sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, load_price_panels, backtest_weights, build_rebalance_weights
 from factors.small_cap import small_cap_factor, small_cap_timing
+from strategies.small_cap import (
+    StrategyConfig,
+    backtest_weights,
+    build_rebalance_weights,
+    load_price_panels,
+)
 
 OUT = ROOT / "reports" / "research"; OUT.mkdir(parents=True, exist_ok=True)
 HK_DIR = ROOT / "data_lake" / "price" / "hk_daily"
@@ -89,7 +97,7 @@ def maxdd(ret):
     return float(((1 + ret.fillna(0)).cumprod() / (1 + ret.fillna(0)).cumprod().cummax() - 1).min())
 
 print(f"\n{'='*65}")
-print(f"  A-H Premium Dynamic Exposure Grid")
+print("  A-H Premium Dynamic Exposure Grid")
 print(f"{'='*65}")
 print(f"  v2.1 baseline: ann={cagr(ret21[ret21.index.year>=2020]):+.1%}  "
       f"sharpe={sharpe(ret21[ret21.index.year>=2020]):.2f}  "

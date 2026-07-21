@@ -208,7 +208,7 @@ def run_validation_pipeline(
     # Pre-calculate factor panel once at the pipeline level to share across all validation stages (L0, L1, L2, L3)
     cached_factor = None
     try:
-        from factory.lines.line2_validation.l1_quick_bt import _resolve_factor_fn, _dispatch_args
+        from factory.lines.line2_validation.l1_quick_bt import _dispatch_args, _resolve_factor_fn
         fn = _resolve_factor_fn(hyp.factor_fn_name)
         args = _dispatch_args(hyp.data_dependencies, close, volume, amount)
         cached_factor = fn(*args, **hyp.factor_params)

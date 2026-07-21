@@ -12,8 +12,8 @@ ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import load_price_panels, build_rebalance_weights
 from factors.small_cap import small_cap_factor
+from strategies.small_cap import build_rebalance_weights, load_price_panels
 
 close, volume, amount = load_price_panels("2010-01-01")
 ipo = close.apply(lambda s: s.first_valid_index())          # 每股首个有效日 ≈ 上市日

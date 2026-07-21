@@ -6,7 +6,10 @@
   cd /Users/kiki/astcok/factor_research
   /opt/homebrew/bin/python3 scripts/ops/prod_health_check.py
 """
-import json, os, subprocess, sys
+import json
+import os
+import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -33,7 +36,7 @@ def main():
     now_cn = datetime.now(CHINA_TZ)
     now_local = datetime.now()
     print("=" * 70)
-    print(f"  生产环境健康检查")
+    print("  生产环境健康检查")
     print(f"  中国时间: {now_cn:%Y-%m-%d %H:%M} CST")
     print(f"  本地时间: {now_local:%Y-%m-%d %H:%M} {now_local.astimezone().tzinfo}")
     print("=" * 70)
@@ -43,7 +46,8 @@ def main():
     import platform
     check(True, "Python", f"{platform.python_version()} @ {sys.executable}")
     try:
-        import pandas; import numpy
+        import numpy
+        import pandas
         check(True, "依赖", f"pandas {pandas.__version__}, numpy {numpy.__version__}")
     except ImportError as e:
         check(False, "依赖", str(e))
@@ -184,7 +188,7 @@ def main():
     if needs_update:
         print(f"  1. 数据过期{data_age}天 → 手动跑: python3 scripts/ops/scheduled_daily_update.py")
     elif data_age > 3 and not cn_market_closed:
-        print(f"  数据过期正常(周末/待收盘), 系统将在北京时间16:30自动更新")
+        print("  数据过期正常(周末/待收盘), 系统将在北京时间16:30自动更新")
     if sig_files and sig_age > 3 and cn_market_closed:
         print(f"  2. 信号过期{sig_age}天 → 手动跑: python3 run_daily.py --no-update")
     if not needs_update and cn_market_closed:

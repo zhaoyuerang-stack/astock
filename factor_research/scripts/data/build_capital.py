@@ -22,12 +22,12 @@ ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from lake.sources.registry import resolve_source  # noqa: E402
 from lake.sources.exchange import (  # noqa: E402
     merge_margin,
     merge_northbound,
     merge_northbound_stock,
 )
+from lake.sources.registry import resolve_source  # noqa: E402
 
 LAKE = Path("data_lake")
 REPORT_DIR = Path("reports/data")

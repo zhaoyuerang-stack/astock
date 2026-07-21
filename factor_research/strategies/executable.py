@@ -11,13 +11,13 @@ import pandas as pd
 
 from core.engine import PricePanel, Signal
 from core.strategy_spec import ExecutableStrategySpec
+from research_toolkit import apply_veto_filter
 from strategies.catalog import (
     resolve_factor_builder,
     resolve_policy_builder,
     resolve_timing_builder,
 )
 from strategies.small_cap import build_rebalance_weights
-from research_toolkit import apply_veto_filter
 
 
 def select_holdings(factor_row: pd.Series, veto_row, top_n: int, veto_q: float) -> list:

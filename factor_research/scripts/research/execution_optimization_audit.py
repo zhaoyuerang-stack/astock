@@ -15,8 +15,11 @@
   · 任一 mode ann ≥ baseline + 5pp     → 立即采纳
   · 否则 → 关闭这条分支 (节省后续 5min K 线工程约 1 周)
 """
-import os, sys, warnings
+import os
+import sys
+import warnings
 from pathlib import Path
+
 warnings.filterwarnings("ignore")
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
@@ -26,22 +29,21 @@ import numpy as np
 import pandas as pd
 
 import scripts.ops.paper_trade as pt
-from strategies.small_cap import run_small_cap_strategy, StrategyConfig
 from lake.load_lake import load_raw_close
-
+from strategies.small_cap import StrategyConfig, run_small_cap_strategy
 
 REPLAY_START = sys.argv[1] if len(sys.argv) > 1 else "2024-01-01"
 REPLAY_END = "2025-12-31"
 TOP_N, REBAL = 25, 20
 
-print(f"加载内核 (factor/timing 计算)...", flush=True)
+print("加载内核 (factor/timing 计算)...", flush=True)
 res = run_small_cap_strategy(StrategyConfig(start="2010-01-01"))
 close, factor, timing = res["close"], res["factor"], res["timing"]
 names = pt.load_names()
 raw_start = (pd.Timestamp(REPLAY_START) - pd.Timedelta(days=400)).strftime("%Y-%m-%d")
 raw_close = load_raw_close(start=raw_start)
 
-print(f"加载 OHLC for fill modes...")
+print("加载 OHLC for fill modes...")
 raw_all = pd.read_parquet(
     "data_lake/price/daily_raw_all.parquet",
     columns=["date", "code", "raw_open", "raw_high", "raw_low", "raw_close"],
@@ -161,7 +163,7 @@ dates_run = close.index[(close.index >= REPLAY_START) & (close.index <= REPLAY_E
 print(f"\n回测期 {dates_run[0].date()} ~ {dates_run[-1].date()}, {len(dates_run)} 交易日\n")
 
 print(f"{'='*70}")
-print(f"  EXECUTION OPTIMIZATION AUDIT")
+print("  EXECUTION OPTIMIZATION AUDIT")
 print(f"{'='*70}")
 print(f"  {'mode':<14s} {'ann':>8s} {'mdd':>8s} {'sh':>6s}  n_trades  vs baseline")
 print(f"  {'-'*68}")
@@ -199,9 +201,9 @@ if best_mode[0] != "open" and best_sh_delta >= 0.10:
 elif best_mode[0] != "open" and (best_mode[1][0] - baseline_ann) >= 0.05:
     print(f"  ⭐ 推荐切换 fill_mode = '{best_mode[0]}' (ann +{(best_mode[1][0] - baseline_ann)*100:.1f}pp)")
 else:
-    print(f"  ❌ 无任一 mode 显著改善")
+    print("  ❌ 无任一 mode 显著改善")
     print(f"     最佳 '{best_mode[0]}' Δsh={best_sh_delta:+.2f}, Δann={(best_mode[1][0] - baseline_ann)*100:+.1f}pp")
-    print(f"  → 关闭这条分支: 节省 5min K 线工程约 1 周 (开盘成交是 OHLC 近似下最优)")
+    print("  → 关闭这条分支: 节省 5min K 线工程约 1 周 (开盘成交是 OHLC 近似下最优)")
 
 # ── 隔夜跳空诊断 ──
 print(f"\n{'='*70}")

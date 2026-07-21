@@ -4,14 +4,18 @@
 含公告日期(防未来函数)、ROE/EPS/营收/净利润/毛利率/现金流、所处行业。
 """
 import warnings; warnings.filterwarnings("ignore")
-import os, time
+import os
+import time
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 import sys
+
 sys.path.insert(0, str(ROOT))
 import akshare as ak
 import pandas as pd
+
 from lake.schema import YJBB_RENAME
 
 # 报告期列表（2010Q1 ~ 2026Q1）

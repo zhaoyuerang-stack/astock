@@ -34,9 +34,8 @@ from core.engine import (  # noqa: E402
     CostModel,
     PricePanel,
     Signal,
+    _map_decisions_to_fill_dates,  # noqa: E402
 )
-from core.engine import _map_decisions_to_fill_dates  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # 合成价格面板：6 个交易日，A/B 两只股票

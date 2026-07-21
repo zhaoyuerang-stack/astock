@@ -3,12 +3,24 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from contracts.views import (AgentAskRequest, AgentAskResponse, AgentKnowledgeSourceView,
-                             AgentSessionAskRequest, AgentSessionAskResponse,
-                             AgentSessionCreateRequest, AgentSessionView)
+from contracts.views import (
+    AgentAskRequest,
+    AgentAskResponse,
+    AgentKnowledgeSourceView,
+    AgentSessionAskRequest,
+    AgentSessionAskResponse,
+    AgentSessionCreateRequest,
+    AgentSessionView,
+)
 from services.agent.knowledge import PROJECT_ROOT, list_knowledge_sources
 from services.agent.planner import ask
-from services.agent.sessions import append_message, create_session, get_session, history_for_llm, list_sessions
+from services.agent.sessions import (
+    append_message,
+    create_session,
+    get_session,
+    history_for_llm,
+    list_sessions,
+)
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 

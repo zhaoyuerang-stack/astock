@@ -3,14 +3,16 @@
 Supports ETF rotation (v1.0), slow stock selection (v1.1), CPV-penalized stock selection (v1.2),
 Huaxi 11-factor ETF rotation (v1.3), and Huaxi 11-factor stock selection rotation (v1.4).
 """
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from factors.large_cap import load_clean_panels_with_growth
 from factors.small_cap import small_cap_timing
+
 
 @dataclass(frozen=True)
 class StrategyConfig:

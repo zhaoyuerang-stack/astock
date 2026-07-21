@@ -7,13 +7,13 @@ import pytest
 
 from scripts.ci import check_holdout_compliance as holdout_guard
 from scripts.ci.check_holdout_compliance import (
-    scan_direct_holdout_access,
-    scan_direct_holdout_dirs,
-    main,
-    validate_monitored_exempt,
     EXPECTED_BOUNDARY,
     MONITORED_EXEMPT,
     PENDING_REMEDIATION,
+    main,
+    scan_direct_holdout_access,
+    scan_direct_holdout_dirs,
+    validate_monitored_exempt,
 )
 
 

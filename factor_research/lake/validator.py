@@ -4,11 +4,11 @@
 设计原则：不信任单一源，逐只多维度交叉确认，产出可追溯的质量报告。
 """
 import json
-import pandas as pd
-import numpy as np
 from pathlib import Path
 
-from lake.data_issue_triage import DATA_ISSUE_CATEGORIES, ISSUE_SEVERITY, build_validation_triage
+import pandas as pd
+
+from lake.data_issue_triage import build_validation_triage
 
 
 class DataValidator:

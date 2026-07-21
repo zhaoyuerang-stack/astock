@@ -18,8 +18,8 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from factors.alpha.transforms import zscore, zscore_cross_section, mad_clip, rank_transform
 from engine.neutralize import zscore_series
+from factors.alpha.transforms import mad_clip, rank_transform, zscore, zscore_cross_section
 from factors.utils import safe_zscore
 
 # 行=日期、列=股票;刻意非对称,使横截面/时间轴结果可区分。

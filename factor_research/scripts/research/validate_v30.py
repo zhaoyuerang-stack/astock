@@ -7,9 +7,13 @@
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/validate_v30.py
 """
-import os, sys, json, warnings
+import os
+import sys
+import warnings
+
 warnings.filterwarnings("ignore")
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -17,10 +21,11 @@ ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, backtest_weights, run_small_cap_strategy
 from scripts.research.build_largecap_value_quality import (
-    load_clean_panels, build_factors,
+    build_factors,
+    load_clean_panels,
 )
+from strategies.small_cap import StrategyConfig, backtest_weights, run_small_cap_strategy
 
 OUT = ROOT / "reports" / "research"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -172,7 +177,7 @@ def walk_forward_v30():
     fix_s = pd.Series(fixed_returns, index=wf_years)
     base_s = pd.Series(base_returns, index=wf_years)
 
-    print(f"\n  WF Summary (2015-2026):")
+    print("\n  WF Summary (2015-2026):")
     print(f"    Ann: WF={wf_s.mean():+.1%}  Fixed={fix_s.mean():+.1%}  Base={base_s.mean():+.1%}")
     print(f"    WF Sharpe: {_sharpe(wf_s):.2f}  WinRate vsBase: {(wf_s>base_s).mean():.0%}")
 
@@ -258,7 +263,7 @@ def rebalance_sensitivity():
 
     # Also test with PT2 overlay acting only on v3.0
     # Compare 50/50 combo of v2.2 and v3.0+PT2
-    print(f"\n  Combined v2.2(50%) + v3.0+PT2(50%) quarterly:")
+    print("\n  Combined v2.2(50%) + v3.0+PT2(50%) quarterly:")
     v20_base = run_small_cap_strategy(cfg)
     v20 = v20_base["returns"]
     sched = build_scheduled_weights(factor, close, 20, 63)

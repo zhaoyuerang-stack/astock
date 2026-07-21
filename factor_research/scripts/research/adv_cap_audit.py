@@ -129,7 +129,7 @@ def main():
     print(f"  ann={m_base['ann']:+.1%}  sh={m_base['sh']:+.2f}  mdd={m_base['mdd']:+.1%}  "
           f"nav={m_base['nav']:.2f}  vol={m_base['vol']:.1%}")
 
-    print(f"\n报告 v3.0 数字: ann +25%, sh ~1.50, mdd -17.7%, nav ~3.0 (8年)")
+    print("\n报告 v3.0 数字: ann +25%, sh ~1.50, mdd -17.7%, nav ~3.0 (8年)")
 
     # Cap 各档
     pv_list = [

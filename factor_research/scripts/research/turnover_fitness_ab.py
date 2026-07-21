@@ -21,7 +21,11 @@ START = "2018-01-01"
 
 
 def main():
-    from factory.autoresearch.novelty import candidate_factor_panel, sample_behavior_dates, topn_turnover
+    from factory.autoresearch.novelty import (
+        candidate_factor_panel,
+        sample_behavior_dates,
+        topn_turnover,
+    )
     from factory.autoresearch.repositories import CandidateRepository, ExperimentLog
     from services.actions.autoresearch import _load_validation_data
     from services.actions.autoresearch_search import run_autoresearch_island_search

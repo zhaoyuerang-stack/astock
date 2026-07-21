@@ -9,9 +9,9 @@ large_order_net_ratio)与既有 illiquidity/size 簇相关性高达 0.66-0.83、
 
 全程截 < holdout boundary(§5.2,新候选搜索)。
 """
+import json
 import os
 import sys
-import json
 from pathlib import Path
 
 PROJECT_ROOT = Path("/Users/kiki/astcok/factor_research")
@@ -20,13 +20,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "research"))
 
-import numpy as np
-import pandas as pd
 
-from core.engine import Signal, PricePanel, BacktestConfig, BacktestEngine, CostModel
-from engine.metrics import metrics
 from illiq_largecap_audit import build_weights, ic_stats
-from governance.holdout import boundary, assert_search_clean
+
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
+from engine.metrics import metrics
+from governance.holdout import assert_search_clean, boundary
 
 COST = CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.0)
 UNIVERSES = [800, 300]
@@ -55,9 +54,9 @@ def screen(name, factor, close, amount, prices, timing, start, universe):
 
 
 def main():
-    from strategies.small_cap import load_price_panels
-    from factors.shareholder import holder_count_chg, holdertrade_net
     from factors.capital_flow import large_order_net_ratio
+    from factors.shareholder import holder_count_chg, holdertrade_net
+    from strategies.small_cap import load_price_panels
 
     b = boundary()
     close, volume, amount = load_price_panels("2010-01-01")

@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import json
 import threading
+from collections.abc import Iterator
 from dataclasses import asdict
 from pathlib import Path
-from typing import Iterator
 
 from .models import Candidate, CandidateDecision, CandidateEvaluationResult, CandidateStatus
 

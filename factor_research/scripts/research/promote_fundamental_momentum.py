@@ -43,7 +43,7 @@ def main():
 
     spec = hypothesis_to_spec(hyp)
     print(f"候选: {spec.name}  指纹 {cand.fingerprint[:10]}")
-    print(f"因子: momentum(60)+revenue_yoy  | 择时: 缺省 PureTrend MA16")
+    print("因子: momentum(60)+revenue_yoy  | 择时: 缺省 PureTrend MA16")
     print(f"data_deps: {list(hyp.data_dependencies)}")
 
     report = promote_spec(

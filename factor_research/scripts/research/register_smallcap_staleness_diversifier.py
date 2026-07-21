@@ -6,24 +6,34 @@
 n_trials 诚实记搜索自由度(流动性族 4 因子 × λ 网格 3 = 12)。
 """
 from __future__ import annotations
-import os, sys
-from pathlib import Path
+
+import os
+import sys
 from datetime import date
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT)); os.chdir(ROOT)
 
 from scripts.research.promote_smallcap_staleness import (  # noqa: E402
-    factor_builder, timing_builder, CONFIG, FAMILY, VERSION, LAMBDA, WIN, HYPOTHESIS)
+    CONFIG,
+    FAMILY,
+    HYPOTHESIS,
+    LAMBDA,
+    VERSION,
+    WIN,
+    factor_builder,
+    timing_builder,
+)
 
 N_TRIALS = 12  # 诚实:流动性族 4 因子(zero_vol/zero_ret/liq_vol/amihud)× λ 网格{0,0.5,1.0}
 
 
 def main():
+    from engine.metrics import compute_hit
+    from strategy_registry import register, register_family
     from workflow.phase2_backtest import Phase2Runner
     from workflow.phase3_wf import WF3Runner
-    from strategy_registry import register_family, register
-    from engine.metrics import compute_hit
 
     print("phase2/3 取诚实 metrics...", flush=True)
     p2 = Phase2Runner(factor_builder, timing_builder, FAMILY, CONFIG).run(warmup_start="2010-01-01")
@@ -53,9 +63,9 @@ def main():
     }
     admission = {
         "track": "diversifier",
-        "rationale": (f"组合边际已证:对 small-cap 核心 Sharpe IS 0.77→1.09 / OOS 0.48→0.60;"
-                      f"zero_ret_days size 正交(截面 corr 0.057)→ 真分散非 size 代理。"
-                      f"phase1-3 验证通过(防未来/成本敏感/WF 9-11 正窗)。"),
+        "rationale": ("组合边际已证:对 small-cap 核心 Sharpe IS 0.77→1.09 / OOS 0.48→0.60;"
+                      "zero_ret_days size 正交(截面 corr 0.057)→ 真分散非 size 代理。"
+                      "phase1-3 验证通过(防未来/成本敏感/WF 9-11 正窗)。"),
         "note": "L1 证据(phase1-3+组合边际 probe);未跑 9-Gate/DSR;λ=0.5 与流动性族筛选计入 n_trials=12",
     }
     config = {

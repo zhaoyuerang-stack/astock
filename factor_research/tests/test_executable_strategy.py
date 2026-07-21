@@ -1,8 +1,9 @@
 """Task 6: spec 驱动 builder 必须逐位复现 canonical 公式,无公式漂移。"""
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
-from pathlib import Path
 
 from core.engine import PricePanel
 from core.strategy_spec import ExecutableStrategySpec

@@ -11,7 +11,7 @@
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
@@ -45,7 +45,7 @@ class WFValidationReport:
 
     def summary(self) -> str:
         lines = [
-            f"WF Validation Report",
+            "WF Validation Report",
             f"  Candidates: {self.n_candidates}, days: {self.n_periods}",
             f"  Best: {self.best_name} (SR={self.best_sharpe:.2f}, ann={self.best_annual:+.1%})",
             f"  DSR: {self.dsr:.2f} (p={self.dsr_p_value:.3f}, {'sig' if self.dsr_significant else 'not sig'})",

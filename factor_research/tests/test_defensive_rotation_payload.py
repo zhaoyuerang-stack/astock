@@ -1,6 +1,5 @@
 from run_daily import build_rotation_payload
 
-
 AUTH = {
     "role": "defensive",
     "family": "defensive-ma16-bond",

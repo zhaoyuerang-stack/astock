@@ -19,14 +19,12 @@ sys.path.insert(0, str(Path.cwd()))
 import numpy as np
 import pandas as pd
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from strategies.small_cap import load_price_panels, build_rebalance_weights
-from factors.small_cap import small_cap_timing
-from factors.alpha.builtins.illiq import AmihudIlliq
-from factors.utils import safe_zscore, mad_clip
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
+from factors.alpha import transforms  # noqa: F401 —— 副作用注册 DSL 变换(zscore/mad_clip/shift 等)
 from factors.alpha.base import FactorData
-from factors.alpha import transforms
-
+from factors.alpha.builtins.illiq import AmihudIlliq
+from factors.small_cap import small_cap_timing
+from strategies.small_cap import build_rebalance_weights, load_price_panels
 
 
 def compute_salience_covariance(close, W=20, theta=0.1, delta=0.7):

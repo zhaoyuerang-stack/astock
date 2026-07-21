@@ -17,8 +17,8 @@ Usage:
 import numpy as np
 import pandas as pd
 
-from portfolio.regime import classify, defensive_grade
 from portfolio.composer import metrics as port_metrics
+from portfolio.regime import classify, defensive_grade
 
 
 def evaluate(

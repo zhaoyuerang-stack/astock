@@ -24,7 +24,6 @@ from contracts.views import DataQualityView, PromotionReadinessView, SystemTruth
 from services.read.decision_inbox import get_decision_inbox
 from services.read.research_exhaustion import get_research_exhaustion
 
-
 # ── fixture 工具 ────────────────────────────────────────────────────────────
 
 def _run(status="no_candidates", ho_ok=0, **kw) -> dict:

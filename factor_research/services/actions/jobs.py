@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import os
 import uuid
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from threading import Lock
-from typing import Any, Callable
+from typing import Any
 
 from contracts.views import ActionJobView
 
@@ -18,7 +19,7 @@ _JOBS: dict[str, ActionJobView] = {}
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def _to_result(value: Any) -> dict | None:

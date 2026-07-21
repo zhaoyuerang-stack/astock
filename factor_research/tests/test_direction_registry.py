@@ -27,7 +27,6 @@ sys.path.insert(0, str(ROOT))
 import knowledge.directions as kd
 from knowledge.graph import SearchGate, load_graph
 
-
 # ── fixture 工具 ────────────────────────────────────────────────────────────
 
 def _entry(**kw) -> dict:

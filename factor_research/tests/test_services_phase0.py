@@ -15,10 +15,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
-from services.actions.run_backtest import run_backtest
-from services.read.registry import list_strategies
-from services.read.factors import list_factors
 from contracts.views import BacktestResult
+from services.actions.run_backtest import run_backtest
+from services.read.factors import list_factors
+from services.read.registry import list_strategies
 
 
 def test_read_endpoints_callable():

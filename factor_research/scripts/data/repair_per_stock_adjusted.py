@@ -30,7 +30,7 @@ def main(target_dates: list[str]) -> int:
     targets = [pd.Timestamp(d) for d in target_dates]
     daily = LAKE / "price/daily"
 
-    print(f"加载 daily_raw_all (因子参考 + 重建源) ...", flush=True)
+    print("加载 daily_raw_all (因子参考 + 重建源) ...", flush=True)
     raw = pd.read_parquet(LAKE / "price/daily_raw_all.parquet")
     raw["date"] = pd.to_datetime(raw["date"])
     raw = raw[raw["date"] <= max(targets)]

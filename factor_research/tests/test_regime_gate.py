@@ -15,9 +15,16 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
+from core.engine import (
+    BacktestConfig,
+    BacktestEngine,
+    CostModel,
+    PricePanel,
+    Signal,
+    _factor_to_weights,
+)
+from factors.autoresearch_dsl import clear_factor_cache, compute_dsl_factor
 from portfolio.regime_gate import REGIME_GATED_DEFAULT, apply_regime_gate  # noqa: E402
-from factors.autoresearch_dsl import compute_dsl_factor, clear_factor_cache
-from core.engine import BacktestEngine, Signal, BacktestConfig, PricePanel, CostModel, _factor_to_weights
 
 
 class TestLegacyRegimeGate(unittest.TestCase):

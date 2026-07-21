@@ -13,9 +13,13 @@ Universe: top 500 by market cap proxy (amount × raw_close)
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/build_quality_growth.py
 """
-import os, sys, warnings
+import os
+import sys
+import warnings
+
 warnings.filterwarnings("ignore")
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
@@ -24,8 +28,7 @@ ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, load_price_panels, backtest_weights, run_small_cap_strategy, build_rebalance_weights
-from factors.small_cap import small_cap_factor, small_cap_timing
+from strategies.small_cap import StrategyConfig, run_small_cap_strategy
 
 OUT = ROOT / "reports" / "research"
 OUT.mkdir(parents=True, exist_ok=True)

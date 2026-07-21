@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Mapping
 
 import pandas as pd
 
@@ -21,7 +21,6 @@ from factors.small_cap import small_cap_factor, small_cap_timing
 from factors.veto import loser_veto_reversal
 from research_toolkit import HostSpec, compute_marginal_report
 from strategies.small_cap import build_rebalance_weights, load_price_panels
-
 
 DEFAULT_WINDOWS = {
     "insample_2018_2026": ("2018-01-01", None),

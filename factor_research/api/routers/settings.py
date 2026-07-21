@@ -7,12 +7,21 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
-from contracts.views import (ActionTokenView, AuditView, LLMConfigSet, LLMConfigView,
-                             LLMTestResult, SystemConfigView)
-from services.actions.action_guard import (ACTION_HEADER, audit_action,
-                                           current_action_token,
-                                           is_loopback_request,
-                                           verify_action_token)
+from contracts.views import (
+    ActionTokenView,
+    AuditView,
+    LLMConfigSet,
+    LLMConfigView,
+    LLMTestResult,
+    SystemConfigView,
+)
+from services.actions.action_guard import (
+    ACTION_HEADER,
+    audit_action,
+    current_action_token,
+    is_loopback_request,
+    verify_action_token,
+)
 from services.read.audit import recent_audit
 from services.read.settings import system_config
 

@@ -13,7 +13,11 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from lake.invariants import LakeInvariantError, assert_price_panel_sane, check_cross_section_sanity  # noqa: E402
+from lake.invariants import (  # noqa: E402
+    LakeInvariantError,
+    assert_price_panel_sane,
+    check_cross_section_sanity,
+)
 
 
 def _long_panel(n_days=10, n_stocks=600, poison_last_day=False, seed=7):

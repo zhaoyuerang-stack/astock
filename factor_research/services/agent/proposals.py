@@ -6,7 +6,6 @@ from typing import Any
 from contracts.agent_control import AgentAction
 from services.read.action_policy import can_agent_do
 
-
 _ALLOWED_PROPOSALS = {
     "promote": {
         "action": AgentAction.PROMOTE_CANDIDATE,

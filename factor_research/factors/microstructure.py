@@ -11,8 +11,8 @@
 import numpy as np
 import pandas as pd
 
-from factors.utils import mad_clip, safe_zscore
 from factors.registry import register_factor
+from factors.utils import mad_clip, safe_zscore
 
 
 def short_reversal(close: pd.DataFrame, n: int = 5) -> pd.DataFrame:

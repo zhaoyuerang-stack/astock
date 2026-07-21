@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter
+
 from contracts.views import TradeReadinessView
 from services.read.trade_readiness import get_trade_readiness
 

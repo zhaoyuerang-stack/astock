@@ -6,14 +6,15 @@ Model Risk Validation Review, Investment Policy Committee).
 from __future__ import annotations
 
 import time
-from typing import Dict, Any, List, Optional
-from model_risk.model_inventory import ModelInventory, ModelCard
+
+from model_risk.model_inventory import ModelCard, ModelInventory
+
 
 class ApprovalWorkflow:
     def __init__(self, inventory: ModelInventory):
         self.inventory = inventory
 
-    def request_approval(self, strategy_id: str, owner: str) -> Optional[ModelCard]:
+    def request_approval(self, strategy_id: str, owner: str) -> ModelCard | None:
         """Initiate approval workflow for a given strategy."""
         card = self.inventory.get_card(strategy_id)
         if not card:
@@ -29,7 +30,7 @@ class ApprovalWorkflow:
         strategy_id: str,
         approver: str,
         notes: str = ""
-    ) -> Optional[ModelCard]:
+    ) -> ModelCard | None:
         """Approve model and sign it off."""
         card = self.inventory.get_card(strategy_id)
         if not card:
@@ -49,7 +50,7 @@ class ApprovalWorkflow:
         strategy_id: str,
         approver: str,
         notes: str = ""
-    ) -> Optional[ModelCard]:
+    ) -> ModelCard | None:
         """Reject model and log reasons."""
         card = self.inventory.get_card(strategy_id)
         if not card:

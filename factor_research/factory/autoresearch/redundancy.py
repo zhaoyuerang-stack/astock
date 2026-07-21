@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from .models import RedundancyReport
 
-
 WEIGHTS = {
     "spearman_corr": 0.3,
     "normalized_mi": 0.2,

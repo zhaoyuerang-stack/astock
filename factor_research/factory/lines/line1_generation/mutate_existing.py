@@ -4,11 +4,10 @@
 扩展新 factor 只需加一条 spec。
 """
 import itertools
+from collections.abc import Iterator
 from datetime import date
-from typing import Iterator, Optional
 
 from factory.ontology import EconomicThesis, Hypothesis, HypothesisStatus
-
 
 # ────────────────────────── Mutation 规格 ──────────────────────────
 
@@ -267,7 +266,7 @@ FACTOR_MUTATION_SPECS: dict[str, dict] = {
 
 def mutate_factor(
     factor_fn_name: str,
-    parent_id: Optional[str] = None,
+    parent_id: str | None = None,
     extra_thesis_note: str = "",
 ) -> Iterator[Hypothesis]:
     """对一个 factor 枚举所有参数组合，yield Hypothesis。"""

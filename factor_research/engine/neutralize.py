@@ -8,7 +8,6 @@
 """
 import numpy as np
 import pandas as pd
-from scipy import stats
 
 
 def mad_winsorize(s: pd.Series, n: float = 5.0) -> pd.Series:

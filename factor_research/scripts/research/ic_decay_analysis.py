@@ -3,6 +3,7 @@
 计算因子与不同预测周期收益的相关性，评估因子预测能力的持久性。
 """
 import warnings
+
 warnings.filterwarnings("ignore")
 import os
 import sys
@@ -16,9 +17,8 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from strategies.small_cap import load_price_panels
 from factors.small_cap import small_cap_factor
+from strategies.small_cap import load_price_panels
 
 
 def calc_ic_decay(factor, close, forward_days_list=[1, 2, 3, 5, 10, 20, 40, 60]):
@@ -79,7 +79,7 @@ def main():
 
     # 计算因子
     factor = small_cap_factor(amount, window=60)
-    print(f"因子: 成交额60日均值的负对数 (小盘 = 低成交额)")
+    print("因子: 成交额60日均值的负对数 (小盘 = 低成交额)")
 
     # IC 衰减
     forward_days = [1, 2, 3, 5, 10, 20, 40, 60]

@@ -5,7 +5,9 @@ n_trials 取 12(族内:流动性族 4 因子 × λ 网格 3)与 30(保守:含更
 dsr_p≥0.05 → standalone 当前证据不通,停在已入册 diversifier。
 """
 from __future__ import annotations
-import os, sys
+
+import os
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -14,12 +16,12 @@ sys.path.insert(0, str(ROOT)); os.chdir(ROOT)
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from workflow.phase2_backtest import run_segment, load_data  # noqa: E402
-from strategies.small_cap import build_rebalance_weights, small_cap_timing  # noqa: E402
-from governance.holdout import boundary  # noqa: E402
-from core.engine import CostModel  # noqa: E402
 from core.analysis.walk_forward import deflated_sharpe  # noqa: E402
+from core.engine import CostModel  # noqa: E402
+from governance.holdout import boundary  # noqa: E402
 from scripts.research.promote_smallcap_staleness import factor_builder, timing_builder  # noqa: E402
+from strategies.small_cap import build_rebalance_weights  # noqa: E402
+from workflow.phase2_backtest import load_data, run_segment  # noqa: E402
 
 COST = CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065)
 

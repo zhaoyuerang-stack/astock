@@ -11,27 +11,25 @@
 
 from __future__ import annotations  # 注解惰性求值:dict|None 等 PEP604 在旧解释器子进程下也不崩
 
-import os
-import sys
-import json
 import datetime
 import hashlib
-import traceback
+import json
+import sys
 from pathlib import Path
-import numpy as np
+
 import pandas as pd
 
 # 设定工作目录
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from services.agent.llm_adapter import get_adapter
 from factory.ontology.report_logic import (
-    TransmissionNode,
     LogicalChain,
+    NodeChange,
+    TransmissionNode,
     TransmissionNodeCategory,
-    NodeChange
 )
+from services.agent.llm_adapter import get_adapter
 
 # 设定输入与输出路径
 PDF_DIR = ROOT / "data_lake" / "research_pdf"

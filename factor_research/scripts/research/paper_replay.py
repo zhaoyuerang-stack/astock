@@ -12,18 +12,18 @@ ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-import numpy as np                                       # noqa: E402
-import pandas as pd                                      # noqa: E402
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
 
-import scripts.ops.paper_trade as pt                     # noqa: E402
-from strategies.small_cap import run_small_cap_strategy, StrategyConfig
+import scripts.ops.paper_trade as pt  # noqa: E402
 from lake.load_lake import load_raw_close
+from strategies.small_cap import StrategyConfig, run_small_cap_strategy
 
 REPLAY_START = sys.argv[1] if len(sys.argv) > 1 else "2024-01-01"
 REPLAY_END = "2025-12-31"
 TOP_N, REBAL = 25, 20
 
-print(f"加载回测内核(算 factor/timing,约 1-2 分钟)...", flush=True)
+print("加载回测内核(算 factor/timing,约 1-2 分钟)...", flush=True)
 res = run_small_cap_strategy(StrategyConfig(start="2010-01-01"))
 close, factor, timing = res["close"], res["factor"], res["timing"]
 names = pt.load_names()
@@ -118,4 +118,4 @@ print("=" * 64)
 out = pd.DataFrame({"date": nav.index, "paper_nav": nav.values,
                     "backtest_nav": bnav.reindex(nav.index).values})
 out.to_csv("reports/paper_replay_nav.csv", index=False)
-print(f"\n净值曲线 → reports/paper_replay_nav.csv")
+print("\n净值曲线 → reports/paper_replay_nav.csv")

@@ -11,25 +11,24 @@ from app_config.log import get_logger
 
 logger = get_logger(__name__)
 
-import os
-import sys
 import argparse
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
-from strategies.small_cap import load_price_panels
-from lake.load_lake import load_daily_basic_panel
+from core.analysis.nine_gates import NineGatesEvaluator, NineGatesReport
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from core.risk.dual_valve import apply_dual_valve_gating
 from factors.autoresearch_dsl import compute_dsl_factor
-from core.engine import PricePanel, Signal, BacktestEngine, CostModel, BacktestConfig
-from core.analysis.nine_gates import NineGatesEvaluator, NineGatesReport
-from strategy_registry import register_family, register, attach_nine_gate
+from lake.load_lake import load_daily_basic_panel
+from strategies.small_cap import load_price_panels
+from strategy_registry import attach_nine_gate, register, register_family
 
 AST_REVERSAL = {
     "type": "linear_combo",
@@ -48,7 +47,7 @@ def parse_allocation(alloc_str: str) -> dict[str, float]:
             k, v = item.split(":")
             alloc[k.strip()] = float(v.strip())
     except Exception as e:
-        raise ValueError(f"Invalid allocation format: {alloc_str}. Detail: {e}")
+        raise ValueError(f"Invalid allocation format: {alloc_str}. Detail: {e}") from e
     total = sum(alloc.values())
     if not (0.99 <= total <= 1.01):
         raise ValueError(f"Portfolio weights must sum up to 1.0, got: {total}")

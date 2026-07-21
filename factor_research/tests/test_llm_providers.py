@@ -10,8 +10,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
-from services.agent.llm_adapter import (AnthropicAdapter, NullAdapter,
-                                        OpenAICompatAdapter, ai_model_info, get_adapter)
+from services.agent.llm_adapter import (
+    AnthropicAdapter,
+    NullAdapter,
+    OpenAICompatAdapter,
+    ai_model_info,
+    get_adapter,
+)
 from services.agent.planner import ask
 
 
@@ -64,7 +69,8 @@ def test_ai_model_info_shape():
 def test_config_save_mask_reset():
     """UI 写配置:key 绝不回传明文(非破坏:测后还原用户真实配置)。"""
     import json
-    from services.agent.llm_adapter import save_runtime_config, llm_config_masked
+
+    from services.agent.llm_adapter import llm_config_masked, save_runtime_config
     bk = _backup_runtime()
     try:
         save_runtime_config("openai_compatible", "deepseek-chat", "https://api.deepseek.com/v1", "sk-SECRET999")
@@ -79,7 +85,7 @@ def test_config_save_mask_reset():
 
 def test_lockdown_independent_of_llm():
     """安全不变量:无论接哪个模型,降仓(high)仍仅提案,LLM 绕不过不越权门。"""
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import MagicMock, patch
     mock_adapter = MagicMock()
     mock_adapter.available.return_value = True
     # Return JSON intent classifying the request as rebalance

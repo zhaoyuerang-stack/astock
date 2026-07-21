@@ -23,8 +23,8 @@ from .generator import generate_seed_candidates
 from .models import Candidate
 from .novelty import (
     candidate_factor_panel,
-    partial_correlation_to_book,
     novelty_score,
+    partial_correlation_to_book,
     sample_behavior_dates,
     topn_long_return,
     topn_turnover,
@@ -673,7 +673,11 @@ def run_island_search(
     # 0. Load historical lessons (系统级反向传播机制预温)
     historical_lessons = []
     try:
-        from factory.autoresearch.repositories import ExperimentLog, CandidateRepository, CandidateDecision
+        from factory.autoresearch.repositories import (
+            CandidateDecision,
+            CandidateRepository,
+            ExperimentLog,
+        )
         exp_repo = ExperimentLog()
         cand_repo = CandidateRepository()
         ast_map = {c.fingerprint: c.ast for c in cand_repo.all()}

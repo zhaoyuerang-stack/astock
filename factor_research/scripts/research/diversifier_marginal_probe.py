@@ -21,15 +21,19 @@ os.chdir(ROOT)
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from scripts.research import signal_source_probe as P  # noqa: E402
-from workflow.phase2_backtest import run_segment, load_data  # noqa: E402
-from strategies.small_cap import build_rebalance_weights, small_cap_factor, small_cap_timing  # noqa: E402
-from governance.holdout import boundary  # noqa: E402
 from core.engine import CostModel  # noqa: E402
-from factors.utils import safe_zscore, mad_clip  # noqa: E402
+from factors.capital_flow import smart_money_divergence  # noqa: E402
 from factors.northbound import northbound_accumulation  # noqa: E402
 from factors.shareholder import holder_count_chg  # noqa: E402
-from factors.capital_flow import smart_money_divergence  # noqa: E402
+from factors.utils import mad_clip, safe_zscore  # noqa: E402
+from governance.holdout import boundary  # noqa: E402
+from scripts.research import signal_source_probe as P  # noqa: E402
+from strategies.small_cap import (  # noqa: E402
+    build_rebalance_weights,
+    small_cap_factor,
+    small_cap_timing,
+)
+from workflow.phase2_backtest import load_data, run_segment  # noqa: E402
 
 TOP_N, REBAL, LEV = 25, 20, 1.25
 LAMBDAS = [0.0, 0.5, 1.0]
@@ -69,7 +73,7 @@ def main():
     b = boundary()
     close, volume, amount = (x.loc[x.index < b] for x in (close, volume, amount))
     oos_hi = str((min(pd.Timestamp("2026-12-31"), b - pd.Timedelta(days=1))).date())
-    SEGS = [("IS 2018-2022", "2018-01-01", "2022-12-31"), (f"OOS 2023+", "2023-01-01", oos_hi)]
+    SEGS = [("IS 2018-2022", "2018-01-01", "2022-12-31"), ("OOS 2023+", "2023-01-01", oos_hi)]
 
     core_z = _zrow(small_cap_factor(amount, window=60))
     blend = _build_blend(close)

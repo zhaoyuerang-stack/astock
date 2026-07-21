@@ -8,20 +8,16 @@
 4. 随着时间积累（推荐 3-6 个月），收集前瞻性真实样本外数据，定期通过 9-Gate 风险门禁重估，达标后方可申请晋级 ACTIVE。
 """
 
-import os
-import sys
-import json
 import datetime
+import json
+import sys
 from pathlib import Path
-from dataclasses import dataclass
-from typing import Optional
 
 # 设定工作目录
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from strategy_registry import register_family, register
-from factory.ontology import Hypothesis, EconomicThesis, HypothesisStatus
+from factory.ontology import EconomicThesis
 
 # 影子日志与表现记录路径
 SHADOW_LOG = ROOT / "data_lake" / "agent" / "shadow_incubation_log.json"
@@ -119,10 +115,10 @@ def configure_shadow_incubation():
     candidate_family = "ontology_industry"
     
     print(f"  当前主系统选股激活策略列表 (ACTIVE): {active_families}")
-    print(f"  准备测试选股器对新因子的隔离机制...")
+    print("  准备测试选股器对新因子的隔离机制...")
     
     # 安全门禁拦截器：只允许在册状态为 ACTIVE 的策略产生交易权重
-    def generate_live_portfolio_weights(family_name: str) -> Optional[dict]:
+    def generate_live_portfolio_weights(family_name: str) -> dict | None:
         # 模拟检查策略状态
         is_active = family_name in active_families
         if not is_active:
@@ -134,7 +130,7 @@ def configure_shadow_incubation():
     if live_weights is None:
         print(f"  [✔] 安全门禁测试通过：新因子 '{candidate_family}' 被成功拦截，不参与实盘选股计算。")
     else:
-        print(f"  [❌] 安全警告：影子因子越权产生了交易权重！")
+        print("  [❌] 安全警告：影子因子越权产生了交易权重！")
         
     print("\n================ 孵化期积累指标说明 ================")
     print("在未来的 90 天观察期内，系统将：")

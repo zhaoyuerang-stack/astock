@@ -11,21 +11,21 @@ Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/gap_reversal_strategy.py
 """
 import warnings; warnings.filterwarnings("ignore")
-import os, sys
+import os
+import sys
 from pathlib import Path
 
 ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-import numpy as np
 import pandas as pd
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from strategies.small_cap import load_price_panels
+from core.engine import BacktestConfig, BacktestEngine, PricePanel, Signal
 from factors.small_cap import small_cap_factor, small_cap_timing
-from factors.utils import safe_zscore, mad_clip
+from factors.utils import mad_clip, safe_zscore
 from lake.load_lake import load_fundamental_panel
+from strategies.small_cap import load_price_panels
 
 OUT = ROOT / "reports" / "research"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -128,7 +128,7 @@ def main():
     # D. Small-cap × Price Momentum filter
     # ═══════════════════════════════════════════════════════════
     print(f"\n{'#'*60}")
-    print(f"  D. SMALL-CAP × MOMENTUM FILTER")
+    print("  D. SMALL-CAP × MOMENTUM FILTER")
     print(f"{'#'*60}", flush=True)
 
     for mom_window in [20, 40, 60]:
@@ -150,7 +150,7 @@ def main():
     # E. Small-cap × Earnings Growth filter
     # ═══════════════════════════════════════════════════════════
     print(f"\n{'#'*60}")
-    print(f"  E. SMALL-CAP × EARNINGS GROWTH FILTER")
+    print("  E. SMALL-CAP × EARNINGS GROWTH FILTER")
     print(f"{'#'*60}", flush=True)
 
     if not fund_npy.empty:
@@ -178,7 +178,7 @@ def main():
     # F. Standalone Earnings Momentum (no size factor)
     # ═══════════════════════════════════════════════════════════
     print(f"\n{'#'*60}")
-    print(f"  F. STANDALONE EARNINGS MOMENTUM")
+    print("  F. STANDALONE EARNINGS MOMENTUM")
     print(f"{'#'*60}", flush=True)
 
     if not fund_npy.empty:
@@ -202,7 +202,7 @@ def main():
     # G. Fundamental × Positive Momentum (no size)
     # ═══════════════════════════════════════════════════════════
     print(f"\n{'#'*60}")
-    print(f"  G. EARNINGS GROWTH × MOMENTUM (NO SIZE)")
+    print("  G. EARNINGS GROWTH × MOMENTUM (NO SIZE)")
     print(f"{'#'*60}", flush=True)
 
     if not fund_npy.empty:
@@ -213,7 +213,7 @@ def main():
 
     # ── Correlation summary ──
     print(f"\n{'#'*60}")
-    print(f"  CORRELATION to Small-cap v2.0")
+    print("  CORRELATION to Small-cap v2.0")
     print(f"{'#'*60}", flush=True)
 
     tests = []
@@ -233,7 +233,7 @@ def main():
         corr = r.returns.loc[common].corr(sc_result.returns.loc[common])
         print(f"  {label}: daily corr vs baseline = {corr:.3f}", flush=True)
 
-    print(f"\nDone.", flush=True)
+    print("\nDone.", flush=True)
 
 
 if __name__ == "__main__":

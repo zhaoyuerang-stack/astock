@@ -6,7 +6,7 @@ to identify decaying strategies.
 from __future__ import annotations
 
 import pandas as pd
-import numpy as np
+
 
 def monitor_ic_decay(
     ic_series: pd.Series,

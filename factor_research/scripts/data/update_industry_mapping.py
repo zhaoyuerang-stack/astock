@@ -4,11 +4,11 @@
 并编译生成 data_lake/meta/industry.parquet 供因子与预测引擎使用。
 """
 
-import os
 import sys
 import time
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
 
 # 设定工作目录
 ROOT = Path(__file__).resolve().parents[2]

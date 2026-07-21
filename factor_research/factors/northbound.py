@@ -19,8 +19,8 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 
-from factors.utils import mad_clip, safe_zscore
 from factors.registry import register_factor
+from factors.utils import mad_clip, safe_zscore
 
 # 取北向子集字段(load_capital_panel 默认含 margin+northbound,这里只要北向持仓口径)
 _NB_FIELDS = (

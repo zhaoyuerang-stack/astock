@@ -27,7 +27,6 @@ from contracts.views import (
 )
 from lake.schema import dataset_contract
 
-
 ROOT = Path(__file__).resolve().parents[2]
 _CORE_MANIFEST = ROOT / "data_lake" / "_manifest.json"
 _TUSHARE_MANIFEST = ROOT / "data_lake" / "tushare_manifest.json"

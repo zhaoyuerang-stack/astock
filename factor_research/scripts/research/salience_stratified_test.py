@@ -18,10 +18,10 @@ sys.path.insert(0, str(Path.cwd()))
 import numpy as np
 import pandas as pd
 
-from strategies.small_cap import load_price_panels
-from factors.utils import safe_zscore, mad_clip
-from factors.alpha.transforms import neutralize
 from engine.factor_analysis import factor_summary
+from factors.alpha.transforms import neutralize
+from strategies.small_cap import load_price_panels
+
 
 def load_industry_groups():
     """Load latest industry mapping from fundamental parquet."""

@@ -7,8 +7,9 @@ Combines:
 """
 from __future__ import annotations
 
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 
 def compute_volume_acceleration(
     volume: pd.DataFrame,

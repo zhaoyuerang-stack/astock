@@ -8,14 +8,17 @@ Target: ann>15%, maxDD>-15%.
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/largecap_analyst_timing.py
 """
-import os, sys
+import os
+import sys
 from pathlib import Path
-import numpy as np, pandas as pd
+
+import numpy as np
+import pandas as pd
 
 ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT); sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, load_price_panels, backtest_weights
+from strategies.small_cap import StrategyConfig, backtest_weights, load_price_panels
 
 OUT = ROOT / "reports" / "research"; OUT.mkdir(parents=True, exist_ok=True)
 ANALYST_DIR = OUT / "analyst_cache"
@@ -133,4 +136,4 @@ if found:
     best_ret.to_csv(OUT / "largecap_analyst_daily.csv")
     print(f"\nWrote: {OUT/'largecap_analyst_daily.csv'}")
 else:
-    print(f"\nNo strategy meets criteria. Closest approaches:")
+    print("\nNo strategy meets criteria. Closest approaches:")

@@ -9,23 +9,25 @@ sleeve = blend(北向+holder+smart_div 中性化等权)/ northbound-only,top-25 
 诚实边界:L0,非 alpha。
 """
 from __future__ import annotations
-import os, sys
+
+import os
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT)); os.chdir(ROOT)
 
 import glob
+
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from scripts.research import signal_source_probe as P  # noqa: E402
-from scripts.research.diversifier_marginal_probe import _build_blend, _zrow  # noqa: E402
-from workflow.phase2_backtest import run_segment, load_data  # noqa: E402
-from strategies.small_cap import build_rebalance_weights, small_cap_timing  # noqa: E402
-from governance.holdout import boundary  # noqa: E402
 from core.engine import CostModel  # noqa: E402
 from factors.northbound import northbound_accumulation  # noqa: E402
+from governance.holdout import boundary  # noqa: E402
+from scripts.research.diversifier_marginal_probe import _build_blend, _zrow  # noqa: E402
+from strategies.small_cap import build_rebalance_weights, small_cap_timing  # noqa: E402
+from workflow.phase2_backtest import load_data, run_segment  # noqa: E402
 
 TOP_N, REBAL = 25, 20
 COST = CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.065)

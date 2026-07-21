@@ -3,8 +3,9 @@ from app_config.log import get_logger
 
 logger = get_logger(__name__)
 
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
 
 AGG = {"open": "first", "high": "max", "low": "min",
        "close": "last", "volume": "sum", "amount": "sum"}

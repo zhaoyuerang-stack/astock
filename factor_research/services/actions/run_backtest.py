@@ -48,15 +48,15 @@ def run_production_engine_backtest(
     Rotation leg:
     when lagged PureTrend dist is <= 0, returns are replaced by 511010.
     """
-    from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
+    from app_config.settings import get_settings
+    from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
     from core.engine import BacktestResult as EngineBacktestResult
-    from strategies.small_cap import load_price_panels, build_rebalance_weights
-    from factors.small_cap import small_cap_timing
     from factors.alpha import transforms  # noqa: F401 - register zscore/mad_clip/shift
     from factors.alpha.base import FactorData
     from factors.alpha.builtins.illiq import AmihudIlliq
+    from factors.small_cap import small_cap_timing
     from factors.veto import salience_covariance_veto
-    from app_config.settings import get_settings
+    from strategies.small_cap import build_rebalance_weights, load_price_panels
 
     warmup_start = get_settings().data.warmup_start
     data_start = str(min(pd.Timestamp(start), pd.Timestamp(warmup_start)).date())

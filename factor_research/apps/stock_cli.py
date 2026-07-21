@@ -7,17 +7,18 @@ Usage:
 import argparse
 import os
 import sys
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import load_price_panels
-from factors.utils import safe_zscore, mad_clip
 from factors.veto import salience_covariance_veto
+from strategies.small_cap import load_price_panels
+
 
 def get_clean_code(code: str) -> str:
     """Format and pad stock code to 6 digits."""

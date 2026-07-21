@@ -18,7 +18,6 @@ holdout)+ 人工确认部署(R-PROD-001)。
 """
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 
 _SMALLCAP_RELOAD_CORR = 0.90  # 披露级:组合与小盘参考腿相关超此 = 疑似小盘 beta 重包装
@@ -60,9 +59,10 @@ def search_composite_allocations(
     legs=None → `run_active()`(唯一正式腿源);注入仅测试。regime_signal(0/1,
     bull=1;须已 lag)启用 regime_adaptive 配权(WS6 路由落点)。
     """
-    from portfolio.composer import compose, metrics as pm
     from governance.holdout import assert_search_clean
     from governance.trial_ledger import record_trials
+    from portfolio.composer import compose
+    from portfolio.composer import metrics as pm
 
     if legs is None:
         from portfolio.strategy_runners import run_active

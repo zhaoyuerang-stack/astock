@@ -16,13 +16,10 @@ r"""Analyst Industry Framework Ontology Model (顶级分析师行业分析框架
    - 库销比创历史新低 $\implies$ 补库存周期即将开启，量价齐升。
 """
 
-import os
 import sys
-from pathlib import Path
-import numpy as np
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Tuple, Optional
+from pathlib import Path
 
 # 设定工作目录
 ROOT = Path(__file__).resolve().parents[3]

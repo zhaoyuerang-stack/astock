@@ -9,6 +9,7 @@ logger = get_logger(__name__)
 
 import akshare as ak
 import pandas as pd
+
 from lake.base import Fetcher, RateLimiter
 from lake.schema import MARGIN_RENAME, NORTHBOUND_RENAME
 from lake.sources.registry import register

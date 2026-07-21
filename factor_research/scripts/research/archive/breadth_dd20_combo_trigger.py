@@ -31,12 +31,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-
 ROOT = Path(__file__).resolve().parents[3]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, run_small_cap_strategy
 from core.engine import CostModel
 from engine.metrics import metrics, yearly_returns
 from scripts.research.archive.breadth_dd20_mainline_validation import (  # noqa: E402
@@ -44,18 +42,13 @@ from scripts.research.archive.breadth_dd20_mainline_validation import (  # noqa:
     build_breadth_dd20_score,
 )
 from scripts.research.archive.hmm_stress_guard_smallcap import build_market_features  # noqa: E402
-from scripts.research.archive.state_transition_execution_explore import (  # noqa: E402
-    ExecutionRule,
-    backtest_execution_overlay,
-)
 from scripts.research.archive.state_transition_lead_experiment import (  # noqa: E402
-    TriggerRule,
     evaluate_lead,
     make_trigger_mask,
     stress_onsets,
 )
 from scripts.research.archive.state_transition_signal_search import rolling_percentile  # noqa: E402
-
+from strategies.small_cap import StrategyConfig, run_small_cap_strategy
 
 OUT_DIR = ROOT / "reports" / "research"
 

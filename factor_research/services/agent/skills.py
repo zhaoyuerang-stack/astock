@@ -14,7 +14,7 @@ from typing import Protocol
 from contracts.models import AgentCitation, AgentOutput
 from services.agent.knowledge import citation_from_hit, retrieve_knowledge
 from services.agent.llm_adapter import get_adapter, llm_ready
-from services.agent.tools import requires_confirmation, tool_registry
+from services.agent.tools import tool_registry
 
 logger = logging.getLogger(__name__)
 

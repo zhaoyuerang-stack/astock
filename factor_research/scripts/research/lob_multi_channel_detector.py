@@ -13,8 +13,10 @@ T日信号 → T+1日仓位决策。
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/lob_multi_channel_detector.py
 """
-import os, sys, time
+import os
+import sys
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -22,8 +24,13 @@ ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, load_price_panels, backtest_weights, build_rebalance_weights
 from factors.small_cap import small_cap_factor, small_cap_timing
+from strategies.small_cap import (
+    StrategyConfig,
+    backtest_weights,
+    build_rebalance_weights,
+    load_price_panels,
+)
 
 OUT = ROOT / "reports" / "research"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -173,10 +180,10 @@ def main():
     df_r = pd.DataFrame(results).sort_values("sharpe", ascending=False)
     df_r.to_csv(OUT / "lob_detector_results.csv", index=False)
 
-    print(f"\n=== LOB Multi-Channel Detector Results ===")
+    print("\n=== LOB Multi-Channel Detector Results ===")
     print(f"v2.0 baseline: annual={cagr(ret_v20[ret_v20.index.year >= 2018]):+.1%} "
           f"sharpe={ret_v20[ret_v20.index.year >= 2018].mean() / ret_v20[ret_v20.index.year >= 2018].std() * np.sqrt(252):.2f}")
-    print(f"\nTop 10:")
+    print("\nTop 10:")
     for _, r in df_r.head(10).iterrows():
         print(f"  th={r['th']:.1f} cut={r['cut']:>2d} fl={r['fl']:.1f} "
               f"annual={r['annual']:+.1%} sharpe={r['sharpe']:.2f} "

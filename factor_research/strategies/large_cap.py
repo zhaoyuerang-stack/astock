@@ -2,14 +2,19 @@
 
 Implementation of the second mother strategy family.
 """
-from dataclasses import dataclass, asdict
-from pathlib import Path
+from dataclasses import asdict, dataclass
+
 import numpy as np
 import pandas as pd
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from factors.large_cap import load_clean_panels_with_growth, build_large_cap_premium_factor, large_cap_timing_hysteresis
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
+from factors.large_cap import (
+    build_large_cap_premium_factor,
+    large_cap_timing_hysteresis,
+    load_clean_panels_with_growth,
+)
 from strategies.small_cap import build_rebalance_weights
+
 
 @dataclass(frozen=True)
 class StrategyConfig:

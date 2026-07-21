@@ -6,19 +6,23 @@ run backtest across smoothing windows, and Walk-Forward validate.
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/ah_premium_full.py
 """
-import os, sys, time
-from pathlib import Path
+import os
+import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import numpy as np, pandas as pd
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
 from scipy.stats import spearmanr
 
 ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT); sys.path.insert(0, str(ROOT))
 
 from core.engine import BacktestConfig, BacktestEngine, PricePanel, Signal
-from strategies.small_cap import load_price_panels
 from factors.small_cap import small_cap_factor
 from scripts.data.hk_daily import HK_DIR, close_series, load_or_fetch_hk_daily
+from strategies.small_cap import load_price_panels
 
 OUT = ROOT / "reports" / "research"; OUT.mkdir(parents=True, exist_ok=True)
 N_WORKERS = 8

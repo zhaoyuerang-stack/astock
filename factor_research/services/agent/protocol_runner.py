@@ -4,7 +4,6 @@ from __future__ import annotations
 from typing import Any
 
 from services.agent.protocols import assert_tool_allowed, get_protocol, list_protocols
-from services.agent.tools import tool_registry
 
 
 def run_protocol_step(

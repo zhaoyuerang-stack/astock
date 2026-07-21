@@ -11,6 +11,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+
 # --- Shared Operators ---
 def R(x): return x.rank(axis=1, pct=True)
 def M(x, d): return x.rolling(d).mean()

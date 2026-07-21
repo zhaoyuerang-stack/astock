@@ -18,12 +18,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-
 ROOT = Path(__file__).resolve().parents[3]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, run_small_cap_strategy
 from engine.metrics import metrics  # noqa: E402
 from scripts.research.archive.hmm_stress_guard_fast_optimize import (  # noqa: E402
     candidate_exposures,
@@ -31,7 +29,7 @@ from scripts.research.archive.hmm_stress_guard_fast_optimize import (  # noqa: E
     load_probabilities,
     precompute_equal_weight_path,
 )
-
+from strategies.small_cap import StrategyConfig, run_small_cap_strategy
 
 OUT_DIR = ROOT / "reports" / "research"
 RESULT_PATH = OUT_DIR / "hmm_stress_guard_walk_forward_results.csv"

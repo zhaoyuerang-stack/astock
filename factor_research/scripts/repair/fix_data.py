@@ -2,11 +2,14 @@
 import warnings; warnings.filterwarnings("ignore")
 import os
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 import sys
+
 sys.path.insert(0, str(ROOT))
 import pandas as pd
+
 from lake.validator import DataValidator
 
 PRICE = Path("data_lake/price/daily")
@@ -38,6 +41,7 @@ for fp in PRICE.glob("*.parquet"):
 print(f"   僵尸股: {len(zombies)}只")
 
 from mootdx.quotes import Quotes
+
 client = Quotes.factory(market="std")
 real, err = 0, 0
 for code in zombies:

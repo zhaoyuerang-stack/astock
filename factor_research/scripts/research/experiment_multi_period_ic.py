@@ -7,7 +7,11 @@
   cd /Users/kiki/astcok/factor_research
   /opt/homebrew/bin/python3 scripts/research/experiment_multi_period_ic.py
 """
-import os, sys, warnings, itertools, importlib
+import importlib
+import itertools
+import os
+import sys
+import warnings
 from pathlib import Path
 
 warnings.filterwarnings("ignore")
@@ -17,13 +21,12 @@ sys.path.insert(0, str(Path.cwd()))
 import numpy as np
 import pandas as pd
 
-from strategies.small_cap import load_price_panels
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from engine.factor_analysis import calc_ic, ic_summary
 from factors.small_cap import small_cap_factor, small_cap_timing
-from factors.utils import safe_zscore, mad_clip
-from strategies.small_cap import build_rebalance_weights
+from factors.utils import mad_clip, safe_zscore
 from factory.lines.line1_generation.mutate_existing import FACTOR_MUTATION_SPECS
+from strategies.small_cap import build_rebalance_weights, load_price_panels
 
 STATS_START = "2018-01-01"
 PERIODS = [1, 5, 10, 20]
@@ -90,9 +93,6 @@ def quick_backtest(factor, close, amount, label):
 
     注意: 此函数在子进程中调用，factor/close/amount 需可 pickle.
     """
-    from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-    from factors.small_cap import small_cap_timing
-    from strategies.small_cap import build_rebalance_weights
 
     try:
         scheduled = build_rebalance_weights(factor, close, top_n=25, rebalance_days=20)
@@ -201,8 +201,8 @@ def main():
     print(f"  成功: {n_built}, 失败: {n_failed}")
 
     # ── 4. 双闸门评分 (并行 IC 计算) ──
-    from concurrent.futures import ProcessPoolExecutor, as_completed
     import multiprocessing
+    from concurrent.futures import ProcessPoolExecutor, as_completed
 
     n_workers = min(multiprocessing.cpu_count(), 8)
     print(f"[4/6] 并行计算多周期 IC ({len(candidates)} 候选, {n_workers} workers)...", flush=True)
@@ -279,7 +279,7 @@ def main():
     df["bt_pass"] = (df["bt_annual"] > 0.05) & (df["bt_maxdd"] > -0.40)
 
     # ── 7. 分析 ──
-    print(f"\n[6/6] 分析结果...\n", flush=True)
+    print("\n[6/6] 分析结果...\n", flush=True)
 
     both_pass = df[df["old_pass"] & df["new_pass"]]
     both_fail = df[df["old_pass"] == False][df["new_pass"] == False]
@@ -303,7 +303,7 @@ def main():
         print(f"  {name:<25} {len(grp):>5} {n_pass:>5}  {prec:>6.0%} {avg_a:>+8.1%} {avg_d:>8.1%}")
 
     # L1 top 10 (按 weighted_score 排序)
-    print(f"\n  L1 表现 Top 10 (按多周期 Score):")
+    print("\n  L1 表现 Top 10 (按多周期 Score):")
     print(f"  {'候选':<35} {'Score':>8} {'1dICIR':>8} {'年化':>8} {'回撤':>8} {'夏普':>6} {'旧':>4} {'新':>4}")
     print(f"  {'─'*85}")
     top10 = df.dropna(subset=["bt_annual"]).nlargest(10, "weighted_score")
@@ -313,7 +313,7 @@ def main():
               f"{'✅' if row['old_pass'] else '❌':>4} {'✅' if row['new_pass'] else '❌':>4}")
 
     # L1 best by actual performance
-    print(f"\n  L1 表现 Top 10 (按年化收益):")
+    print("\n  L1 表现 Top 10 (按年化收益):")
     print(f"  {'候选':<35} {'Score':>8} {'1dICIR':>8} {'年化':>8} {'回撤':>8} {'夏普':>6}")
     print(f"  {'─'*75}")
     top10_bt = df.dropna(subset=["bt_annual"]).nlargest(10, "bt_annual")
@@ -323,7 +323,7 @@ def main():
 
     # ── 结论 ──
     print(f"\n{'='*70}")
-    print(f"  结论")
+    print("  结论")
     print(f"{'='*70}")
     old_prec = df[df["old_pass"]]["bt_pass"].mean() if df["old_pass"].sum() > 0 else 0
     new_prec = df[df["new_pass"]]["bt_pass"].mean() if df["new_pass"].sum() > 0 else 0
@@ -337,8 +337,8 @@ def main():
         print(f"\n  ✅ 新闸门有价值 — 找到了 {int(m_l1)} 个被旧闸门误杀但 L1 通过的候选")
     else:
         print(f"\n  ⚠️ 新闸门无显著增量: 无误杀, 精度接近 ({new_prec:.0%} vs {old_prec:.0%})")
-        print(f"  根本原因: 旧闸门阈值 0.03 太宽松 (99%通过), 几乎是个 no-op")
-        print(f"  真正的改进方向: 提高旧闸门阈值, 用多周期 IC 增强区分力")
+        print("  根本原因: 旧闸门阈值 0.03 太宽松 (99%通过), 几乎是个 no-op")
+        print("  真正的改进方向: 提高旧闸门阈值, 用多周期 IC 增强区分力")
 
     print()
 

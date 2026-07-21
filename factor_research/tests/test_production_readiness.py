@@ -176,8 +176,8 @@ def test_paper_latest_signal_ignores_drafts():
 
 
 def test_scheduled_report_records_production_readiness():
-    from contracts.views import ProductionReadinessView
     import runtime.production_readiness as PR
+    from contracts.views import ProductionReadinessView
     from scripts.ops import scheduled_daily_update as S
 
     old_get = PR.get_production_readiness

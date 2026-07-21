@@ -275,9 +275,9 @@ def _record_kg(hyp, p1, p3):
 def _run_marginal(spec, report):
     """登记后:对当前 ACTIVE 组合算边际贡献,标 ACTIVE/SHADOW。best-effort。"""
     try:
-        from portfolio.strategy_runners import run_active
         from factory.lines.line3_marginal.marginal_eval import evaluate_candidate
         from factory.ontology import Hypothesis
+        from portfolio.strategy_runners import run_active
         from strategies.small_cap import load_price_panels
 
         print("[marginal] 对 ACTIVE 组合算边际贡献...", flush=True)
@@ -304,8 +304,8 @@ def _run_marginal(spec, report):
             print(f"  grade={mreport.grade} → {'ACTIVE' if mreport.grade != 'SHELVE' else 'SHADOW'}", flush=True)
         # §5.3 残差边际硬闸:用 governance.marginal_alpha(残差法)复核 line3 的 raw-corr 定级,
         # 补根因#2 的洞(long-only raw 相关把市场 beta 误当 alpha 冗余)。裸因子对 book 残差化。
+        from factory.lines.line3_marginal.marginal_eval import StrategyConfig, run_candidate_returns
         from governance.marginal import marginal_alpha
-        from factory.lines.line3_marginal.marginal_eval import run_candidate_returns, StrategyConfig
         cand_bare = run_candidate_returns(hyp, 1, close, volume, amount,
                                           config=StrategyConfig(timing_kind="none"))
         mres = marginal_alpha(cand_bare, live)
@@ -338,8 +338,8 @@ def promote_hypothesis(hyp, version="v1.0", **kw):
 
 def promote_pool_l3(version="v1.0", **kw):
     """升 factory pool 中所有 L3_PASSED 的 Hypothesis。"""
-    from factory.pool import HypothesisPool
     from factory.ontology import HypothesisStatus
+    from factory.pool import HypothesisPool
 
     pool = HypothesisPool()
     l3 = pool.list_by_status(HypothesisStatus.L3_PASSED)

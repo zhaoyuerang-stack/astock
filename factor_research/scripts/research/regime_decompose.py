@@ -10,13 +10,14 @@ ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-import numpy as np                                          # noqa: E402
-import matplotlib                                           # noqa: E402
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt                             # noqa: E402
+import matplotlib  # noqa: E402
+import numpy as np  # noqa: E402
 
-from strategies.small_cap import run_small_cap_strategy, StrategyConfig
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+
 from engine.metrics import metrics, yearly_returns
+from strategies.small_cap import StrategyConfig, run_small_cap_strategy
 
 ret = run_small_cap_strategy(StrategyConfig(start="2010-01-01"))["returns"]
 

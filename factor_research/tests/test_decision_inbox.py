@@ -17,10 +17,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from contracts.views import (DataQualityView, DeclaredLeg, GateVerdict,
-                             PromotionReadinessView, SystemTruthView)
+from contracts.views import (
+    DataQualityView,
+    DeclaredLeg,
+    GateVerdict,
+    PromotionReadinessView,
+    SystemTruthView,
+)
 from services.read.decision_inbox import _REVIEW_ITEM_CAP, get_decision_inbox
-
 
 # ── 注入夹具 ────────────────────────────────────────────────────────────
 

@@ -1,8 +1,10 @@
 """腾讯后复权日线源——日线主力（JSON直出，不依赖py_mini_racer）"""
 import threading
-import requests
-import pandas as pd
 from datetime import date
+
+import pandas as pd
+import requests
+
 from lake.base import Fetcher, RateLimiter
 from lake.sources.registry import register
 

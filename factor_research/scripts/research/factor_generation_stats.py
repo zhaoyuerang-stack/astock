@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+
 import numpy as np
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[2] / "data_lake" / "factory" / "autoresearch"
@@ -57,7 +58,7 @@ def print_stats():
                     # Simplify reason for grouping
                     short_reason = reason.split(":")[0].split(" (")[0]
                     reasons[short_reason] = reasons.get(short_reason, 0) + 1
-            except Exception as e:
+            except Exception:
                 continue
 
     if total == 0:

@@ -15,8 +15,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from factors.utils import mad_clip, safe_zscore
 from factors.registry import register_factor
+from factors.utils import mad_clip, safe_zscore
 
 _LAKE = Path(__file__).resolve().parent.parent / "data_lake"
 

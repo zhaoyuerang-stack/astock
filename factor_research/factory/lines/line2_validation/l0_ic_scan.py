@@ -13,20 +13,16 @@ import importlib
 import time
 import uuid
 from datetime import date
-from typing import Optional
 
-import numpy as np
 import pandas as pd
 
 from engine.factor_analysis import calc_ic, ic_summary, newey_west_icir
-
 from factory.ontology import (
     Decision,
     Experiment,
     ExperimentProtocol,
     ExperimentResult,
     Hypothesis,
-    HypothesisStatus,
     check_f1_economic_thesis,
     check_f2_cheap_first,
 )
@@ -68,7 +64,7 @@ def run_l0(
     amount: pd.DataFrame,
     forward_ret: pd.DataFrame,
     vintage_id: str,
-    sample_dates: Optional[int] = None,
+    sample_dates: int | None = None,
     horizon: int = 20,
     factor: pd.DataFrame | None = None,
 ) -> Experiment:

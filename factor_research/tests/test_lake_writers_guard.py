@@ -5,12 +5,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.ci.check_lake_writers import (
+    PENDING_REMEDIATION,
     file_is_violation,
     main,
     scan,
     source_has_lake_write,
     source_is_violation_for_module,
-    PENDING_REMEDIATION,
 )
 
 # ADR-038 决策一:文件级共现误报 6 件,AST 后真实扫描不得再命中
@@ -147,6 +147,7 @@ def test_legacy_version_returns_direct_write_fixture_fails_guard(tmp_path):
 def test_migrated_writers_produce_valid_sidecar(tmp_path):
     """迁移后写路径产出合法 sidecar(hermetic,不跑真数据)。"""
     import pandas as pd
+
     from lake.version_returns import (
         config_hash,
         load_verified_version_returns,
@@ -246,6 +247,7 @@ def test_lake_pending_cleared():
 def test_write_panel_cache_path_key_equivalence(tmp_path):
     """ADR-038 对抗③:write_panel_cache 与 to_parquet 路径/内容逐位等价。"""
     import pandas as pd
+
     from factor_store.store import write_panel_cache
     from factors.autoresearch_dsl import _get_cache_path
 

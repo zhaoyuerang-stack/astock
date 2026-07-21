@@ -4,12 +4,12 @@ Long top N highest expected return laggers identified by the d-LE-SC clustering 
 hedged with the universe equal-weighted benchmark.
 """
 
-from dataclasses import dataclass, asdict
-from pathlib import Path
+from dataclasses import asdict, dataclass
+
 import numpy as np
 import pandas as pd
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from factors.d_le_sc import build_d_le_sc_factor
 from lake.load_lake import load_prices, load_raw_close
 

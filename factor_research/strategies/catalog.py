@@ -9,7 +9,7 @@ build_executable_strategy 解析。未知类型一律抛 UnsupportedStrategyComp
 """
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 import pandas as pd
 
@@ -122,21 +122,21 @@ def resolve_factor_builder(name: str) -> Callable:
     try:
         return FACTOR_BUILDERS[name]
     except KeyError:
-        raise UnsupportedStrategyComponent(f"未知 factor type={name!r}(可选: {sorted(FACTOR_BUILDERS)})")
+        raise UnsupportedStrategyComponent(f"未知 factor type={name!r}(可选: {sorted(FACTOR_BUILDERS)})") from None
 
 
 def resolve_timing_builder(name: str) -> Callable:
     try:
         return TIMING_BUILDERS[name]
     except KeyError:
-        raise UnsupportedStrategyComponent(f"未知 timing type={name!r}(可选: {sorted(TIMING_BUILDERS)})")
+        raise UnsupportedStrategyComponent(f"未知 timing type={name!r}(可选: {sorted(TIMING_BUILDERS)})") from None
 
 
 def resolve_policy_builder(name: str) -> Callable:
     try:
         return POLICY_BUILDERS[name]
     except KeyError:
-        raise UnsupportedStrategyComponent(f"未知 policy veto={name!r}(可选: {sorted(POLICY_BUILDERS)})")
+        raise UnsupportedStrategyComponent(f"未知 policy veto={name!r}(可选: {sorted(POLICY_BUILDERS)})") from None
 
 
 # ── @register_factor 自动接线(PULL,单向依赖合规 strategies→factors)──

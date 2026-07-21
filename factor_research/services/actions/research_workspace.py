@@ -1,9 +1,10 @@
 """State-safe actions for the unified research workspace."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, replace
 from threading import Lock
-from typing import Any, Callable
+from typing import Any
 
 from contracts.views import ActionJobView, ResearchDraftView, ResearchReviewView
 from research_ledger.workspace import DraftRepository, ResearchReviewRepository
@@ -337,8 +338,17 @@ def run_autoresearch_stage(
     data_loader: Callable = _load_stage_data,
     runners: dict[str, Callable] | None = None,
 ) -> dict:
-    from factory.autoresearch import CandidateRepository, ExperimentLog, ReviewQueue, ast_to_hypothesis
-    from factory.autoresearch.models import CandidateDecision, CandidateEvaluationResult, CandidateStatus
+    from factory.autoresearch import (
+        CandidateRepository,
+        ExperimentLog,
+        ReviewQueue,
+        ast_to_hypothesis,
+    )
+    from factory.autoresearch.models import (
+        CandidateDecision,
+        CandidateEvaluationResult,
+        CandidateStatus,
+    )
     from factory.ontology import Decision, HypothesisStatus
 
     expected = {

@@ -16,9 +16,7 @@
 from __future__ import annotations
 
 import json
-import shutil
 import sys
-import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -30,10 +28,10 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from core.engine import PricePanel  # noqa: E402
-from core.strategy_spec import ExecutableStrategySpec  # noqa: E402
 import portfolio.paper_accounts as pa  # noqa: E402
 import strategy_registry  # noqa: E402
+from core.engine import PricePanel  # noqa: E402
+from core.strategy_spec import ExecutableStrategySpec  # noqa: E402
 
 CHINA_TZ = ZoneInfo("Asia/Shanghai")
 

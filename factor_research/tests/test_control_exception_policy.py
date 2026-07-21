@@ -2,10 +2,10 @@
 import pytest
 
 from scripts.ci.check_control_exceptions import (
-    scan_source,
+    ROOT,
     main,
     resolve_control_paths,
-    ROOT,
+    scan_source,
 )
 
 
@@ -86,9 +86,8 @@ def test_four_agent_surface_files_zero_hits_on_live_scan():
     """ADR-038 对抗:四 agent 面文件在守卫下真实扫描零命中。"""
     from scripts.ci.check_control_exceptions import (
         PENDING_REMEDIATION,
-        scan_source,
         resolve_control_paths,
-        ROOT,
+        scan_source,
     )
 
     assert PENDING_REMEDIATION == {}

@@ -5,8 +5,8 @@ Run:  cd /Users/kiki/astcok/factor_research && python3 tests/test_knowledge.py
 铁律对齐:零预置结论 + 失败分级(phase1→SKIP / 其余→DEPRIORITIZE) + 保质期。
 全程用临时 store,绝不写脏真实 knowledge/findings.json。
 """
-import os
 import json
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -15,8 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
-from knowledge.graph import KnowledgeGraph, load_graph
 from factory.ontology import Hypothesis
+from knowledge.graph import KnowledgeGraph, load_graph
 
 HYP = Hypothesis(name="t-illiq20", description="", factor_fn_name="x.AmihudIlliq",
                  factor_params={"window": 20}, data_dependencies=("price/close",))

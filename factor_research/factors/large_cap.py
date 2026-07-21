@@ -2,9 +2,11 @@
 
 Calculates the factors, universe filters, and timing signals for the second mother strategy.
 """
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from pathlib import Path
+
 
 def load_clean_panels_with_growth(data_lake_path=Path("data_lake")):
     """Load and clean financial, price, and net profit YoY growth data."""

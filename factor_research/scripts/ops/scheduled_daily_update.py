@@ -264,8 +264,8 @@ def run_updates(report, dry_run=False):
         print("[dry-run] skip update_prices/update_fundamental")
         return
 
-    from scripts.data import update_lake
     from lake.meta import update_trade_calendar
+    from scripts.data import update_lake
 
     # ── 0. 交易日历（必须先于价量更新，否则 update_prices 不知道新交易日）──
     try:

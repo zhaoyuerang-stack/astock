@@ -1,8 +1,8 @@
 """
 动量类因子
 """
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 from factors.registry import register_factor
 

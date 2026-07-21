@@ -13,7 +13,9 @@
   cd /Users/kiki/astcok/factor_research
   /opt/homebrew/bin/python3 scripts/research/experiment_ts_weighting.py
 """
-import os, sys, warnings
+import os
+import sys
+import warnings
 from pathlib import Path
 
 warnings.filterwarnings("ignore")
@@ -23,10 +25,9 @@ sys.path.insert(0, str(Path.cwd()))
 import numpy as np
 import pandas as pd
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from strategies.small_cap import load_price_panels
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from factors.small_cap import small_cap_factor, small_cap_timing
-from factors.utils import safe_zscore, mad_clip
+from strategies.small_cap import load_price_panels
 
 STATS_START = "2018-01-01"
 INITIAL_CAPITAL = 1_000_000
@@ -237,7 +238,7 @@ def main():
 
     # ── 输出 ──
     print(f"\n{'='*90}")
-    print(f"  详细对比")
+    print("  详细对比")
     print(f"{'='*90}")
     header = (f"  {'场景':<22} {'年化':>8} {'波动':>6} {'回撤':>8} {'夏普':>6} "
               f"{'卡玛':>6} {'终值(万)':>9} {'月胜率':>6} {'换手':>6} {'持仓':>5}")
@@ -253,10 +254,10 @@ def main():
     if len(results) >= 5:
         a = results[0]; b = results[1]; b2 = results[2]
         c = results[3]; c2 = results[4]
-        print(f"\n  正向 (选 illiquidity 增加):")
+        print("\n  正向 (选 illiquidity 增加):")
         print(f"    缩放: Δ年化={b['annual']-a['annual']:+.2%} | "
               f"筛选: Δ年化={c['annual']-a['annual']:+.2%}")
-        print(f"\n  反向 (选 illiquidity 下降/流动性恢复):")
+        print("\n  反向 (选 illiquidity 下降/流动性恢复):")
         print(f"    缩放: Δ年化={b2['annual']-a['annual']:+.2%} | "
               f"筛选: Δ年化={c2['annual']-a['annual']:+.2%}")
 

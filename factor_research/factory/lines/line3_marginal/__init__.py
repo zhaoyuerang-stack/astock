@@ -7,8 +7,8 @@ v3 合并：调用 portfolio.marginal.evaluate (regime-aware + LIVE_D 防御档)
 from .marginal_eval import (
     DEFAULT_CONFIG_GRID,
     GRADE_PRIORITY,
-    MarginalReport,
     NON_SHELVE_GRADES,
+    MarginalReport,
     StrategyConfig,
     evaluate_candidate,
     run_candidate_returns,

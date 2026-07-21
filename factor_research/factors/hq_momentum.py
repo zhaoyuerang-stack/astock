@@ -2,9 +2,11 @@
 
 Combines price momentum, price path smoothness (Kaufman ER), and fundamental quality (ROE, Gross Margin, and Cash Flow Yield).
 """
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from pathlib import Path
+
 
 def load_quality_fundamentals(trade_dates, data_lake_path=Path("data_lake")):
     """Loads ROE, Gross Margin, and CFO per Share from data lake, aligned to trade calendar."""

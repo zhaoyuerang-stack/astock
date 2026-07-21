@@ -6,11 +6,10 @@ Solves the multi-objective portfolio construction problem:
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 from scipy.optimize import minimize
-from typing import Dict, List, Optional, Tuple, Any
 
 from portfolio.constraints import PortfolioConstraints
+
 
 class PortfolioOptimizer:
     def __init__(
@@ -20,7 +19,7 @@ class PortfolioOptimizer:
         l3_trans_cost: float = 0.5,
         l4_market_impact: float = 0.5,
         l5_turnover_penalty: float = 0.2,
-        constraints: Optional[PortfolioConstraints] = None
+        constraints: PortfolioConstraints | None = None
     ):
         self.l1 = l1_factor_risk
         self.l2 = l2_specific_risk
@@ -36,9 +35,9 @@ class PortfolioOptimizer:
         exposures: np.ndarray,                 # factor loading matrix (assets x factors)
         factor_cov: np.ndarray,                # factor covariance matrix (factors x factors)
         specific_var: np.ndarray,              # specific variance vector (assets)
-        tradable_flags: Optional[np.ndarray] = None,
-        buy_sell_costs: Optional[np.ndarray] = None, # cost per asset (e.g. commission + spread)
-        market_impact_coefs: Optional[np.ndarray] = None, # coefficient for square-root market impact
+        tradable_flags: np.ndarray | None = None,
+        buy_sell_costs: np.ndarray | None = None, # cost per asset (e.g. commission + spread)
+        market_impact_coefs: np.ndarray | None = None, # coefficient for square-root market impact
         target_sum: float = 1.0                # target leverage
     ) -> np.ndarray:
         """Solve the optimization problem to find the target weights.

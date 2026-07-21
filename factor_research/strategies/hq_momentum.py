@@ -2,14 +2,15 @@
 
 Long top N highest smooth momentum stocks from a high-quality fundamental universe, hedged with CSI 800 equal-weighted index.
 """
-from dataclasses import dataclass, asdict
-from pathlib import Path
+from dataclasses import asdict, dataclass
+
 import numpy as np
 import pandas as pd
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from factors.hq_momentum import build_hq_momentum_factor
 from strategies.small_cap import build_rebalance_weights
+
 
 @dataclass(frozen=True)
 class StrategyConfig:

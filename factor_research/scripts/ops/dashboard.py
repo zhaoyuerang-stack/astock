@@ -8,7 +8,9 @@
   cd /Users/kiki/astcok/factor_research && python3 scripts/ops/dashboard.py
   浏览器打开 http://localhost:8888
 """
-import os, sys, json, time
+import os
+import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -16,7 +18,6 @@ os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
 from flask import Flask, jsonify, render_template_string
-import numpy as np, pandas as pd
 
 app = Flask(__name__)
 DATA = {}
@@ -275,8 +276,13 @@ def load_data():
     if DATA and time.time() - DATA.get("ts", 0) < 300:
         return DATA
 
-    from strategies.small_cap import load_price_panels, backtest_weights, StrategyConfig, build_rebalance_weights
     from factors.small_cap import small_cap_factor, small_cap_timing
+    from strategies.small_cap import (
+        StrategyConfig,
+        backtest_weights,
+        build_rebalance_weights,
+        load_price_panels,
+    )
 
     close, _, amount = load_price_panels("2010-01-01")
     factor = small_cap_factor(amount, 30)
@@ -360,8 +366,8 @@ def api_live():
     if DATA and "_live_ts" in DATA and t - DATA["_live_ts"] < 60:
         return jsonify(DATA["_live"])
 
-    from strategies.small_cap import load_price_panels
     from factors.small_cap import small_cap_timing
+    from strategies.small_cap import load_price_panels
 
     close, _, amount = load_price_panels("2010-01-01")
     timing, _, dist = small_cap_timing(close, amount, 16)

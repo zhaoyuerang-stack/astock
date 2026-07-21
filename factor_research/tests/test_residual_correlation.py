@@ -67,5 +67,6 @@ def test_partial_corr_bounded_and_degenerate_inputs_return_zero():
 
 if __name__ == "__main__":
     import sys
+
     import pytest
     sys.exit(pytest.main([__file__, "-q"]))

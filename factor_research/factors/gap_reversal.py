@@ -10,7 +10,8 @@ All factors use open price (previously unused in this codebase).
 """
 import numpy as np
 import pandas as pd
-from factors.utils import safe_zscore, mad_clip
+
+from factors.utils import mad_clip, safe_zscore
 
 
 def overnight_gap(open_price: pd.DataFrame, close: pd.DataFrame) -> pd.DataFrame:

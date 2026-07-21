@@ -12,7 +12,6 @@ from pathlib import Path
 
 import pandas as pd
 
-
 ROOT = Path(__file__).resolve().parents[2]
 HK_DIR = ROOT / "data_lake" / "price" / "hk_daily"
 

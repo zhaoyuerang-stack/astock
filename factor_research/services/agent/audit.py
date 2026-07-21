@@ -15,7 +15,7 @@ import hashlib
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -32,7 +32,7 @@ _OPTIONAL_CONTEXT_KEYS = frozenset(
 def _now() -> str:
     """UTC ISO8601, same style as sessions._now."""
     return (
-        datetime.now(timezone.utc)
+        datetime.now(UTC)
         .replace(microsecond=0)
         .isoformat()
         .replace("+00:00", "Z")
@@ -125,7 +125,7 @@ def audit_event(
     try:
         root = _resolve_dir(audit_dir)
         root.mkdir(parents=True, exist_ok=True)
-        ym = datetime.now(timezone.utc).strftime("%Y%m")
+        ym = datetime.now(UTC).strftime("%Y%m")
         path = root / f"agent_audit_{ym}.jsonl"
         line = json.dumps(event, ensure_ascii=False, default=str)
         with path.open("a", encoding="utf-8") as fh:

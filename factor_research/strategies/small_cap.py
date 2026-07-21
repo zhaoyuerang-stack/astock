@@ -3,23 +3,19 @@
 This is the canonical implementation of the small-cap-size v2.0 strategy.
 It uses core.engine.BacktestEngine as the unified backtest path.
 """
-from dataclasses import dataclass, asdict
-from pathlib import Path
+from dataclasses import asdict, dataclass
 
-import numpy as np
 import pandas as pd
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from factors.small_cap import (  # noqa: F401  small_cap_timing re-exported for back-compat
     small_cap_exposure_signal,
     small_cap_factor,
     small_cap_timing,
 )
-from factors.utils import safe_zscore, mad_clip
 from lake.load_lake import load_prices, load_raw_close
 from lake.units import implied_amount
 from research_toolkit import apply_veto_filter
-
 
 # ---------------------------------------------------------------------------
 # Config

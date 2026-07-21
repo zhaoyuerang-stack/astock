@@ -1,9 +1,8 @@
 """Actions for running Auto Factor Research candidates through real validation lines."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date
-from pathlib import Path
-from typing import Callable
 
 import pandas as pd
 

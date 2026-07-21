@@ -10,9 +10,9 @@ load_active_deployment 默认查 strategy_registry,但接受注入的 registry_l
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_MANIFEST = ROOT / "deployments" / "production.json"
@@ -42,7 +42,7 @@ class Deployment:
     legs: tuple[DeploymentLeg, ...]
 
 
-def _default_registry_lookup(family: str, version: str) -> Optional[dict]:
+def _default_registry_lookup(family: str, version: str) -> dict | None:
     """默认实现:从 strategy_registry 读某 family/version 的版本记录(含 status/executable_spec)。"""
     import strategy_registry
     data = strategy_registry._load()
@@ -52,7 +52,7 @@ def _default_registry_lookup(family: str, version: str) -> Optional[dict]:
     return next((v for v in fam.get("versions", []) if v.get("version") == version), None)
 
 
-def read_declared_manifest(manifest_path: Path | str = DEFAULT_MANIFEST) -> Optional[dict]:
+def read_declared_manifest(manifest_path: Path | str = DEFAULT_MANIFEST) -> dict | None:
     """读「声明的」部署清单原文,**不做 fail-closed 校验**。
 
     声明态回答「清单声称在跑什么」,不回答「能不能跑」(后者由 ``load_active_deployment``
@@ -84,7 +84,7 @@ def read_declared_manifest(manifest_path: Path | str = DEFAULT_MANIFEST) -> Opti
 def diagnose_leg(
     leg: dict,
     *,
-    registry_lookup: Optional[Callable[[str, str], Optional[dict]]] = None,
+    registry_lookup: Callable[[str, str], dict | None] | None = None,
 ) -> dict:
     """对单条声明腿做「非抛出式」诊断,产出结构化证据(供证据链)。
 
@@ -134,7 +134,7 @@ def diagnose_leg(
     return out
 
 
-def _validate_leg(leg: DeploymentLeg, registry_lookup: Callable[[str, str], Optional[dict]]) -> None:
+def _validate_leg(leg: DeploymentLeg, registry_lookup: Callable[[str, str], dict | None]) -> None:
     """fail-closed 校验:复用 ``diagnose_leg`` 的同源判定,有阻断即抛。"""
     diag = diagnose_leg(
         {"family": leg.family, "version": leg.version,
@@ -148,7 +148,7 @@ def _validate_leg(leg: DeploymentLeg, registry_lookup: Callable[[str, str], Opti
 def load_active_deployment(
     manifest_path: Path | str = DEFAULT_MANIFEST,
     *,
-    registry_lookup: Optional[Callable[[str, str], Optional[dict]]] = None,
+    registry_lookup: Callable[[str, str], dict | None] | None = None,
 ) -> Deployment:
     """加载并校验当前激活部署。任一腿不满足即抛 DeploymentNotReady(fail-closed)。"""
     registry_lookup = registry_lookup or _default_registry_lookup

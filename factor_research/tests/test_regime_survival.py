@@ -80,6 +80,7 @@ def test_scheduled_search_passes_regime_aware_true():
 def test_walk_forward_service_exposes_and_forwards_regime_aware():
     """services 层签名必须有 regime_aware 并转发给 walk-forward 引擎(引擎经 **island_kw 透传)。"""
     import inspect
+
     from services.actions.autoresearch_search import run_autoresearch_walk_forward
     sig = inspect.signature(run_autoresearch_walk_forward)
     assert "regime_aware" in sig.parameters

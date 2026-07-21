@@ -48,8 +48,8 @@ def test_strategies_small_cap_reexports_legacy_timing_name():
     """Task 7 kept ``small_cap_timing`` as a re-export from strategies.small_cap
     because research scripts import it from there. Pin that back-compat path so a
     future cleanup does not silently drop it."""
-    from strategies.small_cap import small_cap_timing as reexported
     from factors.small_cap import small_cap_timing as canonical_wrapper
+    from strategies.small_cap import small_cap_timing as reexported
 
     assert reexported is canonical_wrapper
 

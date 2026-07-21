@@ -1,8 +1,8 @@
 """Small-cap size factor and timing signal."""
 import numpy as np
-import pandas as pd
-from factors.utils import safe_zscore, mad_clip
+
 from factors.registry import register_factor
+from factors.utils import mad_clip, safe_zscore
 
 
 def small_cap_factor(amount, window=60):

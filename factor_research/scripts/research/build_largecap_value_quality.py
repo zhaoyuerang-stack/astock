@@ -8,9 +8,13 @@ Key fixes from v1:
   - Test multiple universes (top 100/200/300/500)
   - IC by year to check time-series stability
 """
-import os, sys, warnings
+import os
+import sys
+import warnings
+
 warnings.filterwarnings("ignore")
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
@@ -267,7 +271,7 @@ def main():
         print(f"  {label:<15} annual={mm['annual']:>+7.1%}  Sharpe={mm['sharpe']:>5.2f}  maxDD={mm['maxdd']:>+6.1%}")
 
     # Yearly
-    print(f"\n  Yearly returns:")
+    print("\n  Yearly returns:")
     for year in sorted(set(bt.index.year)):
         r = bt[bt.index.year == year]
         ann = (1 + r.fillna(0)).prod() ** (252 / len(r)) - 1 if len(r) > 0 else 0

@@ -2,11 +2,14 @@
 import warnings; warnings.filterwarnings("ignore")
 import os
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 import sys
+
 sys.path.insert(0, str(ROOT))
 import pandas as pd
+
 from lake.validator import DataValidator
 
 PRICE = Path("data_lake/price/daily")
@@ -28,7 +31,7 @@ v = DataValidator(calendar=cal)
 results = [v.validate(fp.stem, pd.read_parquet(fp))
            for fp in sorted(PRICE.glob("*.parquet"))]
 report = v.quality_report(results, save_path="data_lake/quality_report.json")
-print(f"\n=== 最终数据质量 ===")
+print("\n=== 最终数据质量 ===")
 print(f"干净 {report['clean']}/{report['total']} ({report['clean_ratio']:.1%})")
 print(f"剩余真问题: {report['issue_breakdown']}")
 print(f"剩余问题股(个案,供人工复核): {[f['code'] for f in report['flagged']]}")

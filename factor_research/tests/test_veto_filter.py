@@ -14,17 +14,17 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
-from factors.veto import loser_veto_reversal, salience_covariance_veto
-from policy.candidate_filters import loser_reversal_filter
 from factors.illiquidity_components import salience_covariance_score
+from factors.veto import loser_veto_reversal, salience_covariance_veto
+from factory.lines.line2_validation.veto_triage import should_route_to_veto_review
+from factory.ontology import Decision, Experiment, ExperimentProtocol, ExperimentResult
+from policy.candidate_filters import loser_reversal_filter
 from scripts.research.veto_filter_marginal import (
     register_loser_veto_observation,
     run_marginal_veto_protocol,
     summarize_marginal,
 )
 from strategies.small_cap import build_rebalance_weights
-from factory.lines.line2_validation.veto_triage import should_route_to_veto_review
-from factory.ontology import Decision, Experiment, ExperimentProtocol, ExperimentResult
 
 
 def _toy_panels():

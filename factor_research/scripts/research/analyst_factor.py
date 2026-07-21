@@ -9,18 +9,28 @@ Data source: akshare.stock_research_report_em (East Money individual stock repor
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/analyst_factor.py
 """
-import os, sys, time
-from pathlib import Path
+import os
+import sys
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import numpy as np, pandas as pd
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
 
 ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT); sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, load_price_panels, backtest_weights, build_rebalance_weights
+from scipy.stats import spearmanr
+
 from factors.small_cap import small_cap_factor, small_cap_timing
 from governance.holdout import assert_search_clean, boundary
-from scipy.stats import spearmanr
+from strategies.small_cap import (
+    StrategyConfig,
+    backtest_weights,
+    build_rebalance_weights,
+    load_price_panels,
+)
 
 OUT = ROOT / "reports" / "research"; OUT.mkdir(parents=True, exist_ok=True)
 ANALYST_DIR = OUT / "analyst_cache"; ANALYST_DIR.mkdir(parents=True, exist_ok=True)

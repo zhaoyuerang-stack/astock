@@ -8,7 +8,6 @@
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -50,6 +49,7 @@ def test_gate3_source_has_no_bfill():
     与仓库 CI 守卫同风格的源码级机械断言:旧代码含 .bfill() 必失败。
     """
     import inspect
+
     from core.analysis.nine_gates import NineGatesEvaluator
 
     src = inspect.getsource(NineGatesEvaluator.run_gate3_neutralization)

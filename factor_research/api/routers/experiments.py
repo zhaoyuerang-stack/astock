@@ -7,12 +7,8 @@ from contracts.views import (
     ActionJobView,
     AutoResearchCandidateView,
     AutoResearchFunnelView,
-    AutoResearchIslandSearchResponse,
-    AutoResearchLLMGenResponse,
-    AutoResearchPromoteResponse,
     AutoResearchReviewItemView,
     AutoResearchReviewRequest,
-    AutoResearchRunResponse,
     FunnelView,
     HypothesisView,
     PromotionReadinessView,
@@ -22,10 +18,10 @@ from contracts.views import (
     ResearchDraftView,
     ResearchReviewRequest,
     ResearchReviewView,
+    ResearchRunIndexView,
     ResearchWorkItemActionRequest,
     ResearchWorkItemDetailView,
     ResearchWorkItemListView,
-    ResearchRunIndexView,
 )
 from services.actions.action_guard import ACTION_HEADER, audit_action, verify_action_token
 from services.actions.autoresearch import (
@@ -117,7 +113,7 @@ def get_amount_timing_validation() -> dict:
 
 @router.get("/logical-chains")
 def get_logical_chains() -> list[dict]:
-    import os, json
+    import json
     from pathlib import Path
     ROOT = Path(__file__).resolve().parents[2]
     logic_dir = ROOT / "data_lake" / "research_signals" / "logic_chains"

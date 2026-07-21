@@ -5,16 +5,16 @@ AUM constraints, and market regime restrictions.
 """
 from __future__ import annotations
 
-import pandas as pd
-from typing import Dict, Any, List
+from typing import Any
+
 
 class LimitationCheck:
     def __init__(self, strategy_id: str):
         self.strategy_id = strategy_id
         self.breached = False
-        self.details: List[Dict[str, Any]] = []
+        self.details: list[dict[str, Any]] = []
 
-    def check_style_drift(self, exposures: Dict[str, float], limits: Dict[str, float]):
+    def check_style_drift(self, exposures: dict[str, float], limits: dict[str, float]):
         """Ensure exposures to style factor components (e.g. Size, Beta, Value) do not exceed budget."""
         for factor, value in exposures.items():
             limit = limits.get(factor, 0.5)
@@ -54,7 +54,7 @@ class LimitationCheck:
                 "status": "OK"
             })
 
-    def check_regime_applicability(self, current_regime: str, applicable_regimes: List[str]):
+    def check_regime_applicability(self, current_regime: str, applicable_regimes: list[str]):
         """Ensure the strategy is only running in approved market regimes."""
         if current_regime not in applicable_regimes:
             self.breached = True

@@ -28,8 +28,8 @@ def test_factor_composer_canonical_equal_weight():
 
 
 def test_portfolio_composer_canonical_and_legacy_compose_match():
-    from portfolio.portfolio_composer import compose_portfolio_returns
     from portfolio.composer import compose
+    from portfolio.portfolio_composer import compose_portfolio_returns
 
     idx = pd.date_range("2024-01-01", periods=3)
     returns = {

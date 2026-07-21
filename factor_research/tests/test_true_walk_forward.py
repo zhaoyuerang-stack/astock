@@ -3,8 +3,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from core.analysis.rolling_origin import rolling_origin_stability, rolling_origin_windows
 from core.engine import PricePanel
-from core.analysis.rolling_origin import rolling_origin_windows, rolling_origin_stability
 
 
 def _panel(years=6, n=20, seed=0):

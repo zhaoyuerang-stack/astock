@@ -23,12 +23,9 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lake.load_lake import load_prices, load_raw_close
 from factory.pool import HypothesisPool
-from factory.ontology import HypothesisStatus
+from lake.load_lake import load_prices, load_raw_close
 from metasearch.factor_mi_audit import audit_hypothesis_pool, mi_matrix
-from metasearch.mi_auditor import mi
-
 
 STATUS_COLORS = {
     "live_active": ("🟢", "ACTIVE LIVE"),
@@ -76,17 +73,17 @@ def _print_neighbors(dist: pd.DataFrame, target: str, k=5):
         return
     d = dist.loc[target].drop(target).sort_values()
     print(f"\n  {target}")
-    print(f"  最相似 (近邻, 信息冗余):")
+    print("  最相似 (近邻, 信息冗余):")
     for n, v in d.head(k).items():
         print(f"    {v:.2f}  {n}")
-    print(f"  最独立 (远邻, 信息互补):")
+    print("  最独立 (远邻, 信息互补):")
     for n, v in d.tail(k).iloc[::-1].items():
         print(f"    {v:.2f}  {n}")
 
 
 def _print_coverage_summary(coords: pd.DataFrame, status_map: dict):
     """已覆盖区域 + 空白象限."""
-    print(f"\n=== 信息地图分布 ===")
+    print("\n=== 信息地图分布 ===")
     print(f"  X range: [{coords['x'].min():+.2f}, {coords['x'].max():+.2f}]")
     print(f"  Y range: [{coords['y'].min():+.2f}, {coords['y'].max():+.2f}]")
 
@@ -107,7 +104,7 @@ def _print_coverage_summary(coords: pd.DataFrame, status_map: dict):
 
 
 def _print_legend():
-    print(f"\n  Legend:")
+    print("\n  Legend:")
     for k, (icon, label) in STATUS_COLORS.items():
         print(f"    {icon} {label}")
 
@@ -193,7 +190,7 @@ def main():
             status_map[h.name] = h.status.value
 
     if args.with_live:
-        print(f"\nAdding LIVE strategies as anchors...")
+        print("\nAdding LIVE strategies as anchors...")
         from portfolio.strategy_runners import LIVE_STRATEGIES, run_all_live
         live_returns = run_all_live(start="2018-01-01")
         # 用 LIVE returns 直接作为 "IC-like" 时序 (与 candidate IC 同长度对齐 by date)
@@ -227,7 +224,7 @@ def main():
 
     # ── 邻居分析: 重点对每个 LIVE 看最相似/最独立的候选 ──
     print(f"\n{'='*70}")
-    print(f"  LIVE 策略的信息邻居 (用来选下一个互补候选)")
+    print("  LIVE 策略的信息邻居 (用来选下一个互补候选)")
     print(f"{'='*70}")
     for name, status in status_map.items():
         if "live" in status:

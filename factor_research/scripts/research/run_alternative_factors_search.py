@@ -5,7 +5,6 @@ Usage:
 """
 from __future__ import annotations
 
-import os
 import sys
 import warnings
 from pathlib import Path
@@ -46,8 +45,8 @@ print("  Evolving Alternative Factors Search (Path A: Shareholders & Flows)")
 print("=" * 80)
 print(f"Restricted Allowed Factors to: {sorted(reg.ALLOWED_FACTORS.keys())}\n")
 
+from factory.autoresearch.repositories import CandidateRepository, ExperimentLog, ReviewQueue
 from services.actions.autoresearch_search import run_autoresearch_island_search
-from factory.autoresearch.repositories import CandidateRepository, ReviewQueue, ExperimentLog
 
 
 def main():

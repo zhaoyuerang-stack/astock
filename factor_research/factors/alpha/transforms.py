@@ -8,7 +8,6 @@ import pandas as pd
 
 from factors.alpha.base import register_transform
 
-
 # ---------------------------------------------------------------------------
 # Core transforms
 # ---------------------------------------------------------------------------

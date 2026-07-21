@@ -100,7 +100,7 @@ def get_trade_readiness() -> TradeReadinessView:
         sig_dir = ROOT / "signals"
         files = sorted(sig_dir.glob("20*.json"))
         if files:
-            with open(files[-1], "r", encoding="utf-8") as f:
+            with open(files[-1], encoding="utf-8") as f:
                 sig = json.load(f)
                 regime_status = sig.get("regime", "bull")
                 # Scale confidence slightly depending on regime/distance

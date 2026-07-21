@@ -7,7 +7,6 @@ With yearly breakdown for the best combo.
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/hmm_macro_threshold_sweep.py
 """
-import json
 import os
 import sys
 from pathlib import Path
@@ -19,8 +18,8 @@ ROOT = Path(__file__).resolve().parents[3]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, backtest_weights, run_small_cap_strategy
 from engine.metrics import metrics
+from strategies.small_cap import StrategyConfig, backtest_weights, run_small_cap_strategy
 
 OUT_DIR = ROOT / "reports" / "research"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -304,7 +303,7 @@ def main():
               f"{base_dd:>+7.1%} {hmm_dd:>+7.1%} {stress_days:>7}", flush=True)
 
     # Show bull-year damage across thresholds for floor=0.0
-    print(f"\n=== Bull-year damage vs threshold (floor=0.0) ===", flush=True)
+    print("\n=== Bull-year damage vs threshold (floor=0.0) ===", flush=True)
     bull_years = [2015, 2021, 2025]
     print(f"{'Threshold':>10} {'2015':>8} {'2021':>8} {'2025':>8} {'Sharpe':>8}", flush=True)
     for th in thresholds:

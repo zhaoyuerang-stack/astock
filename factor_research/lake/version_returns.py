@@ -23,9 +23,10 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
-from datetime import datetime, timezone
+from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import pandas as pd
 
@@ -143,7 +144,7 @@ def write_version_returns(
         "data_fingerprint": str(data_fingerprint),
         "cost_hash": str(cost_hash),
         "source": str(source),
-        "written_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "written_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "rows": int(len(series)),
         "series_hash": series_hash,
     }

@@ -126,8 +126,8 @@ def test_sweep_audit_size_records_grid_width_to_ledger(tmp_path):
 
     否则 best-of-k 选 size 而不计惩罚 = p-hacking。用注入的 tmp 账本,绝不碰真账本。
     """
-    from scripts.ops.scheduled_factor_search import sweep_audit_size, _AUDIT_SIZE_GRID
     from governance.trial_ledger import honest_n_trials
+    from scripts.ops.scheduled_factor_search import _AUDIT_SIZE_GRID, sweep_audit_size
     close, volume, amount, factor = _synthetic_ohlcav()
     ledger = tmp_path / "trial_ledger.jsonl"
     ast = {"execution": {"portfolio_size": 25, "rebalance_freq": "20D"}}

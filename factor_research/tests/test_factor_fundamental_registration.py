@@ -20,7 +20,6 @@ from factors.registry import FACTOR_REGISTRY, discover, register_factor
 from factory.autoresearch.registry import ALLOWED_FACTORS
 from scripts.ci import check_factor_registry as guard
 
-
 # ── 真实仓库状态:gross_margin 已注册且未提升为 searchable ──────────────────
 
 def test_gross_margin_registered_via_register_factor():

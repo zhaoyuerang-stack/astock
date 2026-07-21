@@ -4,22 +4,25 @@
   cd /Users/kiki/astcok/factor_research
   /opt/homebrew/bin/python3 scripts/research/regime_timeline.py
 """
-import os, sys, warnings
+import os
+import sys
+import warnings
 from pathlib import Path
+
 warnings.filterwarnings("ignore")
 os.chdir(Path(__file__).resolve().parent.parent.parent)
 sys.path.insert(0, str(Path.cwd()))
 
-import numpy as np; import pandas as pd
-from strategies.small_cap import load_price_panels
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from factors.small_cap import small_cap_timing
-from factors.alpha import transforms
+import numpy as np
+import pandas as pd
+
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
+from factors.alpha import transforms  # noqa: F401 —— 副作用注册 DSL 变换(zscore/mad_clip/shift 等)
 from factors.alpha.base import FactorData
 from factors.alpha.builtins.illiq import AmihudIlliq, SizeProxy
-from factors.alpha.builtins.momentum import PriceMomentum
-from factors.alpha.builtins.volatility import Volatility
-from strategies.small_cap import build_rebalance_weights
+from factors.small_cap import small_cap_timing
+from strategies.small_cap import build_rebalance_weights, load_price_panels
+
 
 def main():
     close, volume, amount = load_price_panels('2010-01-01')
@@ -62,7 +65,7 @@ def main():
 
     # 月度表格
     months = [m[0] for m in monthly_data[list(monthly_data.keys())[0]]]
-    print(f'\n月度滚动Sharpe (12月窗口):')
+    print('\n月度滚动Sharpe (12月窗口):')
     header = f'{"":<28}' + ''.join(f'{m:>8}' for m in months) + ' |  趋势'
     print(header)
     print('-' * len(header))
@@ -83,7 +86,7 @@ def main():
         ('2026 Q1(1-3月)', '2026-01', '2026-03'),
         ('2026 Q2(4-6月)', '2026-04', '2026-06'),
     ]
-    print(f'\n分阶段平均Sharpe:')
+    print('\n分阶段平均Sharpe:')
     print(f'{"阶段":<20} {"Amihud小盘":>12} {"大盘SHORT":>12} {"旧Size":>12}')
     for label, start, end in stages:
         print(f'{label:<20}', end='')

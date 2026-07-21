@@ -6,14 +6,13 @@ and standardized expected return forecasts (Alpha).
 from __future__ import annotations
 
 import pandas as pd
-import numpy as np
-from typing import Dict, List, Optional
+
 
 def synthesize_alpha(
-    factors: Dict[str, pd.DataFrame],
-    weights: Optional[Dict[str, float]] = None,
+    factors: dict[str, pd.DataFrame],
+    weights: dict[str, float] | None = None,
     winsorize_limits: float = 3.0,
-    decay_halflife: Optional[int] = None
+    decay_halflife: int | None = None
 ) -> pd.DataFrame:
     """Synthesize multiple alpha factors into a single expected return forecast.
 

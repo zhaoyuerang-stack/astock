@@ -4,13 +4,15 @@ Measures portfolio turnover, trade distributions, and execution drag.
 """
 from __future__ import annotations
 
+from typing import Any
+
 import pandas as pd
-from typing import Dict, Any
+
 
 def generate_turnover_report(
     weights: pd.DataFrame,
     cost_series: pd.Series
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Calculate average turnover, cumulative cost, and cost drag statistics."""
     # Turnover calculation: sum(|w_t - w_{t-1}|) / 2
     trades = weights.diff().fillna(0.0)

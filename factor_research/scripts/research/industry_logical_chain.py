@@ -4,24 +4,23 @@
 并将其映射到系统的核心 Hypothesis 本体中。
 """
 
-import os
-import sys
 import json
+import sys
 from pathlib import Path
 
 # 设定工作目录
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from services.agent.llm_adapter import get_adapter
 from factory.ontology import (
-    TransmissionNode,
-    LogicalChain,
-    TransmissionNodeCategory,
-    NodeChange,
+    EconomicThesis,
     Hypothesis,
-    EconomicThesis
+    LogicalChain,
+    NodeChange,
+    TransmissionNode,
+    TransmissionNodeCategory,
 )
+from services.agent.llm_adapter import get_adapter
 
 OUT_DIR = ROOT / "data_lake" / "research_signals" / "logic_chains"
 OUT_DIR.mkdir(parents=True, exist_ok=True)

@@ -10,9 +10,25 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import (agent, agent_control, backtest, data, experiments, factors, inbox,
-                         paper, paper_accounts, portfolio, risk, settings, state, strategies,
-                         system, trade_readiness, governance)
+from api.routers import (
+    agent,
+    agent_control,
+    backtest,
+    data,
+    experiments,
+    factors,
+    governance,
+    inbox,
+    paper,
+    paper_accounts,
+    portfolio,
+    risk,
+    settings,
+    state,
+    strategies,
+    system,
+    trade_readiness,
+)
 
 app = FastAPI(title="Quant Research Platform API", version="0.0-phase0")
 

@@ -60,7 +60,7 @@ def call(api_name: str, params: dict, fields: str = "", *, max_retry: int = 6) -
             req = urllib.request.Request(API_URL, data=body,
                                          headers={"Content-Type": "application/json"})
             r = json.loads(urllib.request.urlopen(req, timeout=60).read())
-        except Exception as e:  # 网络瞬时错误 → 退避重试(指数,封顶 30s)
+        except Exception:  # 网络瞬时错误 → 退避重试(指数,封顶 30s)
             if attempt == max_retry - 1:
                 raise
             time.sleep(min(30, 3 * 2 ** attempt))

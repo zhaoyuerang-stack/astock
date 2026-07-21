@@ -12,20 +12,25 @@
   cd /Users/kiki/astcok/factor_research
   /opt/homebrew/bin/python3 scripts/research/experiment_factor_timing_pairing.py
 """
-import os, sys, warnings, importlib, itertools
+import importlib
+import itertools
+import os
+import sys
+import warnings
 from pathlib import Path
+
 warnings.filterwarnings("ignore")
 os.chdir(Path(__file__).resolve().parent.parent.parent)
 sys.path.insert(0, str(Path.cwd()))
 
 import numpy as np
 import pandas as pd
-from strategies.small_cap import load_price_panels
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
+
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from factors.small_cap import small_cap_factor, small_cap_timing
-from factors.utils import safe_zscore, mad_clip
-from strategies.small_cap import build_rebalance_weights
+from factors.utils import mad_clip, safe_zscore
 from factory.lines.line1_generation.mutate_existing import FACTOR_MUTATION_SPECS
+from strategies.small_cap import build_rebalance_weights, load_price_panels
 
 
 def build_factor(fn_name, params, close, volume, amount):
@@ -144,7 +149,7 @@ def main():
     print(f"  完成 {len(df)} 个配对")
 
     # ── 分析 ──
-    print(f"\n[3/3] 结果分析\n")
+    print("\n[3/3] 结果分析\n")
 
     # 极端组合
     print("=" * 90)
@@ -155,14 +160,14 @@ def main():
         print(f"  {row['name']:<40} {row['timing']:<10} ann={row['ann']:+.1%} mdd={row['mdd']:.1%} sh={row['sh']:.2f}")
 
     print(f"\n{'='*90}")
-    print(f"  🛡 防御型配对 (回撤 > -10%)")
+    print("  🛡 防御型配对 (回撤 > -10%)")
     print(f"{'='*90}")
     defense = df[df["mdd"] > -0.10].nlargest(15, "ann")
     for _, row in defense.iterrows():
         print(f"  {row['name']:<40} {row['timing']:<10} ann={row['ann']:+.1%} mdd={row['mdd']:.1%} sh={row['sh']:.2f}")
 
     print(f"\n{'='*90}")
-    print(f"  ⚡ 极端不对称 (ann>30% 不管回撤)")
+    print("  ⚡ 极端不对称 (ann>30% 不管回撤)")
     print(f"{'='*90}")
     extreme = df[df["ann"] > 0.30].nlargest(10, "ann")
     for _, row in extreme.iterrows():
@@ -170,7 +175,7 @@ def main():
 
     # 按因子家族 × 择时风格汇总
     print(f"\n{'='*90}")
-    print(f"  因子家族 × 择时风格: 最佳配对")
+    print("  因子家族 × 择时风格: 最佳配对")
     print(f"{'='*90}")
     print(f"  {'家族':<20} {'最佳择时':<10} {'年化':>8} {'回撤':>8} {'夏普':>6} {'卡玛':>6}")
     print("  " + "-" * 65)
@@ -182,7 +187,7 @@ def main():
 
     # 配对收益: 用最适配的择时 vs 无择时
     print(f"\n{'='*90}")
-    print(f"  择时增益: 最适配择时 vs 裸奔 (无择时)")
+    print("  择时增益: 最适配择时 vs 裸奔 (无择时)")
     print(f"{'='*90}")
     print(f"  {'因子':<35} {'最佳择时':<10} {'改进后':>15} {'裸奔':>15} {'增益':>8}")
     print("  " + "-" * 90)

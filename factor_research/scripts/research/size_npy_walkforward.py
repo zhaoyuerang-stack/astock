@@ -11,9 +11,10 @@ Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/size_npy_walkforward.py
 """
 import warnings; warnings.filterwarnings("ignore")
-import os, sys
-from pathlib import Path
+import os
+import sys
 from itertools import product
+from pathlib import Path
 
 ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT)
@@ -22,11 +23,11 @@ sys.path.insert(0, str(ROOT))
 import numpy as np
 import pandas as pd
 
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from strategies.small_cap import load_price_panels
+from core.engine import BacktestConfig, BacktestEngine, PricePanel, Signal
 from factors.small_cap import small_cap_factor, small_cap_timing
-from factors.utils import safe_zscore, mad_clip
+from factors.utils import mad_clip, safe_zscore
 from lake.load_lake import load_fundamental_panel
+from strategies.small_cap import load_price_panels
 
 OUT = ROOT / "reports" / "research"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -121,7 +122,7 @@ def main():
     # Phase 1: Vol Target Sweep (full period 2018-2026)
     # ═══════════════════════════════════════════════════════════
     print(f"\n{'='*70}")
-    print(f"  PHASE 1: Vol Target Parameter Sweep (full period)")
+    print("  PHASE 1: Vol Target Parameter Sweep (full period)")
     print(f"{'='*70}", flush=True)
 
     weights = build_rebalance_weights(factor, close)
@@ -132,7 +133,7 @@ def main():
     max_exp = 1.5
 
     # Baselines
-    print(f"\n  --- Baselines ---", flush=True)
+    print("\n  --- Baselines ---", flush=True)
     res_no_timing = backtest_period(close, volume, amount, weights, timing=None)
     print(f"  No timing:         Annual={res_no_timing['annual']:+.1%} "
           f"DD={res_no_timing['maxdd']:+.1%} Sharpe={res_no_timing['sharpe']:.2f}", flush=True)
@@ -142,7 +143,7 @@ def main():
           f"DD={res_pt['maxdd']:+.1%} Sharpe={res_pt['sharpe']:.2f}", flush=True)
 
     # Vol Target only (no PureTrend)
-    print(f"\n  --- Vol Target ONLY (no PureTrend) ---", flush=True)
+    print("\n  --- Vol Target ONLY (no PureTrend) ---", flush=True)
     print(f"  {'Target Vol':<10} {'LB':<5} {'Annual':>8} {'MaxDD':>8} {'Sharpe':>7} {'Calmar':>7}", flush=True)
     print(f"  {'-'*50}", flush=True)
     vt_results = []
@@ -155,7 +156,7 @@ def main():
               f"{res['sharpe']:+7.2f} {res['calmar']:+7.2f}", flush=True)
 
     # Vol Target + PureTrend combined
-    print(f"\n  --- Vol Target + PureTrend ---", flush=True)
+    print("\n  --- Vol Target + PureTrend ---", flush=True)
     print(f"  {'Target Vol':<10} {'LB':<5} {'Annual':>8} {'MaxDD':>8} {'Sharpe':>7} {'Calmar':>7}", flush=True)
     print(f"  {'-'*50}", flush=True)
     vt_pt_results = []
@@ -191,7 +192,7 @@ def main():
     # Phase 2: Deep-dive on best configs with leverage sweep
     # ═══════════════════════════════════════════════════════════
     print(f"\n{'='*70}")
-    print(f"  PHASE 2: Best Configs — Leverage Sweep")
+    print("  PHASE 2: Best Configs — Leverage Sweep")
     print(f"{'='*70}", flush=True)
 
     # Pick top 3 configs from Phase 1
@@ -223,7 +224,7 @@ def main():
     # Phase 3: Walk-Forward on best vol-target config
     # ═══════════════════════════════════════════════════════════
     print(f"\n{'='*70}")
-    print(f"  PHASE 3: Walk-Forward with Vol Target")
+    print("  PHASE 3: Walk-Forward with Vol Target")
     print(f"{'='*70}", flush=True)
 
     # Use the best config from Phase 1: highest Calmar
@@ -336,7 +337,7 @@ def main():
         wf_maxdd = float(((1 + wf_ret).cumprod() / (1 + wf_ret).cumprod().cummax() - 1).min())
 
         print(f"\n{'='*70}")
-        print(f"  WF AGGREGATE OOS (Vol Target)")
+        print("  WF AGGREGATE OOS (Vol Target)")
         print(f"{'='*70}", flush=True)
         print(f"  Period: {wf_ret.index[0].date()} ~ {wf_ret.index[-1].date()} ({len(wf_ret)}d)")
         print(f"  Annual: {wf_annual:+.1%}")
@@ -352,7 +353,7 @@ def main():
 
     # ── Final comparison table ──
     print(f"\n{'='*70}")
-    print(f"  FINAL COMPARISON")
+    print("  FINAL COMPARISON")
     print(f"{'='*70}", flush=True)
     print(f"  {'Strategy':<35} {'Annual':>8} {'MaxDD':>8} {'Sharpe':>7} {'Calmar':>7}")
     print(f"  {'-'*65}")
@@ -376,7 +377,7 @@ def main():
         print(f"  {'WF OOS with Vol Target':<35} {wf_annual:+8.1%} "
               f"{wf_maxdd:+8.1%} {wf_sharpe:+7.2f} {wf_annual/abs(wf_maxdd) if wf_maxdd < 0 else 0:+7.2f}")
 
-    print(f"\nDone.", flush=True)
+    print("\nDone.", flush=True)
 
 
 if __name__ == "__main__":

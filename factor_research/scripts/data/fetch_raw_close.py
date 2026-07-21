@@ -4,14 +4,18 @@
 mootdx单次800条，分批6次回溯2010。鲁棒+断点续传(已有则跳过)。
 """
 import warnings; warnings.filterwarnings("ignore")
-import os, threading
+import os
+import threading
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 import sys
+
 sys.path.insert(0, str(ROOT))
 import pandas as pd
 from mootdx.quotes import Quotes
+
 from lake.base import Fetcher, RateLimiter
 from lake.sources.registry import register
 
@@ -67,10 +71,12 @@ class TdxRawFetcher(Fetcher):
 
 def update_raw_prices_tushare():
     """使用 Tushare daily 接口批量增量更新 daily_raw，避免逐股请求，速度快 100 倍。"""
-    from lake.sources.tushare import call, to_code
-    from lake.compact import compact_raw_prices
-    import pandas as pd
     from pathlib import Path
+
+    import pandas as pd
+
+    from lake.compact import compact_raw_prices
+    from lake.sources.tushare import call, to_code
 
     daily_raw_dir = Path("data_lake/price/daily_raw")
     daily_raw_all_fp = Path("data_lake/price/daily_raw_all.parquet")

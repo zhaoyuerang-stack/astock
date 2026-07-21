@@ -8,7 +8,6 @@ the trend filter is robust to data weighting choice.
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/hmm_macro_amount_weighted_walkforward.py
 """
-import json
 import os
 import sys
 from pathlib import Path
@@ -21,7 +20,6 @@ os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
 from strategies.small_cap import StrategyConfig, backtest_weights, run_small_cap_strategy
-from engine.metrics import metrics
 
 OUT_DIR = ROOT / "reports" / "research"
 OUT_DIR.mkdir(parents=True, exist_ok=True)

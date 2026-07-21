@@ -3,7 +3,6 @@
 风格: 自检脚本(python3 tests/test_notify.py),与 test_all.sh 一致。
 全程 mock,不真发通知 / 不联网。
 """
-import json
 import os
 import sys
 import tempfile

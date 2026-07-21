@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -47,7 +46,7 @@ class RegimeEngine:
         self.close = close
         self.amount = amount
         self.cfg = cfg
-        self._labels: Optional[pd.DataFrame] = None
+        self._labels: pd.DataFrame | None = None
 
     def classify(self) -> pd.DataFrame:
         """返回 date × dimension 的 regime 标签 DataFrame.

@@ -17,9 +17,9 @@ ROOT = Path(__file__).resolve().parents[1]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
+from contracts.views import BondInstructionView  # noqa: E402
 from portfolio import paper_engine as pe  # noqa: E402
 from scripts.ops import paper_trade as pt  # noqa: E402
-from contracts.views import BondInstructionView  # noqa: E402
 
 BOND_PX = 141.0     # ETF 不复权参考价
 STOCK_PX = 10.0

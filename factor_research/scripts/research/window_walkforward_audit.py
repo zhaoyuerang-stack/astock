@@ -135,7 +135,7 @@ def main():
     print("汇总")
     print("=" * 80)
     df = pd.DataFrame(rows)
-    print(f"\n  WF 8 年 best_w 分布:")
+    print("\n  WF 8 年 best_w 分布:")
     for w, n in df["best_w"].value_counts().sort_index().items():
         print(f"    w={w:>3d}: {n}/8 年 ({n/8*100:.0f}%)")
 
@@ -158,11 +158,11 @@ def main():
         dominant_w = df["best_w"].value_counts().idxmax()
         print(f"  ✓ best_w 稳定 (主导 w={dominant_w}, {df['best_w'].value_counts().max()}/8 年)")
     else:
-        print(f"  ✗ best_w 不稳定 (分散度高) → window 选择对 train sample 敏感")
+        print("  ✗ best_w 不稳定 (分散度高) → window 选择对 train sample 敏感")
 
     if abs(avg_oos_ann_best - avg_oos_ann_w20) < 0.03:
         print(f"  ✓ WF vs Fixed-20 OOS 接近 ({avg_oos_ann_best:+.1%} vs {avg_oos_ann_w20:+.1%})")
-        print(f"     → window=20 不是 in-sample 过拟合，固定 20 实战 OK")
+        print("     → window=20 不是 in-sample 过拟合，固定 20 实战 OK")
     else:
         delta = avg_oos_ann_best - avg_oos_ann_w20
         if delta > 0:

@@ -2,13 +2,16 @@
 阶段3主脚本：全市场日线下载(腾讯源,回溯2010) + 全量校验 + 质量报告
 """
 import warnings; warnings.filterwarnings("ignore")
-import os, sys
+import os
+import sys
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
-import pandas as pd
 import akshare as ak
+import pandas as pd
+
 from lake.sources.registry import resolve_source
 from lake.validator import DataValidator
 
@@ -53,7 +56,7 @@ def main():
     compact_raw_prices("data_lake/price/daily_raw", "data_lake/price/daily_raw_all.parquet")
 
     report = v.quality_report(results, save_path="data_lake/quality_report.json")
-    print(f"\n=== 质量报告 ===", flush=True)
+    print("\n=== 质量报告 ===", flush=True)
     print(f"总数={report['total']} 干净={report['clean']} ({report['clean_ratio']:.1%})", flush=True)
     print(f"问题分布: {report['issue_breakdown']}", flush=True)
     print("详见 data_lake/quality_report.json", flush=True)

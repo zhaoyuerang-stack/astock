@@ -6,10 +6,10 @@ from app_config.log import get_logger
 
 logger = get_logger(__name__)
 
-import pandas as pd
 from pathlib import Path
 
 import akshare as ak
+import pandas as pd
 
 META = Path("data_lake/meta")
 META.mkdir(parents=True, exist_ok=True)

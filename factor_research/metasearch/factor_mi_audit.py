@@ -10,10 +10,9 @@
   IC 时间序列两两 MI 高 = 因子在不同时段产生同样方向的预测 = 冗余
 """
 import importlib
+import json
 import sys
 import time
-import json
-from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
@@ -22,10 +21,9 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from engine.factor_analysis import calc_ic
-from factors.utils import safe_zscore, mad_clip
-from factory.pool import HypothesisPool
 from factory.ontology import HypothesisStatus
-from metasearch.mi_auditor import mi, conditional_mi
+from factory.pool import HypothesisPool
+from metasearch.mi_auditor import mi
 
 
 def _resolve_factor_fn(fn_name: str):
@@ -195,13 +193,13 @@ def main():
         print("⚠ no candidates with valid IC")
         return
 
-    print(f"\nComputing pairwise MI matrix...")
+    print("\nComputing pairwise MI matrix...")
     t0 = time.time()
     mat = mi_matrix(ics)
     print(f"  {time.time()-t0:.1f}s, {mat.shape[0]}×{mat.shape[1]} matrix")
 
     # 自相关上限 (bins=8 → log2(8) = 3 bits)
-    print(f"\n=== MI 分布概览 ===")
+    print("\n=== MI 分布概览 ===")
     off_diag = []
     for i in range(len(mat)):
         for j in range(i+1, len(mat)):
@@ -214,7 +212,7 @@ def main():
     print(f"  独立 pair (MI<0.5):   {(off_diag<0.5).sum()}")
 
     # Clustering
-    print(f"\n=== 信息冗余簇 (MI > 2.0 = 同信息源) ===")
+    print("\n=== 信息冗余簇 (MI > 2.0 = 同信息源) ===")
     clusters = cluster_by_redundancy(mat, threshold=2.0)
     for i, c in enumerate(clusters):
         if len(c) > 1:
@@ -230,7 +228,7 @@ def main():
     n_total = len(ics)
     n_keep = len(clusters)
     saving = 1 - n_keep / n_total
-    print(f"\n💡 L−1 MI 过滤效果估算:")
+    print("\n💡 L−1 MI 过滤效果估算:")
     print(f"  原 hypothesis: {n_total}")
     print(f"  独立簇: {n_keep}")
     print(f"  算力节省: {saving:.0%} (每簇保留 1 个,其他可跳过 L1)")

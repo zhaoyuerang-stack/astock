@@ -5,15 +5,17 @@ to ensure true active alpha.
 """
 from __future__ import annotations
 
-import pandas as pd
+from typing import Any
+
 import numpy as np
-from typing import Dict, Any
+import pandas as pd
+
 
 class ChallengerComparison:
     def __init__(self, strategy_id: str, challenger_id: str):
         self.strategy_id = strategy_id
         self.challenger_id = challenger_id
-        self.metrics: Dict[str, Any] = {}
+        self.metrics: dict[str, Any] = {}
         self.outperformed = False
 
     def compare(self, strategy_returns: pd.Series, challenger_returns: pd.Series):

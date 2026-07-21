@@ -11,7 +11,7 @@ sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
 from services.agent.planner import ask
-from services.agent.tools import tool_registry, requires_confirmation
+from services.agent.tools import tool_registry
 
 
 def test_tool_whitelist_risk():

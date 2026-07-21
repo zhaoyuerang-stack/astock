@@ -5,11 +5,12 @@ and peak-to-trough recovery stats.
 """
 from __future__ import annotations
 
-import pandas as pd
-import numpy as np
-from typing import Dict, Any, List
+from typing import Any
 
-def generate_drawdown_report(returns: pd.Series) -> Dict[str, Any]:
+import pandas as pd
+
+
+def generate_drawdown_report(returns: pd.Series) -> dict[str, Any]:
     """Analyze the drawdown profile of returns."""
     cum_returns = (1 + returns).cumprod()
     running_max = cum_returns.cummax()
@@ -19,7 +20,7 @@ def generate_drawdown_report(returns: pd.Series) -> Dict[str, Any]:
     
     # Identify drawdown events (where drawdown < 0)
     is_in_dd = drawdowns < 0
-    dd_events: List[Dict[str, Any]] = []
+    dd_events: list[dict[str, Any]] = []
     
     peak_date = None
     trough_date = None

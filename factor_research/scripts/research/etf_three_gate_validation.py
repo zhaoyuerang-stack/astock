@@ -4,8 +4,11 @@
   2. 分年稳定性 — 35/35/15/15 配置每年独立 Sharpe/ann/mdd
   3. 极端事件 — A 股已知大跌期 (2018/2020-Q1/2022/2024-Q3) ETF 是否真避险
 """
-import os, sys, warnings
+import os
+import sys
+import warnings
 from pathlib import Path
+
 warnings.filterwarnings("ignore")
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
@@ -13,8 +16,9 @@ sys.path.insert(0, str(ROOT))
 
 import numpy as np
 import pandas as pd
-from portfolio.strategy_runners import run_active
+
 from portfolio.composer import metrics as pm
+from portfolio.strategy_runners import run_active
 
 ETF_DIR = ROOT / "data_lake" / "cross_asset" / "etf"
 START = "2018-01-01"
@@ -51,7 +55,7 @@ def metrics_period(r):
 
 # ─── Gate 1: Walk-Forward MA grid ───
 print(f"{'='*70}")
-print(f"  Gate 1: Walk-Forward MA grid (年度滚动选最优 MA)")
+print("  Gate 1: Walk-Forward MA grid (年度滚动选最优 MA)")
 print(f"{'='*70}")
 
 ma_grid = [10, 30, 60, 120, 240]
@@ -67,7 +71,7 @@ for code, name in [("511010", "国债"), ("518880", "黄金")]:
 
     # Walk-forward: 每年用前 3 年选最优 MA, 测下一年 OOS
     years = sorted(set(close.index.year))
-    print(f"\n  WF 年度选最优 MA (前 3 年训练 → 下年 OOS):")
+    print("\n  WF 年度选最优 MA (前 3 年训练 → 下年 OOS):")
     print(f"    {'OOS year':>9s}  {'best MA (IS)':>13s}  {'OOS sh':>7s}  {'OOS ann':>8s}")
     wf_results = []
     for i, oos_y in enumerate(years[3:]):
@@ -98,7 +102,7 @@ for code, name in [("511010", "国债"), ("518880", "黄金")]:
 
 # ─── Gate 2: 35/35/15/15 配置分年稳定性 ───
 print(f"\n\n{'='*70}")
-print(f"  Gate 2: 35/35/15/15 配置分年独立测试")
+print("  Gate 2: 35/35/15/15 配置分年独立测试")
 print(f"{'='*70}")
 
 a_ret = run_active(start=START)
@@ -117,7 +121,7 @@ W = (0.35, 0.35, 0.15, 0.15)
 portfolio = W[0]*illiq + W[1]*small + W[2]*gold_a + W[3]*gov_a
 baseline = 0.5 * illiq + 0.5 * small
 
-print(f"\n  按年看 baseline (50/50) vs 推荐 (35/35/15/15):")
+print("\n  按年看 baseline (50/50) vs 推荐 (35/35/15/15):")
 print(f"  {'year':>5s}  {'base_ann':>9s} {'base_sh':>8s} {'base_mdd':>9s}  "
       f"{'new_ann':>9s} {'new_sh':>7s} {'new_mdd':>8s}  Δsh   Δmdd")
 print("  " + "-" * 90)
@@ -143,7 +147,7 @@ for y in years:
 
 # ─── Gate 3: 极端事件 ───
 print(f"\n\n{'='*70}")
-print(f"  Gate 3: A 股已知大跌期, ETF 是否真避险")
+print("  Gate 3: A 股已知大跌期, ETF 是否真避险")
 print(f"{'='*70}")
 
 # 找 baseline drawdown 最大的 5 个区间
@@ -165,7 +169,7 @@ for end_date, ret_60 in worst_60d.items():
     stress_periods.append((start_d, end_date, ret_60))
     if len(stress_periods) >= 5: break
 
-print(f"\n  baseline 历史 5 个最差 60 日 (A 股最痛苦时刻):")
+print("\n  baseline 历史 5 个最差 60 日 (A 股最痛苦时刻):")
 print(f"  {'period':>22s}  {'A股 60d ret':>11s}  {'gold 60d':>10s}  {'gov 60d':>9s}  {'组合 60d':>9s}  防御?")
 print("  " + "-" * 88)
 for s, e, r60 in stress_periods:
@@ -179,11 +183,11 @@ for s, e, r60 in stress_periods:
 
 # ─── 总结 ───
 print(f"\n\n{'='*70}")
-print(f"  三关总结")
+print("  三关总结")
 print(f"{'='*70}")
 m_base = pm(baseline)
 m_port = pm(portfolio)
-print(f"\n  全期 (2018-2026) baseline vs 推荐:")
+print("\n  全期 (2018-2026) baseline vs 推荐:")
 print(f"    baseline: ann {m_base['annual']:+.1%} sh {m_base['sharpe']:+.2f} cal {m_base['calmar']:+.2f} mdd {m_base['maxdd']:+.1%}")
 print(f"    35/35/15/15: ann {m_port['annual']:+.1%} sh {m_port['sharpe']:+.2f} cal {m_port['calmar']:+.2f} mdd {m_port['maxdd']:+.1%}")
 print(f"    Δ: sh {m_port['sharpe']-m_base['sharpe']:+.2f}  cal {m_port['calmar']-m_base['calmar']:+.2f}  mdd {m_port['maxdd']-m_base['maxdd']:+.1%}")

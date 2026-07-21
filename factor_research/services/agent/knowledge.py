@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 PACKAGE_ROOT = PROJECT_ROOT / "factor_research"
 
@@ -148,8 +147,12 @@ def _score(query: str, text: str, source_type: str) -> float:
 def _get_dynamic_system_info() -> str:
     """Format the current system status as a Markdown document."""
     try:
-        from services.read import factors as fac, registry as reg
-        from services.read import experiments as ex, portfolio as pf, risk as rk, state as st
+        from services.read import experiments as ex
+        from services.read import factors as fac
+        from services.read import portfolio as pf
+        from services.read import registry as reg
+        from services.read import risk as rk
+        from services.read import state as st
         
         # 不带空行:标题与第一节合并成同一 chunk,避免产出"只有标题没有内容"的空心
         # chunk(它靠标题关键词高分挤占检索席位,却答不出任何真实状态)。

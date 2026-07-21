@@ -32,7 +32,6 @@ from factors.small_cap import small_cap_timing
 from lake.load_lake import LAKE, load_raw_close, load_tushare_panel
 from strategies.small_cap import _drop_star, load_price_panels
 
-
 STATS_START = "2018-01-01"
 WARMUP_START = "2010-01-01"
 TOP_N = 25

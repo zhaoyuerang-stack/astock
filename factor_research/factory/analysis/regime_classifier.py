@@ -17,7 +17,6 @@
 import numpy as np
 import pandas as pd
 
-
 REGIME_LABELS = ["bull", "bear", "chop", "crisis"]
 
 

@@ -17,13 +17,12 @@
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
-import hashlib
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Optional
 
 # 失败候选的默认动作:按 stage 分级。
 # phase1 合成审计失败 = 候选真坏(leaky/未来函数)→ 永久 SKIP 同参数。
@@ -112,7 +111,7 @@ class Finding:
 class KnowledgeGraph:
     """研究结论的有向图(节点=Finding,边=depends_on)。"""
 
-    def __init__(self, store_path: Optional[str] = None):
+    def __init__(self, store_path: str | None = None):
         self._findings: dict[str, Finding] = {}
         self.store_path = store_path
         if store_path and os.path.exists(store_path):
@@ -124,7 +123,7 @@ class KnowledgeGraph:
         if self.store_path:
             self.save(self.store_path)
 
-    def get(self, finding_id: str) -> Optional[Finding]:
+    def get(self, finding_id: str) -> Finding | None:
         return self._findings.get(finding_id)
 
     def all_valid(self) -> list:
@@ -173,7 +172,7 @@ class KnowledgeGraph:
     # ── 从验证结果现场生长 finding ──
     def record_from_validation(
         self, hyp, passed: bool, metrics: dict,
-        stage: str = "", action: Optional[str] = None, expiry_days: int = 180,
+        stage: str = "", action: str | None = None, expiry_days: int = 180,
     ) -> Finding:
         """把一次验证结果转成 Finding(失败也记,避免重复尝试)。
 
@@ -403,7 +402,7 @@ def sync_pending_lessons_to_graph(
 DEFAULT_STORE = os.path.join(os.path.dirname(__file__), "findings.json")
 
 
-def load_graph(store_path: Optional[str] = None, include_directions: bool = True) -> KnowledgeGraph:
+def load_graph(store_path: str | None = None, include_directions: bool = True) -> KnowledgeGraph:
     """加载知识图谱(缺省用 knowledge/findings.json)。空文件 → 空图。
 
     include_directions=True 时内存合并方向登记簿(direction_registry.json)的 gates:

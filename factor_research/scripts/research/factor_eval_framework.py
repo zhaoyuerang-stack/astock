@@ -10,7 +10,9 @@
   cd /Users/kiki/astcok/factor_research
   /opt/homebrew/bin/python3 scripts/research/factor_eval_framework.py
 """
-import os, sys, warnings
+import os
+import sys
+import warnings
 from pathlib import Path
 
 warnings.filterwarnings("ignore")
@@ -20,14 +22,19 @@ sys.path.insert(0, str(Path.cwd()))
 import numpy as np
 import pandas as pd
 
-from strategies.small_cap import load_price_panels
 from engine.factor_analysis import calc_ic, ic_summary
-from factors.small_cap import small_cap_factor
 from factors.momentum import (
-    mom_n, volatility, illiquidity as mom_illiquidity,
-    price_to_ma, vol_ratio,
+    illiquidity as mom_illiquidity,
 )
-from factors.utils import safe_zscore, mad_clip
+from factors.momentum import (
+    mom_n,
+    price_to_ma,
+    vol_ratio,
+    volatility,
+)
+from factors.small_cap import small_cap_factor
+from factors.utils import mad_clip, safe_zscore
+from strategies.small_cap import load_price_panels
 
 STATS_START = "2018-01-01"
 FORWARD_PERIODS = [1, 2, 3, 5, 10, 20]
@@ -230,7 +237,7 @@ def main():
             print("\n  注: 时序 IC 远小于截面 IC 是正常的——截面利用了全市场排序信息,")
             print("  时序只利用了单只股票自身的变化. 但对仓位管理/择时, 时序视角更直接.")
 
-    print(f"\n  输出: 本脚本仅打印结果, 不修改任何系统代码.")
+    print("\n  输出: 本脚本仅打印结果, 不修改任何系统代码.")
 
 
 if __name__ == "__main__":

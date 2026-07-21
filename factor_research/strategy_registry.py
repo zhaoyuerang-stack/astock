@@ -19,8 +19,8 @@ import argparse
 import json
 import os
 import re
+from datetime import UTC, date
 from pathlib import Path
-from datetime import date
 
 from engine.metrics import compute_hit
 
@@ -367,7 +367,7 @@ def attach_decay_check(family, version, result, *, checked_at=None):
     不改 status/admission——是否退役仍走 retire_version() 人工/workflow 决策。
     经 _save 走台账唯一写入口。
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
     data = _load()
     fam = next((f for f in data["families"] if f["id"] == family), None)
     if fam is None:
@@ -377,7 +377,7 @@ def attach_decay_check(family, version, result, *, checked_at=None):
         raise ValueError(f"版本 '{family}/{version}' 不存在")
     v["decay_check"] = {
         **dict(result or {}),
-        "checked_at": checked_at or datetime.now(timezone.utc).isoformat(),
+        "checked_at": checked_at or datetime.now(UTC).isoformat(),
     }
     _save(data)
     return f"{family}/{version}"
@@ -395,7 +395,7 @@ def attach_catalog_status(family, version, status, *, marginal=None, changed_at=
     version 的 status/admission(那是 strategy_registry.register() 的事)。
     经 _save 走台账唯一写入口。
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
     if status not in {"ACTIVE", "SHADOW"}:
         raise ValueError(f"catalog_status 只能是 ACTIVE/SHADOW,收到 {status!r}")
     data = _load()
@@ -408,7 +408,7 @@ def attach_catalog_status(family, version, status, *, marginal=None, changed_at=
     v["catalog_status"] = {
         "status": status,
         "marginal": dict(marginal or {}),
-        "changed_at": changed_at or datetime.now(timezone.utc).isoformat(),
+        "changed_at": changed_at or datetime.now(UTC).isoformat(),
     }
     _save(data)
     return f"{family}/{version}"
@@ -459,9 +459,10 @@ def retire_version(family, version, *, reason, evidence_refs=(), actor="workflow
     control_events 链式审计、把退役原因与证据指针写入 evidence.retirement(不删除历史字段)。
     """
     import uuid
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    from governance.control_events import append_event, DEFAULT_LOG as CE_DEFAULT_LOG
+    from governance.control_events import DEFAULT_LOG as CE_DEFAULT_LOG
+    from governance.control_events import append_event
     from governance.state_machine import CN_TO_STATE
 
     data = _load()
@@ -476,7 +477,7 @@ def retire_version(family, version, *, reason, evidence_refs=(), actor="workflow
     spec_hash = ((item.get("executable_spec") or {}).get("spec_hash")) or ""
 
     append_event(
-        event_id=str(uuid.uuid4()), timestamp=datetime.now(timezone.utc).isoformat(),
+        event_id=str(uuid.uuid4()), timestamp=datetime.now(UTC).isoformat(),
         actor=actor, family=family, version=version, spec_hash=spec_hash,
         from_state=from_state, to_state="RETIRED", reason_code=reason,
         evidence_refs=tuple(evidence_refs),
@@ -487,7 +488,7 @@ def retire_version(family, version, *, reason, evidence_refs=(), actor="workflow
     evidence["retirement"] = {
         "reason": reason,
         "evidence_refs": list(evidence_refs),
-        "retired_at": datetime.now(timezone.utc).isoformat(),
+        "retired_at": datetime.now(UTC).isoformat(),
         "actor": actor,
     }
     item["evidence"] = evidence

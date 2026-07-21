@@ -10,9 +10,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.ci import check_factor_registry as guard
 from factors.registry import FACTOR_REGISTRY, register_factor
-
+from scripts.ci import check_factor_registry as guard
 
 # ── 注册门:import 期 fail-closed ─────────────────────────────────────────
 
@@ -174,9 +173,9 @@ def test_holder_count_chg_spec_unchanged_after_migration():
 
 def _assert_migrated_specs(expected: dict) -> None:
     """三面(whitelist params/data、DSL call、catalog builder)逐位钉死。"""
-    from factory.autoresearch.registry import ALLOWED_FACTORS
     from factors.autoresearch_dsl import _FACTOR_CALLS
     from factors.registry import discover
+    from factory.autoresearch.registry import ALLOWED_FACTORS
     from strategies.catalog import resolve_factor_builder
 
     reg = discover()

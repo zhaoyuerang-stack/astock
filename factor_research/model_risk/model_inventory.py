@@ -8,7 +8,6 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
 
 DEFAULT_INVENTORY_PATH = (
     Path(__file__).resolve().parent.parent
@@ -19,19 +18,19 @@ DEFAULT_INVENTORY_PATH = (
 class ModelCard:
     strategy_id: str                   # family/version
     economic_hypothesis: str           # 经济假设
-    data_sources: List[str]            # 数据来源
+    data_sources: list[str]            # 数据来源
     train_period: str                  # 训练区间
     oos_period: str                    # 样本外区间
-    applicable_regimes: List[str]      # 适用市场状态
+    applicable_regimes: list[str]      # 适用市场状态
     capacity_limit: float              # 容量上限 (CNY)
-    style_exposures: Dict[str, float]  # 风格暴露
-    forbidden_conditions: List[str]    # 禁用条件
-    known_failure_cases: List[str]     # 已知失效案例
+    style_exposures: dict[str, float]  # 风格暴露
+    forbidden_conditions: list[str]    # 禁用条件
+    known_failure_cases: list[str]     # 已知失效案例
     owner: str                         # 负责人
     approver: str                      # 审批人
     approval_status: str = "PENDING"   # PENDING | APPROVED | REJECTED
-    signature: Optional[str] = None    # 审批签名
-    metadata: Dict = field(default_factory=dict)
+    signature: str | None = None    # 审批签名
+    metadata: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -47,14 +46,14 @@ class ModelInventory:
     def __init__(self, path: Path = DEFAULT_INVENTORY_PATH):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._cards: Dict[str, ModelCard] = {}
+        self._cards: dict[str, ModelCard] = {}
         self.load()
 
     def load(self) -> None:
         if not self.path.exists():
             return
         try:
-            with open(self.path, "r", encoding="utf-8") as f:
+            with open(self.path, encoding="utf-8") as f:
                 data = json.load(f)
                 for sid, card_data in data.items():
                     self._cards[sid] = ModelCard.from_dict(card_data)
@@ -69,8 +68,8 @@ class ModelInventory:
         self._cards[card.strategy_id] = card
         self.save()
 
-    def get_card(self, strategy_id: str) -> Optional[ModelCard]:
+    def get_card(self, strategy_id: str) -> ModelCard | None:
         return self._cards.get(strategy_id)
 
-    def list_all(self) -> List[ModelCard]:
+    def list_all(self) -> list[ModelCard]:
         return list(self._cards.values())

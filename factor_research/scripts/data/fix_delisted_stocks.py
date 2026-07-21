@@ -8,10 +8,13 @@ Output:
   - Individual parquet files in data_lake/price/daily/ with full columns
   - Rebuilt daily_all.parquet (LONG format: date×code×close×volume×amount)
 """
-import os, sys, time, json, urllib.request
+import json
+import os
+import sys
+import time
+import urllib.request
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -93,8 +96,9 @@ for i, code in enumerate(missing):
 print(f"  Done. Added {added} stocks")
 
 # ── Step 3: Rebuild daily_all as LONG table ──
-print(f"\n[3/3] Rebuilding daily_all.parquet (LONG format)...", flush=True)
+print("\n[3/3] Rebuilding daily_all.parquet (LONG format)...", flush=True)
 from lake.load_lake import load_prices
+
 prices = load_prices(start="2010-01-01")
 print(f"  Loaded: close={prices['close'].shape}")
 
@@ -112,4 +116,4 @@ for d in dfs[1:]:
 long.to_parquet(DAILY_ALL, index=False)
 print(f"  Saved: {DAILY_ALL}")
 print(f"  Rows: {len(long)}  Codes: {long['code'].nunique()}")
-print(f"\nDone. Ready for re-run.")
+print("\nDone. Ready for re-run.")

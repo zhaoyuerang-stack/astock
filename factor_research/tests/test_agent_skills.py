@@ -16,8 +16,13 @@ os.chdir(ROOT)
 
 from services.agent import skills
 from services.agent.llm_adapter import NullAdapter
-from services.agent.skills import (StockDataSkill, SystemStatusSkill, _number_guard,
-                                    route_skill, tool_registry)
+from services.agent.skills import (
+    StockDataSkill,
+    SystemStatusSkill,
+    _number_guard,
+    route_skill,
+    tool_registry,
+)
 
 
 def _offline() -> None:

@@ -5,12 +5,13 @@ and preserve research histories.
 """
 from __future__ import annotations
 
-import json
 import hashlib
-from dataclasses import asdict, dataclass, field
+import json
+from collections.abc import Iterator
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any
 
 DEFAULT_LEDGER_PATH = (
     Path(__file__).resolve().parent.parent
@@ -24,18 +25,18 @@ DEFAULT_RESEARCH_RUN_INDEX_PATH = (
 @dataclass
 class LedgerEntry:
     experiment_id: str
-    parent_experiment_id: Optional[str]
+    parent_experiment_id: str | None
     hypothesis_text: str
-    llm_prompt_hash: Optional[str]
+    llm_prompt_hash: str | None
     factor_ast_hash: str
     code_commit_hash: str
     data_snapshot_hash: str
     universe_version: str
     cost_model_version: str
     random_seed: int
-    tried_parameters: Dict[str, Any]
-    result_metrics: Dict[str, Any]
-    rejection_reason: Optional[str]
+    tried_parameters: dict[str, Any]
+    result_metrics: dict[str, Any]
+    rejection_reason: str | None
     reviewer: str
     run_at: str
     notes: str = ""
@@ -63,10 +64,10 @@ class ResearchRunRecord:
 
     script: str
     hypothesis: str
-    data_vintage: Dict[str, Any]
-    metrics: Dict[str, Any]
+    data_vintage: dict[str, Any]
+    metrics: dict[str, Any]
     verdict: str
-    artifact_paths: List[str]
+    artifact_paths: list[str]
     next_action: str
     source: str = ""
     run_at: str = ""
@@ -122,7 +123,7 @@ class ResearchLedger:
         last = ""
         if not self.path.exists():
             return last
-        with open(self.path, "r", encoding="utf-8") as f:
+        with open(self.path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line:
@@ -158,7 +159,7 @@ class ResearchLedger:
         legacy = 0
         if not self.path.exists():
             return True, problems
-        with open(self.path, "r", encoding="utf-8") as f:
+        with open(self.path, encoding="utf-8") as f:
             for i, line in enumerate(f):
                 line = line.strip()
                 if not line:
@@ -188,7 +189,7 @@ class ResearchLedger:
         if not self.path.exists():
             return 0
         recs = []
-        with open(self.path, "r", encoding="utf-8") as f:
+        with open(self.path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if line:
@@ -211,7 +212,7 @@ class ResearchLedger:
         """Iterate through all ledger entries."""
         if not self.path.exists():
             return
-        with open(self.path, "r", encoding="utf-8") as f:
+        with open(self.path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line:
@@ -221,14 +222,14 @@ class ResearchLedger:
                 except Exception:
                     pass
 
-    def list_all(self) -> List[LedgerEntry]:
+    def list_all(self) -> list[LedgerEntry]:
         return list(self.iter_all())
 
     def iter_research_runs(self) -> Iterator[ResearchRunRecord]:
         """Iterate only ``record_type=research_run`` rows."""
         if not self.path.exists():
             return
-        with open(self.path, "r", encoding="utf-8") as f:
+        with open(self.path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line:
@@ -240,10 +241,10 @@ class ResearchLedger:
                 except Exception:
                     continue
 
-    def list_research_runs(self) -> List[ResearchRunRecord]:
+    def list_research_runs(self) -> list[ResearchRunRecord]:
         return list(self.iter_research_runs())
 
-    def get_by_id(self, experiment_id: str) -> Optional[LedgerEntry]:
+    def get_by_id(self, experiment_id: str) -> LedgerEntry | None:
         for entry in self.iter_all():
             if entry.experiment_id == experiment_id:
                 return entry

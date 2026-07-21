@@ -16,9 +16,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
-from factory.autoresearch import ReviewQueue, CandidateStatus, CandidateRepository
+from factory.autoresearch import CandidateRepository, CandidateStatus, ReviewQueue
 from services.actions.autoresearch import promote_approved_candidate, review_autoresearch_candidate
-from workflow.promote import promote_pool_l3, promote_hypothesis
+from workflow.promote import promote_hypothesis, promote_pool_l3
 
 
 def run_bulk_promotion():
@@ -48,7 +48,7 @@ def run_bulk_promotion():
                     repository=repository,
                     review_queue=review_queue
                 )
-                print(f"  → Approved successfully.")
+                print("  → Approved successfully.")
             except Exception as e:
                 print(f"  → Error approving {fp}: {e}")
 

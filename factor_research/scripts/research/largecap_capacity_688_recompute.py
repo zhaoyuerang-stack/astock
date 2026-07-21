@@ -1,6 +1,5 @@
 import sys; sys.path.insert(0,"/Users/kiki/astcok/factor_research")
-import numpy as np, pandas as pd
-from factors.large_cap import load_clean_panels_with_growth, build_large_cap_premium_factor
+from factors.large_cap import build_large_cap_premium_factor, load_clean_panels_with_growth
 from strategies.small_cap import build_rebalance_weights
 
 panels = load_clean_panels_with_growth()

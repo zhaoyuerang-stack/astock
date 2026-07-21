@@ -10,8 +10,10 @@ Expected correlation < 0.3 (northbound focuses on large/mid-cap, different drive
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/northbound_factor.py
 """
-import os, sys
+import os
+import sys
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -19,7 +21,12 @@ ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import backtest_weights, StrategyConfig, run_small_cap_strategy, build_rebalance_weights
+from strategies.small_cap import (
+    StrategyConfig,
+    backtest_weights,
+    build_rebalance_weights,
+    run_small_cap_strategy,
+)
 
 OUT = ROOT / "reports" / "research"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -101,8 +108,8 @@ def main():
     ret_nb_pt2 = None
 
     # ── v2.0 small-cap baseline ──
-    from strategies.small_cap import load_price_panels
     from factors.small_cap import small_cap_factor, small_cap_timing
+    from strategies.small_cap import load_price_panels
     close_all, vol_all, amount_all = load_price_panels("2017-01-01")
     factor_sc = small_cap_factor(amount_all, 60)
     timing_sc, _, _ = small_cap_timing(close_all, amount_all, 16)
@@ -119,7 +126,7 @@ def main():
 
     mnb = m(ret_nb[ret_nb.index.year >= 2019])
     msc = m(ret_sc[ret_sc.index.year >= 2019])
-    print(f"\n[5] Results (2019+, post warmup):")
+    print("\n[5] Results (2019+, post warmup):")
     print(f'  {"":<22} {"Ann":>8} {"Sharpe":>7} {"MaxDD":>8}')
     print(f'  {"Northbound":<22} {mnb["annual"]:>+7.1%}  {mnb["sharpe"]:>5.2f}  {mnb["maxdd"]:>+7.1%}')
     print(f'  {"v2.0 small-cap":<22} {msc["annual"]:>+7.1%}  {msc["sharpe"]:>5.2f}  {msc["maxdd"]:>+7.1%}')
@@ -133,7 +140,7 @@ def main():
     print(f'  Corr_NB_SC:   {ret_nb.loc[common_nb_sc].corr(ret_sc.loc[common_nb_sc]):.3f}')
 
     # Yearly
-    print(f'\n  Yearly returns:')
+    print('\n  Yearly returns:')
     print(f'  {"Year":>6} {"Northbound":>10} {"v2.0":>10}')
     for year in range(2019, 2027):
         rn = ret_nb[ret_nb.index.year == year]

@@ -1,6 +1,5 @@
 # [STATUS: archived] 已退役探索变体族,不再维护;仅供追溯。见 scripts/research/archive/__init__.py
 """Yearly breakdown of HMM macro exit vs baseline."""
-import json
 import os
 import sys
 from pathlib import Path

@@ -16,8 +16,10 @@ Key question: at what cost level does pure trend tw=2 STOP being better than bas
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/cost_slippage_sensitivity.py
 """
-import os, sys
+import os
+import sys
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -104,6 +106,7 @@ results = []
 for name, buy_c, sell_c in scenarios:
     # Override cost in config
     from dataclasses import replace
+
     from core.engine import CostModel
     cost_model = CostModel(buy_cost=buy_c, sell_cost=sell_c)
     cfg_c = replace(cfg, cost=cost_model)
@@ -175,10 +178,10 @@ for _, r in df.iterrows():
     prev_row_c = r
 
 # Comparison: how does PT benefit from lower turnover?
-print(f"\n=== Turnover Economics ===", flush=True)
-print(f"  PT is a conservative overlay (cuts to 0 when trend < 0)")
-print(f"  This means PT trades LESS frequently than baseline:")
-print(f"  - Lower turnover → lower cost")
-print(f"  - Higher costs hurt PT LESS than they hurt baseline")
-print(f"  - Therefore: higher costs ACTUALLY WIDEN PT's relative advantage")
-print(f"  (within reasonable limits — above breakeven, costs eat everything)")
+print("\n=== Turnover Economics ===", flush=True)
+print("  PT is a conservative overlay (cuts to 0 when trend < 0)")
+print("  This means PT trades LESS frequently than baseline:")
+print("  - Lower turnover → lower cost")
+print("  - Higher costs hurt PT LESS than they hurt baseline")
+print("  - Therefore: higher costs ACTUALLY WIDEN PT's relative advantage")
+print("  (within reasonable limits — above breakeven, costs eat everything)")

@@ -12,9 +12,11 @@ Grid:
 
 判定: sharpe ≥ 0.5 且 maxdd ≥ -35% 入"HK 候选池", 进一步测组合贡献。
 """
-import os, sys, warnings
+import os
+import sys
+import warnings
 from pathlib import Path
-from itertools import product
+
 warnings.filterwarnings("ignore")
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
@@ -191,15 +193,16 @@ def main():
               f"mdd={m['maxdd']:+.1%}, cal={m['calmar']:+.2f}")
 
     if not promising:
-        print(f"  (无候选; HK universe 太小或 alpha 弱)")
+        print("  (无候选; HK universe 太小或 alpha 弱)")
         return
 
     # 组合层: best HK 候选 + A 股 ACTIVE
     print(f"\n{'='*60}")
-    print(f"  组合测试: A 股 ACTIVE + 最佳 HK")
+    print("  组合测试: A 股 ACTIVE + 最佳 HK")
     print(f"{'='*60}")
+    from portfolio.composer import compose
+    from portfolio.composer import metrics as pm
     from portfolio.strategy_runners import run_active
-    from portfolio.composer import compose, metrics as pm
     a_returns = run_active(start="2018-01-01")
 
     # Baseline: A 股 ACTIVE only
@@ -220,11 +223,11 @@ def main():
           f"cal={mc['calmar']-mb['calmar']:+.3f} "
           f"mdd={mc['maxdd']-mb['maxdd']:+.2%}")
     if mc['sharpe'] > mb['sharpe']:
-        print(f"  ✅ HK 进入组合改善 Sharpe — Cross-market 突破成功")
+        print("  ✅ HK 进入组合改善 Sharpe — Cross-market 突破成功")
     elif mc['calmar'] > mb['calmar']:
-        print(f"  ◐ HK 改善 Calmar 不改善 Sharpe (risk-adjusted 视角好)")
+        print("  ◐ HK 改善 Calmar 不改善 Sharpe (risk-adjusted 视角好)")
     else:
-        print(f"  ❌ HK 仍拖累组合")
+        print("  ❌ HK 仍拖累组合")
 
 
 if __name__ == "__main__":

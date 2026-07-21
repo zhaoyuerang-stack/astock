@@ -11,7 +11,6 @@ Goal: confirm tw=3 is robustly best across years, not a lucky pick.
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/hmm_macro_single_tw3_walkforward.py
 """
-import json
 import os
 import sys
 from pathlib import Path
@@ -24,7 +23,6 @@ os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
 from strategies.small_cap import StrategyConfig, backtest_weights, run_small_cap_strategy
-from engine.metrics import metrics
 
 OUT_DIR = ROOT / "reports" / "research"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -253,9 +251,9 @@ def main():
     wf_years = [y for y in years if y >= 2015]
 
     print(f"\nWalk-forward: {len(wf_years)} years...", flush=True)
-    print(f"  Pre-test hypothesis: tw=3 should dominate window selection", flush=True)
-    print(f"  If false → overfitting concern", flush=True)
-    print(f"  If true → robust signal", flush=True)
+    print("  Pre-test hypothesis: tw=3 should dominate window selection", flush=True)
+    print("  If false → overfitting concern", flush=True)
+    print("  If true → robust signal", flush=True)
 
     wf_returns = []
     baseline_annual = []

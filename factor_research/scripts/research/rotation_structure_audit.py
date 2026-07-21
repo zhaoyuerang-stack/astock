@@ -102,8 +102,8 @@ def main():
     print("=" * 80)
     print("Rotation structure OOS audit — 2013-2017 设计盲区验证")
     print("=" * 80)
-    print(f"\n指控 #4: bull→illiq, bear→国债 是 2026 设计的结构,")
-    print(f"用 2018-2025 验证 = 后视偏差. 2013-2017 是设计盲区, 真 OOS.")
+    print("\n指控 #4: bull→illiq, bear→国债 是 2026 设计的结构,")
+    print("用 2018-2025 验证 = 后视偏差. 2013-2017 是设计盲区, 真 OOS.")
 
     # ─── 跑 illiq w20 + Band (2013 起, 含 warmup) ───
     print("\n[1/3] 跑 illiq w20 + Band 全期 (从 2010 warmup, 2013+ 输出)")
@@ -196,13 +196,13 @@ def main():
 
     if oos_delta > 0.02:
         print(f"\n  ✓ 设计盲区轮动胜出 +{oos_delta:.1%} → 结构 robust, 不是 backward-looking 过拟合")
-        print(f"     v3.0 轮动结构可信, 进 LIVE 关键剩余风险 = T+1 摩擦 + STATUS 数字对齐")
+        print("     v3.0 轮动结构可信, 进 LIVE 关键剩余风险 = T+1 摩擦 + STATUS 数字对齐")
     elif oos_delta > 0:
         print(f"\n  △ 设计盲区轮动微弱胜出 {oos_delta:+.1%} → 结构边际有效")
         print(f"     注意 OOS Δ ({oos_delta:+.1%}) << IS Δ ({is_delta:+.1%}), 部分 backward-looking")
     else:
         print(f"\n  ✗ 设计盲区轮动不胜出 ({oos_delta:+.1%}) → 结构是 2018+ data-fitting")
-        print(f"     v3.0 轮动结构不能进 LIVE, 退回纯 illiq+Band 基线")
+        print("     v3.0 轮动结构不能进 LIVE, 退回纯 illiq+Band 基线")
 
 
 if __name__ == "__main__":

@@ -24,11 +24,17 @@ START = "2018-01-01"
 
 def main():
     from factory.autoresearch.novelty import (
-        candidate_factor_panel, max_return_correlation, sample_behavior_dates, topn_long_return,
+        candidate_factor_panel,
+        max_return_correlation,
+        sample_behavior_dates,
+        topn_long_return,
     )
     from factory.autoresearch.repositories import CandidateRepository, ExperimentLog
     from services.actions.autoresearch import _load_validation_data
-    from services.actions.autoresearch_search import active_book_panels, run_autoresearch_island_search
+    from services.actions.autoresearch_search import (
+        active_book_panels,
+        run_autoresearch_island_search,
+    )
 
     close, volume, amount, forward_ret = _load_validation_data(START)
 

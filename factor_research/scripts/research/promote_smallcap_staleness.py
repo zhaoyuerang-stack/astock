@@ -7,18 +7,19 @@ zero_ret_days 是研究线第一个过可交易性闸门的信号(size 正交 0.
 λ=0.5(marginal probe 的 OOS 甜点);**λ + 流动性族 4 因子筛选都是搜索自由度,入册须计入 n_trials。**
 """
 from __future__ import annotations
-import os, sys
+
+import os
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT)); os.chdir(ROOT)
 
 import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
 
-from factors.utils import safe_zscore, mad_clip  # noqa: E402
-from factors.small_cap import small_cap_factor, small_cap_timing  # noqa: E402
 from factors.microstructure import zero_ret_days  # noqa: E402 —— canonical 因子
+from factors.small_cap import small_cap_factor, small_cap_timing  # noqa: E402
+from factors.utils import mad_clip, safe_zscore  # noqa: E402
 
 FAMILY = "small-cap-staleness"
 VERSION = "v1.0"
@@ -46,10 +47,10 @@ def timing_builder(close, amount):
 
 
 def main():
+    from engine.metrics import compute_hit
     from workflow.phase1_synthetic import Phase1Checker
     from workflow.phase2_backtest import Phase2Runner
     from workflow.phase3_wf import WF3Runner
-    from engine.metrics import compute_hit
 
     print(f"\n{'='*64}\n  {FAMILY} → phase1-3 (small_cap + {LAMBDA}·zero_ret)\n{'='*64}", flush=True)
 

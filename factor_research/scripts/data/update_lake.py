@@ -12,10 +12,12 @@ CLI 入口(argparse + __main__)与 run_validate()(纯 CLI 用,非生产层依赖
 """
 import warnings; warnings.filterwarnings("ignore")
 import argparse
-from pathlib import Path
 from datetime import date
+from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[2]
 import sys
+
 sys.path.insert(0, str(ROOT))
 
 from lake.update import (  # noqa: E402

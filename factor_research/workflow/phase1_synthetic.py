@@ -25,9 +25,9 @@ logger = get_logger(__name__)
 
 import hashlib
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
 
 import numpy as np
 import pandas as pd
@@ -166,7 +166,7 @@ class Phase1Checker:
         ],
         timing_builder: Callable[[pd.DataFrame, pd.DataFrame], pd.Series],
         family: str = "unnamed",
-        config: Optional[dict] = None,
+        config: dict | None = None,
     ):
         self.factor_builder = factor_builder
         self.timing_builder = timing_builder

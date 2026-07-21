@@ -9,9 +9,12 @@ Parallelization:
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/alpha101_screening.py
 """
-import os, sys, time
-from pathlib import Path
+import os
+import sys
+import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
@@ -83,7 +86,7 @@ def build_factors_parallel(batch_names):
             elif name == "a049": results[name] = -Delta(c,1)
             elif name == "a050": results[name] = -R(C(R(v),R(c),5)).rolling(5).max()
             elif name == "a055": results[name] = -C(R((c-c.rolling(12).min())/(c.rolling(12).max()-c.rolling(12).min()+1e-6)),R(v),6)
-        except Exception as e:
+        except Exception:
             pass  # skip problematic factors
     return results
 
@@ -162,7 +165,7 @@ def main():
     df.to_csv(OUT / "alpha101_screening.csv", index=False)
 
     print(f"\n{'='*60}")
-    print(f"  Alpha101 IC Screening Results (Top 20)")
+    print("  Alpha101 IC Screening Results (Top 20)")
     print(f"{'='*60}")
     print(f"  {'Name':<8} {'IC20d':>8} {'ICIR':>7} {'Pos%':>7} {'Corr_v21':>9}")
     orth = []

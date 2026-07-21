@@ -8,7 +8,6 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-
 FEATURE_COLUMNS = ["risk_appetite", "volatility", "liquidity", "ma_diffusion"]
 
 

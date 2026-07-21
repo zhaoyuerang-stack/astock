@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+
 from contracts.views import GovernanceView
 from model_risk.model_inventory import ModelInventory
 from research_ledger.ledger import ResearchLedger
@@ -260,7 +261,7 @@ def get_governance_overview() -> GovernanceView:
     try:
         factory_log_path = Path(__file__).resolve().parent.parent.parent / "data_lake" / "factory" / "experiment_log.jsonl"
         if factory_log_path.exists():
-            with open(factory_log_path, "r", encoding="utf-8") as f:
+            with open(factory_log_path, encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if not line:

@@ -7,22 +7,25 @@
   cd /Users/kiki/astcok/factor_research
   /opt/homebrew/bin/python3 scripts/research/mvp_leg_factory.py
 """
-import os, sys, warnings
+import os
+import sys
+import warnings
 from pathlib import Path
+
 warnings.filterwarnings("ignore")
 os.chdir(Path(__file__).resolve().parent.parent.parent)
 sys.path.insert(0, str(Path.cwd()))
 
 import numpy as np
 import pandas as pd
-from strategies.small_cap import load_price_panels
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
+
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
+from factors.fundamental import bp_proxy, ep_proxy, net_profit_yoy, revenue_yoy, roe
 from factors.small_cap import small_cap_factor, small_cap_timing
-from factors.utils import safe_zscore, mad_clip
-from strategies.small_cap import build_rebalance_weights
-from factory.regime import RegimeEngine
+from factors.utils import mad_clip, safe_zscore
 from factory.analysis.asymmetry_audit import asymmetry_report
-from factors.fundamental import bp_proxy, ep_proxy, net_profit_yoy, roe, revenue_yoy
+from factory.regime import RegimeEngine
+from strategies.small_cap import build_rebalance_weights, load_price_panels
 
 
 def build_weight_dict(factor, close, top_n=25, rebalance_days=20, direction=1):
@@ -180,7 +183,7 @@ def main():
     print(f"  总计 {len(legs)} 条有效腿")
 
     # ── 评估展示 ──
-    print(f"\n[4/4] 腿评估 + 编排\n")
+    print("\n[4/4] 腿评估 + 编排\n")
 
     # 按 regime 分组展示 top
     for rv, rlabel in [("up", "Bull (trend=up)"), ("down", "Bear (trend=down)")]:
@@ -195,7 +198,7 @@ def main():
 
     # ── 编排优化 ──
     print(f"\n{'='*80}")
-    print(f"  编排优化 (+ 债券 ETF)")
+    print("  编排优化 (+ 债券 ETF)")
     print(f"{'='*80}")
 
     # 基线

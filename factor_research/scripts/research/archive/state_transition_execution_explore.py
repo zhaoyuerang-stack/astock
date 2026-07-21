@@ -26,12 +26,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-
 ROOT = Path(__file__).resolve().parents[3]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, run_small_cap_strategy
 from core.engine import CostModel
 from engine.metrics import metrics
 from scripts.research.archive.state_transition_lead_experiment import (  # noqa: E402
@@ -41,7 +39,7 @@ from scripts.research.archive.state_transition_lead_experiment import (  # noqa:
     make_trigger_mask,
     stress_onsets,
 )
-
+from strategies.small_cap import StrategyConfig, run_small_cap_strategy
 
 OUT_DIR = ROOT / "reports" / "research"
 

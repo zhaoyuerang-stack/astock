@@ -19,16 +19,15 @@ from app_config.log import get_logger
 
 logger = get_logger(__name__)
 
-from dataclasses import dataclass, field
-from itertools import product
-from typing import Callable, Optional
 import time
+from collections.abc import Callable
+from dataclasses import dataclass
+from itertools import product
 
 import numpy as np
 import pandas as pd
 
 from factors.alpha.base import Factor, FactorData
-
 
 # ---------------------------------------------------------------------------
 # Search axis definition
@@ -39,7 +38,7 @@ class Axis:
     """One dimension of the search space."""
     name: str                          # e.g. "window", "factor", "neutralize"
     values: list                       # e.g. [20, 60, 120]
-    apply_to_param: Optional[str] = None  # parameter name to set on factor
+    apply_to_param: str | None = None  # parameter name to set on factor
 
 
 # ---------------------------------------------------------------------------
@@ -56,8 +55,8 @@ class SpaceResult:
     maxdd: float
     sharpe: float
     calmar: float
-    ic_mean: Optional[float] = None
-    icir: Optional[float] = None
+    ic_mean: float | None = None
+    icir: float | None = None
     n_days: int = 0
 
     def summary(self) -> str:
@@ -277,8 +276,11 @@ class FactorSpace:
         dict with keys: wf_metrics, dsr_report, pbo_report, windows, best_params
         """
         from core.analysis.walk_forward import (
-            walk_forward_windows, purge_days, wf_metrics,
-            deflated_sharpe, pbo_cscv,
+            deflated_sharpe,
+            pbo_cscv,
+            purge_days,
+            walk_forward_windows,
+            wf_metrics,
         )
 
         # Determine purge gap
@@ -482,7 +484,7 @@ class FactorSpace:
     # Internal
     # ------------------------------------------------------------------
 
-    def _build_factor(self, params: dict, data: FactorData) -> Optional[Factor]:
+    def _build_factor(self, params: dict, data: FactorData) -> Factor | None:
         """Build a Factor from search parameters."""
         factor = None
 

@@ -1,9 +1,7 @@
 """Ensure every top-level module has parseable MODULE_STATUS.md."""
 from __future__ import annotations
 
-import sys
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parents[2]
 REQUIRED = ["# MODULE_STATUS", "Status:", "Role:"]

@@ -11,8 +11,10 @@ All use rising_edge mode (simple_cross/adaptive/individual channels were worse).
 Usage:
   cd /Users/kiki/astcok/factor_research && python3 scripts/research/lob_detector_walkforward.py
 """
-import os, sys
+import os
+import sys
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -20,8 +22,13 @@ ROOT = Path("/Users/kiki/astcok/factor_research").resolve()
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-from strategies.small_cap import StrategyConfig, load_price_panels, backtest_weights, build_rebalance_weights
 from factors.small_cap import small_cap_factor, small_cap_timing
+from strategies.small_cap import (
+    StrategyConfig,
+    backtest_weights,
+    build_rebalance_weights,
+    load_price_panels,
+)
 
 OUT = ROOT / "reports" / "research"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -162,14 +169,14 @@ wf_s = pd.Series(wf_returns, index=wf_years)
 fix_s = pd.Series(fixed_returns, index=wf_years)
 base_s = pd.Series(base_returns, index=wf_years)
 
-print(f"\n=== Walk-Forward Summary (2015-2026) ===")
+print("\n=== Walk-Forward Summary (2015-2026) ===")
 print(f"{'Metric':<20} {'WF':>14} {'Fixed(2.0,3d)':>14} {'Baseline':>14}")
 print(f"{'Annualized':<20} {wf_s.mean():>+13.1%} {fix_s.mean():>+13.1%} {base_s.mean():>+13.1%}")
 print(f"{'Sharpe':<20} {sharpe_of(wf_s):>13.2f} {sharpe_of(fix_s):>13.2f} {sharpe_of(base_s):>13.2f}")
 print(f"{'Min Yearly':<20} {wf_s.min():>+13.1%} {fix_s.min():>+13.1%} {base_s.min():>+13.1%}")
 print(f"{'Win vs Base':<20} {(wf_s > base_s).mean():>13.0%} {(fix_s > base_s).mean():>13.0%} {'':>14}")
 
-print(f"\n=== Parameter Selection History ===")
+print("\n=== Parameter Selection History ===")
 for p in param_history:
     print(f"  {p['year']}: th={p['th']:.2f} cut={p['cut']}d fl={p['fl']:.1f} supp={p['supp']} (IS_sh={p['is_sharpe']:.2f})")
 

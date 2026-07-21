@@ -19,9 +19,9 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from factory.autoresearch.registry import ALLOWED_FACTORS
 from factors import alpha101
 from factors.autoresearch_dsl import _FACTOR_CALLS
+from factory.autoresearch.registry import ALLOWED_FACTORS
 
 # 机械扫描 + 数值近重复审计后移出搜索宇宙的因子
 _BANNED_SEARCHABLE = frozenset({

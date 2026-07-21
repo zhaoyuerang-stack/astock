@@ -6,14 +6,13 @@ industry sectors, and stock-specific selection (alpha).
 from __future__ import annotations
 
 import pandas as pd
-import numpy as np
-from typing import Dict, Any
+
 
 def attribute_returns(
     weights: pd.DataFrame,                 # date x asset
     returns: pd.DataFrame,                 # date x asset
-    exposures: Dict[str, pd.DataFrame],    # factor_name -> date x asset
-    benchmark_returns: Optional[pd.Series] = None
+    exposures: dict[str, pd.DataFrame],    # factor_name -> date x asset
+    benchmark_returns: pd.Series | None = None
 ) -> pd.DataFrame:
     """Attribute daily portfolio returns to systematic style factors and alpha."""
     common_idx = weights.index.intersection(returns.index)

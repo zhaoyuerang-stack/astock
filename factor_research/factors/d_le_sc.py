@@ -6,7 +6,6 @@ into Leaders and Laggers using Hermitian Spectral Clustering.
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -72,7 +71,7 @@ class DLESCClustering:
         n_iterations: int = 10,
         random_state: int = 42,
         tol: float = 1e-6,
-        device: Optional[str] = None,
+        device: str | None = None,
     ):
         self.n_iterations = n_iterations
         self.random_state = random_state
@@ -187,7 +186,7 @@ class DLESCClustering:
                 return U[:, 0]
 
     # ---- Main Fit Flow ----
-    def fit_single(self, A: np.ndarray) -> Dict[str, np.ndarray]:
+    def fit_single(self, A: np.ndarray) -> dict[str, np.ndarray]:
         """Runs the complete d-LE-SC algorithm on a single directed adjacency matrix."""
         self.eta = 0.25
 
@@ -282,7 +281,7 @@ def build_d_le_sc_factor(
     lead_percentile: float = 0.5,
     random_state: int = 42,
     rebalance_days: int = 5,
-) -> Tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Computes the d-LE-SC factor values.
 
     Parameters:

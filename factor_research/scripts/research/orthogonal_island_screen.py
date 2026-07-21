@@ -7,9 +7,9 @@
 factor_pool_screen 的判决规则(真 alpha = L0 裸因子夏普≥0.8 且独立 IC 方向对、|IC|≥0.02)。
 全程截 < holdout boundary(§5.2:这是新候选搜索,不是既有策略的confirmatory审计)。
 """
+import json
 import os
 import sys
-import json
 from pathlib import Path
 
 PROJECT_ROOT = Path("/Users/kiki/astcok/factor_research")
@@ -20,12 +20,12 @@ sys.path.insert(0, str(PROJECT_ROOT / "scripts" / "research"))
 
 import numpy as np
 import pandas as pd
-
-from core.engine import PricePanel, CostModel
-from engine.metrics import metrics
-from strategy_truth_screen import _run, independent_ic, capacity_est
 from illiq_largecap_audit import build_weights
-from governance.holdout import boundary, assert_search_clean
+from strategy_truth_screen import _run, capacity_est, independent_ic
+
+from core.engine import CostModel, PricePanel
+from engine.metrics import metrics
+from governance.holdout import assert_search_clean, boundary
 
 START = "2018-01-01"
 COST = CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.0)
@@ -33,8 +33,8 @@ COST = CostModel(buy_cost=0.00225, sell_cost=0.00275, financing_rate=0.0)
 
 def factor_registry(close, volume, amount):
     """name -> (factor_df, direction)。含 2 个既有价量因子作正交性参照基线。"""
-    from factors.shareholder import holder_count_chg, holdertrade_net
     from factors.capital_flow import large_order_net_ratio
+    from factors.shareholder import holder_count_chg, holdertrade_net
 
     ret = close.pct_change(fill_method=None)
     adv = amount.rolling(20).mean()
@@ -71,8 +71,8 @@ def screen_factor(name, factor, direction, prices, timing):
 
 
 def main():
-    from strategies.small_cap import load_price_panels
     from factors.small_cap import small_cap_timing
+    from strategies.small_cap import load_price_panels
 
     b = boundary()
     close, volume, amount = load_price_panels("2010-01-01")

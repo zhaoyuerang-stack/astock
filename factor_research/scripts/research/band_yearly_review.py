@@ -4,18 +4,20 @@
   cd /Users/kiki/astcok/factor_research
   /opt/homebrew/bin/python3 scripts/research/band_yearly_review.py
 """
-import os, sys, warnings
+import os
+import sys
+import warnings
 from pathlib import Path
+
 warnings.filterwarnings("ignore")
 os.chdir(Path(__file__).resolve().parent.parent.parent)
 sys.path.insert(0, str(Path.cwd()))
 
 import numpy as np
-import pandas as pd
-from core.engine import BacktestEngine, BacktestConfig, Signal, PricePanel, CostModel
-from strategies.small_cap import load_price_panels
+
+from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from factors.small_cap import small_cap_factor, small_cap_timing
-from strategies.small_cap import build_rebalance_weights
+from strategies.small_cap import build_rebalance_weights, load_price_panels
 
 
 def main():
@@ -87,7 +89,7 @@ def main():
         print(f"  Annualized={ann:+.2%}  Calmar={cal:.2f}  NAV={nav:.0f}wan (100wan start)")
 
         # 月度热力
-        print(f"\n  Monthly returns:")
+        print("\n  Monthly returns:")
         for yr in sorted(set(r.index.year)):
             row = f"  {yr} "
             for m in range(1, 13):

@@ -5,9 +5,8 @@
 面向全市场的“产业因果关系知识图谱”（Node-Link 格式），保存至 data_lake/research_signals/industry_knowledge_graph.json。
 """
 
-import os
-import sys
 import json
+import sys
 from pathlib import Path
 
 # 设定工作目录

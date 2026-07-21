@@ -11,8 +11,11 @@ V2 思路:
   · mom252 + HK MA / HK Band
   · multi-factor combo (mom252 + illiq + low_vol 等权)
 """
-import os, sys, warnings
+import os
+import sys
+import warnings
 from pathlib import Path
+
 warnings.filterwarnings("ignore")
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
@@ -20,6 +23,7 @@ sys.path.insert(0, str(ROOT))
 
 import numpy as np
 import pandas as pd
+
 from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, Signal
 from factors.utils import mad_clip, safe_zscore
 
@@ -113,7 +117,7 @@ f_lowvol = safe_zscore(mad_clip(-ret.rolling(60).std()))
 f_size = safe_zscore(mad_clip(-np.log(amount.rolling(60).mean() + 1)))
 
 # HK independent timings (各 MA 窗口)
-print(f"\n=== Test 1: HK 独立 timing on mom252 ===")
+print("\n=== Test 1: HK 独立 timing on mom252 ===")
 print(f"{'config':<40s} {'ann':>7s} {'sh':>5s} {'mdd':>7s} {'cal':>6s}")
 print("-" * 70)
 
@@ -139,7 +143,7 @@ for ma_w in [8, 16, 32, 60]:
                   f"{x['mdd']:+7.1%} {x['cal']:+6.2f}{mark}")
 
 # Multi-factor combo
-print(f"\n=== Test 2: Multi-factor 等权 combo ===")
+print("\n=== Test 2: Multi-factor 等权 combo ===")
 combos = {
     "mom252+illiq": (f_mom252 + f_illiq) / 2,
     "mom252+lowvol": (f_mom252 + f_lowvol) / 2,
@@ -165,15 +169,17 @@ for cname, combo_f in combos.items():
                       f"{x['mdd']:+7.1%} {x['cal']:+6.2f}{mark}")
 
 # 找出最佳并测组合
-print(f"\n=== Test 3: 最佳 HK 候选加入 A 股 portfolio ===")
+print("\n=== Test 3: 最佳 HK 候选加入 A 股 portfolio ===")
 # 用 mom252 + notiming (V1 grid 已知 sh 0.49)
 r_best = run(close, volume, amount, f_mom252, top_n=15, rebal=20, timing=None, lev=1.25)
 best_m = m(r_best)
 print(f"Best HK candidate (mom252 notiming): ann={best_m['a']:+.1%}, sh={best_m['sh']:.2f}, "
       f"mdd={best_m['mdd']:+.1%}")
 
+from portfolio.composer import compose
+from portfolio.composer import metrics as pm
 from portfolio.strategy_runners import run_active
-from portfolio.composer import compose, metrics as pm
+
 a_ret = run_active(start="2018-01-01")
 base_rp, _ = compose(a_ret, method="risk_parity")
 mb = pm(base_rp)
