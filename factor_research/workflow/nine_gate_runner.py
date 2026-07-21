@@ -260,7 +260,7 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
             "mechanism": thesis_mechanism,
             "citation": thesis_citation
         }
-        config = SimpleNamespace(version=spec.version, start=ts)
+        config: Any = SimpleNamespace(version=spec.version, start=ts)
     else:
         if strategy_name == "small_cap":
             from strategies.small_cap import StrategyConfig, run_small_cap_strategy
@@ -272,8 +272,9 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
                 "citation": "small_cap size premium"
             }
         elif strategy_name == "size_earnings":
-            from strategies.size_earnings import StrategyConfig, run_strategy
-            config = StrategyConfig()
+            from strategies.size_earnings import StrategyConfig as SizeEarningsConfig
+            from strategies.size_earnings import run_strategy
+            config = SizeEarningsConfig()
             config = _apply_version_overrides(config, strategy_name, version, start)
             res = run_strategy(config)
             thesis = {
@@ -281,8 +282,9 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
                 "citation": "size-earnings blend strategy"
             }
         elif strategy_name == "large_cap":
-            from strategies.large_cap import StrategyConfig, run_large_cap_strategy
-            config = StrategyConfig()
+            from strategies.large_cap import StrategyConfig as LargeCapConfig
+            from strategies.large_cap import run_large_cap_strategy
+            config = LargeCapConfig()
             config = _apply_version_overrides(config, strategy_name, version, start)
             res = run_large_cap_strategy(config)
             thesis = {
@@ -290,8 +292,9 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
                 "citation": "large_cap growth hedged"
             }
         elif strategy_name == "hq_momentum":
-            from strategies.hq_momentum import StrategyConfig, run_hq_momentum_strategy
-            config = StrategyConfig()
+            from strategies.hq_momentum import StrategyConfig as HqMomentumConfig
+            from strategies.hq_momentum import run_hq_momentum_strategy
+            config = HqMomentumConfig()
             config = _apply_version_overrides(config, strategy_name, version, start)
             res = run_hq_momentum_strategy(config)
             thesis = {
@@ -299,8 +302,11 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
                 "citation": "high quality momentum hedged"
             }
         elif strategy_name == "roc_yc":
-            from strategies.roc_yc import StrategyConfig, run_roc_yc_strategy
-            config = StrategyConfig(
+            # 注:strategies/roc_yc.py 不存在(仅 factors/roc_yc.py),疑死分支,存废待裁决;
+            # 别名 import 仅为消除 mypy 同名冲突,不改变运行时 ImportError 行为。
+            from strategies.roc_yc import StrategyConfig as RocYcConfig
+            from strategies.roc_yc import run_roc_yc_strategy
+            config = RocYcConfig(
                 blend_weight=0.5,
                 neutralize=True,
                 hedged=True,
