@@ -29,6 +29,7 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -37,21 +38,22 @@ from core.engine import BacktestConfig, BacktestEngine, CostModel, PricePanel, S
 from governance.holdout import assert_search_clean, boundary
 from strategies.small_cap import load_price_panels as load_data
 
-ROOT = Path(__file__).resolve().parent.parent
-OUT_DIR = ROOT / "reports" / "discovery"
+ROOT: Path = Path(__file__).resolve().parent.parent
+OUT_DIR: Path = ROOT / "reports" / "discovery"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-TRAIN_YEARS = 3
-TEST_YEARS = 1
-STEP_YEARS = 1
-MIN_WINDOWS = 5
+TRAIN_YEARS: int = 3
+TEST_YEARS: int = 1
+STEP_YEARS: int = 1
+MIN_WINDOWS: int = 5
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def build_rebalance_weights(factor, close, top_n=25, rebalance_days=20):
+def build_rebalance_weights(factor: pd.DataFrame, close: pd.DataFrame, top_n: int = 25,
+                            rebalance_days: int = 20) -> dict[pd.Timestamp, pd.Series]:
     fdates = factor.dropna(how="all").index.intersection(close.index)
     if len(fdates) < 50:
         return {}
@@ -70,7 +72,7 @@ def build_rebalance_weights(factor, close, top_n=25, rebalance_days=20):
     return weights
 
 
-def _year_bounds(year):
+def _year_bounds(year: int) -> tuple[str, str]:
     """Return (first_trading_day_of_year, last_trading_day_of_year) as strings."""
     return f"{year}-01-01", f"{year}-12-31"
 
@@ -90,8 +92,8 @@ class WF3Runner:
         ],
         timing_builder: Callable[[pd.DataFrame, pd.DataFrame], pd.Series],
         family: str = "unnamed",
-        config: dict | None = None,
-    ):
+        config: dict[str, Any] | None = None,
+    ) -> None:
         self.factor_builder = factor_builder
         self.timing_builder = timing_builder
         self.family = family
@@ -106,7 +108,7 @@ class WF3Runner:
             financing_rate=self.config.get("financing_rate", _default.financing_rate),
         )
 
-    def run(self, warmup_start: str = "2010-01-01") -> dict:
+    def run(self, warmup_start: str = "2010-01-01") -> dict[str, Any]:
         """Run Walk-Forward and return results dict."""
         logger.info(f"Phase 3 WF: {self.family}")
 
@@ -255,7 +257,8 @@ class WF3Runner:
 
         return report
 
-    def _backtest(self, close, volume, amount, weights, timing):
+    def _backtest(self, close: pd.DataFrame, volume: pd.DataFrame, amount: pd.DataFrame,
+                  weights: dict[pd.Timestamp, pd.Series], timing: pd.Series | None) -> dict[str, Any] | None:
         """Run backtest on a date range. Returns metrics dict or None."""
         if len(weights) < 2 or close.shape[0] < 50:
             return None
@@ -289,7 +292,7 @@ class WF3Runner:
 @dataclass
 class WFReport:
     family: str
-    data: dict
+    data: dict[str, Any]
     timestamp: str = field(default_factory=lambda: str(pd.Timestamp.now()))
 
     @property
@@ -336,7 +339,7 @@ class WFReport:
         return "\n".join(lines)
 
 
-def _make_serializable(obj):
+def _make_serializable(obj: Any) -> Any:
     if isinstance(obj, dict):
         return {k: _make_serializable(v) for k, v in obj.items()}
     if isinstance(obj, list):
