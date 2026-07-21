@@ -122,7 +122,7 @@ def _marginal_action(verdict: str, blocker: str, crowd: float | None) -> str:
     if "未审计" in blocker:
         return "先跑完整 9-Gate 产出门禁证据"
     if "DSR" in blocker:
-        return ("簇内已拥挤(corr>%.2f),微调边际≈0,建议换信息源" % crowd) if crowded \
+        return (f"簇内已拥挤(corr>{crowd:.2f}),微调边际≈0,建议换信息源") if crowded \
             else "扩样本/增信息源,提升样本外显著性"
     if "PBO" in blocker:
         return "降搜索自由度/简化参数,抑过拟合"

@@ -166,7 +166,7 @@ def test_llm_intent_ranking_without_keyword():
 def test_llm_intent_named_strategy():
     data = tool_registry()["strategies"].fn()
     fam = data[0]["family"]
-    _set_adapter(_IntentAgent('{"skill":"system_status","tool":"strategies","intent":"named","entity":"%s"}' % fam))
+    _set_adapter(_IntentAgent(f'{{"skill":"system_status","tool":"strategies","intent":"named","entity":"{fam}"}}'))
     sk = route_skill("帮我说说那个策略", {})
     r = sk.answer("帮我说说那个策略", {})
     assert r["tool"] == "strategies" and fam in r["output"].summary

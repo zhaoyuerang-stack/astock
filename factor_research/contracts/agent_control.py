@@ -6,11 +6,11 @@ structured payloads without introducing a new framework dependency.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class ModuleStatus(str, Enum):
+class ModuleStatus(StrEnum):
     ONLINE = "ONLINE"
     ONLINE_CRITICAL = "ONLINE_CRITICAL"
     ONLINE_CRITICAL_ARTIFACTS = "ONLINE_CRITICAL_ARTIFACTS"
@@ -33,7 +33,7 @@ class ModuleStatus(str, Enum):
     TEMP_ONLY = "TEMP_ONLY"
 
 
-class AgentAction(str, Enum):
+class AgentAction(StrEnum):
     READ = "read"
     WRITE_ARTIFACT = "write_artifact"
     WRITE_REGISTRY = "write_registry"

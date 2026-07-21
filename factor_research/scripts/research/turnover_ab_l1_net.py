@@ -65,8 +65,8 @@ def main():
                    "l1_decision": None if not net else net["decision"]}
             rows.append(row)
             na = "L0死" if not net else f"{net['net_annual']:+.1%}"
-            print(f"  {r['fp']} gross_icir={r['icir']:+.2f} turn={r['turnover']:.2f} → 净年化 {na}"
-                  f"{'' if not net else ' sh=%.2f dd=%.1f%%'%(net['sharpe'], net['maxdd']*100)}")
+            extra = "" if not net else f" sh={net['sharpe']:.2f} dd={net['maxdd'] * 100:.1f}%"
+            print(f"  {r['fp']} gross_icir={r['icir']:+.2f} turn={r['turnover']:.2f} → 净年化 {na}{extra}")
         out[arm] = rows
 
     def mean_net(rows):
