@@ -133,9 +133,6 @@ ALLOWED_EXCEPTIONS: set[tuple[str, int]] = set()
 
 # 文件 + import 目标级例外:比行号稳定,但仍要求新增桥接显式登记。
 ALLOWED_IMPORT_EXCEPTIONS = {
-    # walk_forward 评估在 search.py 函数体内延迟导入 core.analysis(避免模块级
-    # 循环依赖),有意为之;原行号钉 (search.py, 275) 迁移至此(2026-07-18)。
-    ("factors/alpha/search.py", "core.analysis.walk_forward"),
     # ADR-038 决策三 scoped 署名:data_lake/factor_store/ 写区只许 factor_store/ 前缀模块
     # 写,factors 的 DSL 面板缓存只能借 store 署名代笔——制度性依赖,非架构倒灌;
     # scoped 区若撤销(署名机制改归 lake/),此边随机制一并下线。2026-07-21 P1-1① 登记。
