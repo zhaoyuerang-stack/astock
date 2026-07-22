@@ -17,7 +17,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
+from app_config.log import get_logger
 from factory.ontology.report_logic import NodeChange, TransmissionNodeCategory
+
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -213,9 +216,9 @@ class IndustryOntologyPredictor:
 # 测试与运行演示
 # ══════════════════════════════════════════════════
 def run_prediction_demo():
-    print("==================================================")
-    print("启动核心量化引擎：基于本体的行业景气与业绩预测")
-    print("==================================================")
+    logger.info("==================================================")
+    logger.info("启动核心量化引擎：基于本体的行业景气与业绩预测")
+    logger.info("==================================================")
     
     # 模拟从信号目录读取到的 3 个行业的研报逻辑链数据
     mock_signals = [
@@ -254,25 +257,25 @@ def run_prediction_demo():
     predictor = IndustryOntologyPredictor()
     
     # 1. 节点聚合
-    print("[*] 聚合研报碎片化节点中...")
+    logger.info("[*] 聚合研报碎片化节点中...")
     states = predictor.aggregate_signals(mock_signals)
     for state in states:
-        print(f"\n行业: {state.industry}")
+        logger.info(f"\n行业: {state.industry}")
         for cat, node in state.aggregated_nodes.items():
-            print(f"  └─ 节点: {cat.value:<10} | 得分: {node.score:+.2f} | 券商共识: {node.consensus:.1%} | 样本数: {node.sample_count}")
+            logger.info(f"  └─ 节点: {cat.value:<10} | 得分: {node.score:+.2f} | 券商共识: {node.consensus:.1%} | 样本数: {node.sample_count}")
             
     # 2. 逻辑传导与业绩预测
-    print("\n[*] 执行本体因果网络传导推理，预测行业未来业绩释放强度...")
+    logger.info("\n[*] 执行本体因果网络传导推理，预测行业未来业绩释放强度...")
     rankings = predictor.rank_industries(states)
     
-    print("\n================ 行业景气预测排行榜 ================")
+    logger.info("\n================ 行业景气预测排行榜 ================")
     for rank, (ind, score) in enumerate(rankings, 1):
-        print(f" 排名 {rank}: 【{ind:<6}】 未来业绩释放强度预测值: {score:+.3f}")
+        logger.info(f" 排名 {rank}: 【{ind:<6}】 未来业绩释放强度预测值: {score:+.3f}")
         
-    print("\n[量化组合管理接入说明]:")
-    print("预测得分将直接注入 portfolio/composer.py 优化器。")
-    print("在满足行业集中度上限的前提下，优化器将向预测分最高的行业进行战术配置超配。")
-    print("==================================================")
+    logger.info("\n[量化组合管理接入说明]:")
+    logger.info("预测得分将直接注入 portfolio/composer.py 优化器。")
+    logger.info("在满足行业集中度上限的前提下，优化器将向预测分最高的行业进行战术配置超配。")
+    logger.info("==================================================")
 
 
 if __name__ == "__main__":

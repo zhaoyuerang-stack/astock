@@ -14,6 +14,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 
 @dataclass(frozen=True)
 class BOMItem:
@@ -129,9 +133,9 @@ class BOMChainAnalyzer:
 # 测试与运行演示
 # ══════════════════════════════════════════════════
 def run_bom_demo():
-    print("==================================================")
-    print("启动 BOM 驱动的产业链因果成本传导分析 (BOM Engine)")
-    print("==================================================")
+    logger.info("==================================================")
+    logger.info("启动 BOM 驱动的产业链因果成本传导分析 (BOM Engine)")
+    logger.info("==================================================")
     
     # 模拟上游有色金属和化工研报中提取到的原材料即期价格变化率 (Price Change)
     # 例如：碳酸锂价格暴涨 50%，半导体硅片价格上涨 15%
@@ -144,29 +148,29 @@ def run_bom_demo():
     
     analyzer = BOMChainAnalyzer()
     
-    print("[*] 正在输入上游原材料价格变动参数:")
+    logger.info("[*] 正在输入上游原材料价格变动参数:")
     for material, change in upstream_shocks.items():
-        print(f"  原材料: {material:<10} | 价格变动率: {change:+.1%}")
+        logger.info(f"  原材料: {material:<10} | 价格变动率: {change:+.1%}")
         
-    print("\n[*] 执行下游 BOM 传导计算...")
+    logger.info("\n[*] 执行下游 BOM 传导计算...")
     shocks = analyzer.calculate_cost_shock(upstream_shocks)
     
-    print("\n================ 下游产业毛利率冲击预测 ================")
+    logger.info("\n================ 下游产业毛利率冲击预测 ================")
     for prod_name, res in shocks.items():
-        print(f"\n产品: 【{prod_name}】 ──▶ 下游行业: {res['downstream_industry']}")
-        print(f"  ├─ 定价权指数 (Pricing Power)   : {res['pricing_power']:.2f}")
-        print(f"  ├─ 上游BOM综合原料成本上涨幅度   : {res['raw_cost_shock']:+.2%}")
-        print(f"  ├─ 预估行业综合毛利率受损 (Margin Shock): {res['margin_shock']:+.2%}")
-        print("  └─ 触发现货传导细节:")
+        logger.info(f"\n产品: 【{prod_name}】 ──▶ 下游行业: {res['downstream_industry']}")
+        logger.info(f"  ├─ 定价权指数 (Pricing Power)   : {res['pricing_power']:.2f}")
+        logger.info(f"  ├─ 上游BOM综合原料成本上涨幅度   : {res['raw_cost_shock']:+.2%}")
+        logger.info(f"  ├─ 预估行业综合毛利率受损 (Margin Shock): {res['margin_shock']:+.2%}")
+        logger.info("  └─ 触发现货传导细节:")
         for det in res['details']:
-            print(f"      • {det['material']:<8} (占比 {det['weight']:.0%}): 提价 {det['price_change']:+.1%} -> 贡献成本涨幅 {det['cost_contribution']:+.2%}")
+            logger.info(f"      • {det['material']:<8} (占比 {det['weight']:.0%}): 提价 {det['price_change']:+.1%} -> 贡献成本涨幅 {det['cost_contribution']:+.2%}")
             
-    print("\n[量化因子化与组合优化对接说明]:")
-    print("1. BOM 传导计算得到的 Margin Shock 直接作为行业 alpha 修正项。")
-    print("2. 在本例中，动力电池原料成本暴涨导致下游新能源汽车毛利受损 -11.0%，")
-    print("   即使该行业个股量价动量强劲，组合优化器也会因为 -11.0% 的基本面扣分，自动降低新能源汽车的持仓权重，")
-    print("   实现基于物理产业链的“智能避险”。")
-    print("==================================================")
+    logger.info("\n[量化因子化与组合优化对接说明]:")
+    logger.info("1. BOM 传导计算得到的 Margin Shock 直接作为行业 alpha 修正项。")
+    logger.info("2. 在本例中，动力电池原料成本暴涨导致下游新能源汽车毛利受损 -11.0%，")
+    logger.info("   即使该行业个股量价动量强劲，组合优化器也会因为 -11.0% 的基本面扣分，自动降低新能源汽车的持仓权重，")
+    logger.info("   实现基于物理产业链的“智能避险”。")
+    logger.info("==================================================")
 
 
 if __name__ == "__main__":

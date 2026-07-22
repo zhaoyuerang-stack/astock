@@ -4,8 +4,12 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import replace
 
+from app_config.log import get_logger
+
 from .models import Candidate
 from .validator import validate_candidate_ast
+
+logger = get_logger(__name__)
 
 _SEEDS = [
     # 股东户数/北向正交族:probe 早期看好(原始 ICIR 0.57),但后续全市场 top25 long-only
@@ -97,13 +101,13 @@ def _steer_seed_order(all_seeds: list) -> list:
                 mid.append(seed)
         steered = front + mid + back
         if not steered:
-            print("[generator] 方向登记簿过滤后种子为空,退回未过滤顺序(自饿保护)")
+            logger.warning("[generator] 方向登记簿过滤后种子为空,退回未过滤顺序(自饿保护)")
             return all_seeds
         if skipped:
-            print(f"[generator] 方向登记簿 SKIP {skipped} 个种子(已证伪方向不再复搜)")
+            logger.info(f"[generator] 方向登记簿 SKIP {skipped} 个种子(已证伪方向不再复搜)")
         return steered
     except Exception as e:
-        print(f"[generator] 方向层 steering 失败(fail-open,保持原顺序): {e}")
+        logger.warning(f"[generator] 方向层 steering 失败(fail-open,保持原顺序): {e}")
         return all_seeds
 
 

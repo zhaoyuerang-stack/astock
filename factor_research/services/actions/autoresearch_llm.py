@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 
+from app_config.log import get_logger
 from contracts.views import AutoResearchLLMGenResponse
 from factory.autoresearch import CandidateRepository, validate_candidate_ast
 from factory.autoresearch.guards import LeakageGuardError, run_leakage_guard
@@ -16,6 +17,8 @@ from factory.autoresearch.registry import ALLOWED_FACTORS, ALLOWED_TRANSFORMS
 from factory.autoresearch.validator import DSLValidationError
 
 from .autoresearch import _run_candidates
+
+logger = get_logger(__name__)
 
 
 def _dsl_system_prompt() -> str:
@@ -101,7 +104,7 @@ def generate_llm_candidates(
 
         direction_block = prompt_block()
     except Exception as e:
-        print(f"[llm_gen] 方向登记簿读取失败(fail-open): {e}", flush=True)
+        logger.warning(f"[llm_gen] 方向登记簿读取失败(fail-open): {e}")
 
     user = (
         f"请提出 {n} 个候选因子。"

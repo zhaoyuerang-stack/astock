@@ -25,8 +25,11 @@ ROOT: Path = Path(__file__).resolve().parent.parent
 
 import pandas as pd
 
+from app_config.log import get_logger
 from core.analysis.nine_gates import NineGatesEvaluator, NineGatesReport
 from core.engine import PricePanel, Signal
+
+logger = get_logger(__name__)
 
 # CLI 策略名 → 台账母策略 id（用于 --persist 把审计摘要写回对应版本）
 STRATEGY_TO_FAMILY: dict[str, str] = {
@@ -202,18 +205,18 @@ def _load_spec_from_registry(family: str, version: str | None) -> dict | None:
 
 def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: bool = False,
                    version: str | None = None, start: str | None = None) -> dict:
-    print("=" * 80)
-    print(f"  Running 9-Gate Evaluation Pipeline for Strategy: {strategy_name}")
-    print("=" * 80)
+    logger.info("=" * 80)
+    logger.info(f"  Running 9-Gate Evaluation Pipeline for Strategy: {strategy_name}")
+    logger.info("=" * 80)
 
     # 1. Dynamically run strategy and retrieve outputs
-    print(f"\n[Step 1] Loading and executing strategy '{strategy_name}'...", flush=True)
+    logger.info(f"\n[Step 1] Loading and executing strategy '{strategy_name}'...")
 
     family_id = STRATEGY_TO_FAMILY.get(strategy_name, strategy_name)
     spec_dict = _load_spec_from_registry(family_id, version)
 
     if spec_dict:
-        print(f"  Found executable_spec in registry for {family_id}/{version}. Running dynamically via ExecutableStrategySpec...", flush=True)
+        logger.info(f"  Found executable_spec in registry for {family_id}/{version}. Running dynamically via ExecutableStrategySpec...")
         from types import SimpleNamespace
 
         from core.strategy_spec import ExecutableStrategySpec
@@ -440,7 +443,7 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
     if timing is not None:
         timing = timing.loc[timing.index < b]
 
-    print(f"  Execution complete. Truncated to < {b.date()} to protect holdout. Loaded {close_tr.shape[1]} stocks x {close_tr.shape[0]} dates.")
+    logger.info(f"  Execution complete. Truncated to < {b.date()} to protect holdout. Loaded {close_tr.shape[1]} stocks x {close_tr.shape[0]} dates.")
 
     # 2. Build Signal
     signal = Signal(
@@ -475,10 +478,10 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
             except Exception:
                 pass
             if n_trials is None:
-                print(f"  ⚠️ Warning: {e}. No search trials logged in governance ledger. Using default n_trials=1.")
+                logger.warning(f"  ⚠️ Warning: {e}. No search trials logged in governance ledger. Using default n_trials=1.")
                 n_trials = 1
-        print(f"  [n_trials] 自动取该母策略台账迭代数 N={n_trials}（逐家族搜索广度，公平多重检验）", flush=True)
-    print(f"\n[Step 2] Initializing 9-Gate Evaluator (n_trials={n_trials}, start={config.start}) & running audits...", flush=True)
+        logger.info(f"  [n_trials] 自动取该母策略台账迭代数 N={n_trials}（逐家族搜索广度，公平多重检验）")
+    logger.info(f"\n[Step 2] Initializing 9-Gate Evaluator (n_trials={n_trials}, start={config.start}) & running audits...")
 
     # We define a stub factor builder to support look-ahead perturbation checks
     def factor_builder_stub(p: PricePanel) -> pd.DataFrame:
@@ -490,7 +493,7 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
                 strat_pert = build_executable_strategy(s, p)
                 return strat_pert.factor
             except Exception as e:
-                print(f"  [lookahead check] Dynamic factor rebuild failed: {e}. Falling back to cached factor.")
+                logger.warning(f"  [lookahead check] Dynamic factor rebuild failed: {e}. Falling back to cached factor.")
         return factor
 
     evaluator = NineGatesEvaluator(
@@ -525,13 +528,13 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
 
     report_path.write_text(markdown_content, encoding="utf-8")
 
-    print("\n" + "=" * 80)
-    print(f"9-Gate Evaluation Completed! Report saved to:\n{report_path}")
-    print("=" * 80)
+    logger.info("\n" + "=" * 80)
+    logger.info(f"9-Gate Evaluation Completed! Report saved to:\n{report_path}")
+    logger.info("=" * 80)
 
     # Print summary to console
-    print("\nExecutive Summary:")
-    print(markdown_content.split("## Detailed Gate Findings")[0].strip())
+    logger.info("\nExecutive Summary:")
+    logger.info(markdown_content.split("## Detailed Gate Findings")[0].strip())
 
     # 5. （可选）把 DSR/PSR/多重检验摘要写回台账对应版本（机构级多重检验证据落库）
     summary = report.summarize()
@@ -541,12 +544,12 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
     if persist:
         family_id = STRATEGY_TO_FAMILY.get(strategy_name, strategy_name)
         if not family_id:
-            print(f"  [persist] 跳过：{strategy_name} 无台账 family 映射")
+            logger.info(f"  [persist] 跳过：{strategy_name} 无台账 family 映射")
         else:
             from strategy_registry import attach_nine_gate
             attach_nine_gate(family_id, config.version, summary)
-            print(f"  [persist] Nine-Gate 摘要已写入台账 {family_id}/{config.version}："
-                  f"DSR_p={summary.get('dsr_p')}, PSR={summary.get('psr')}, n_trials={summary.get('n_trials')}")
+            logger.info(f"  [persist] Nine-Gate 摘要已写入台账 {family_id}/{config.version}："
+                        f"DSR_p={summary.get('dsr_p')}, PSR={summary.get('psr')}, n_trials={summary.get('n_trials')}")
             # 留存 gate5 日收益序列 → lineage 相关性 / PBO(2B/2C)复用,避免二次回测
             # 守卫审计 #5:必须走 lake.version_returns.write_version_returns(身份信封)
             rets = getattr(evaluator, "gate5_returns", None)
@@ -570,7 +573,7 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
                             break
                         break
                 except Exception as exc:  # noqa: BLE001 — 台账读失败时降级 config-only
-                    print(f"  [persist] 台账身份读取失败({exc}),尝试 config 降级")
+                    logger.warning(f"  [persist] 台账身份读取失败({exc}),尝试 config 降级")
                 if not spec_hash and not cfg_hash:
                     # 无台账 config 时用运行时 config 快照(若可 dict 化)
                     raw_cfg = getattr(config, "__dict__", None) or {}
@@ -593,7 +596,7 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
                     spec_hash=spec_hash,
                     config_hash=cfg_hash,
                 )
-                print(f"  [persist] 收益序列已留存 ({len(rets)} 日) → version_returns/{family_id}__{config.version}.csv(+provenance)")
+                logger.info(f"  [persist] 收益序列已留存 ({len(rets)} 日) → version_returns/{family_id}__{config.version}.csv(+provenance)")
     try:
         record_nine_gate_research_run(
             strategy_name=strategy_name,
@@ -602,7 +605,7 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
             report_path=report_path,
         )
     except Exception as exc:
-        print(f"  [research-ledger] 9-Gate 归档失败: {exc}", flush=True)
+        logger.warning(f"  [research-ledger] 9-Gate 归档失败: {exc}")
     return summary
 
 
@@ -648,15 +651,15 @@ def audit_stale_registered(persist: bool = True) -> list[dict[str, Any]]:
             if not _auditable(sname, v["version"]):
                 reason = "无兼容 runner(行业级因子等)" if sname is None else "无该版本配置规格"
                 results.append({"id": sid, "action": "SKIP", "reason": reason})
-                print(f"  [audit-stale] SKIP {sid}: {reason}", flush=True)
+                logger.info(f"  [audit-stale] SKIP {sid}: {reason}")
                 continue
             try:
-                print(f"  [audit-stale] 审计 {sid} ...", flush=True)
+                logger.info(f"  [audit-stale] 审计 {sid} ...")
                 run_evaluation(sname, version=v["version"], persist=persist)
                 results.append({"id": sid, "action": "AUDITED", "reason": ""})
             except Exception as e:
                 results.append({"id": sid, "action": "FAIL", "reason": str(e)[:120]})
-                print(f"  [audit-stale] FAIL {sid}: {e}", flush=True)
+                logger.warning(f"  [audit-stale] FAIL {sid}: {e}")
     n = {k: sum(1 for r in results if r["action"] == k) for k in ("AUDITED", "SKIP", "FAIL")}
-    print(f"\n[audit-stale] 完成:审计 {n['AUDITED']} / 跳过 {n['SKIP']} / 失败 {n['FAIL']}", flush=True)
+    logger.info(f"\n[audit-stale] 完成:审计 {n['AUDITED']} / 跳过 {n['SKIP']} / 失败 {n['FAIL']}")
     return results

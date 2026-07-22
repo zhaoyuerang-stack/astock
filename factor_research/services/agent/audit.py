@@ -14,10 +14,13 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
 
 # factor_research/ — same root as sessions.py / agent_cli ROOT
 _RESEARCH_ROOT = Path(__file__).resolve().parents[2]
@@ -98,7 +101,7 @@ def audit_event(
     result: Any = None,
     audit_dir: str | Path | None = None,
 ) -> None:
-    """Append one audit JSON line. Never raises on I/O failure (warn to stderr)."""
+    """Append one audit JSON line. Never raises on I/O failure (warn via logger)."""
     ctx = dict(context or {})
     event: dict[str, Any] = {
         "ts": _now(),
@@ -131,8 +134,7 @@ def audit_event(
         with path.open("a", encoding="utf-8") as fh:
             fh.write(line + "\n")
     except OSError as exc:
-        print(
-            f"agent_audit: failed to write audit event for tool={tool!r}: {exc}",
-            file=sys.stderr,
+        logger.warning(
+            f"agent_audit: failed to write audit event for tool={tool!r}: {exc}"
         )
         return

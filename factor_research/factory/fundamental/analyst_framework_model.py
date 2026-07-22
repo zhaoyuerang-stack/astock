@@ -25,6 +25,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 
 class LifecycleStage(Enum):
     INTRODUCTION = "introduction"       # 导入期 (渗透率 < 10%)
@@ -137,9 +141,9 @@ class AnalystIndustryFramework:
 # 测试与行业框架量化运行演示
 # ══════════════════════════════════════════════════
 def run_framework_demo():
-    print("==================================================")
-    print("启动顶级分析师行业分析框架 (Analyst Framework Engine)")
-    print("==================================================")
+    logger.info("==================================================")
+    logger.info("启动顶级分析师行业分析框架 (Analyst Framework Engine)")
+    logger.info("==================================================")
     
     # 模拟 3 个处于不同生命周期与供需环境的代表性行业
     # 1. 光伏太阳能行业：渗透率高 (55%, 成熟期)，前 3 年盲目扩张导致 CapEx 暴增 60%，库存天数从 40天升至 80天 (产能过剩，内卷价格战)
@@ -178,25 +182,25 @@ def run_framework_demo():
     
     framework = AnalystIndustryFramework()
     
-    print("[*] 正在利用分析师框架分析行业基本面结构...")
+    logger.info("[*] 正在利用分析师框架分析行业基本面结构...")
     for ind in industries:
         stage = framework.get_lifecycle_stage(ind.penetration_rate)
         capex_eff = framework.evaluate_capex_cycle_effect(ind.capex_growth_3y)
         inv_eff = framework.evaluate_inventory_cycle(ind.days_of_inventory, ind.historical_avg_doi)
         quality = framework.calculate_industry_quality_score(ind)
         
-        print(f"\n行业: 【{ind.industry_name}】")
-        print(f"  ├─ 生命周期阶段       : {stage.value.upper()} (渗透率: {ind.penetration_rate:.0%})")
-        print(f"  ├─ 资本开支周期冲击   : {capex_eff:+.2f} (前值增速: {ind.capex_growth_3y:+.0%})")
-        print(f"  ├─ 库存周期偏离度     : {inv_eff:+.2f} (当前库销 {ind.days_of_inventory}天 vs 均值 {ind.historical_avg_doi}天)")
-        print(f"  ├─ 格局与壁垒护城河分 : {framework.evaluate_competition_moat(ind.cr3_concentration, ind.barrier_to_entry):.2f}")
-        print(f"  └─ 综合行业质地评分   : {quality:.3f}")
+        logger.info(f"\n行业: 【{ind.industry_name}】")
+        logger.info(f"  ├─ 生命周期阶段       : {stage.value.upper()} (渗透率: {ind.penetration_rate:.0%})")
+        logger.info(f"  ├─ 资本开支周期冲击   : {capex_eff:+.2f} (前值增速: {ind.capex_growth_3y:+.0%})")
+        logger.info(f"  ├─ 库存周期偏离度     : {inv_eff:+.2f} (当前库销 {ind.days_of_inventory}天 vs 均值 {ind.historical_avg_doi}天)")
+        logger.info(f"  ├─ 格局与壁垒护城河分 : {framework.evaluate_competition_moat(ind.cr3_concentration, ind.barrier_to_entry):.2f}")
+        logger.info(f"  └─ 综合行业质地评分   : {quality:.3f}")
         
-    print("\n[分析师框架与量化因子对接说明]:")
-    print("1. 行业质地评分直接用作行业 ETF / 行业因子（Industry Alpha）的过滤权。")
-    print("2. 光伏组件由于盲目扩张导致产能过剩，质量分暴跌至 0.280。系统将全面禁止超配光伏板块，防止‘低价内卷’杀估值。")
-    print("3. 重卡机械虽然处于成熟期，但得益于供给收缩、高度垄断和库存出清（景气度向上），质量分高达 0.729，系统会触发买入周期性超配。")
-    print("==================================================")
+    logger.info("\n[分析师框架与量化因子对接说明]:")
+    logger.info("1. 行业质地评分直接用作行业 ETF / 行业因子（Industry Alpha）的过滤权。")
+    logger.info("2. 光伏组件由于盲目扩张导致产能过剩，质量分暴跌至 0.280。系统将全面禁止超配光伏板块，防止‘低价内卷’杀估值。")
+    logger.info("3. 重卡机械虽然处于成熟期，但得益于供给收缩、高度垄断和库存出清（景气度向上），质量分高达 0.729，系统会触发买入周期性超配。")
+    logger.info("==================================================")
 
 
 if __name__ == "__main__":

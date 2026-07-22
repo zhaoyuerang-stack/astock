@@ -16,7 +16,10 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from app_config.log import get_logger
 from core.analysis.walk_forward import deflated_sharpe, pbo_cscv
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -138,6 +141,6 @@ def validate_candidates(
     )
 
     if verbose:
-        print(report.summary())
+        logger.info(report.summary())
 
     return report

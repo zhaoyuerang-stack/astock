@@ -224,7 +224,7 @@ def test_append_only_two_events(audit_dir):
 # ── 7. unwritable audit dir → tool still succeeds + stderr warning ───────
 
 
-def test_unwritable_audit_dir_does_not_break_call(tmp_path, monkeypatch, capsys):
+def test_unwritable_audit_dir_does_not_break_call(tmp_path, monkeypatch, caplog):
     # Point at a regular file so mkdir / open fails with OSError.
     blocked = tmp_path / "not_a_directory"
     blocked.write_text("block", encoding="utf-8")
@@ -232,8 +232,8 @@ def test_unwritable_audit_dir_does_not_break_call(tmp_path, monkeypatch, capsys)
 
     result = call_capability("echo", {"x": "still-works"}, _registry_ok())
     assert result["echo"] == "still-works"
-    err = capsys.readouterr().err
-    assert "agent_audit" in err
+    # P1-3 后告警统一走 get_logger,断言 WARNING 记录本身而非输出通道
+    assert "agent_audit" in caplog.text
 
 
 # ── 8. protocol_runner: protocol_id present, single line (no double-log) ─

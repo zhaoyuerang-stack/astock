@@ -18,7 +18,10 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
+from app_config.log import get_logger
 from factory.regime import RegimeEngine
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -125,7 +128,7 @@ class StrategyComposer:
         for ll in leg_lists: total *= len(ll)
 
         if verbose:
-            print(f"Composer: {len(regime_names)} regimes x {'x'.join(str(len(l)) for l in leg_lists)} = {total} 组合")
+            logger.info(f"Composer: {len(regime_names)} regimes x {'x'.join(str(len(l)) for l in leg_lists)} = {total} 组合")
 
         mkt = self.close.loc[self.start:].pct_change().mean(axis=1).fillna(0)
         combos = []
@@ -161,8 +164,8 @@ class StrategyComposer:
 
         if verbose and combos:
             best = combos[0]
-            print(f"  最优: {best['ann']:+.1%}/{best['mdd']:.1%}/sh={best['sh']:.2f} "
-                  f"score={best['composite_score']:.0%} nav={best['nav']*100:.0f}万")
+            logger.info(f"  最优: {best['ann']:+.1%}/{best['mdd']:.1%}/sh={best['sh']:.2f} "
+                        f"score={best['composite_score']:.0%} nav={best['nav']*100:.0f}万")
 
         best = combos[0]
         return StrategyDefinition(
@@ -180,11 +183,11 @@ class StrategyComposer:
 
     def report(self, top_n=10):
         if not self._results:
-            print("先调用 optimize()"); return
-        print(f"\n  {'排名':<4} {'Bull':<25} {'Bear':<25} {'年化':>8} {'回撤':>8} {'夏普':>6} {'评分':>6}")
-        print("  " + "-" * 90)
+            logger.info("先调用 optimize()"); return
+        logger.info(f"\n  {'排名':<4} {'Bull':<25} {'Bear':<25} {'年化':>8} {'回撤':>8} {'夏普':>6} {'评分':>6}")
+        logger.info("  " + "-" * 90)
         for i, c in enumerate(self._results[:top_n]):
             b_name = c["leg_map"].get("bull", LegSpec("?", "?", pd.Series())).name
             br_name = c["leg_map"].get("bear", LegSpec("?", "?", pd.Series())).name
-            print(f"  {i+1:<4} {b_name:<25} {br_name:<25} {c['ann']:>+7.1%} "
-                  f"{c['mdd']:>+7.1%} {c['sh']:>5.2f} {c['composite_score']:>5.0%}")
+            logger.info(f"  {i+1:<4} {b_name:<25} {br_name:<25} {c['ann']:>+7.1%} "
+                        f"{c['mdd']:>+7.1%} {c['sh']:>5.2f} {c['composite_score']:>5.0%}")

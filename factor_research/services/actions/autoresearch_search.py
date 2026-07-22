@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import date
 
+from app_config.log import get_logger
 from contracts.views import (
     AutoResearchChampionView,
     AutoResearchIslandSearchResponse,
@@ -21,6 +22,8 @@ from governance.trial_ledger import record_trials  # §5.1 chokepoint:搜索即�
 
 from .autoresearch import _load_validation_data
 from .autoresearch_llm import generate_llm_candidates
+
+logger = get_logger(__name__)
 
 _ISLAND_THEMES = [
     "动量与趋势延续",
@@ -105,7 +108,7 @@ def _llm_seeds(islands: int, adapter, repository, experiment_log=None) -> tuple[
             ]
             seeds.extend(stamped)
         except ValueError as e:
-            print(f"[llm_seeds] 岛{i}({theme})播种失败: {str(e)[:120]}", flush=True)
+            logger.warning(f"[llm_seeds] 岛{i}({theme})播种失败: {str(e)[:120]}")
     return seeds, ("llm" if seeds else "seeds")
 
 

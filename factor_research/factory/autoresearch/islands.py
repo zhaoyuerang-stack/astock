@@ -19,6 +19,8 @@ import copy
 import random
 from dataclasses import dataclass, field, replace
 
+from app_config.log import get_logger
+
 from .generator import generate_seed_candidates
 from .models import Candidate
 from .novelty import (
@@ -32,6 +34,8 @@ from .novelty import (
 from .pipeline import run_validation_pipeline
 from .registry import ALLOWED_FACTORS, ALLOWED_TRANSFORMS
 from .validator import DSLValidationError, validate_candidate_ast
+
+logger = get_logger(__name__)
 
 
 class _MockRepo:
@@ -692,9 +696,9 @@ def run_island_search(
                 elif eval_res.decision == CandidateDecision.DISCARD:
                     fit_score = -0.5
                 historical_lessons.append((ast, fit_score))
-        print(f"[*] Loaded {len(historical_lessons)} historical lessons for surrogate model pre-warming.")
+        logger.info(f"[*] Loaded {len(historical_lessons)} historical lessons for surrogate model pre-warming.")
     except Exception as e:
-        print(f"[!] Failed to load historical lessons: {e}")
+        logger.warning(f"[!] Failed to load historical lessons: {e}")
 
     seeds = list(seeds) if seeds else list(generate_seed_candidates(limit=max(n_islands * population, 150)))
     pipe_kw = dict(
@@ -922,7 +926,7 @@ def run_island_search(
                         try:
                             pre_evaluated_results[c.fingerprint] = fut.result()
                         except Exception as e:
-                            print(f"[!] Error pre-evaluating candidate {c.fingerprint[:8]}: {e}")
+                            logger.warning(f"[!] Error pre-evaluating candidate {c.fingerprint[:8]}: {e}")
             else:
                 from concurrent.futures import ProcessPoolExecutor
                 num_workers = min(len(candidates_to_eval), 8)
@@ -948,7 +952,7 @@ def run_island_search(
                             if experiment_log:
                                 experiment_log.append(res)
                         except Exception as e:
-                            print(f"[!] Error pre-evaluating candidate {c.fingerprint[:8]}: {e}")
+                            logger.warning(f"[!] Error pre-evaluating candidate {c.fingerprint[:8]}: {e}")
 
         # 3. Evaluate and breed next generation
         for i, pop in enumerate(islands):
@@ -1004,7 +1008,7 @@ def run_island_search(
         if all_evaluated_fits:
             max_fit = max(all_evaluated_fits)
             mean_fit = sum(all_evaluated_fits) / len(all_evaluated_fits)
-            print(f"[Evolution Progress] Generation {gen:02d} completed. Max Fitness: {max_fit:.4f}, Mean Fitness: {mean_fit:.4f}", flush=True)
+            logger.info(f"[Evolution Progress] Generation {gen:02d} completed. Max Fitness: {max_fit:.4f}, Mean Fitness: {mean_fit:.4f}")
 
     # Batch pre-evaluate final remaining candidates
     candidates_to_eval = _candidates_pending_evaluation(
@@ -1030,7 +1034,7 @@ def run_island_search(
                     try:
                         pre_evaluated_results[c.fingerprint] = fut.result()
                     except Exception as e:
-                        print(f"[!] Error pre-evaluating candidate {c.fingerprint[:8]}: {e}")
+                        logger.warning(f"[!] Error pre-evaluating candidate {c.fingerprint[:8]}: {e}")
         else:
             from concurrent.futures import ProcessPoolExecutor
             num_workers = min(len(candidates_to_eval), 8)
@@ -1056,7 +1060,7 @@ def run_island_search(
                         if experiment_log:
                             experiment_log.append(res)
                     except Exception as e:
-                        print(f"[!] Error pre-evaluating candidate {c.fingerprint[:8]}: {e}")
+                        logger.warning(f"[!] Error pre-evaluating candidate {c.fingerprint[:8]}: {e}")
 
     # 收最后一代的遗漏评估
     for i, pop in enumerate(islands):
@@ -1087,7 +1091,7 @@ def run_island_search(
                         if experiment_log:
                             experiment_log.append(res)
                     except Exception as e:
-                        print(f"[!] Error in final stage evaluation for {c.fingerprint[:8]}: {e}")
+                        logger.warning(f"[!] Error in final stage evaluation for {c.fingerprint[:8]}: {e}")
         else:
             from concurrent.futures import ProcessPoolExecutor
             num_workers = min(len(final_candidates), 8)
@@ -1112,7 +1116,7 @@ def run_island_search(
                         if experiment_log:
                             experiment_log.append(res)
                     except Exception as e:
-                        print(f"[!] Error in final stage evaluation for {c.fingerprint[:8]}: {e}")
+                        logger.warning(f"[!] Error in final stage evaluation for {c.fingerprint[:8]}: {e}")
 
     champions: list[ChampionRecord] = []
     for fp, (fit, l0_result) in ranked_all:

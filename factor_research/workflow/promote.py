@@ -28,6 +28,10 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 if TYPE_CHECKING:
     # 仅为类型注解引入,保持 "import promote 很轻"(重依赖都在函数体内延迟导入)
     from factory.ontology import Hypothesis
@@ -62,30 +66,30 @@ def promote_spec(spec: FactorSpec, version: str = "v1.0", warmup_start: str = "2
     from workflow.phase3_wf import WF3Runner
     from workflow.phase4_register import Phase4Register
 
-    print(f"\n{'='*60}\nPromote: {spec.name} → {version}\n{'='*60}", flush=True)
+    logger.info(f"\n{'='*60}\nPromote: {spec.name} → {version}\n{'='*60}")
 
     # ── intake:知识图谱 gate(仅 SKIP 短路;force 可越过)──
     if hyp is not None and not force:
         from knowledge.graph import load_graph
         skip, reason = load_graph().should_skip(hyp)
         if skip:
-            print(f"  ⏭ 知识图谱 gate 跳过(不跑 phase):{reason}", flush=True)
+            logger.info(f"  ⏭ 知识图谱 gate 跳过(不跑 phase):{reason}")
             return None
 
     # ── phase1 合成防未来审计 ──
-    print("[phase1] 合成防未来审计...", flush=True)
+    logger.info("[phase1] 合成防未来审计...")
     checker = Phase1Checker(spec.factor_builder, spec.timing_builder, spec.name, spec.config)
     p1 = checker.run_all(use_clean=True, save_lessons=False)
     fails = [r for r in p1 if r.is_fail]
-    print(f"  → {'PASS' if not fails else 'FAIL '+str([r.check_id for r in fails])}", flush=True)
+    logger.info(f"  → {'PASS' if not fails else 'FAIL '+str([r.check_id for r in fails])}")
 
     # ── phase2 三段回测 ──
-    print("[phase2] 三段回测(IS/OOS/压力)...", flush=True)
+    logger.info("[phase2] 三段回测(IS/OOS/压力)...")
     p2 = Phase2Runner(spec.factor_builder, spec.timing_builder, spec.name, spec.config).run(
         warmup_start=warmup_start)
 
     # ── phase3 walk-forward ──
-    print("[phase3] walk-forward...", flush=True)
+    logger.info("[phase3] walk-forward...")
     p3 = WF3Runner(spec.factor_builder, spec.timing_builder, spec.name, spec.config).run(
         warmup_start=warmup_start)
 
@@ -101,10 +105,10 @@ def promote_spec(spec: FactorSpec, version: str = "v1.0", warmup_start: str = "2
             from factory.repositories.experiment_log import ExperimentLog
             evidence_ids = [e.experiment_id for e in ExperimentLog().list_by_hypothesis(hyp_id)]
         except Exception as e:
-            print(f"  (证据链查询跳过 non-fatal): {type(e).__name__}: {str(e)[:60]}", flush=True)
+            logger.warning(f"  (证据链查询跳过 non-fatal): {type(e).__name__}: {str(e)[:60]}")
 
     # ── phase4 登记(唯一台账写入口) ──
-    print("[phase4] 登记...", flush=True)
+    logger.info("[phase4] 登记...")
     report = Phase4Register(spec.name, version).register(
         p1, p2, p3,
         hypothesis=getattr(spec, "hypothesis", ""),
@@ -115,12 +119,12 @@ def promote_spec(spec: FactorSpec, version: str = "v1.0", warmup_start: str = "2
     )
     if report is not None:
         report.phase_summary = _phase_summary(p1, p2, p3, report)
-    print(report, flush=True)
+    logger.info(report)
 
     # ── [可选] Nine-Gate 完整审计 → 回填台账 DSR/PSR/PBO 摘要 ──
     if run_nine_gate:
         if report and report.registered:
-            print("[nine-gate] 完整审计并回填台账...", flush=True)
+            logger.info("[nine-gate] 完整审计并回填台账...")
             ng_result = run_nine_gate_after_registration(
                 report,
                 strategy_name=nine_gate_strategy,
@@ -128,18 +132,17 @@ def promote_spec(spec: FactorSpec, version: str = "v1.0", warmup_start: str = "2
                 n_trials=nine_gate_trials,
                 start=nine_gate_start,
             )
-            print(f"  → {ng_result.get('status')}: {ng_result.get('strategy', '')}", flush=True)
+            logger.info(f"  → {ng_result.get('status')}: {ng_result.get('strategy', '')}")
         else:
-            print("[nine-gate] 跳过: phase4 未登记成功", flush=True)
+            logger.warning("[nine-gate] 跳过: phase4 未登记成功")
 
     # ── [可选] 边际评级 → ACTIVE/SHADOW ──
     if run_marginal and report.registered:
         if getattr(report, "status", "") == "在册":
             _run_marginal(spec, report)
         else:
-            print(
-                f"[marginal] 跳过: phase4 status={getattr(report, 'status', '')!r} 非在册",
-                flush=True,
+            logger.info(
+                f"[marginal] 跳过: phase4 status={getattr(report, 'status', '')!r} 非在册"
             )
 
     return report
@@ -283,9 +286,9 @@ def _record_kg(hyp: Hypothesis, p1: list[CheckResult] | None, p3: dict[str, Any]
             kg.record_from_validation(hyp, passed=True, metrics=metrics, stage="phase3")
         else:
             kg.record_from_validation(hyp, passed=False, metrics=metrics, stage="phase3")
-        print(f"  [knowledge] {kg.summary()}", flush=True)
+        logger.info(f"  [knowledge] {kg.summary()}")
     except Exception as e:
-        print(f"  [knowledge] 记录跳过(non-fatal): {type(e).__name__}: {str(e)[:80]}", flush=True)
+        logger.warning(f"  [knowledge] 记录跳过(non-fatal): {type(e).__name__}: {str(e)[:80]}")
 
 
 def _run_marginal(spec: FactorSpec, report: RegistrationReport) -> None:
@@ -296,7 +299,7 @@ def _run_marginal(spec: FactorSpec, report: RegistrationReport) -> None:
         from portfolio.strategy_runners import run_active
         from strategies.small_cap import load_price_panels
 
-        print("[marginal] 对 ACTIVE 组合算边际贡献...", flush=True)
+        logger.info("[marginal] 对 ACTIVE 组合算边际贡献...")
         # §5.2 缝③:边际 ACTIVE/SHADOW 定级是选择,只用 <boundary,金库不参与定级。
         from governance.holdout import boundary
         _hb = boundary()
@@ -307,7 +310,7 @@ def _run_marginal(spec: FactorSpec, report: RegistrationReport) -> None:
         # 若 spec 来自 from_factory,其 config 不含 fn_name,这里 best-effort 跳过。
         fn_name = spec.config.get("factor_fn_name")
         if not fn_name:
-            print("  (spec 无 factor_fn_name,跳过 marginal;factory 来源的 Hypothesis 走 promote_hypothesis)", flush=True)
+            logger.info("  (spec 无 factor_fn_name,跳过 marginal;factory 来源的 Hypothesis 走 promote_hypothesis)")
             return
         hyp = Hypothesis(name=spec.name, description=spec.hypothesis,
                          factor_fn_name=fn_name,
@@ -317,7 +320,7 @@ def _run_marginal(spec: FactorSpec, report: RegistrationReport) -> None:
                                         close=close, volume=volume, amount=amount,
                                         vintage_id="promote")
         if mreport is not None:
-            print(f"  grade={mreport.grade} → {'ACTIVE' if mreport.grade != 'SHELVE' else 'SHADOW'}", flush=True)
+            logger.info(f"  grade={mreport.grade} → {'ACTIVE' if mreport.grade != 'SHELVE' else 'SHADOW'}")
         # §5.3 残差边际硬闸:用 governance.marginal_alpha(残差法)复核 line3 的 raw-corr 定级,
         # 补根因#2 的洞(long-only raw 相关把市场 beta 误当 alpha 冗余)。裸因子对 book 残差化。
         from factory.lines.line3_marginal.marginal_eval import StrategyConfig, run_candidate_returns
@@ -325,20 +328,20 @@ def _run_marginal(spec: FactorSpec, report: RegistrationReport) -> None:
         cand_bare = run_candidate_returns(hyp, 1, close, volume, amount,
                                           config=StrategyConfig(timing_kind="none"))
         mres = marginal_alpha(cand_bare, live)
-        print(f"  [marginal-residual] corr(book)={mres.get('corr_to_book')} "
-              f"残差夏普={mres.get('residual_sharpe')} → {mres['marginal_verdict']}", flush=True)
+        logger.info(f"  [marginal-residual] corr(book)={mres.get('corr_to_book')} "
+                    f"残差夏普={mres.get('residual_sharpe')} → {mres['marginal_verdict']}")
         catalog_status = "SHADOW" if "冗余" in mres.get("marginal_verdict", "") else "ACTIVE"
         if catalog_status == "SHADOW":
-            print("  ⚠️ 残差判定冗余:与在册组合同质,降级 SHADOW 不并实盘权重。", flush=True)
+            logger.warning("  ⚠️ 残差判定冗余:与在册组合同质,降级 SHADOW 不并实盘权重。")
         try:
             import strategy_registry
             strategy_registry.attach_catalog_status(report.family, report.version, catalog_status, marginal=mres)
-            print(f"  [marginal] 已写台账 catalog_status={catalog_status}"
-                  f"(portfolio/strategy_runners.py 下次加载时生效)", flush=True)
+            logger.info(f"  [marginal] 已写台账 catalog_status={catalog_status}"
+                        f"(portfolio/strategy_runners.py 下次加载时生效)")
         except Exception as e:
-            print(f"  [marginal] 写台账失败(non-fatal): {type(e).__name__}: {str(e)[:80]}", flush=True)
+            logger.warning(f"  [marginal] 写台账失败(non-fatal): {type(e).__name__}: {str(e)[:80]}")
     except Exception as e:
-        print(f"  marginal 跳过(non-fatal): {type(e).__name__}: {str(e)[:80]}", flush=True)
+        logger.warning(f"  marginal 跳过(non-fatal): {type(e).__name__}: {str(e)[:80]}")
 
 
 def promote_hypothesis(hyp: Hypothesis, version: str = "v1.0", **kw: Any) -> RegistrationReport | None:
@@ -360,9 +363,9 @@ def promote_pool_l3(version: str = "v1.0", **kw: Any) -> list[RegistrationReport
     pool = HypothesisPool()
     l3 = pool.list_by_status(HypothesisStatus.L3_PASSED)
     if not l3:
-        print("pool 中无 L3_PASSED 候选。", flush=True)
+        logger.info("pool 中无 L3_PASSED 候选。")
         return []
-    print(f"发现 {len(l3)} 个 L3_PASSED 候选,逐个 promote...", flush=True)
+    logger.info(f"发现 {len(l3)} 个 L3_PASSED 候选,逐个 promote...")
     reports = []
     for hyp in l3:
         reports.append(promote_hypothesis(hyp, version=version, **kw))

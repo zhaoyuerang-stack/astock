@@ -18,7 +18,10 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from app_config.log import get_logger
 from providers.llm_adapter import LLMAdapter, get_adapter
+
+logger = get_logger(__name__)
 
 ALLOWED_VERIFY_COMMANDS = {"python", "python3", "pytest", "ruff", "mypy"}
 SHELL_CONTROL_CHARS = re.compile(r"[;&|<>`$]")
@@ -157,17 +160,17 @@ class Actuator:
             path = item.get("path")
             content = item.get("content")
             if not isinstance(path, str) or not isinstance(content, str):
-                print(f"[Actuator Warning] LLM returned invalid file item: {item}")
+                logger.warning(f"[Actuator Warning] LLM returned invalid file item: {item}")
                 continue
             try:
                 validate_target_file(path, cwd)
             except ValueError as exc:
-                print(f"[Actuator Warning] LLM returned unsafe file path: {exc}")
+                logger.warning(f"[Actuator Warning] LLM returned unsafe file path: {exc}")
                 continue
             if path in allowed_paths:
                 modifications[path] = content
             else:
-                print(f"[Actuator Warning] LLM tried to modify unauthorized file: {path}")
+                logger.warning(f"[Actuator Warning] LLM tried to modify unauthorized file: {path}")
 
         return modifications
 
@@ -227,9 +230,9 @@ class Controller:
         self.max_rounds = max_rounds
 
     def run(self) -> bool:
-        print(f"\n[Controller] Starting execution loop for Intent: '{self.intent.description}'")
-        print(f"[Controller] Target files: {self.intent.target_files}")
-        print(f"[Controller] Verification command: '{self.intent.verify_command}'")
+        logger.info(f"\n[Controller] Starting execution loop for Intent: '{self.intent.description}'")
+        logger.info(f"[Controller] Target files: {self.intent.target_files}")
+        logger.info(f"[Controller] Verification command: '{self.intent.verify_command}'")
 
         # Load current state and initialize goal parameters
         state = self.memory.load()
@@ -244,12 +247,12 @@ class Controller:
         try:
             while True:
                 # 1. Run Sensor
-                print("\n=== [Sensor] Executing verification checks ===")
+                logger.info("\n=== [Sensor] Executing verification checks ===")
                 sensor_res = self.sensor.sense(self.intent, self.cwd)
 
                 # 2. Check if goal is accomplished
                 if sensor_res.passed:
-                    print("\n🎉 [Sensor] SUCCESS! All verification checks passed.")
+                    logger.info("\n🎉 [Sensor] SUCCESS! All verification checks passed.")
                     state["active"] = False
                     state["last_error"] = ""
                     state["history"].append({
@@ -263,17 +266,17 @@ class Controller:
                 # Sensor failed. Increment round
                 state["round"] += 1
                 curr_round = state["round"]
-                print(f"\n❌ [Sensor] FAILED. Round {curr_round}/{self.max_rounds}")
+                logger.warning(f"\n❌ [Sensor] FAILED. Round {curr_round}/{self.max_rounds}")
 
                 # Output snippet (max 300 chars)
                 snippet = sensor_res.output.strip()
                 if len(snippet) > 400:
                     snippet = snippet[:400] + "\n... (truncated)"
-                print(f"[Sensor Output]:\n{snippet}")
+                logger.info(f"[Sensor Output]:\n{snippet}")
 
                 # 3. Guard: Max rounds limit
                 if curr_round > self.max_rounds:
-                    print(f"\n🛑 [Controller] Maximum iteration limit ({self.max_rounds}) reached. Aborting.")
+                    logger.warning(f"\n🛑 [Controller] Maximum iteration limit ({self.max_rounds}) reached. Aborting.")
                     state["active"] = False
                     state["history"].append({
                         "round": curr_round,
@@ -287,7 +290,7 @@ class Controller:
                 curr_error = sensor_res.output.strip()
                 prev_error = state.get("last_error", "").strip()
                 if curr_error == prev_error and curr_round > 1:
-                    print("\n🛑 [Controller] Identical error output received twice in a row. Aborting to prevent wild guessing.")
+                    logger.warning("\n🛑 [Controller] Identical error output received twice in a row. Aborting to prevent wild guessing.")
                     state["active"] = False
                     state["history"].append({
                         "round": curr_round,
@@ -300,13 +303,13 @@ class Controller:
                 state["last_error"] = curr_error
 
                 # 5. Call Actuator
-                print("\n🤖 [Actuator] Querying LLM adapter for edits...")
+                logger.info("\n🤖 [Actuator] Querying LLM adapter for edits...")
                 try:
                     edits = self.actuator.act(self.intent, state, sensor_res.output, self.cwd)
                     if not edits:
-                        print("[Controller Warning] Actuator returned no changes.")
+                        logger.warning("[Controller Warning] Actuator returned no changes.")
                     else:
-                        print(f"[Actuator] Suggested edits for files: {list(edits.keys())}")
+                        logger.info(f"[Actuator] Suggested edits for files: {list(edits.keys())}")
                         # Apply changes to disk
                         for rel_path, content in edits.items():
                             if rel_path not in self.intent.target_files:
@@ -314,9 +317,9 @@ class Controller:
                             full_path = validate_target_file(rel_path, self.cwd)
                             full_path.parent.mkdir(parents=True, exist_ok=True)
                             full_path.write_text(content, encoding="utf-8")
-                            print(f"[Actuator] Wrote updated content to {rel_path}")
+                            logger.info(f"[Actuator] Wrote updated content to {rel_path}")
                 except Exception as e:
-                    print(f"💥 [Controller Error] Actuator execution failed: {e}")
+                    logger.warning(f"💥 [Controller Error] Actuator execution failed: {e}")
                     state["active"] = False
                     state["history"].append({
                         "round": curr_round,
@@ -335,7 +338,7 @@ class Controller:
                 self.memory.save(state)
 
         except KeyboardInterrupt:
-            print("\n🛑 [Controller] Interrupted by user. Saving state...")
+            logger.warning("\n🛑 [Controller] Interrupted by user. Saving state...")
             state["active"] = False
             self.memory.save(state)
             return False

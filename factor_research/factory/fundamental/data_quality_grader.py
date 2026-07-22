@@ -29,6 +29,10 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 
 class DataCategory(Enum):
     AUDITED_FINANCIAL = "audited_financial"  # 审计财务
@@ -105,9 +109,9 @@ class DataQualityGrader:
 # 测试与数据评级实操演示
 # ══════════════════════════════════════════════════
 def run_grader_demo():
-    print("==================================================")
-    print("启动数据分类与可信度评级引擎 (Data Grader Engine)")
-    print("==================================================")
+    logger.info("==================================================")
+    logger.info("启动数据分类与可信度评级引擎 (Data Grader Engine)")
+    logger.info("==================================================")
     
     # 模拟在新能源动力电池 BOM 中，不同渠道获取的原材料价格变动数据
     # 1. 碳酸锂价格变动：来自于第三方报价网站抓取 (GRADE_C, 信任分 0.50)，报价显示暴涨 50%
@@ -151,12 +155,12 @@ def run_grader_demo():
     
     grader = DataQualityGrader()
     
-    print("[*] 原始数据输入与分类评级:")
+    logger.info("[*] 原始数据输入与分类评级:")
     feeds = [lithium_feed, cathode_feed, copper_feed]
     for f in feeds:
-        print(f"\n指标: 【{f.variable_name}】 | 来源: {f.source_name}")
-        print(f"  ├─ 数据分类 : {f.category.value:<18} | 质量评级 : {f.grade.value}")
-        print(f"  └─ 原始变化 : {f.value:+.1%} | 可信度系数 : {f.trust_score:.2f} ──▶ 折扣后数值: {grader.apply_trust_discount(f):+.1%}")
+        logger.info(f"\n指标: 【{f.variable_name}】 | 来源: {f.source_name}")
+        logger.info(f"  ├─ 数据分类 : {f.category.value:<18} | 质量评级 : {f.grade.value}")
+        logger.info(f"  └─ 原始变化 : {f.value:+.1%} | 可信度系数 : {f.trust_score:.2f} ──▶ 折扣后数值: {grader.apply_trust_discount(f):+.1%}")
         
     # 执行 BOM 成本传导对比
     items_data = [(lithium_bom, lithium_feed), (cathode_bom, cathode_feed), (copper_bom, copper_feed)]
@@ -167,15 +171,15 @@ def run_grader_demo():
     # 2. 升级计算 (融入可信度分级折扣)
     discounted_shock = grader.get_discounted_cost_shock(items_data)
     
-    print("\n================ 传导结果对比 ================ ")
-    print(f" 传统计算模式下的总成本冲击率 : {raw_shock:+.2%}")
-    print(f" 评级折扣模式下的总成本冲击率 : {discounted_shock:+.2%}")
-    print(f" 差值 (缓冲空间)              : {raw_shock - discounted_shock:+.2%}")
+    logger.info("\n================ 传导结果对比 ================ ")
+    logger.info(f" 传统计算模式下的总成本冲击率 : {raw_shock:+.2%}")
+    logger.info(f" 评级折扣模式下的总成本冲击率 : {discounted_shock:+.2%}")
+    logger.info(f" 差值 (缓冲空间)              : {raw_shock - discounted_shock:+.2%}")
     
-    print("\n[量化系统稳健性说明]:")
-    print("通过对网页抓取数据（碳酸锂）进行 0.50 的可信度折扣，系统将成本冲击预估从 +21.9% 修正为更稳健的 +13.1%。")
-    print("这有效防止了网络噪音或单日网页报价剧烈波动对因子决策造成的虚假过度反应，确保了量化交易的稳定性。")
-    print("==================================================")
+    logger.info("\n[量化系统稳健性说明]:")
+    logger.info("通过对网页抓取数据（碳酸锂）进行 0.50 的可信度折扣，系统将成本冲击预估从 +21.9% 修正为更稳健的 +13.1%。")
+    logger.info("这有效防止了网络噪音或单日网页报价剧烈波动对因子决策造成的虚假过度反应，确保了量化交易的稳定性。")
+    logger.info("==================================================")
 
 
 if __name__ == "__main__":
