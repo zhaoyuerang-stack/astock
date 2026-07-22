@@ -36,6 +36,14 @@ EXCLUDE_DIRS = {"__pycache__", ".git", "data_lake", "signals", "reports", "logs"
 FORBIDDEN_EDGES = [
     ("run_daily", ["factory.", "scripts.", "workflow.", "knowledge.", "api.", "services."]),
     ("workflow.", ["scripts."]),
+    # factory 候选工厂(lines/autoresearch/ontology/fundamental/pool):与 workflow 同层并列,
+    # 居 services/api/registry/ledger 之下。2026-07-21 P1-1② 起入表:agent_loop.py 模块级
+    # import services.agent.llm_adapter 的倒灌边已切(llm_adapter 下沉 providers/);
+    # 入表前 AST 全量扫描存量边:core×8/factors×6/knowledge×2/engine×2/providers×1/
+    # research_toolkit×1/portfolio×1 均向下或同层机制调用,无其他倒灌。
+    # factory→portfolio.marginal / research_toolkit 两条边已取证留待专项评审,不在禁列。
+    ("factory.", ["services.", "api.", "workflow.", "scripts.", "strategy_registry.",
+                  "research_ledger.", "metasearch.", "run_daily", "apps."]),
     ("strategies.", ["factory.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
     ("factors.", ["factory.", "strategies.", "scripts.research.", "workflow.", "core.", "knowledge.", "api.", "services.", "governance."]),
     # policy 是候选/持仓硬约束的底层叶子(candidate_filters/constraints),被 factors.veto
@@ -69,6 +77,14 @@ FORBIDDEN_EDGES = [
     # contracts 是纯 DTO 叶子:只依赖 pydantic + stdlib,不得依赖任何业务层
     ("contracts.", ["core.", "lake.", "factors.", "strategies.", "factory.", "workflow.",
                     "engine.", "metasearch.", "knowledge.", "scripts.", "services.", "api.", "governance."]),
+    # providers 外部服务客户端层(LLM 适配器等):2026-07-21 P1-1② 新建,与 contracts 同范式
+    # 焊死在叶子层——只许 stdlib+yaml,配置经文件路径/环境变量注入(不 import 业务配置模块);
+    # 各上层(factory/services/api/scripts)向下消费。
+    ("providers.", ["core.", "lake.", "factors.", "strategies.", "factory.", "workflow.",
+                    "engine.", "metasearch.", "knowledge.", "scripts.", "services.", "api.",
+                    "governance.", "contracts.", "research_ledger.", "strategy_registry.",
+                    "portfolio.", "policy.", "research_toolkit.", "run_daily", "apps.",
+                    "app_config.", "capacity.", "model_risk.", "factor_store."]),
     # governance 治理层(holdout 金库/成本钉/trial 账本/状态机):位于 core 之上、
     # factory/workflow/portfolio 之下。2026-07-21 P1-1③ 起入表:成本/指纹纯口径已
     # 下沉 lake(cost.py/fingerprint.py),本层只留执法;可向下依赖 lake/app_config/core,
