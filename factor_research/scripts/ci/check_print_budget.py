@@ -40,9 +40,6 @@ WHITELIST: dict[str, int] = {
     "metasearch/factor_mi_audit.py": 23,
     "metasearch/information_map.py": 28,
     "metasearch/signal_flow_tracer.py": 13,
-    # ── 库层 fail-open 告警,语义待清(P2 候选:换 logger.warning 后收紧)──
-    "knowledge/directions.py": 3,
-    "knowledge/graph.py": 1,
 }
 
 

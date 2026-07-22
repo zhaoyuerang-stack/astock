@@ -20,6 +20,10 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 _VALID_ACTIONS = {"SKIP", "DEPRIORITIZE", "BOOST", "NOTE"}
 _STATUS_LABEL = {"falsified": "已证伪", "weak": "太弱", "frontier": "空白区"}
 
@@ -63,7 +67,7 @@ def load_direction_entries(path: str | None = None) -> list[DirectionEntry]:
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
     except Exception as e:
-        print(f"[directions] 登记簿解析失败,忽略(fail-open): {e}")
+        logger.warning(f"[directions] 登记簿解析失败,忽略(fail-open): {e}")
         return []
     entries: list[DirectionEntry] = []
     for raw in data.get("entries", []):
@@ -73,10 +77,10 @@ def load_direction_entries(path: str | None = None) -> list[DirectionEntry]:
         action = str(raw.get("action", "")).strip().upper()
         evidence = tuple(str(x) for x in raw.get("evidence", []) if str(x).strip())
         if not eid or action not in _VALID_ACTIONS:
-            print(f"[directions] 条目非法(缺 id 或 action∉{sorted(_VALID_ACTIONS)}),忽略: {eid or raw}")
+            logger.warning(f"[directions] 条目非法(缺 id 或 action∉{sorted(_VALID_ACTIONS)}),忽略: {eid or raw}")
             continue
         if not evidence:
-            print(f"[directions] 条目无 evidence 指针,忽略(证据门控): {eid}")
+            logger.warning(f"[directions] 条目无 evidence 指针,忽略(证据门控): {eid}")
             continue
         entries.append(DirectionEntry(
             id=eid,

@@ -24,6 +24,10 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
 
+from app_config.log import get_logger
+
+logger = get_logger(__name__)
+
 # 失败候选的默认动作:按 stage 分级。
 # phase1 合成审计失败 = 候选真坏(leaky/未来函数)→ 永久 SKIP 同参数。
 # 其余阶段(L0~L3 / phase2 / phase3)"alpha 弱" = regime/区间依赖 → DEPRIORITIZE + 保质期。
@@ -418,5 +422,5 @@ def load_graph(store_path: str | None = None, include_directions: bool = True) -
                 # setdefault + 直插:不经 add()(add 会把策展条目写回 findings.json)
                 kg._findings.setdefault(f.id, f)
         except Exception as e:
-            print(f"[knowledge] 方向登记簿合并失败(fail-open): {e}")
+            logger.warning(f"[knowledge] 方向登记簿合并失败(fail-open): {e}")
     return kg
