@@ -45,7 +45,11 @@ FORBIDDEN_EDGES = [
     ("factory.", ["services.", "api.", "workflow.", "scripts.", "strategy_registry.",
                   "research_ledger.", "metasearch.", "run_daily", "apps."]),
     ("strategies.", ["factory.", "scripts.research.", "workflow.", "knowledge.", "api.", "services."]),
-    ("factors.", ["factory.", "strategies.", "scripts.research.", "workflow.", "core.", "knowledge.", "api.", "services.", "governance."]),
+    # factor_store. 于 2026-07-21 P1-1① 入禁:factors↔factor_store 环的恶化通道焊死;
+    # 存量唯一边 autoresearch_dsl→factor_store.store 是 ADR-038 决策三 scoped 写区的
+    # 署名代笔(制度性依赖,非架构倒灌),经 ALLOWED_IMPORT_EXCEPTIONS 显式留痕,
+    # scoped 区撤销(署名机制改归 lake/)时一并下线。
+    ("factors.", ["factory.", "strategies.", "scripts.research.", "workflow.", "core.", "knowledge.", "api.", "services.", "governance.", "factor_store."]),
     # policy 是候选/持仓硬约束的底层叶子(candidate_filters/constraints),被 factors.veto
     # 等兼容 wrapper 反向 import(factors→policy),因此 policy 必须停在 factors 之下:
     # 不得 import factors(否则 factors↔policy 成环)、engine/core,也不得倒灌
@@ -113,6 +117,10 @@ ALLOWED_IMPORT_EXCEPTIONS = {
     # walk_forward 评估在 search.py 函数体内延迟导入 core.analysis(避免模块级
     # 循环依赖),有意为之;原行号钉 (search.py, 275) 迁移至此(2026-07-18)。
     ("factors/alpha/search.py", "core.analysis.walk_forward"),
+    # ADR-038 决策三 scoped 署名:data_lake/factor_store/ 写区只许 factor_store/ 前缀模块
+    # 写,factors 的 DSL 面板缓存只能借 store 署名代笔——制度性依赖,非架构倒灌;
+    # scoped 区若撤销(署名机制改归 lake/),此边随机制一并下线。2026-07-21 P1-1① 登记。
+    ("factors/autoresearch_dsl.py", "factor_store.store"),
     # 研究编排脚本:批量晋级/周度搜索需要桥接 factory → workflow。
     ("scripts/ops/bulk_promote.py", "factory.autoresearch"),
     ("scripts/ops/bulk_promote.py", "services.actions.autoresearch"),
