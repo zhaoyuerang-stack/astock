@@ -13,8 +13,11 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 import urllib.request
 from pathlib import Path
+
+from providers.llm_ledger import record_call
 
 ROOT = Path(__file__).resolve().parents[1]
 logger = logging.getLogger(__name__)
@@ -108,11 +111,13 @@ class OpenAICompatAdapter(LLMAdapter):
     def available(self) -> bool:
         return bool(self.api_key and self.model and self.base_url)
 
-    def _chat(self, system: str, user: str, max_tokens: int = 1200, timeout: int | None = None) -> str:
+    def _chat_raw(self, system: str, user: str, max_tokens: int = 1200, timeout: int | None = None,
+                  capability: str = "complete") -> tuple[str, dict]:
         # 推理(thinking)模型会先花 token 思考,max_tokens 需留足,否则 content 为空
         # 生成型调用实测 20-35s,默认 30s 读超时掐在边缘上 → 按 max_tokens 放宽
         # timeout 显式传入时用之(交互路由/解读用短超时,避免落到 120s 地板把请求挂死)
         url = f"{self.base_url}/chat/completions"
+        t0 = time.monotonic()
         try:
             data = _http_post(
                 url,
@@ -122,14 +127,27 @@ class OpenAICompatAdapter(LLMAdapter):
                 timeout=timeout if timeout is not None else max(120, max_tokens // 25),
             )
         except urllib.error.HTTPError as e:
+            # 失败调用先于上层 except 吞没落账——失败正是最该追踪的浪费
+            record_call(capability=capability, provider=self.name, model=self.model,
+                        system_chars=len(system), user_chars=len(user), data=None,
+                        latency_ms=int((time.monotonic() - t0) * 1000), outcome="error",
+                        error_kind=f"HTTP {e.code}")
             raise RuntimeError(f"HTTP {e.code} @ {url}(检查 base_url/model)") from e
-        return data["choices"][0]["message"]["content"].strip()
+        record_call(capability=capability, provider=self.name, model=self.model,
+                    system_chars=len(system), user_chars=len(user), data=data,
+                    latency_ms=int((time.monotonic() - t0) * 1000), outcome="ok")
+        return data["choices"][0]["message"]["content"].strip(), data
+
+    def _chat(self, system: str, user: str, max_tokens: int = 1200, timeout: int | None = None,
+              capability: str = "complete") -> str:
+        return self._chat_raw(system, user, max_tokens, timeout, capability)[0]
 
     def route(self, request, context, tool_names, timeout: int | None = 15):
         try:
             ans = self._chat(
                 f"你是路由器。只能从以下工具里选一个:{tool_names}。只回工具名,或回 none。",
-                f"页面={context.get('current_page','')} 请求={request}", max_tokens=256, timeout=timeout).strip().strip('"').lower()
+                f"页面={context.get('current_page','')} 请求={request}", max_tokens=256, timeout=timeout,
+                capability="route").strip().strip('"').lower()
             # 推理模型可能带思考前缀,取末尾出现的工具名
             for t in tool_names:
                 if t in ans:
@@ -147,18 +165,20 @@ class OpenAICompatAdapter(LLMAdapter):
             return self._chat(
                 _SYNTH_SYSTEM,
                 f"历史对话:\n{history_text}\n\n当前问题:{request}\n工具:{tool_name}\n数据:{json.dumps(data, ensure_ascii=False)[:3000]}",
-                max_tokens=1500, timeout=timeout)   # 思考模型留足 token,否则 content 为空
+                max_tokens=1500, timeout=timeout,   # 思考模型留足 token,否则 content 为空
+                capability="synthesize")
         except Exception:  # noqa: BLE001
             return None
 
     def complete(self, system, user, max_tokens=2000, timeout: int | None = None):
         try:
-            return self._chat(system, user, max_tokens=max_tokens, timeout=timeout)
+            return self._chat(system, user, max_tokens=max_tokens, timeout=timeout,
+                              capability="complete")
         except Exception:  # noqa: BLE001
             return None
 
     def ping(self) -> bool:
-        self._chat("你是助手", "回复:通", max_tokens=64)
+        self._chat("你是助手", "回复:通", max_tokens=64, capability="ping")
         return True
 
 
@@ -174,8 +194,10 @@ class AnthropicAdapter(LLMAdapter):
     def available(self) -> bool:
         return bool(self.api_key and self.model)
 
-    def _msg(self, system: str, user: str, max_tokens: int = 1200, timeout: int | None = None) -> str:
+    def _msg_raw(self, system: str, user: str, max_tokens: int = 1200, timeout: int | None = None,
+                 capability: str = "complete") -> tuple[str, dict]:
         url = f"{self.base_url}/v1/messages"
+        t0 = time.monotonic()
         try:
             data = _http_post(
                 url,
@@ -185,13 +207,26 @@ class AnthropicAdapter(LLMAdapter):
                 timeout=timeout if timeout is not None else 30,
             )
         except urllib.error.HTTPError as e:
+            # 失败调用先于上层 except 吞没落账——失败正是最该追踪的浪费
+            record_call(capability=capability, provider=self.name, model=self.model,
+                        system_chars=len(system), user_chars=len(user), data=None,
+                        latency_ms=int((time.monotonic() - t0) * 1000), outcome="error",
+                        error_kind=f"HTTP {e.code}")
             raise RuntimeError(f"HTTP {e.code} @ {url}(检查 base_url/model)") from e
-        return data["content"][0]["text"].strip()
+        record_call(capability=capability, provider=self.name, model=self.model,
+                    system_chars=len(system), user_chars=len(user), data=data,
+                    latency_ms=int((time.monotonic() - t0) * 1000), outcome="ok")
+        return data["content"][0]["text"].strip(), data
+
+    def _msg(self, system: str, user: str, max_tokens: int = 1200, timeout: int | None = None,
+             capability: str = "complete") -> str:
+        return self._msg_raw(system, user, max_tokens, timeout, capability)[0]
 
     def route(self, request, context, tool_names, timeout: int | None = 15):
         try:
             ans = self._msg(f"只能从工具 {tool_names} 选一个,只回工具名或 none。",
-                            f"页面={context.get('current_page','')} 请求={request}", max_tokens=256, timeout=timeout).strip().strip('"').lower()
+                            f"页面={context.get('current_page','')} 请求={request}", max_tokens=256,
+                            timeout=timeout, capability="route").strip().strip('"').lower()
             for t in tool_names:
                 if t in ans:
                     return t
@@ -207,18 +242,19 @@ class AnthropicAdapter(LLMAdapter):
             )
             return self._msg(_SYNTH_SYSTEM,
                              f"历史对话:\n{history_text}\n\n当前问题:{request}\n工具:{tool_name}\n数据:{json.dumps(data, ensure_ascii=False)[:3000]}",
-                             timeout=timeout)
+                             timeout=timeout, capability="synthesize")
         except Exception:  # noqa: BLE001
             return None
 
     def complete(self, system, user, max_tokens=2000, timeout: int | None = None):
         try:
-            return self._msg(system, user, max_tokens=max_tokens, timeout=timeout)
+            return self._msg(system, user, max_tokens=max_tokens, timeout=timeout,
+                             capability="complete")
         except Exception:  # noqa: BLE001
             return None
 
     def ping(self) -> bool:
-        self._msg("你是助手", "回复:通", max_tokens=64)
+        self._msg("你是助手", "回复:通", max_tokens=64, capability="ping")
         return True
 
 
