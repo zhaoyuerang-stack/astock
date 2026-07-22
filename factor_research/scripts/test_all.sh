@@ -72,6 +72,14 @@ fi
 uv tool run mypy==2.3.0 --disallow-untyped-defs --ignore-missing-imports --follow-imports=skip strategy_registry.py workflow/ strategies/
 
 echo ""
+echo "=== check_print_budget.py (库层 print 预算 ratchet:get_logger 唯一观测口) ==="
+# 口径:默认拒止——factor_research/ 下所有 .py 裸 print=0,除 scripts/tests/scratch/
+# apps/data_lake 豁免与白名单冻结项(CLI 表示层/研究报告打印,只降不升)。
+# P1-3 已把 workflow/factory/services 156 处库路径 print 归并 get_logger(5c560873);
+# 本守卫防新增 print 静默回退,新增正当 CLI print 须在守卫 WHITELIST 冻结并说明理由。
+python3 scripts/ci/check_print_budget.py
+
+echo ""
 echo "=== test_loop_foundations.py (防自欺地基:trial账本 + holdout金库) ==="
 python3 tests/test_loop_foundations.py
 
