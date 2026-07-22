@@ -304,22 +304,6 @@ def run_evaluation(strategy_name: str, n_trials: int | None = None, persist: boo
                 "mechanism": "做多高质量且前期具备动量共振特征的中大盘股票，对冲大盘指数，捕获高保真动量趋势残差收益。",
                 "citation": "high quality momentum hedged"
             }
-        elif strategy_name == "roc_yc":
-            # 注:strategies/roc_yc.py 不存在(仅 factors/roc_yc.py),疑死分支,存废待裁决;
-            # 别名 import 仅为消除 mypy 同名冲突,不改变运行时 ImportError 行为。
-            from strategies.roc_yc import StrategyConfig as RocYcConfig
-            from strategies.roc_yc import run_roc_yc_strategy
-            config = RocYcConfig(
-                blend_weight=0.5,
-                neutralize=True,
-                hedged=True,
-            )
-            config = _apply_version_overrides(config, strategy_name, version, start)
-            res = run_roc_yc_strategy(config)
-            thesis = {
-                "mechanism": "结合 A 股基本面资本回报率（ROC/ROE）与盈利收益率（YC/EP），即经典的乔·格林布拉特“神奇公式”，并在截面上剥离 CNE6 风格与行业暴露，最后做多高品质便宜股票并做空 top-800 市值等权基准以剥离 Beta，获取长期风格中性且市场中性的纯净超额收益。",
-                "citation": "Joel Greenblatt's Magic Formula (Style-Neutralized & Hedged)"
-            }
         elif strategy_name == "illiquidity":
             from types import SimpleNamespace
             ver = version or "v3.1"
