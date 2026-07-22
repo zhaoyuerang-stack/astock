@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from services.agent.capability import call_capability
 from services.agent.protocols import assert_tool_allowed, get_protocol, list_protocols
 
 
@@ -14,7 +15,6 @@ def run_protocol_step(
     confirm_token: str | None = None,
 ) -> dict[str, Any]:
     """Execute one tool under a registered protocol (Strict rail)."""
-    from apps.agent_cli import call_capability
 
     spec = get_protocol(protocol_id)
     assert_tool_allowed(protocol_id, tool_name)

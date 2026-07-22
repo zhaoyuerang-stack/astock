@@ -259,7 +259,7 @@ def test_protocol_runner_single_line_with_protocol_id(audit_dir, monkeypatch):
             ("idea",),
         ),
     }
-    monkeypatch.setattr("apps.agent_cli.tool_registry", lambda: fake_tools)
+    monkeypatch.setattr("services.agent.capability.tool_registry", lambda: fake_tools)
     spec = get_protocol("idea_precheck")
     assert "strategy_idea_check" in spec.allowed_tools
 

@@ -34,7 +34,7 @@ def test_call_capability_checks_risk_and_exact_arguments():
 
 
 def test_cli_rejects_non_executable_high_risk(monkeypatch, capsys):
-    monkeypatch.setattr("apps.agent_cli.tool_registry", _registry)
+    monkeypatch.setattr("services.agent.capability.tool_registry", _registry)
 
     assert main(["call", "--tool", "rebalance", "--args-json", "{}"]) == 2
     error = json.loads(capsys.readouterr().err)

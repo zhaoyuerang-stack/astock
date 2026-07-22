@@ -1,6 +1,6 @@
 """Append-only Agent tool-call audit log (ADR-037 P6.4).
 
-Strict-rail executions pass through ``apps.agent_cli.call_capability``;
+Strict-rail executions pass through ``services.agent.capability.call_capability``;
 this module records one JSONL line per attempt (ok or error), including
 authorization denials. Values and tokens are never written — only digests,
 key names, and non-sensitive context.
