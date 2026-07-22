@@ -100,6 +100,22 @@ FORBIDDEN_EDGES = [
     ("governance.", ["factors.", "strategies.", "factory.", "workflow.", "services.", "api.",
                      "apps.", "portfolio.", "scripts.", "research_ledger.", "strategy_registry.",
                      "metasearch.", "capacity.", "model_risk.", "factor_store.", "knowledge."]),
+    # portfolio 组合/边际评估库:位于 strategies/factors/core/governance 之上、
+    # factory/workflow 研究编排与产品接缝之下。2026-07-22 专项评审:factory→
+    # portfolio.marginal 为合法复用(canonical 边际评估器单一实现);实测出站全部
+    # 向下(core/strategies/factors/governance/lake/runtime/strategy_registry),
+    # 零违规入表——只禁上层接缝/编排/横向台账面,保向下依赖合法。
+    ("portfolio.", ["factory.", "workflow.", "services.", "api.", "apps.", "scripts.",
+                    "run_daily", "knowledge.", "metasearch.", "research_ledger.", "policy."]),
+    # research_toolkit 研究工具箱(triage/alpha_audit 等):纯函数叶子,实测零业务层
+    # 依赖(仅 numpy/pandas/scipy/sklearn)。factory→research_toolkit(veto_triage
+    # 路由)为合法向下消费;按 contracts/providers 范式焊死叶子层,防工具箱
+    # 向上长业务依赖。2026-07-22 专项评审入表。
+    ("research_toolkit.", ["core.", "lake.", "factors.", "strategies.", "factory.", "workflow.",
+                           "engine.", "metasearch.", "knowledge.", "scripts.", "services.", "api.",
+                           "governance.", "contracts.", "research_ledger.", "strategy_registry.",
+                           "portfolio.", "policy.", "providers.", "run_daily", "apps.",
+                           "app_config.", "capacity.", "model_risk.", "factor_store.", "runtime."]),
 ]
 
 # 全局禁止import的模块(无论从哪一层):已退场的兼容层 / 死接口。
