@@ -397,7 +397,8 @@ class Explorer:
         logger.info("FINAL RANKINGS")
         logger.info(f"{'='*90}")
         hdr = f"{'#':<4} {'Name':<30} {'P1':<5} {'P2':<5} {'P3':<5} {'IS':>7} {'OOS':>7} {'WF':>7} {'WF_DD':>7} {'Shpe':>6}"
-        logger.info(hdr); print("-" * 90)
+        logger.info(hdr)
+        logger.info("-" * 90)
         for i, r in enumerate(ranked, 1):
             p1 = "✅" if r.get("phase1_pass", True) else "❌"
             p2 = "✅" if r.get("phase2_pass", True) else "❌"
