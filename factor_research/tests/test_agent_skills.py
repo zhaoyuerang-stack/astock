@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
+from providers.llm_adapter import NullAdapter
 from services.agent import skills
-from services.agent.llm_adapter import NullAdapter
 from services.agent.skills import (
     StockDataSkill,
     SystemStatusSkill,

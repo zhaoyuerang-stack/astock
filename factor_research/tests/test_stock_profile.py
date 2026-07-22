@@ -44,8 +44,8 @@ def test_agent_routes_stock_question_to_stock_profile():
 
 
 if __name__ == "__main__":
+    from providers.llm_adapter import NullAdapter
     from services.agent import skills
-    from services.agent.llm_adapter import NullAdapter
     skills.get_adapter = lambda: NullAdapter()   # 路由/摘要确定性,不依赖外部 LLM
 
     test_stock_profile_reads_price_and_basic_data()

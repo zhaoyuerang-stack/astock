@@ -54,13 +54,13 @@ def get_action_token(request: Request) -> ActionTokenView:
 
 @router.get("/llm", response_model=LLMConfigView)
 def get_llm() -> LLMConfigView:
-    from services.agent.llm_adapter import llm_config_masked
+    from providers.llm_adapter import llm_config_masked
     return LLMConfigView(**llm_config_masked())
 
 
 @router.post("/llm", response_model=LLMConfigView)
 def set_llm(body: LLMConfigSet, _confirmed: None = Depends(require_action_token)) -> LLMConfigView:
-    from services.agent.llm_adapter import llm_config_masked, save_runtime_config
+    from providers.llm_adapter import llm_config_masked, save_runtime_config
     save_runtime_config(body.provider, body.model, body.base_url, body.api_key)
     _audit_config(f"set LLM provider={body.provider} model={body.model}", "key 已更新" if body.api_key else "保留原 key")
     return LLMConfigView(**llm_config_masked())
@@ -68,7 +68,7 @@ def set_llm(body: LLMConfigSet, _confirmed: None = Depends(require_action_token)
 
 @router.post("/llm/test", response_model=LLMTestResult)
 def test_llm_endpoint(_confirmed: None = Depends(require_action_token)) -> LLMTestResult:
-    from services.agent.llm_adapter import test_llm
+    from providers.llm_adapter import test_llm
     audit_action("test LLM connection", "provider adapter invoked", status="accepted")
     return LLMTestResult(**test_llm())
 

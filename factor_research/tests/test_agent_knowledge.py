@@ -93,8 +93,8 @@ def test_best_strategy_question_returns_ranked_runtime_strategy_not_count_only()
 
 if __name__ == "__main__":
     # 确定性断言离线化:路由/摘要不依赖外部 LLM(LLM 行为由 test_agent_fallback 的内部 mock 覆盖)。
+    from providers.llm_adapter import NullAdapter
     from services.agent import skills
-    from services.agent.llm_adapter import NullAdapter
     skills.get_adapter = lambda: NullAdapter()
 
     print("Running agent knowledge tests...\n")

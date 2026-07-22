@@ -20,7 +20,7 @@ from factory.ontology import (
     TransmissionNode,
     TransmissionNodeCategory,
 )
-from services.agent.llm_adapter import get_adapter
+from providers.llm_adapter import get_adapter
 
 OUT_DIR = ROOT / "data_lake" / "research_signals" / "logic_chains"
 OUT_DIR.mkdir(parents=True, exist_ok=True)

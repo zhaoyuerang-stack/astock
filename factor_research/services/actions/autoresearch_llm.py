@@ -80,7 +80,7 @@ def generate_llm_candidates(
     优先级高于逐条历史,让生成端绕开已被系统性证伪的形态。
     """
     if adapter is None:
-        from services.agent.llm_adapter import get_adapter
+        from providers.llm_adapter import get_adapter
 
         adapter = get_adapter()
     if not adapter.available():

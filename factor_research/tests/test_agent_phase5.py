@@ -84,8 +84,8 @@ def test_llm_cannot_override_strategy_counts():
 
 if __name__ == "__main__":
     # 单测离线确定性:status/stock 的硬数据断言不依赖外部 LLM;LLM 行为由注入式 adapter 单独验证。
+    from providers.llm_adapter import NullAdapter
     from services.agent import skills
-    from services.agent.llm_adapter import NullAdapter
     skills.get_adapter = lambda: NullAdapter()
 
     print("Running Phase 5 agent tests...\n")

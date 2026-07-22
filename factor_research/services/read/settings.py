@@ -27,7 +27,7 @@ def _services_status() -> list[dict]:
         out.append({"name": "DuckDB (即席QA)", "status": "正常"})
     except ImportError:
         out.append({"name": "DuckDB (即席QA)", "status": "未安装"})
-    from services.agent.llm_adapter import llm_ready
+    from providers.llm_adapter import llm_ready
     out.append({"name": "Agent LLM", "status": "已接入" if llm_ready() else "规则式(无 key)"})
     out.append({"name": "数据湖 data_lake", "status": "正常" if (ROOT / "data_lake").exists() else "缺失"})
     return out
@@ -36,7 +36,7 @@ def _services_status() -> list[dict]:
 def system_config() -> SystemConfigView:
     s = _settings()
     from lake.cleaning import load_quarantine
-    from services.agent.llm_adapter import ai_model_info
+    from providers.llm_adapter import ai_model_info
     return SystemConfigView(
         cost={**(s.get("cost") or {}), "locked": True},   # 成本铁律,只读
         strategy=s.get("strategy") or {},

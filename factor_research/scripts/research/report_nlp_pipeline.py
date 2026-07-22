@@ -29,7 +29,7 @@ from factory.ontology.report_logic import (
     TransmissionNode,
     TransmissionNodeCategory,
 )
-from services.agent.llm_adapter import get_adapter
+from providers.llm_adapter import get_adapter
 
 # 设定输入与输出路径
 PDF_DIR = ROOT / "data_lake" / "research_pdf"

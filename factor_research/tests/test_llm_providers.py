@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
-from services.agent.llm_adapter import (
+from providers.llm_adapter import (
     AnthropicAdapter,
     NullAdapter,
     OpenAICompatAdapter,
@@ -21,7 +21,7 @@ from services.agent.planner import ask
 
 
 def _backup_runtime():
-    from services.agent.llm_adapter import _RUNTIME
+    from providers.llm_adapter import _RUNTIME
     return (_RUNTIME, _RUNTIME.read_text(encoding="utf-8") if _RUNTIME.exists() else None)
 
 
@@ -70,7 +70,7 @@ def test_config_save_mask_reset():
     """UI 写配置:key 绝不回传明文(非破坏:测后还原用户真实配置)。"""
     import json
 
-    from services.agent.llm_adapter import llm_config_masked, save_runtime_config
+    from providers.llm_adapter import llm_config_masked, save_runtime_config
     bk = _backup_runtime()
     try:
         save_runtime_config("openai_compatible", "deepseek-chat", "https://api.deepseek.com/v1", "sk-SECRET999")

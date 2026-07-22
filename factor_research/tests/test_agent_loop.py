@@ -17,7 +17,7 @@ from factory.autoresearch.agent_loop import (
     SensorOutput,
     validate_target_file,
 )
-from services.agent.llm_adapter import NullAdapter
+from providers.llm_adapter import NullAdapter
 
 
 class MockSensor(Sensor):
