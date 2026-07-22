@@ -75,8 +75,11 @@ FORBIDDEN_EDGES = [
     ("api.", ["core.", "lake.", "factors.", "strategies.", "factory.", "workflow.",
               "engine.", "metasearch.", "knowledge.", "scripts.", "governance."]),
     # services 是受控接缝(有意允许 import 引擎),但不得反向依赖 api。
-    # read 是只读查询面,不得调用 actions 写入/执行面;actions 可按需读 read 视图。
-    ("services.read.", ["services.actions."]),
+    # 子域向序(2026-07-22 P1-4 实测零违规后入表执法):read 是只读查询面(34 文件,
+    # 最大子域),不得调用 actions 写入/执行面,也不得依赖 agent 编排环;actions 可按需
+    # 读 read 视图(can_agent_do 等 3 边),但不得依赖 agent;agent 是编排器,可消费两侧。
+    ("services.read.", ["services.actions.", "services.agent."]),
+    ("services.actions.", ["services.agent."]),
     ("services.", ["api."]),
     # contracts 是纯 DTO 叶子:只依赖 pydantic + stdlib,不得依赖任何业务层
     ("contracts.", ["core.", "lake.", "factors.", "strategies.", "factory.", "workflow.",
